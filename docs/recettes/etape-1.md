@@ -22,7 +22,7 @@ Pour repartir d'un historique vide, supprimer le fichier `%USERPROFILE%\.powerj\
 | 8 | Taper `!zzz`. | `historique : aucune commande ne correspond à !zzz`. |
 | 9 | Taper ` secret` (avec un espace au début), puis `history`. | `secret` n'apparaît pas dans l'historique. |
 | 10 | Taper `ls |` puis Entrée. | Prompt de continuation `>> ` ; taper `where { $_.dir` puis Entrée : encore `>> ` ; taper `}` : la commande complète est exécutée (`commande inconnue : ls`). |
-| 11 | Taper `cd C:\` puis Entrée. | Pas de continuation (l'antislash final ne prolonge pas la ligne) : `commande inconnue : cd`. |
+| 11 | Taper `essai C:\` puis Entrée. | Pas de prompt de continuation `>>` : l'antislash final ne prolonge pas la ligne, la commande est exécutée tout de suite (`commande inconnue : essai`). Ce scénario ne teste que la continuation ; `cd` arrive à l'étape 2. |
 | 12 | Édition : taper un texte, utiliser ←/→, Début/Fin, Ctrl+←/→ (mot par mot), Ctrl+W, Ctrl+K, Ctrl+U. | Comportement Emacs habituel. |
 | 13 | Sur une ligne non vide, Ctrl+D. | Supprime le caractère sous le curseur. |
 | 14 | Sur une ligne vide, Ctrl+D. | Le shell se ferme. |

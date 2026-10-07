@@ -13,7 +13,7 @@ PJ C:\dev> java.util.List.of("apple", "banana", "orange") | where { $_.contains(
 
 ## État
 
-Étape 1 : édition de ligne (JLine), historique persistant, ↑/↓ par préfixe, Ctrl+R, Ctrl+C, Ctrl+D, `history`, `!!` / `!n` / `!texte`, saisie multi-ligne. Voir le plan de développement (§11 de la spécification).
+Étape 2 : commandes natives (`git`, `ipconfig`, `notepad`…), `cd` / `pwd` / `which`, enchaînement `;` `&&` `||`, variables (`$x = …`, `$exit`, `$last`, `$?`), redirections `>` `>>` `2>`, encodage des commandes natives. Étapes précédentes : édition de ligne, historique, Ctrl+R. Voir le plan de développement (§11 de la spécification).
 
 ## Construire
 
