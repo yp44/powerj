@@ -12,7 +12,10 @@ import java.util.List;
  *   <li>{@code ;}, {@code &&}, {@code ||}, {@code |}, {@code >}, {@code >>}, {@code 2>}, {@code 2>>}
  *       sont des opérateurs, même collés à un mot ;</li>
  *   <li>{@code =} isolé (après une variable) marque une affectation ;</li>
- *   <li>{@code ( … )} délimite une sous-expression, éventuellement suivie d'accès : {@code (ls).name}.</li>
+ *   <li>{@code ( … )} délimite une sous-expression, éventuellement suivie d'accès : {@code (ls).name} ;</li>
+ *   <li>{@code { … }} délimite un bloc d'expression, analysé par {@link ExpressionParser} ;</li>
+ *   <li>{@code 2>&1} envoie les erreurs dans la sortie ; {@code ==} et {@code >=} sont des mots (forme
+ *       courte de {@code where}).</li>
  * </ul>
  */
 public final class Lexer {
@@ -50,7 +53,12 @@ public final class Lexer {
             return new Token.Separator(Connector.IF_FAILURE);
         }
         if (startsWith("2>&1")) {
-            throw new SyntaxException("la redirection 2>&1 n'est pas encore disponible");
+            pos += 4;
+            return new Token.Redirection(Token.Stream.ERR_TO_OUT, false);
+        }
+        if (startsWith(">=") || startsWith("==")) {
+            pos += 2;
+            return new Token.Word(input.substring(pos - 2, pos)); // opérateurs de la forme courte de where
         }
         if (startsWith("2>>") || startsWith(">>")) {
             var stream = c == '2' ? Token.Stream.ERR : Token.Stream.OUT;
@@ -85,6 +93,8 @@ public final class Lexer {
                 yield new Token.Close(accessors());
             }
             case '"' -> string();
+            case '{' -> block();
+            case '}' -> throw new SyntaxException("« } » sans « { » correspondante (position " + (pos + 1) + ")");
             case '$' -> isVariableStart(pos + 1) ? variable() : word();
             default -> word();
         };
@@ -101,6 +111,7 @@ public final class Lexer {
     private boolean isWordEnd() {
         char c = peek();
         return Character.isWhitespace(c) || c == ';' || c == '|' || c == '"' || c == '>' || c == '(' || c == ')'
+                || c == '{' || c == '}'
                 || startsWith("&&") || (c == '2' && startsWith("2>") && atWordStart());
     }
 
@@ -201,6 +212,49 @@ public final class Lexer {
             }
         }
     }
+
+    /** {@code { … }} : texte jusqu'à l'accolade fermante correspondante, chaînes et caractères compris. */
+    private Token.Block block() {
+        int open = pos++;
+        int depth = 1;
+        while (!atEnd()) {
+            char c = input.charAt(pos);
+            switch (c) {
+                case '"' -> {
+                    string(); // valide la chaîne et avance après elle
+                    continue;
+                }
+                case '\'' -> {
+                    pos++;
+                    while (!atEnd() && input.charAt(pos) != '\'') {
+                        pos += input.charAt(pos) == '\\' ? 2 : 1;
+                    }
+                }
+                case '{' -> depth++;
+                case '}' -> {
+                    if (--depth == 0) {
+                        String source = input.substring(open + 1, pos);
+                        pos++;
+                        return new Token.Block(source);
+                    }
+                }
+                default -> { }
+            }
+            pos++;
+        }
+        throw new SyntaxException("bloc non fermé (« { » à la position " + (open + 1) + ")");
+    }
+
+    /** Lit la chaîne qui commence à {@code start} ; utilisé aussi par l'analyse des expressions. */
+    static Scanned<Token.Str> stringAt(String input, int start) {
+        var lexer = new Lexer(input);
+        lexer.pos = start;
+        Token.Str str = lexer.string();
+        return new Scanned<>(str, lexer.pos);
+    }
+
+    /** Élément lu et position qui le suit. */
+    record Scanned<T>(T value, int end) { }
 
     private String escape() {
         if (atEnd()) {

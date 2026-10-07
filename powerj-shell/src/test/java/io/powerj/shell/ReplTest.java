@@ -196,7 +196,7 @@ class ReplTest {
     void incompleteLineContinuesOnTheNextOne() throws Exception {
         session("liste |" + ENTER + "where { $_.dir" + ENTER + "}" + ENTER);
 
-        assertThat(screen).contains(">> ", "pipeline « | » n'est pas encore disponible");
+        assertThat(screen).contains(">> ", "commande inconnue : liste");
         assertThat(history).containsExactly("liste |\nwhere { $_.dir\n}");
     }
 }

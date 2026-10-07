@@ -7,6 +7,7 @@ import java.lang.reflect.RecordComponent;
 import java.lang.reflect.Type;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -15,6 +16,7 @@ import java.util.Locale;
 import java.util.Optional;
 
 import io.powerj.api.Option;
+import io.powerj.core.lang.Units;
 
 /**
  * Construit le record de paramètres d'un cmdlet à partir des arguments saisis, en style Unix
@@ -271,13 +273,18 @@ public final class OptionBinder {
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static Object convertScalar(String command, OptionSpec spec, Class<?> type, Object value) {
-        if (value == null || type.isInstance(value) && type != Object.class) {
-            return value;
+        if (value == null || type.isInstance(value)) {
+            return value; // dont Object : valeur transmise telle quelle (bloc { }, objet)
         }
         String text = Values.text(value);
         try {
-            if (type == String.class || type == Object.class) {
-                return value instanceof String ? value : text;
+            if (type == String.class) {
+                return text;
+            }
+            if (type == Duration.class) {
+                return Units.parse(text).filter(Duration.class::isInstance).orElseThrow(
+                        () -> new PjException(command + " : durée attendue pour --" + spec.longName()
+                                + " (ex. 30s, 5m, 2h, 7d), pas '" + text + "'"));
             }
             if (type == Path.class) {
                 return value instanceof Path p ? p : Path.of(text);
@@ -286,7 +293,8 @@ public final class OptionBinder {
                 return Integer.valueOf(text);
             }
             if (type == long.class || type == Long.class) {
-                return Long.valueOf(text);
+                // taille avec unité : 10kb, 1.5mb (FR-19)
+                return Units.parse(text).filter(Long.class::isInstance).orElseGet(() -> Long.valueOf(text));
             }
             if (type == double.class || type == Double.class) {
                 return Double.valueOf(text);

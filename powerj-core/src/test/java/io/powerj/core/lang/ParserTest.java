@@ -69,21 +69,71 @@ class ParserTest {
         assertThatThrownBy(() -> Parser.parse("a &&")).hasMessageContaining("commande attendue après");
         assertThatThrownBy(() -> Parser.parse("a >")).hasMessageContaining("fichier attendu");
         assertThatThrownBy(() -> Parser.parse("$x =")).hasMessageContaining("valeur attendue");
-        assertThatThrownBy(() -> Parser.parse("ls | where")).hasMessageContaining("pipeline");
+        assertThatThrownBy(() -> Parser.parse("ls |")).hasMessageContaining("commande attendue après « | »");
+        assertThatThrownBy(() -> Parser.parse("| ls")).hasMessageContaining("commande attendue");
+        assertThatThrownBy(() -> Parser.parse("ls | $x")).hasMessageContaining("première étape");
+        assertThatThrownBy(() -> Parser.parse("ls > f | where x")).hasMessageContaining("le placer à la fin");
+        assertThatThrownBy(() -> Parser.parse("where }")).hasMessageContaining("« } » sans « { »");
+        assertThatThrownBy(() -> Parser.parse("where { $_.x ")).hasMessageContaining("bloc non fermé");
         assertThatThrownBy(() -> Parser.parse("$x.y = 1")).hasMessageContaining("variable simple");
     }
 
     @Test
     void subExpressions() {
         assertThat(only("(ls).name").body()).isEqualTo(new ExpressionBody(new Ast.SubExpression(
-                new Command("ls", false, List.of()), List.of(new Accessor.Property("name")))));
+                pipeline(new Command("ls", false, List.of())), List.of(new Accessor.Property("name")))));
         assertThat(only("help members (ls -r)[0]").body()).isEqualTo(new Command("help", false, List.of(
                 new WordArgument("members"),
-                new Ast.ExpressionArgument(new Ast.SubExpression(new Command("ls", false, List.of(new WordArgument("-r"))),
+                new Ast.ExpressionArgument(new Ast.SubExpression(pipeline(new Command("ls", false, List.of(new WordArgument("-r")))),
                         List.of(new Accessor.Index(0)))))));
         assertThatThrownBy(() -> Parser.parse("(ls")).hasMessageContaining("« ) » manquante");
         assertThatThrownBy(() -> Parser.parse("()")).hasMessageContaining("parenthèses vides");
         assertThatThrownBy(() -> Parser.parse("ls)")).hasMessageContaining("« ) » inattendu");
+    }
+
+    private static Ast.Pipeline pipeline(Ast.Body... bodies) {
+        return new Ast.Pipeline(java.util.Arrays.stream(bodies).map(b -> new Ast.Stage(b, false)).toList(), List.of());
+    }
+
+    @Test
+    void pipelineStages() {
+        var statement = only("ls -r | where { $_.size > 1mb } | ^more");
+        assertThat(statement.pipeline().stages()).extracting(s -> ((Command) s.body()).name())
+                .containsExactly("ls", "where", "more");
+        var where = (Command) statement.pipeline().stages().get(1).body();
+        assertThat(where.arguments()).singleElement().isEqualTo(new Ast.ExpressionArgument(new Ast.BlockExpression(
+                "$_.size > 1mb", new Ast.Binary(Ast.Operator.GT,
+                        new Ast.Get(new Ast.VariableExpression("_", List.of()), "size"), new Ast.Literal(1024L * 1024)))));
+        assertThat(((Command) statement.pipeline().stages().get(2).body()).forceNative()).isTrue();
+    }
+
+    @Test
+    void pipelineInsideParentheses() {
+        var body = (ExpressionBody) only("(ls | where { $_.dir }).name").body();
+        var sub = (Ast.SubExpression) body.expression();
+        assertThat(sub.pipeline().stages()).hasSize(2);
+    }
+
+    @Test
+    void errorsToOutputPerStage() {
+        var statement = only("git status 2>&1 | where { $_.contains(\"x\") } 2> err.txt");
+        assertThat(statement.pipeline().stages()).extracting(Ast.Stage::errorsToOutput).containsExactly(true, false);
+        assertThat(statement.redirects()).containsExactly(
+                new Ast.Redirect(Token.Stream.ERR, false, new WordArgument("err.txt")));
+    }
+
+    @Test
+    void whereShortForm() {
+        assertThat(only("ls | where size > 10kb > out.txt").pipeline()).satisfies(p -> {
+            assertThat(((Command) p.stages().get(1).body()).arguments()).containsExactly(
+                    new WordArgument("size"), new WordArgument(">"), new WordArgument("10kb"));
+            assertThat(p.redirects()).containsExactly(new Ast.Redirect(Token.Stream.OUT, false, new WordArgument("out.txt")));
+        });
+        assertThat(((Command) only("where ext == log").body()).arguments()).containsExactly(
+                new WordArgument("ext"), new WordArgument("=="), new WordArgument("log"));
+        assertThat(((Command) only("where size >= 1").body()).arguments()).hasSize(3);
+        // Hors de where, > reste une redirection.
+        assertThat(only("echo a > b").redirects()).hasSize(1);
     }
 
     @Test
