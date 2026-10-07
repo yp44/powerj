@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Version du document** | 0.3 (expressions en syntaxe Java) |
+| **Version du document** | 0.4 (bibliothèque standard Java accessible par défaut) |
 | **Statut** | À valider |
 | **Plateforme cible** | Windows 10/11 x64 (`powerj.exe`), Linux/macOS en bonus |
 | **Socle technique** | Java 27, Maven 3.9, JLine 3 |
@@ -49,7 +49,6 @@ PJ C:\dev\powerj> git status --porcelain | where { $_.startsWith(" M ") }
 PJ C:\dev\powerj> java.util.List.of("apple", "banana", "orange") | where { $_.contains("b") }
 banana
 
-PJ C:\dev\powerj> import java.time.*
 PJ C:\dev\powerj> LocalDate.now().plusDays(10).dayOfWeek
 FRIDAY
 ```
@@ -411,14 +410,29 @@ MONDAY
 
 **Règle lexicale (désambiguïsation avec les commandes).** En position de commande, un mot de la forme `ident(.ident)+` est une **expression Java** s'il est **immédiatement** suivi de `(` (sans espace), ou s'il désigne une classe ou un champ statique d'une classe connue. Sinon, la résolution des commandes (FR-13) s'applique. Ainsi `java -version` et `notepad.exe fichier.txt` restent des commandes natives, tandis que `java.lang.Math.max(1, 2)` est un appel Java. En cas de doute, une expression peut toujours être mise entre parenthèses : `(Math.max(1, 2))`.
 
-**FR-47 — Imports.** `import java.util.*` ou `import java.time.LocalDate` rend les classes utilisables par leur nom simple pour le reste de la session (ou depuis `profile.pj`). `java.lang.*` est importé par défaut. `import` sans argument liste les imports actifs. Un nom simple ambigu (deux imports) produit une erreur listant les candidats.
+**FR-47 — Imports par défaut.** Les packages les plus utiles du JDK sont **importés automatiquement** : leurs classes s'utilisent directement par leur nom simple, sans `import`.
+
+| Domaine | Packages importés par défaut |
+|---|---|
+| Base | `java.lang`, `java.math`, `java.text` |
+| Collections et flux | `java.util`, `java.util.function`, `java.util.stream`, `java.util.regex`, `java.util.concurrent` |
+| Fichiers et E/S | `java.io`, `java.nio.file`, `java.nio.charset` |
+| Réseau | `java.net`, `java.net.http` |
+| Dates | `java.time`, `java.time.format` |
+
+Ces packages ne contiennent aucun nom de classe en double (vérifié sur le JDK), donc aucun conflit. Les packages susceptibles d'en créer (`java.awt` avec `List`, `java.sql` avec `Date`…) ne sont pas importés par défaut, mais restent utilisables par leur nom complet (`java.sql.Date`) ou par un `import` explicite.
+
+**Imports explicites.** `import java.security.*` ou `import javax.crypto.Cipher` ajoute des imports pour le reste de la session (ou depuis `profile.pj`). `import` sans argument liste les imports actifs. Un nom simple devenu ambigu (deux imports) produit une erreur listant les candidats.
 
 ```text
-PJ> import java.time.*
 PJ> LocalDate.now().plusDays(10).dayOfWeek
 FRIDAY
-PJ> Math.max(3, 7)
-7
+PJ> Files.readString(Path.of("notes.txt")).lines().count()
+42
+PJ> HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create("https://example.com")).build(), HttpResponse.BodyHandlers.ofString()).statusCode()
+200
+PJ> new BigDecimal("0.1").add(new BigDecimal("0.2"))
+0.3
 ```
 
 **FR-48 — Instanciation.** `new Classe(args)` appelle un constructeur public : `new java.io.File("C:\\temp")`, `new StringBuilder("ab").reverse()`.
@@ -447,7 +461,8 @@ banana
 ```
 
 **FR-52 — Périmètre et sécurité.**
-- Accessibles : classes et membres **`public`** des packages **exportés** par les modules du runtime (`java.se` complet, cf. §7) et par les modules tiers chargés (§4.4).
+- Accessibles par défaut : classes et membres **`public`** de **toute la bibliothèque standard Java SE**, c'est-à-dire tous les packages exportés par les modules `java.*` du runtime (agrégat `java.se`, cf. §7) : `java.base` (lang, util, io, nio, net, math, time, text, security…), `java.net.http`, `java.sql`, `java.xml`, `java.desktop`, `java.logging`, `java.management`, `java.prefs`, `javax.crypto`, `javax.net.ssl`, etc.
+- **Pas de bibliothèque externe** en interop : l'appel direct est limité au JDK. Un besoin qui demande une bibliothèque tierce (Apache Commons, client de base de données…) se traite en **écrivant un cmdlet** (§4) qui embarque cette bibliothèque. Les classes des modules tiers ne sont pas exposées en expression Java.
 - Pas d'accès réflexif forcé (`setAccessible`), ni aux packages internes (`jdk.internal.*`, `sun.*`).
 - Les méthodes `default` des interfaces et les méthodes héritées sont accessibles normalement ; l'appel passe par l'interface publique quand la classe d'implémentation n'est pas exportée (ex. `List.of(...)` renvoie une classe interne, ses méthodes sont appelées via `java.util.List`).
 
@@ -461,7 +476,6 @@ banana
 **FR-55 — Exemples de session.**
 
 ```text
-PJ> import java.nio.file.*
 PJ> Files.readAllLines(Path.of("notes.txt")) | where { $_.contains("TODO") }
 PJ> Files.size(Path.of("gros.iso")) / 1mb
 PJ> new java.io.File("C:\\Windows").listFiles() | where { $_.directory && $_.name.startsWith("S") }
@@ -581,7 +595,7 @@ Yves   Bonjour Yves !   2026-10-07 10:12:03
 
 - Au démarrage, chaque `~/.powerj/modules/*.jar` est chargé dans son propre `ModuleLayer` (isolation des dépendances entre modules).
 - `mod-load <chemin.jar>` charge un module à chaud ; `mod-list` liste les modules chargés et leurs cmdlets.
-- Les classes publiques exportées par un module chargé sont aussi utilisables en expression Java (§3.13) : `import com.example.greet.*`.
+- Les classes d'un module ne sont **pas** utilisables en expression Java (§3.13) : seuls ses cmdlets sont exposés. C'est le moyen prévu pour utiliser une bibliothèque externe depuis PowerJ.
 - Un module invalide (nom en conflit, exception au chargement) est signalé par un avertissement ; les autres modules sont chargés normalement.
 
 ---
@@ -624,7 +638,7 @@ ligne saisie
 
 ### 5.4 Interopérabilité Java (`powerj-core`, package `interop`)
 
-- **Résolution des classes** : index des packages exportés construit au démarrage depuis `ModuleLayer.boot()` et les couches des modules tiers (paresseux, en tâche de fond) ; imports de session.
+- **Résolution des classes** : index des packages exportés par les modules `java.*` de `ModuleLayer.boot()` (construit paresseusement, en tâche de fond) ; imports par défaut (FR-47) et imports de session. Les couches des modules tiers ne sont pas indexées.
 - **Résolution des membres** : métadonnées par type (méthodes publiques, propriétés dérivées, champs) mises en cache via `ClassValue` ; appels via `MethodHandle` obtenus par `MethodHandles.publicLookup()`, en remontant à l'interface ou la superclasse publique exportée quand la classe concrète ne l'est pas.
 - **Conversion des arguments** : table de conversions (FR-50) exprimée par `switch` sur les types ; choix de surcharge par score de spécificité.
 - **Blocs → interfaces fonctionnelles** : adaptation via `MethodHandleProxies.asInterfaceInstance` (ou `LambdaMetafactory` pour les interfaces fréquentes du JDK).
@@ -716,7 +730,8 @@ Le dossier peut être déplacé via la variable d'environnement `POWERJ_HOME`.
 - **Commandes natives** : tests multiplateformes avec `cmd /c echo` (Windows) / `echo` (Linux), code retour, stderr, natif → natif.
 - **Complétion** : candidats attendus pour des lignes partielles.
 - **Intégration REPL** : terminal JLine « dumb » piloté par script (entrées simulées, sorties vérifiées), y compris historique et Ctrl+R.
-- **Modules** : chargement de `powerj-sample-module`, gestion des collisions de noms, import de ses classes en expression Java.
+- **Modules** : chargement de `powerj-sample-module`, gestion des collisions de noms, classes du module non accessibles en expression Java.
+- **Imports par défaut** : test automatique vérifiant qu'aucun nom simple n'est en double entre les packages importés par défaut (protège contre l'ajout de classes dans une future version du JDK).
 - **Recette manuelle** : une fiche par étape (§11), exécutée par le PM sur l'exe produit par la CI.
 
 ---
@@ -798,7 +813,7 @@ Chaque étape :
 1. `java.util.List.of("apple", "banana", "orange") | where { $_.contains("b") }` affiche `banana`.
 2. `$l = java.util.List.of("apple", "banana")` puis `$l.size()` affiche `2`.
 3. `Math.max(3, 7)` et `java.lang.Math.PI`.
-4. `import java.time.*` puis `LocalDate.now().plusDays(10).dayOfWeek`.
+4. `LocalDate.now().plusDays(10).dayOfWeek` (sans import : `java.time` est importé par défaut) ; `import java.security.*` puis `MessageDigest.getInstance("SHA-256")`.
 5. `new java.io.File("C:\\Windows").listFiles() | where { $_.directory }`.
 6. `$l.stream().map({ $_.toUpperCase() }).toList()`.
 7. `String.format("%s-%05d", "id", 42)` (varargs + conversion).
@@ -831,7 +846,7 @@ Chaque étape :
 4. `greet -n Yves | where { $_.message.contains("Yves") }`.
 5. `help greet` affiche l'aide générée.
 6. `mod-list` liste le module.
-7. `import com.example.greet.*` puis `new Greeting("Yves", "Salut", java.time.Instant.now())`.
+7. `new com.example.greet.Greeting(...)` : erreur « classe inconnue » (les classes des modules ne sont pas exposées).
 
 ### Après ces étapes
 
@@ -894,7 +909,6 @@ PJ C:\dev> ls -d | where { $_.name.matches("^[a-m].*") } | ^more
 PJ C:\dev> mvn -q verify; $exit
 PJ C:\dev> code .                       # application graphique, rend la main
 PJ C:\dev> java.util.List.of("apple", "banana", "orange") | where { $_.contains("b") }
-PJ C:\dev> import java.nio.file.*
 PJ C:\dev> ls -r --filter *.log | where { Files.size($_.path) > 10mb }
 PJ C:\dev> (ls).name.stream().map({ $_.toUpperCase() }).sorted().toList()
 ```
@@ -944,7 +958,7 @@ find src --name *.java --since 7d | where { $_.size > 2kb } | group { $_.path.pa
 | `[System.Math]::Max(3, 7)` | `Math.max(3, 7)` |
 | `[System.IO.File]::ReadAllLines("a.txt")` | `java.nio.file.Files.readAllLines(Path.of("a.txt"))` |
 | `New-Object System.Text.StringBuilder` | `new StringBuilder()` |
-| `using namespace System.IO` | `import java.io.*` |
+| `using namespace System.Security` | `import java.security.*` (java.io, java.util, java.nio.file… sont importés par défaut) |
 | `[int] "42"` | `[int] "42"` |
 
 ### 12.5 Questions ouvertes pour le PM
@@ -956,4 +970,3 @@ find src --name *.java --since 7d | where { $_.size > 2kb } | group { $_.path.pa
 5. **Dictionnaires littéraux** (`{k: v}`) : utiles en v1 ou reportés ? (Avec l'interop, `java.util.Map.of("k", "v")` couvre déjà le besoin.)
 6. **Licence** du module `powerj-api` pour les auteurs de modules tiers (même licence que le projet ?).
 7. **Interop et effets de bord** : faut-il une option de configuration pour désactiver l'interop Java (`interop.enabled=false`) dans des contextes restreints ?
-8. **Classpath additionnel** : autoriser l'ajout de jars « bibliothèques » (sans cmdlets) dans `~/.powerj/lib/` pour les utiliser en interop (ex. Apache Commons) ?
