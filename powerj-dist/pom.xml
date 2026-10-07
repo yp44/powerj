@@ -128,6 +128,9 @@
                                             <!-- Toute la bibliothèque Java SE est appelable depuis le shell (spec FR-52). -->
                                             <arg value="--add-modules"/>
                                             <arg value="java.se"/>
+                                            <!-- JLine accède à la console native (FFM / bibliothèque native). -->
+                                            <arg value="--java-options"/>
+                                            <arg value="--enable-native-access=org.jline.terminal.ffm,org.jline.nativ"/>
                                             <arg value="--jlink-options"/>
                                             <arg value="--strip-java-debug-attributes --no-header-files --no-man-pages"/>
                                             <arg value="--dest"/>

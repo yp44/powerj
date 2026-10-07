@@ -29,6 +29,7 @@
 
         <junit.version>5.13.4</junit.version>
         <assertj.version>3.27.4</assertj.version>
+        <jline.version>4.4.7</jline.version>
     </properties>
 
     <dependencyManagement>
@@ -52,6 +53,16 @@
                 <groupId>io.powerj</groupId>
                 <artifactId>powerj-shell</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.jline</groupId>
+                <artifactId>jline-reader</artifactId>
+                <version>${jline.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.jline</groupId>
+                <artifactId>jline-terminal-ffm</artifactId>
+                <version>${jline.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.junit</groupId>
