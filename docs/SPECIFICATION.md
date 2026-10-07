@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Version du document** | 0.2 (ajout de l'interopérabilité Java) |
+| **Version du document** | 0.3 (expressions en syntaxe Java) |
 | **Statut** | À valider |
 | **Plateforme cible** | Windows 10/11 x64 (`powerj.exe`), Linux/macOS en bonus |
 | **Socle technique** | Java 27, Maven 3.9, JLine 3 |
@@ -35,18 +35,18 @@ PowerJ est un **shell interactif orienté objet** écrit en Java. Comme PowerShe
 - les **commandes natives** (`git`, `cat`, `notepad`…) s'utilisent librement et se comportent comme dans un shell classique : leur sortie standard et leur sortie d'erreur restent des flux.
 
 ```text
-PJ C:\dev\powerj> ls -r --filter *.java | where { $_.size > 10kb and $_.modified > now - 7d }
+PJ C:\dev\powerj> ls -r --filter *.java | where { $_.size > 10kb && $_.modified > now - 7d }
 
 name               size      modified              dir
 ----               ----      --------              ---
 Parser.java        14,2 KB   2026-10-05 18:12      false
 Evaluator.java     11,8 KB   2026-10-06 09:40      false
 
-PJ C:\dev\powerj> git status --porcelain | where { $_ like ' M *' }
+PJ C:\dev\powerj> git status --porcelain | where { $_.startsWith(" M ") }
  M src/core/Parser.java
  M src/core/Evaluator.java
 
-PJ C:\dev\powerj> java.util.List.of("apple", "banana", "orange") | where { $_ like 'b*' }
+PJ C:\dev\powerj> java.util.List.of("apple", "banana", "orange") | where { $_.contains("b") }
 banana
 
 PJ C:\dev\powerj> import java.time.*
@@ -235,7 +235,7 @@ Des objets successifs du même type record sont regroupés dans un même tableau
 En **affectation**, l'objet est conservé tel quel :
 
 ```text
-PJ> java.util.List.of("apple", "banana", "orange") | where { $_ like 'b*' }
+PJ> java.util.List.of("apple", "banana", "orange") | where { $_.contains("b") }
 banana
 PJ> $l = java.util.List.of("apple", "banana")
 PJ> $l.size()
@@ -254,17 +254,30 @@ Tailles et durées en format lisible (`14,2 KB`, `2 h 05 min`), dates en heure l
 
 **FR-32 — Littéraux.** Chaînes `'brutes'` et `"interpolées $var $(expr)"`, entiers, décimaux, `true`/`false`/`null`, tailles et durées (FR-19), `now`, listes `[1, 2, 3]`.
 
-**FR-33 — Opérateurs dans `{ }`.**
+**FR-33 — Opérateurs dans `{ }` : syntaxe Java.** Les blocs utilisent les opérateurs de Java ; pour tout le reste (motifs, expressions régulières, appartenance…), on appelle **les méthodes Java** des objets (§3.13). Il n'y a pas d'opérateur propre au shell comme `like` ou `-match`.
 
-| Catégorie | Opérateurs |
+| Catégorie | Opérateurs | Sémantique |
+|---|---|---|
+| Égalité | `==  !=` | Égalité de **valeur** (`Objects.equals`), pas de référence ; nombres comparés par valeur (`1 == 1L`). |
+| Ordre | `<  <=  >  >=` | Nombres par valeur ; autres types via `Comparable.compareTo` (dates, `Duration`, chaînes…). |
+| Logique | `&&  \|\|  !` | Court-circuit, comme en Java. |
+| Arithmétique | `+  -  *  /  %` | Règles Java ; `+` concatène si l'un des opérandes est une `String` ; `Instant - Duration`, `Instant + Duration` supportés. |
+| Ternaire | `cond ? a : b` | Comme en Java. |
+
+Les comparaisons de chaînes sont **sensibles à la casse**, comme en Java (`equalsIgnoreCase`, `toLowerCase()` pour l'inverse).
+
+Équivalences pour les besoins courants :
+
+| Besoin | Écriture PowerJ |
 |---|---|
-| Comparaison | `==  !=  <  <=  >  >=` |
-| Motifs | `like` (joker `*` `?`, insensible à la casse), `=~` (expression régulière) |
-| Logique | `and  or  not` |
-| Arithmétique | `+  -  *  /  %` (y compris `Instant - Duration`) |
-| Appartenance | `in` (`$_.ext in ['java', 'kt']`) |
+| Contient | `$_.contains("b")` |
+| Commence / finit par | `$_.name.startsWith("Pa")`, `$_.name.endsWith(".java")` |
+| Expression régulière | `$_.matches("^[a-m].*")` (ligne entière) ou `Pattern.compile("IPv4").matcher($_).find()` |
+| Insensible à la casse | `$_.toLowerCase().contains("readme")`, `$_.equalsIgnoreCase("ok")` |
+| Appartenance | `List.of("png", "jpg").contains($_.ext)` |
+| Joker de fichier | `FileSystems.getDefault().getPathMatcher("glob:*.java").matches($_.path.fileName)` (ou option `--filter` de `ls`) |
 
-Comparaisons de chaînes insensibles à la casse par défaut.
+Note : `!` en début de ligne reste l'expansion d'historique (FR-11) ; à l'intérieur d'une expression, c'est la négation. `&&` et `||` ne sont pas des opérateurs d'enchaînement de commandes en v1.
 
 **FR-34 — Redirections (hors blocs).** `> fichier` (écrase), `>> fichier` (ajoute) pour le flux de sortie ; `2> fichier`, `2>&1` pour le flux d'erreur. Les objets redirigés vers un fichier sont écrits sous leur forme affichée.
 
@@ -321,10 +334,10 @@ Vérité : `false`, `null`, `0`, `""` et liste vide sont faux ; tout le reste es
 
 CA :
 - `ls -r | where { $_.size > 1mb }` ;
-- `ls | where { $_.name like '*.java' and not $_.dir }` ;
-- `ls | where ext in ['png', 'jpg']` ;
-- `git status --porcelain | where { $_ like ' M *' }` ;
-- `ipconfig | where { $_ =~ 'IPv4' }`.
+- `ls | where { $_.name.endsWith(".java") && !$_.dir }` ;
+- `ls | where { List.of("png", "jpg").contains($_.ext) }` ;
+- `git status --porcelain | where { $_.startsWith(" M ") }` ;
+- `ipconfig | where { $_.contains("IPv4") }`.
 
 ### 3.10 Commandes natives
 
@@ -449,9 +462,9 @@ banana
 
 ```text
 PJ> import java.nio.file.*
-PJ> Files.readAllLines(Path.of("notes.txt")) | where { $_ like '*TODO*' }
+PJ> Files.readAllLines(Path.of("notes.txt")) | where { $_.contains("TODO") }
 PJ> Files.size(Path.of("gros.iso")) / 1mb
-PJ> new java.io.File("C:\\Windows").listFiles() | where { $_.directory and $_.name like 'S*' }
+PJ> new java.io.File("C:\\Windows").listFiles() | where { $_.directory && $_.name.startsWith("S") }
 PJ> java.util.UUID.randomUUID()
 PJ> java.net.InetAddress.getLocalHost().hostAddress
 PJ> String.join(", ", (ls).name)
@@ -557,7 +570,7 @@ public final class GreetProvider implements CmdletProvider {
 Utilisation :
 
 ```text
-PJ C:\> greet --name Yves -c 2 | where { $_.message like '*Yves*' }
+PJ C:\> greet --name Yves -c 2 | where { $_.message.contains("Yves") }
 name   message          at
 ----   -------          --
 Yves   Bonjour Yves !   2026-10-07 10:12:03
@@ -769,10 +782,10 @@ Chaque étape :
 
 **Recette :**
 1. `ls -r | where { $_.size > 1mb }`.
-2. `ls | where { $_.name like '*.java' and not $_.dir }`.
+2. `ls | where { $_.name.endsWith(".java") && !$_.dir }`.
 3. `ls | where size > 10kb` (forme courte).
-4. `git status --porcelain | where { $_ like ' M *' }`.
-5. `ipconfig | where { $_ =~ 'IPv4' }`.
+4. `git status --porcelain | where { $_.startsWith(" M ") }`.
+5. `ipconfig | where { $_.contains("IPv4") }`.
 6. `ls | ^more` : sortie paginée.
 7. `ls -r C:\ | where { $_.ext == 'log' }` puis Ctrl+C : arrêt immédiat.
 8. `git commandeinconnue 2> err.txt` : `err.txt` contient le message.
@@ -782,7 +795,7 @@ Chaque étape :
 **Contenu :** §3.13 (FR-46 à FR-55) : appels statiques, champs statiques, `import`, `new`, appels d'instance, surcharges et conversions, varargs, casts, blocs → interfaces fonctionnelles, exceptions, `help members` / `help <classe>` ; runtime jlink `java.se` complet.
 
 **Recette :**
-1. `java.util.List.of("apple", "banana", "orange") | where { $_ like 'b*' }` affiche `banana`.
+1. `java.util.List.of("apple", "banana", "orange") | where { $_.contains("b") }` affiche `banana`.
 2. `$l = java.util.List.of("apple", "banana")` puis `$l.size()` affiche `2`.
 3. `Math.max(3, 7)` et `java.lang.Math.PI`.
 4. `import java.time.*` puis `LocalDate.now().plusDays(10).dayOfWeek`.
@@ -815,7 +828,7 @@ Chaque étape :
 1. Copier `greet.jar` (artefact CI) dans `~/.powerj/modules/`, relancer.
 2. `greet --name Yves -c 2` affiche deux objets.
 3. `gr<Tab>` et `greet --<Tab>` complètent.
-4. `greet -n Yves | where { $_.message like '*Yves*' }`.
+4. `greet -n Yves | where { $_.message.contains("Yves") }`.
 5. `help greet` affiche l'aide générée.
 6. `mod-list` liste le module.
 7. `import com.example.greet.*` puis `new Greeting("Yves", "Salut", java.time.Instant.now())`.
@@ -846,14 +859,14 @@ valeur        = chaine | nombre | unite | variable_acces | liste | mot ;
 bloc          = "{" expression "}" ;
 redirection   = ( ">" | ">>" | "2>" | "2>>" ) chemin | "2>&1" ;
 
-expression    = ou ;
-ou            = et { "or" et } ;
-et            = non { "and" non } ;
-non           = [ "not" ] comparaison ;
-comparaison   = somme [ ( "==" | "!=" | "<" | "<=" | ">" | ">=" | "like" | "=~" | "in" ) somme ] ;
+expression    = ou [ "?" expression ":" expression ] ;
+ou            = et { "||" et } ;
+et            = egalite { "&&" egalite } ;
+egalite       = comparaison [ ( "==" | "!=" ) comparaison ] ;
+comparaison   = somme [ ( "<" | "<=" | ">" | ">=" ) somme ] ;
 somme         = produit { ( "+" | "-" ) produit } ;
 produit       = unaire { ( "*" | "/" | "%" ) unaire } ;
-unaire        = [ "-" ] [ cast ] postfixe ;
+unaire        = [ "-" | "!" ] [ cast ] postfixe ;
 cast          = "[" nom_qualifie "]" ;
 postfixe      = primaire { "." ident [ arguments ] | "[" expression "]" } ;
 arguments     = "(" [ arg_java { "," arg_java } ] ")" ;   (* sans espace avant "(" *)
@@ -876,11 +889,11 @@ chaine        = "'" { car } "'" | '"' { car | "$" ident | "$(" pipeline ")" } '"
 PJ C:\dev> ls -r --filter *.java | where { $_.modified > now - 1d }
 PJ C:\dev> $gros = ls -r | where size > 100mb
 PJ C:\dev> $gros.path
-PJ C:\dev> git branch --list | where { $_ like '*feature*' }
-PJ C:\dev> ls -d | where { $_.name =~ '^[a-m]' } | ^more
+PJ C:\dev> git branch --list | where { $_.contains("feature") }
+PJ C:\dev> ls -d | where { $_.name.matches("^[a-m].*") } | ^more
 PJ C:\dev> mvn -q verify; $exit
 PJ C:\dev> code .                       # application graphique, rend la main
-PJ C:\dev> java.util.List.of("apple", "banana", "orange") | where { $_ like 'b*' }
+PJ C:\dev> java.util.List.of("apple", "banana", "orange") | where { $_.contains("b") }
 PJ C:\dev> import java.nio.file.*
 PJ C:\dev> ls -r --filter *.log | where { Files.size($_.path) > 10mb }
 PJ C:\dev> (ls).name.stream().map({ $_.toUpperCase() }).sorted().toList()
@@ -922,8 +935,9 @@ find src --name *.java --since 7d | where { $_.size > 2kb } | group { $_.path.pa
 |---|---|
 | `Get-ChildItem -Recurse -Filter *.java` | `ls -r --filter *.java` |
 | `Where-Object { $_.Length -gt 1MB }` | `where { $_.size > 1mb }` |
-| `$_.Name -like '*.txt'` | `$_.name like '*.txt'` |
-| `-and`, `-or`, `-not` | `and`, `or`, `not` |
+| `$_.Name -like '*.txt'` | `$_.name.endsWith(".txt")` |
+| `-and`, `-or`, `-not` | `&&`, `\|\|`, `!` |
+| `$_ -match 'IPv4'` | `$_.contains("IPv4")` / `$_.matches(".*IPv4.*")` |
 | `$LASTEXITCODE` | `$exit` |
 | `& "C:\outil.exe"` | `^"C:\outil.exe"` |
 | `Get-Member` | `help members` |

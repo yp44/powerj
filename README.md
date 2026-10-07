@@ -4,8 +4,8 @@ Shell interactif orienté objet écrit en Java 27 : les commandes renvoient des 
 
 ```text
 PJ C:\dev> ls -r --filter *.java | where { $_.size > 10kb }
-PJ C:\dev> git status --porcelain | where { $_ like ' M *' }
-PJ C:\dev> java.util.List.of("apple", "banana", "orange") | where { $_ like 'b*' }
+PJ C:\dev> git status --porcelain | where { $_.startsWith(" M ") }
+PJ C:\dev> java.util.List.of("apple", "banana", "orange") | where { $_.contains("b") }
 ```
 
 - Spécification : [docs/SPECIFICATION.md](docs/SPECIFICATION.md)
