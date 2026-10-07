@@ -258,7 +258,7 @@ public final class ExpressionParser {
         List<Tok> run() {
             List<Tok> tokens = new ArrayList<>();
             while (true) {
-                while (pos < input.length() && Character.isWhitespace(input.charAt(pos))) {
+                while (pos < input.length() && Lexer.isBlank(input.charAt(pos))) {
                     pos++;
                 }
                 if (pos >= input.length()) {

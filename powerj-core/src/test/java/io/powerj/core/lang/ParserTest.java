@@ -137,6 +137,14 @@ class ParserTest {
     }
 
     @Test
+    void nonBreakingSpacesSeparateWords() {
+        // AltGr+6 puis AltGr+Espace sur un clavier français : « | » suivi d'une espace insécable.
+        var statement = only("ls -r |\u00a0where {\u00a0$_.size\u202f>\u00a06kb }");
+        assertThat(statement.pipeline().stages()).extracting(s -> ((Command) s.body()).name())
+                .containsExactly("ls", "where");
+    }
+
+    @Test
     void emptyLineHasNoStep() {
         assertThat(Parser.parse("   ").steps()).isEmpty();
         assertThat(Parser.parse(";;").steps()).isEmpty();

@@ -110,14 +110,14 @@ public final class Lexer {
 
     private boolean isWordEnd() {
         char c = peek();
-        return Character.isWhitespace(c) || c == ';' || c == '|' || c == '"' || c == '>' || c == '(' || c == ')'
+        return isBlank(c) || c == ';' || c == '|' || c == '"' || c == '>' || c == '(' || c == ')'
                 || c == '{' || c == '}'
                 || startsWith("&&") || (c == '2' && startsWith("2>") && atWordStart());
     }
 
     /** {@code 2>} n'est une redirection qu'en début de mot ({@code a2>b} reste un mot suivi de {@code >}). */
     private boolean atWordStart() {
-        return pos == 0 || Character.isWhitespace(input.charAt(pos - 1));
+        return pos == 0 || isBlank(input.charAt(pos - 1));
     }
 
     private Token.Var variable() {
@@ -289,8 +289,16 @@ public final class Lexer {
         }
     }
 
+    /**
+     * Séparateur : espace, tabulation, fin de ligne, mais aussi les espaces insécables (U+00A0, U+202F), que
+     * le clavier français produit facilement en tapant AltGr+Espace juste après {@code |} (AltGr+6).
+     */
+    public static boolean isBlank(char c) {
+        return Character.isWhitespace(c) || Character.isSpaceChar(c);
+    }
+
     private void skipWhitespace() {
-        while (!atEnd() && Character.isWhitespace(peek())) {
+        while (!atEnd() && isBlank(peek())) {
             pos++;
         }
     }
