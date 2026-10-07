@@ -14,9 +14,9 @@ jobs:
     name: Build et tests (Linux)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '27'
@@ -33,7 +33,7 @@ jobs:
           set -e
           test "$code" -eq 3 || { echo "code retour attendu 3, obtenu $code"; exit 1; }
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: powerj-linux-x64
           path: powerj-dist/target/powerj-*.zip
@@ -43,9 +43,9 @@ jobs:
     name: Exe et installeur (Windows)
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '27'
@@ -72,14 +72,14 @@ jobs:
           exit /b 0
 
       - name: Archive portable powerj.exe
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: powerj-windows-x64-portable
           path: powerj-dist/target/powerj-*.zip
           if-no-files-found: error
 
       - name: Installeur Windows
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: powerj-windows-x64-installer
           path: powerj-dist/target/installer/*.exe

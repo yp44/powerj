@@ -1,0 +1,90 @@
+package io.powerj.core.exec;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+
+import org.junit.jupiter.api.Test;
+
+class SupervisorTest {
+
+    private final Supervisor supervisor = new Supervisor();
+
+    @Test
+    void successCarriesTheValues() {
+        assertThat(supervisor.run("ok", () -> List.of("a", 1)))
+                .isEqualTo(new Outcome.Success(List.of("a", 1)));
+    }
+
+    @Test
+    void expectedErrorKeepsItsMessage() {
+        var outcome = supervisor.run("x", () -> {
+            throw new PjException("commande inconnue : x");
+        });
+
+        assertThat(outcome).isInstanceOfSatisfying(Outcome.Failure.class,
+                f -> assertThat(f.error().message()).isEqualTo("commande inconnue : x"));
+    }
+
+    @Test
+    void stackOverflowDoesNotEscape() {
+        var outcome = supervisor.run("rec", () -> List.of(recurse(0)));
+
+        assertThat(outcome).isInstanceOfSatisfying(Outcome.Failure.class,
+                f -> assertThat(f.error().message()).isEqualTo("récursion trop profonde"));
+    }
+
+    @Test
+    void outOfMemoryDoesNotEscapeAndShellCanContinue() {
+        var outcome = supervisor.run("oom", () -> {
+            throw new OutOfMemoryError("Java heap space");
+        });
+
+        assertThat(outcome).isInstanceOfSatisfying(Outcome.Failure.class,
+                f -> assertThat(f.error().message()).startsWith("mémoire insuffisante"));
+        assertThat(supervisor.run("next", List::of)).isEqualTo(new Outcome.Success(List.of()));
+    }
+
+    @Test
+    void unexpectedExceptionBecomesAnInternalError() {
+        var outcome = supervisor.run("bug", () -> {
+            throw new IllegalStateException("boom");
+        });
+
+        assertThat(outcome).isInstanceOfSatisfying(Outcome.Failure.class, f -> {
+            assertThat(f.error().message()).contains("erreur interne", "boom");
+            assertThat(f.error().cause()).containsInstanceOf(IllegalStateException.class);
+        });
+    }
+
+    @Test
+    void cancelInterruptsTheRunningCommand() throws Exception {
+        var started = new CountDownLatch(1);
+        var result = new AtomicReference<Outcome>();
+        var worker = Thread.ofVirtual().start(() -> result.set(supervisor.run("sleep", () -> {
+            started.countDown();
+            Thread.sleep(TimeUnit.MINUTES.toMillis(1));
+            return List.of();
+        })));
+
+        started.await();
+        supervisor.cancel();
+        worker.join(TimeUnit.SECONDS.toMillis(10));
+
+        assertThat(result.get()).isEqualTo(new Outcome.Cancelled());
+    }
+
+    @Test
+    void cancelWithoutRunningCommandIsHarmless() {
+        supervisor.cancel();
+
+        assertThat(supervisor.run("ok", List::of)).isEqualTo(new Outcome.Success(List.of()));
+    }
+
+    private static int recurse(int depth) {
+        return recurse(depth + 1) + 1;
+    }
+}

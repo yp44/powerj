@@ -13,7 +13,7 @@ PJ C:\dev> java.util.List.of("apple", "banana", "orange") | where { $_.contains(
 
 ## État
 
-Étape 0 (squelette) : REPL minimal — bannière, prompt, `exit [code]`. Voir le plan de développement (§11 de la spécification).
+Étape 1 : édition de ligne (JLine), historique persistant, ↑/↓ par préfixe, Ctrl+R, Ctrl+C, Ctrl+D, `history`, `!!` / `!n` / `!texte`, saisie multi-ligne. Voir le plan de développement (§11 de la spécification).
 
 ## Construire
 
