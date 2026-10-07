@@ -129,7 +129,7 @@
                                             <arg value="--add-modules"/>
                                             <arg value="java.se"/>
                                             <arg value="--jlink-options"/>
-                                            <arg value="--strip-debug --no-header-files --no-man-pages"/>
+                                            <arg value="--strip-java-debug-attributes --no-header-files --no-man-pages"/>
                                             <arg value="--dest"/>
                                             <arg value="${dist.jpackage}"/>
                                             <arg line="${dist.platform.args}"/>
