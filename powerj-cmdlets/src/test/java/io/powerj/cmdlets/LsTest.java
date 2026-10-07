@@ -25,7 +25,11 @@ class LsTest {
         Files.writeString(tmp.resolve("A.java"), "class A {}");
         Files.writeString(tmp.resolve("src/main/Main.java"), "x");
         Files.writeString(tmp.resolve("src/notes.TXT"), "y");
-        Files.writeString(tmp.resolve(".cache"), "z");
+        Path cache = Files.writeString(tmp.resolve(".cache"), "z");
+        if (System.getProperty("os.name").startsWith("Windows")) {
+            // Sous Windows, c'est l'attribut « caché » qui compte, pas le point initial.
+            Files.setAttribute(cache, "dos:hidden", true);
+        }
         context = new TestContext<>(tmp);
     }
 
