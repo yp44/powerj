@@ -2,6 +2,8 @@ package io.powerj.core.exec;
 
 import java.util.List;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -22,32 +24,58 @@ public final class Supervisor {
         List<Object> execute() throws Exception;
     }
 
+    /** Pile des fils d'exécution : de la marge pour les expressions profondes. */
+    private static final long STACK_SIZE = 16L * 1024 * 1024;
+
+    /** Commande en cours : son fil, son résultat, et le nombre de Ctrl+C reçus. */
+    private record Running(Thread worker, CompletableFuture<Outcome> outcome, String commandLine, AtomicInteger cancels) { }
+
     private byte[] memoryReserve = new byte[MEMORY_RESERVE_BYTES];
-    private volatile Thread runner;
+    private volatile Running running;
 
     /**
-     * Exécute la tâche et en renvoie le résultat ; ne lève jamais d'exception.
+     * Exécute la tâche dans un fil dédié et en renvoie le résultat ; ne lève jamais d'exception. Si la tâche
+     * ne réagit pas au premier Ctrl+C, le second l'abandonne (FR-57) : le résultat est
+     * {@link Outcome.Abandoned} et la tâche continue en arrière-plan, sans retenir le shell.
      *
      * @param commandLine ligne saisie, pour le journal et les messages
      */
     public Outcome run(String commandLine, Task task) {
-        runner = Thread.currentThread();
+        var outcome = new CompletableFuture<Outcome>();
+        Thread worker = Thread.ofPlatform().name("powerj-commande").daemon().stackSize(STACK_SIZE).unstarted(() -> {
+            Outcome result;
+            try {
+                result = new Outcome.Success(task.execute());
+            } catch (Throwable t) {
+                result = failureOf(commandLine, t);
+            } finally {
+                restoreMemoryReserve();
+            }
+            outcome.complete(result);
+        });
+        running = new Running(worker, outcome, commandLine, new AtomicInteger());
         try {
-            return new Outcome.Success(task.execute());
-        } catch (Throwable t) {
-            return failureOf(commandLine, t);
+            worker.start();
+            return outcome.join();
         } finally {
-            runner = null;
-            Thread.interrupted(); // une annulation arrivée en fin de commande ne doit pas toucher la suivante
-            restoreMemoryReserve();
+            running = null;
         }
     }
 
-    /** Demande l'annulation de la commande en cours (Ctrl+C) ; sans effet si aucune ne tourne. */
+    /**
+     * Ctrl+C : le premier demande l'annulation de la commande en cours (interruption) ; le suivant
+     * l'abandonne si elle ne s'est pas arrêtée. Sans effet si aucune commande ne tourne.
+     */
     public void cancel() {
-        var current = runner;
-        if (current != null) {
-            current.interrupt();
+        var current = running;
+        if (current == null) {
+            return;
+        }
+        if (current.cancels().incrementAndGet() == 1) {
+            current.worker().interrupt();
+        } else {
+            LOG.warning(() -> "Commande abandonnée : " + current.commandLine());
+            current.outcome().complete(new Outcome.Abandoned(current.commandLine()));
         }
     }
 

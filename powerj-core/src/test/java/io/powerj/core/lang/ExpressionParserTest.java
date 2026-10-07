@@ -69,9 +69,29 @@ class ExpressionParserTest {
         assertThatThrownBy(() -> ExpressionParser.parse("1 2")).hasMessageContaining("« 2 » inattendu");
         assertThatThrownBy(() -> ExpressionParser.parse("$_.")).hasMessageContaining("nom attendu après « . »");
         assertThatThrownBy(() -> ExpressionParser.parse("$_ like \"b\"")).hasMessageContaining("« like » inattendu");
+        assertThatThrownBy(() -> ExpressionParser.parse("$_.size = 1")).hasMessageContaining("utiliser ==");
+        assertThatThrownBy(() -> ExpressionParser.parse("new File")).hasMessageContaining("« ( » attendu après new File");
         assertThatThrownBy(() -> ExpressionParser.parse("$")).hasMessageContaining("nom de variable attendu");
-        assertThatThrownBy(() -> ExpressionParser.parse("1 # 2")).hasMessageContaining("caractère inattendu « # »");
+        assertThatThrownBy(() -> ExpressionParser.parse("1 # 2")).hasMessageContaining("« # » inattendu");
         assertThatThrownBy(() -> ExpressionParser.parse("\"abc")).hasMessageContaining("chaîne non fermée");
+    }
+
+    @Test
+    void javaSyntax() {
+        assertThat(ExpressionParser.parse("java.util.List.of(\"a\")")).isEqualTo(new Invoke(
+                new Get(new Get(new Ast.Name("java"), "util"), "List"), "of",
+                List.of(new Ast.StringExpression(List.of(new StringPart.Text("a"))))));
+        assertThat(ExpressionParser.parse("new StringBuilder(\"ab\").reverse()")).isEqualTo(new Invoke(
+                new Ast.New("StringBuilder", List.of(new Ast.StringExpression(List.of(new StringPart.Text("ab"))))),
+                "reverse", List.of()));
+        assertThat(ExpressionParser.parse("[java.util.ArrayList] $l")).isEqualTo(
+                new Ast.Cast("java.util.ArrayList", new VariableExpression("l", List.of())));
+        assertThat(ExpressionParser.parse("[x]")).isEqualTo(new Ast.ListLiteral(List.of(new Ast.Name("x"))));
+        assertThat(ExpressionParser.parse("$l.sort({ $a.length() - $b.length() })"))
+                .isInstanceOf(Invoke.class)
+                .extracting(e -> ((Invoke) e).arguments().getFirst()).isInstanceOf(Ast.BlockExpression.class);
+        // Dans un bloc, les accès peuvent être séparés par des espaces.
+        assertThat(ExpressionParser.parse("$_ .name")).isEqualTo(new Get(CURRENT, "name"));
     }
 
     @Test

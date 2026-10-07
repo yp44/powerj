@@ -67,7 +67,8 @@ public final class Interpreter {
         builtins.put("pwd", Builtins::pwd);
         builtins.put("exit", Builtins::exit);
         builtins.put("which", this::which);
-        builtins.put("help", (args, _) -> Help.run(args, registry));
+        builtins.put("help", (args, _) -> Help.run(args, registry, session.java()));
+        builtins.put("import", (args, _) -> importClasses(args));
         builtins.putAll(extraBuiltins);
     }
 
@@ -96,7 +97,7 @@ public final class Interpreter {
      */
     public void execute(String line) throws InterruptedException {
         blockingError = false;
-        Ast.Script script = Parser.parse(line);
+        Ast.Script script = Parser.parse(line, session.java()::isStaticReference);
         boolean succeeded = true;
         for (Ast.Step step : script.steps()) {
             if (session.exitRequest().isPresent()) {
@@ -133,7 +134,7 @@ public final class Interpreter {
             }
         } catch (PjException e) {
             blockingError = true;
-            reportError(e.error().message(), errTarget);
+            reportError(describe(e.error()), errTarget);
             return false;
         }
     }
@@ -217,7 +218,7 @@ public final class Interpreter {
                     closeQuietly(output);
                 } catch (PjException e) {
                     blockingErrors.set(true);
-                    errors.accept(e.error().message());
+                    errors.accept(describe(e.error()));
                     closeQuietly(output);
                 } catch (Throwable t) {
                     blockingErrors.set(true);
@@ -338,10 +339,25 @@ public final class Interpreter {
                         stage.errorsToOutput() ? message -> output.accept(message) : errors));
             }
         }
-        Path executable = resolver.resolve(command.name(), session).orElseThrow(() -> new PjException(
-                (command.forceNative() ? "commande native introuvable : " : "commande inconnue : ") + command.name()));
+        Path executable = resolver.resolve(command.name(), session).orElseThrow(() -> unknownCommand(command));
         List<String> textArgs = args.stream().map(Values::text).toList();
         return new NativeStep(new NativeRunner.Command(executable, textArgs, stage.errorsToOutput()));
+    }
+
+    /** Commande introuvable ; {@code Math.NOPE} : le champ statique manque plutôt que la commande. */
+    private PjException unknownCommand(Ast.Command command) {
+        if (command.forceNative()) {
+            return new PjException("commande native introuvable : " + command.name());
+        }
+        int dot = command.name().lastIndexOf('.');
+        if (dot > 0 && command.arguments().isEmpty()) {
+            var owner = session.java().find(command.name().substring(0, dot));
+            if (owner.isPresent()) {
+                return new PjException(owner.get().getSimpleName() + " n'a pas de champ statique "
+                        + command.name().substring(dot + 1));
+            }
+        }
+        return new PjException("commande inconnue : " + command.name());
     }
 
     private boolean runCmdlet(CmdletRegistry.Registered cmdlet, List<Object> args, Source input,
@@ -358,7 +374,7 @@ public final class Interpreter {
     /** Compile le texte d'un bloc pour un cmdlet ({@code CmdletContext.compile}). */
     private io.powerj.api.ScriptBlock compile(String source) {
         try {
-            return new CompiledBlock(source.strip(), ExpressionParser.parse(source), evaluator);
+            return new CompiledBlock(source.strip(), ExpressionParser.parse(source, session.java()::isStaticReference), evaluator);
         } catch (SyntaxException e) {
             throw new IllegalArgumentException(e.getMessage(), e);
         }
@@ -432,6 +448,17 @@ public final class Interpreter {
         }
     }
 
+    /** {@code import java.security.*}, {@code import javax.crypto.Cipher} ; sans argument : imports actifs (FR-47). */
+    private List<Object> importClasses(List<Object> args) {
+        if (args.isEmpty()) {
+            return List.copyOf(session.java().imports());
+        }
+        for (Object arg : args) {
+            session.java().addImport(Values.text(arg));
+        }
+        return List.of();
+    }
+
     private List<Object> which(List<Object> names, Session session) {
         if (names.isEmpty()) {
             throw new PjException("which : nom de commande attendu");
@@ -501,6 +528,24 @@ public final class Interpreter {
     private Consumer<String> errorSink(Optional<NativeRunner.FileTarget> errTarget) {
         return errTarget.<Consumer<String>>map(target -> message -> append(target.file(), message))
                 .orElse(io.errors());
+    }
+
+    /**
+     * Message d'une erreur bloquante ; l'exception Java d'origine est conservée dans {@code $errors} et sa
+     * pile ajoutée au message si {@code $debug} vaut {@code true} (FR-43, FR-53).
+     */
+    private String describe(PjError error) {
+        if (error.cause().isEmpty()) {
+            return error.message();
+        }
+        Throwable cause = error.cause().get();
+        session.recordError(cause);
+        if (!session.debug()) {
+            return error.message();
+        }
+        var trace = new java.io.StringWriter();
+        cause.printStackTrace(new PrintWriter(trace));
+        return error.message() + System.lineSeparator() + trace.toString().stripTrailing();
     }
 
     private void reportError(String message, Optional<NativeRunner.FileTarget> target) {

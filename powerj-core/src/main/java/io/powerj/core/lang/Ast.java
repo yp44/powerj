@@ -89,8 +89,24 @@ public final class Ast {
 
     public record VariableExpression(String name, List<Accessor> accessors) implements Expression { }
 
-    /** Pipeline entre parenthèses, dont on prend la valeur : {@code (ls).name}, {@code (ls | where {…})}. */
-    public record SubExpression(Pipeline pipeline, List<Accessor> accessors) implements Expression { }
+    /** Pipeline entre parenthèses, dont on prend la valeur : {@code (ls)}, {@code (ls | where {…})}. */
+    public record SubExpression(Pipeline pipeline) implements Expression { }
+
+    /**
+     * Nom nu dans une expression : classe ({@code Math}, {@code LocalDate}) ou début de nom qualifié
+     * ({@code java} dans {@code java.util.List.of(…)}), résolu à l'évaluation (FR-46, FR-47).
+     */
+    public record Name(String name) implements Expression { }
+
+    /** {@code new Classe(arguments)} (FR-48). */
+    public record New(String type, List<Expression> arguments) implements Expression {
+        public New {
+            arguments = List.copyOf(arguments);
+        }
+    }
+
+    /** Conversion explicite {@code [type] valeur} (FR-50). */
+    public record Cast(String type, Expression operand) implements Expression { }
 
     /** Bloc {@code { … }} : sa valeur est un {@link io.powerj.api.ScriptBlock} évalué plus tard. */
     public record BlockExpression(String source, Expression body) implements Expression { }

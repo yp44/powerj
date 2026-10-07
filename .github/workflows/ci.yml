@@ -39,6 +39,9 @@ jobs:
           "filtre : $u"
           $t = printf "b\na\nc\n" | sort | where { $_ != "c" }
           "tri : $t"
+          "java : $(Math.max(3, 7))"
+          $n = List.of("a", "bb", "ccc").stream().filter({ $_.length() > 1 }).count()
+          "lambda : $n"
           sh -c "exit 3"
           exit $exit
           EOF
@@ -55,6 +58,8 @@ jobs:
           grep -q 'usr$' out.txt
           grep -q 'filtre : usr' out.txt
           grep -q 'tri : \[a, b\]' out.txt
+          grep -q 'java : 7' out.txt
+          grep -q 'lambda : 2' out.txt
 
       - name: Test de fumée du mode non interactif
         run: |
@@ -111,6 +116,9 @@ jobs:
           "filtre : $u"
           $t = ^cmd /c "echo b& echo a& echo c" | ^sort | where { $_ != "c" }
           "tri : $t"
+          "java : $(Math.max(3, 7))"
+          $n = List.of("a", "bb", "ccc").stream().filter({ $_.length() > 1 }).count()
+          "lambda : $n"
           ^cmd /c "exit 3"
           exit $exit
           '@ | Set-Content smoke.txt
@@ -119,7 +127,7 @@ jobs:
           Get-Content out.txt
           if ($code -ne 3) { throw "code retour attendu 3, obtenu $code" }
           foreach ($attendu in 'C:\Windows', 'ligne : deux', 'secours', 'cmdlet (io.powerj.cmdlets)', 'System32',
-                               'filtre : Windows', 'tri : [a, b]') {
+                               'filtre : Windows', 'tri : [a, b]', 'java : 7', 'lambda : 2') {
             if (-not (Select-String -Path out.txt -SimpleMatch $attendu -Quiet)) { throw "absent de la sortie : $attendu" }
           }
           # Le code 3 attendu de powerj.exe ne doit pas devenir le code retour de l'étape.

@@ -78,6 +78,30 @@ class SupervisorTest {
     }
 
     @Test
+    void secondCancelAbandonsACommandThatIgnoresInterruption() throws Exception {
+        var started = new CountDownLatch(1);
+        var stop = new java.util.concurrent.atomic.AtomicBoolean();
+        var result = new AtomicReference<Outcome>();
+        var caller = Thread.ofVirtual().start(() -> result.set(supervisor.run("boucle", () -> {
+            started.countDown();
+            while (!stop.get()) {
+                Thread.onSpinWait(); // ignore l'interruption, comme un calcul du JDK
+            }
+            return List.of();
+        })));
+
+        started.await();
+        supervisor.cancel();
+        caller.join(300);
+        assertThat(caller.isAlive()).isTrue();
+        supervisor.cancel();
+        caller.join(TimeUnit.SECONDS.toMillis(10));
+
+        assertThat(result.get()).isEqualTo(new Outcome.Abandoned("boucle"));
+        stop.set(true);
+    }
+
+    @Test
     void cancelWithoutRunningCommandIsHarmless() {
         supervisor.cancel();
 

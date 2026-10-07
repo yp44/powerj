@@ -752,12 +752,12 @@ ligne saisie
 - L'objet courant `$_` d'un bloc est lié par une **Scoped Value** pendant l'évaluation.
 - Les commandes natives sont lancées via `ProcessBuilder` (redirections `INHERIT`, `PIPE`) ; les natives consécutives forment un groupe lancé par `ProcessBuilder.startPipeline` (octets transmis directement) ; les objets envoyés à un natif sont écrits sur son stdin sous leur forme affichée.
 
-### 5.4 Interopérabilité Java (`powerj-core`, package `interop`)
+### 5.4 Interopérabilité Java (`powerj-core`, `JavaClasses`, `JavaInvoker`, `FunctionalAdapter`)
 
-- **Résolution des classes** : index des packages exportés par les modules `java.*` de `ModuleLayer.boot()` (construit paresseusement, en tâche de fond) ; imports par défaut (FR-47) et imports de session. Les couches des modules tiers ne sont pas indexées.
-- **Résolution des membres** : métadonnées par type (méthodes publiques, propriétés dérivées, champs) mises en cache via `ClassValue` ; appels via `MethodHandle` obtenus par `MethodHandles.publicLookup()`, en remontant à l'interface ou la superclasse publique exportée quand la classe concrète ne l'est pas.
+- **Résolution des classes** : recherche par le chargeur de classes de la plateforme (qui ne voit pas les modules tiers), en ne gardant que les classes publiques des packages exportés par les modules `java.*` ; imports par défaut (FR-47) et imports de session ; résultats mis en cache.
+- **Résolution des membres** : méthodes publiques par type et par nom mises en cache via `ClassValue`, vues à travers l'interface ou la superclasse publique exportée quand la classe concrète ne l'est pas (`List.of(…)`) ; appel par réflexion (`Method.invoke`), suffisant en v1 — les `MethodHandle` restent une optimisation possible si les appels Java deviennent un goulot.
 - **Conversion des arguments** : table de conversions (FR-50) exprimée par `switch` sur les types ; choix de surcharge par score de spécificité.
-- **Blocs → interfaces fonctionnelles** : adaptation via `MethodHandleProxies.asInterfaceInstance` (ou `LambdaMetafactory` pour les interfaces fréquentes du JDK).
+- **Blocs → interfaces fonctionnelles** : implémentation par `java.lang.reflect.Proxy` de la méthode abstraite unique (méthodes `default` déléguées par `InvocationHandler.invokeDefault`) ; `$_`, `$a`, `$b`, `$args` liés par `ScopedValue` à chaque appel.
 - **Déroulage** (FR-30b) : appliqué à la sortie de chaque étape par l'exécuteur du pipeline.
 - **Interceptions** (FR-58) : table des méthodes redirigées ou refusées (`System.exit`, `Runtime.halt`, `System.setOut`…), consultée à la résolution d'un appel ; vérification du jeton d'annulation (FR-57) à chaque invocation d'un bloc.
 
@@ -787,7 +787,7 @@ Les nouveautés de Java sont utilisées **là où elles apportent un bénéfice 
 | **Stream Gatherers** | Opérations de flux sur mesure dans le pipeline (fenêtrage, `first`/`last`, dédoublonnage — utiles dès les cmdlets du backlog). |
 | **FFM API** | Accès console Windows (via JLine) ; lecture de l'en-tête PE pour détecter les applications GUI, sans JNI. |
 | **Sequenced Collections** | Historique (`getFirst`/`getLast`/`reversed`), colonnes ordonnées. |
-| **`MethodHandles`, `MethodHandleProxies`, `LambdaMetafactory`** | Interopérabilité Java : appels de méthodes/constructeurs rapides et mis en cache, conversion des blocs `{ }` en interfaces fonctionnelles. |
+| **Réflexion, `Proxy`, `ClassValue`** | Interopérabilité Java : appels de méthodes/constructeurs avec cache par type, conversion des blocs `{ }` en interfaces fonctionnelles (`MethodHandles` : optimisation possible plus tard). |
 | **`ClassValue`** | Cache des métadonnées de membres par type, sans fuite de classloader (modules tiers). |
 | **Module import declarations, constructeurs flexibles** | Lisibilité du code. |
 | **Patterns primitifs** | Dans l'évaluateur pour les comparaisons numériques, si finalisés dans le JDK 27. |

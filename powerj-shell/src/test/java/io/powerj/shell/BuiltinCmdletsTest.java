@@ -103,7 +103,8 @@ class BuiltinCmdletsTest {
         assertThat(run("(ls -r | where { $_.name.endsWith(\".md\") && !$_.dir }).name")).isEqualTo("spec.md\n");
         assertThat(run("(ls | where { $_.dir }).name")).isEqualTo("docs\n");
         assertThat(run("(ls -r | where { $_.size > 6 && $_.modified > now - 1d }).name")).isEqualTo("notes.txt\n");
-        assertThatThrownBy(() -> run("ls | where { List.of(\"txt\").size() }")).hasMessageContaining("« List » inconnu");
+        assertThat(run("(ls -r | where { List.of(\"md\", \"png\").contains($_.ext) }).name")).isEqualTo("spec.md\n");
+        assertThatThrownBy(() -> run("ls | where { $_.size = 1 }")).hasMessageContaining("utiliser ==");
     }
 
     @Test
