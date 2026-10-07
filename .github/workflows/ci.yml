@@ -33,6 +33,8 @@ jobs:
           $l = sh -c "printf 'un\ndeux\n'"
           "ligne : $l[1]"
           sh -c "exit 1" || "secours"
+          which ls
+          (ls / --dirs).name
           sh -c "exit 3"
           exit $exit
           EOF
@@ -45,6 +47,8 @@ jobs:
           grep -q '/usr$' out.txt
           grep -q 'ligne : deux' out.txt
           grep -q 'secours' out.txt
+          grep -q 'ls → cmdlet (io.powerj.cmdlets)' out.txt
+          grep -q 'usr$' out.txt
 
       - uses: actions/upload-artifact@v5
         with:
@@ -83,6 +87,8 @@ jobs:
           $l = ^cmd /c "echo un& echo deux"
           "ligne : $l[1]"
           ^cmd /c "exit 1" || "secours"
+          which ls
+          (ls C:\Windows --dirs).name
           ^cmd /c "exit 3"
           exit $exit
           '@ | Set-Content smoke.txt
@@ -90,7 +96,7 @@ jobs:
           $code = $LASTEXITCODE
           Get-Content out.txt
           if ($code -ne 3) { throw "code retour attendu 3, obtenu $code" }
-          foreach ($attendu in 'C:\Windows', 'ligne : deux', 'secours') {
+          foreach ($attendu in 'C:\Windows', 'ligne : deux', 'secours', 'cmdlet (io.powerj.cmdlets)', 'System32') {
             if (-not (Select-String -Path out.txt -SimpleMatch $attendu -Quiet)) { throw "absent de la sortie : $attendu" }
           }
           # Le code 3 attendu de powerj.exe ne doit pas devenir le code retour de l'étape.

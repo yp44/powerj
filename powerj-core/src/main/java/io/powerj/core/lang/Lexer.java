@@ -11,7 +11,8 @@ import java.util.List;
  *   <li>{@code $nom.prop[0]} est une référence de variable ;</li>
  *   <li>{@code ;}, {@code &&}, {@code ||}, {@code |}, {@code >}, {@code >>}, {@code 2>}, {@code 2>>}
  *       sont des opérateurs, même collés à un mot ;</li>
- *   <li>{@code =} isolé (après une variable) marque une affectation.</li>
+ *   <li>{@code =} isolé (après une variable) marque une affectation ;</li>
+ *   <li>{@code ( … )} délimite une sous-expression, éventuellement suivie d'accès : {@code (ls).name}.</li>
  * </ul>
  */
 public final class Lexer {
@@ -75,6 +76,14 @@ public final class Lexer {
                 pos++;
                 yield new Token.Assign();
             }
+            case '(' -> {
+                pos++;
+                yield new Token.Open();
+            }
+            case ')' -> {
+                pos++;
+                yield new Token.Close(accessors());
+            }
             case '"' -> string();
             case '$' -> isVariableStart(pos + 1) ? variable() : word();
             default -> word();
@@ -91,7 +100,7 @@ public final class Lexer {
 
     private boolean isWordEnd() {
         char c = peek();
-        return Character.isWhitespace(c) || c == ';' || c == '|' || c == '"' || c == '>'
+        return Character.isWhitespace(c) || c == ';' || c == '|' || c == '"' || c == '>' || c == '(' || c == ')'
                 || startsWith("&&") || (c == '2' && startsWith("2>") && atWordStart());
     }
 

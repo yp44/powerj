@@ -65,6 +65,9 @@ public final class Ast {
 
     public record VariableExpression(String name, List<Accessor> accessors) implements Expression { }
 
+    /** Commande ou expression entre parenthèses, dont on prend la valeur : {@code (ls).name}, {@code (pwd)}. */
+    public record SubExpression(Body body, List<Accessor> accessors) implements Expression { }
+
     /** Redirection d'un flux vers un fichier. */
     public record Redirect(Token.Stream stream, boolean append, Argument target) { }
 }

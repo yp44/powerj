@@ -14,13 +14,14 @@ import org.jline.utils.AttributedString;
 import org.jline.utils.AttributedStyle;
 
 import io.powerj.core.BuildInfo;
-import io.powerj.core.exec.Builtin;
+import io.powerj.core.exec.CmdletRegistry;
 import io.powerj.core.exec.Interpreter;
 import io.powerj.core.exec.Outcome;
 import io.powerj.core.exec.PjException;
 import io.powerj.core.exec.Session;
 import io.powerj.core.exec.ShellIo;
 import io.powerj.core.exec.Supervisor;
+import io.powerj.core.exec.Values;
 
 /**
  * Boucle de lecture-exécution du shell : lit une ligne avec JLine (historique, Ctrl+R…), l'exécute
@@ -35,15 +36,15 @@ public final class Repl {
     private final Terminal terminal;
     private final PrintWriter out;
 
-    public Repl(LineReader reader, Supervisor supervisor, Session session) {
+    public Repl(LineReader reader, Supervisor supervisor, Session session, CmdletRegistry registry) {
         this.reader = Objects.requireNonNull(reader, "reader");
         this.supervisor = Objects.requireNonNull(supervisor, "supervisor");
         this.session = Objects.requireNonNull(session, "session");
         this.terminal = reader.getTerminal();
         this.out = terminal.writer();
         boolean interactive = !terminal.getType().startsWith("dumb");
-        this.interpreter = new Interpreter(session, new ShellIo(out, this::printError, interactive),
-                Map.of("history", this::history));
+        var io = new ShellIo(out, this::printError, interactive, () -> terminal.getWidth());
+        this.interpreter = new Interpreter(session, io, Map.of("history", this::history), registry);
         // Ctrl+C pendant l'exécution annule la commande sans quitter le shell (FR-03) ;
         // pendant la saisie, JLine lève UserInterruptException.
         terminal.handle(Terminal.Signal.INT, _ -> supervisor.cancel());
@@ -93,13 +94,14 @@ public final class Repl {
     }
 
     /** {@code history} (liste numérotée, numéros réutilisables avec {@code !n}) ou {@code history --clear}. */
-    private List<Object> history(List<String> args, Session ignored) throws Exception {
+    private List<Object> history(List<Object> args, Session ignored) throws Exception {
         if (args.equals(List.of("--clear"))) {
             reader.getHistory().purge();
             return List.of();
         }
         if (!args.isEmpty()) {
-            throw new PjException("history : option inconnue '" + args.getLast() + "' (option disponible : --clear)");
+            throw new PjException("history : option inconnue '" + Values.text(args.getLast())
+                    + "' (option disponible : --clear)");
         }
         List<Object> lines = new ArrayList<>();
         for (var entry : reader.getHistory()) {

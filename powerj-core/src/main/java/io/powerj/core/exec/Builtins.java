@@ -10,11 +10,11 @@ final class Builtins {
     private Builtins() {
     }
 
-    static List<Object> cd(List<String> args, Session session) {
+    static List<Object> cd(List<Object> args, Session session) {
         if (args.size() > 1) {
             throw new PjException("cd : un seul argument attendu");
         }
-        String target = args.isEmpty() ? "~" : args.getFirst();
+        String target = args.isEmpty() ? "~" : Values.text(args.getFirst());
         Path path = switch (target) {
             case "-" -> session.previousDirectory()
                     .orElseThrow(() -> new PjException("cd : pas de dossier précédent"));
@@ -27,21 +27,21 @@ final class Builtins {
         return List.of();
     }
 
-    static List<Object> pwd(List<String> args, Session session) {
+    static List<Object> pwd(List<Object> args, Session session) {
         if (!args.isEmpty()) {
             throw new PjException("pwd : aucun argument attendu");
         }
         return List.of(session.currentDirectory());
     }
 
-    static List<Object> exit(List<String> args, Session session) {
+    static List<Object> exit(List<Object> args, Session session) {
         int code = switch (args.size()) {
             case 0 -> 0;
             case 1 -> {
                 try {
-                    yield Integer.parseInt(args.getFirst());
+                    yield Integer.parseInt(Values.text(args.getFirst()));
                 } catch (NumberFormatException _) {
-                    throw new PjException("exit : code retour invalide '" + args.getFirst() + "'");
+                    throw new PjException("exit : code retour invalide '" + Values.text(args.getFirst()) + "'");
                 }
             }
             default -> throw new PjException("exit : un seul argument attendu");

@@ -74,6 +74,19 @@ class ParserTest {
     }
 
     @Test
+    void subExpressions() {
+        assertThat(only("(ls).name").body()).isEqualTo(new ExpressionBody(new Ast.SubExpression(
+                new Command("ls", false, List.of()), List.of(new Accessor.Property("name")))));
+        assertThat(only("help members (ls -r)[0]").body()).isEqualTo(new Command("help", false, List.of(
+                new WordArgument("members"),
+                new Ast.ExpressionArgument(new Ast.SubExpression(new Command("ls", false, List.of(new WordArgument("-r"))),
+                        List.of(new Accessor.Index(0)))))));
+        assertThatThrownBy(() -> Parser.parse("(ls")).hasMessageContaining("« ) » manquante");
+        assertThatThrownBy(() -> Parser.parse("()")).hasMessageContaining("parenthèses vides");
+        assertThatThrownBy(() -> Parser.parse("ls)")).hasMessageContaining("« ) » inattendu");
+    }
+
+    @Test
     void emptyLineHasNoStep() {
         assertThat(Parser.parse("   ").steps()).isEmpty();
         assertThat(Parser.parse(";;").steps()).isEmpty();

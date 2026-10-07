@@ -1,6 +1,7 @@
 package io.powerj.shell;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.logging.Level;
@@ -10,6 +11,7 @@ import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
 
 import io.powerj.core.BuildInfo;
+import io.powerj.core.exec.CmdletRegistry;
 import io.powerj.core.exec.Session;
 import io.powerj.core.exec.Supervisor;
 
@@ -36,7 +38,13 @@ public final class Main {
     private static int run(PowerJHome home, ShellConfig config) {
         Terminal terminal;
         try {
-            terminal = TerminalBuilder.builder().system(true).name("PowerJ").build();
+            var builder = TerminalBuilder.builder().system(true).name("PowerJ");
+            // Entrée ou sortie redirigée (fichier, pipe) : UTF-8, quelle que soit la page de code du système.
+            if (!isInteractiveConsole()) {
+                builder.encoding(StandardCharsets.UTF_8).stdinEncoding(StandardCharsets.UTF_8)
+                        .stdoutEncoding(StandardCharsets.UTF_8).stderrEncoding(StandardCharsets.UTF_8);
+            }
+            terminal = builder.build();
         } catch (IOException e) {
             LOG.log(Level.SEVERE, "Terminal indisponible", e);
             System.err.println("PowerJ : terminal indisponible (" + e.getMessage() + ")");
@@ -48,7 +56,7 @@ public final class Main {
             var reader = ShellReader.create(terminal, home, config);
             var session = new Session(Path.of(System.getProperty("user.home")), Path.of("").toAbsolutePath(),
                     System.getenv());
-            var repl = new Repl(reader, new Supervisor(), session);
+            var repl = new Repl(reader, new Supervisor(), session, CmdletRegistry.discover());
             int code = repl.run(BuildInfo.current());
             try {
                 reader.getHistory().save();
@@ -59,6 +67,11 @@ public final class Main {
         } finally {
             close(terminal);
         }
+    }
+
+    private static boolean isInteractiveConsole() {
+        var console = System.console();
+        return console != null && console.isTerminal();
     }
 
     private static void close(Terminal terminal) {

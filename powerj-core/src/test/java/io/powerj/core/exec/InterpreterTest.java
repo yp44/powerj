@@ -31,7 +31,8 @@ class InterpreterTest {
         assumeFalse(Platform.isWindows(), "commandes Unix");
         Files.createDirectories(tmp.resolve("home"));
         session = new Session(tmp.resolve("home"), tmp, System.getenv());
-        interpreter = new Interpreter(session, new ShellIo(new PrintWriter(out, true), errors::add, false), Map.of());
+        interpreter = new Interpreter(session, new ShellIo(new PrintWriter(out, true), errors::add, false), Map.of(),
+                CmdletRegistry.of(List.of()));
     }
 
     private String run(String line) throws Exception {
@@ -73,7 +74,7 @@ class InterpreterTest {
         assertThat(session.lastSucceeded()).isFalse();
         assertThat(run("$last.exitCode")).isEqualTo("3" + System.lineSeparator());
         assertThat(run("$last.duration")).endsWith(" s" + System.lineSeparator());
-        assertThat(run("$last")).contains("command", "exitCode : 3");
+        assertThat(run("$last")).contains("command", "exitCode", "/sh", "[-c, exit 3]");
     }
 
     @Test

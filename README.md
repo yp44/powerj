@@ -13,7 +13,7 @@ PJ C:\dev> java.util.List.of("apple", "banana", "orange") | where { $_.contains(
 
 ## État
 
-Étape 2 : commandes natives (`git`, `ipconfig`, `notepad`…), `cd` / `pwd` / `which`, enchaînement `;` `&&` `||`, variables (`$x = …`, `$exit`, `$last`, `$?`), redirections `>` `>>` `2>`, encodage des commandes natives. Étapes précédentes : édition de ligne, historique, Ctrl+R. Voir le plan de développement (§11 de la spécification).
+Étape 3 : premiers cmdlets — `ls` (objets `FileEntry`) et `env` —, accès aux propriétés (`(ls).name`, `$f[0].path.parent`), affichage en tableau, options façon Unix (`-ra`, `--rec`, `--filter=*.java`), `help`, `help members`. Étapes précédentes : commandes natives, `cd`, `;` `&&` `||`, variables, redirections, édition de ligne et historique. Voir le plan de développement (§11 de la spécification).
 
 ## Construire
 
