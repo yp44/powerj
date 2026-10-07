@@ -691,8 +691,7 @@ Le dossier peut être déplacé via la variable d'environnement `POWERJ_HOME`.
 | NFR-04 | `ls -r` sur 100 000 fichiers sans dépassement mémoire (streaming). |
 | NFR-05 | Couverture de tests ≥ 80 % sur `powerj-core`. |
 | NFR-06 | Aucune exception Java brute affichée à l'utilisateur hors mode debug. |
-| NFR-07 | Taille de l'installeur < 80 Mo (runtime `java.se` complet). |
-| NFR-08 | Premier appel d'une méthode Java < 50 ms ; appels suivants (cache) < 1 ms. |
+| NFR-07 | Premier appel d'une méthode Java < 50 ms ; appels suivants (cache) < 1 ms. |
 
 ---
 
