@@ -11,6 +11,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 
 import org.jline.reader.History;
 import org.junit.jupiter.api.Test;
@@ -77,8 +80,34 @@ class ReplTest {
 
     @Test
     void ctrlCClearsTheLineBeingTyped() throws Exception {
-        assertThat(session("abandonnée" + CTRL_C + "exit 4" + ENTER)).isEqualTo(4);
-        assertThat(history).containsExactly("exit 4");
+        home = new PowerJHome(tmp.resolve("home")).createDirectories();
+        try (var terminal = TestTerminal.interactive()) {
+            var reader = ShellReader.create(terminal.terminal(), home, ShellConfig.defaults());
+            var repl = new Repl(reader, new Supervisor(), () -> Path.of("C:\\dev"));
+            terminal.startTyping();
+            var code = new CompletableFuture<Integer>();
+            Thread.ofVirtual().start(() -> code.complete(repl.run(BUILD)));
+
+            // Ctrl+C n'est envoyé qu'une fois la ligne effectivement en cours de saisie.
+            terminal.type("abandonnée");
+            awaitUntil(() -> reader.isReading() && reader.getBuffer().toString().equals("abandonnée"));
+            terminal.type(CTRL_C);
+            awaitUntil(() -> reader.isReading() && reader.getBuffer().length() == 0);
+            terminal.type("exit 4" + ENTER);
+
+            assertThat(code.get(20, TimeUnit.SECONDS)).isEqualTo(4);
+            assertThat(reader.getHistory()).extracting(History.Entry::line).containsExactly("exit 4");
+        }
+    }
+
+    private static void awaitUntil(BooleanSupplier condition) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
+        while (!condition.getAsBoolean()) {
+            if (System.nanoTime() > deadline) {
+                throw new AssertionError("condition jamais atteinte");
+            }
+            Thread.sleep(10);
+        }
     }
 
     @Test
