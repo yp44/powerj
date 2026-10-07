@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Version du document** | 0.4 (bibliothèque standard Java accessible par défaut) |
+| **Version du document** | 0.5 (navigation, enchaînement, environnement, encodage, robustesse, mode non interactif) |
 | **Statut** | À valider |
 | **Plateforme cible** | Windows 10/11 x64 (`powerj.exe`), Linux/macOS en bonus |
 | **Socle technique** | Java 27, Maven 3.9, JLine 3 |
@@ -71,7 +71,7 @@ FRIDAY
 - Pas de compatibilité syntaxique avec PowerShell ou bash.
 - Pas d'exécution distante (*remoting*).
 - Pas de *providers* (registre, certificats…) façon PowerShell.
-- **Périmètre cmdlets volontairement réduit à 2 cmdlets (`ls` et `where`)** ; le reste du catalogue est au backlog (§12.3).
+- **Périmètre cmdlets volontairement réduit à 3 cmdlets (`ls`, `where`, `env`)** ; le reste du catalogue est au backlog (§12.3).
 
 ---
 
@@ -104,13 +104,49 @@ Chaque exigence porte un identifiant `FR-xx` et un ou plusieurs **critères d'ac
 **FR-01 — Prompt.** Au démarrage, PowerJ affiche une bannière (`PowerJ 0.x — Java 27`) puis le prompt `PJ <répertoire courant>> `.
 - CA : lancer `powerj.exe` depuis `C:\Users\yves` affiche `PJ C:\Users\yves> `.
 
-**FR-02 — Saisie multi-ligne.** Si une ligne se termine par `|` ou `\`, ou si une accolade/guillemet reste ouvert, le shell affiche un prompt de continuation `>> ` et attend la suite.
+**FR-02 — Saisie multi-ligne.** Si une ligne se termine par `|`, `&&` ou `||`, ou si une accolade, une parenthèse ou un guillemet reste ouvert (pas de continuation par `\`, pour que `cd C:\` reste valide), le shell affiche un prompt de continuation `>> ` et attend la suite.
 - CA : `ls |` + Entrée affiche `>> ` ; `where { $_.dir }` + Entrée exécute le pipeline complet.
 
-**FR-03 — Interruption.** **Ctrl+C** pendant l'exécution annule la commande en cours (cmdlets et process natifs) et rend la main sans quitter le shell. Ctrl+C sur une ligne en cours de saisie l'efface.
-- CA : `ls -r C:\` puis Ctrl+C rend le prompt en moins de 500 ms.
+**FR-03 — Interruption (Ctrl+C).** Ctrl+C **tue la commande en cours** et rend la main sans jamais quitter le shell :
+- pendant la saisie : efface la ligne courante ;
+- pendant l'exécution : annule tout le pipeline — cmdlets, expressions Java et process natifs (y compris leurs process enfants) — selon le mécanisme décrit en §3.14 ;
+- second Ctrl+C si la commande ne s'est pas arrêtée : abandon forcé (§3.14).
+- CA : `ls -r C:\` puis Ctrl+C rend le prompt ; `Stream.iterate(0, { $_ + 1 }).forEach({ $_ })` puis Ctrl+C rend le prompt ; `ping -t localhost` puis Ctrl+C arrête `ping`.
 
-**FR-04 — Sortie.** `exit` (ou Ctrl+D sur ligne vide) quitte le shell en sauvegardant l'historique. `exit <code>` quitte avec ce code retour.
+**FR-04 — Sortie (Ctrl+D).** **Ctrl+D sur une ligne vide** ou `exit` quitte le shell en sauvegardant l'historique ; sur une ligne non vide, Ctrl+D supprime le caractère sous le curseur. `exit <code>` quitte avec ce code retour. Si des commandes abandonnées tournent encore (§3.14), le shell les termine avant de quitter.
+
+**FR-04b — Navigation dans les dossiers.** Commandes internes au REPL (pas des cmdlets) :
+
+| Commande | Effet |
+|---|---|
+| `cd <chemin>` | Change le répertoire courant (chemin absolu, relatif, `..`, `~` = dossier utilisateur, lecteur `D:`). |
+| `cd` | Retour au dossier utilisateur. |
+| `cd -` | Retour au dossier précédent. |
+| `pwd` | Affiche le répertoire courant (objet `Path`). |
+
+Le répertoire courant est propre au shell : il sert de base aux chemins relatifs des cmdlets, des appels Java passant par PowerJ et des commandes natives lancées (répertoire de travail du process). `$pwd` contient le `Path` courant.
+- CA : `cd ~`, `cd ..`, `cd -`, `cd D:`, `cd "C:\\Program Files"` ; le prompt suit ; `git status` s'exécute dans le bon dossier.
+
+**FR-04c — Enchaînement de commandes.** Au niveau de la ligne, plusieurs commandes s'enchaînent comme des instructions Java :
+
+| Syntaxe | Effet |
+|---|---|
+| `a ; b` | Exécute `a` puis `b`, quel que soit le résultat. |
+| `a && b` | Exécute `b` seulement si `a` a **réussi**. |
+| `a \|\| b` | Exécute `b` seulement si `a` a **échoué**. |
+
+« Réussi » se définit ainsi : commande native → code retour 0 ; cmdlet ou expression Java → aucune erreur bloquante ; expression de valeur `Boolean` → sa valeur. Cette règle donne la même lecture qu'en Java (`&&`/`||` court-circuitent, une commande « vaut » son succès) : `mvn package && java -jar target/app.jar`, `Files.exists(Path.of("build")) || mkdir build`. `$?` reflète le succès de la dernière commande exécutée.
+
+**FR-04d — Mode non interactif.**
+
+| Invocation | Effet |
+|---|---|
+| `powerj -c "<ligne>"` | Exécute la ligne puis quitte. |
+| `powerj fichier.pj` | Exécute le fichier ligne par ligne (en v1 : suite de lignes, sans structures de contrôle) puis quitte. |
+| `… \| powerj -c "where { $_.contains(\"x\") }"` | Si stdin n'est pas un terminal, ses lignes alimentent la première étape (lignes `String`). |
+
+Dans ce mode : pas de prompt, pas d'historique, pas de couleurs si la sortie n'est pas un terminal, et une erreur bloquante arrête l'exécution. **Code retour** du process : `exit <n>` si appelé ; sinon 0 si la dernière commande a réussi, le code de la dernière commande native si elle a échoué, 1 pour une erreur bloquante PowerJ.
+- CA : `powerj -c "ls | where { $_.size > 1mb }"` depuis `cmd.exe` ; `powerj -c "^cmd /c exit 3"` puis `echo %ERRORLEVEL%` affiche 3 ; `dir /b | powerj -c "where { $_.endsWith(\".txt\") }"`.
 
 ### 3.2 Édition de ligne
 
@@ -142,7 +178,7 @@ Chaque exigence porte un identifiant `FR-xx` et un ou plusieurs **critères d'ac
 Il n'existe **pas** de forme longue (`pj-ls`, `Get-ChildItem`…).
 
 **FR-13 — Ordre de résolution.** Pour le premier mot d'une étape :
-1. mot-clé interne du REPL (`exit`, `history`, `help`, `which`) ;
+1. mot-clé interne du REPL (`exit`, `history`, `help`, `which`, `cd`, `pwd`, `import`) ;
 2. alias défini par l'utilisateur ;
 3. **cmdlet** (intégré ou fourni par un module) ;
 4. **commande native** trouvée dans le `PATH` (avec `PATHEXT` sous Windows) ;
@@ -251,7 +287,12 @@ Tailles et durées en format lisible (`14,2 KB`, `2 h 05 min`), dates en heure l
 
 **FR-31 — Variables.** `$nom = <pipeline>` affecte le résultat (un objet → l'objet ; plusieurs → liste ; aucun → `null`). Variables automatiques : `$_` (objet courant), `$last` (métadonnées de la dernière commande native), `$exit` (son code retour), `$?` (succès de la dernière commande), `$errors` (erreurs récentes), `$home`, `$pwd`.
 
-**FR-32 — Littéraux.** Chaînes `'brutes'` et `"interpolées $var $(expr)"`, entiers, décimaux, `true`/`false`/`null`, tailles et durées (FR-19), `now`, listes `[1, 2, 3]`.
+**FR-32 — Littéraux.** Comme en Java, avec quelques ajouts du shell :
+- **chaînes** entre guillemets doubles, avec les **échappements Java** : `\\` pour un antislash, `\"`, `\n`, `\t`, `\uXXXX` → `"C:\\Users\\yves"` ; interpolation `$var` et `$(expr)` (`\$` pour un `$` littéral) ; blocs de texte `"""…"""` ;
+- **caractères** entre apostrophes : `'a'`, `'\n'` (type `char`, comme en Java) ;
+- entiers, décimaux, `true`/`false`/`null`, tailles et durées (FR-19), `now`, listes `[1, 2, 3]`.
+
+**FR-32b — Arguments de commande non quotés.** Un argument de commande écrit **sans guillemets** (`cd C:\Users`, `ls D:\photos`, `git log -n 5`) est pris **tel quel** : l'antislash n'y est pas un caractère d'échappement, ce qui permet de taper les chemins Windows naturellement. Les échappements Java ne s'appliquent qu'**à l'intérieur des guillemets**. Un argument contenant des espaces se met entre guillemets en doublant les antislashs : `cd "C:\\Program Files"`.
 
 **FR-33 — Opérateurs dans `{ }` : syntaxe Java.** Les blocs utilisent les opérateurs de Java ; pour tout le reste (motifs, expressions régulières, appartenance…), on appelle **les méthodes Java** des objets (§3.13). Il n'y a pas d'opérateur propre au shell comme `like` ou `-match`.
 
@@ -282,7 +323,7 @@ Note : `!` en début de ligne reste l'expansion d'historique (FR-11) ; à l'int�
 
 ### 3.9 Cmdlets du périmètre actuel
 
-Seuls **deux cmdlets** sont dans le périmètre de ce document. Ils couvrent à eux seuls les mécanismes centraux : production d'objets records, accès aux attributs, pipeline, expressions, mélange avec les commandes natives.
+Seuls **trois cmdlets** sont dans le périmètre de ce document : `ls`, `where` et `env`. Les deux premiers couvrent à eux seuls les mécanismes centraux : production d'objets records, accès aux attributs, pipeline, expressions, mélange avec les commandes natives.
 
 #### FR-35 — `ls` : lister des fichiers
 
@@ -338,6 +379,28 @@ CA :
 - `git status --porcelain | where { $_.startsWith(" M ") }` ;
 - `ipconfig | where { $_.contains("IPv4") }`.
 
+#### FR-36b — `env` : variables d'environnement
+
+```text
+env                              # liste toutes les variables
+env <NOM>                        # une variable
+env --set <NOM>=<valeur>         # crée ou modifie (aussi : env -s NOM=valeur)
+env --unset <NOM>                # supprime
+env --append <NOM> <valeur>      # ajoute à une liste (séparateur ; sous Windows, : ailleurs)
+env --prepend <NOM> <valeur>     # idem, en tête de liste
+```
+
+Sortie : flux de `record EnvVar(String name, String value)`, triés par nom (noms insensibles à la casse sous Windows).
+
+Les modifications concernent **l'environnement de la session PowerJ** : elles s'appliquent à toutes les commandes natives lancées ensuite, à la recherche des exécutables dans le `PATH` (FR-13) et aux réglages lus par PowerJ (`POWERJ_NATIVE_ENCODING`…). Elles ne sont pas persistées : pour les rendre permanentes, les placer dans `profile.pj` (§8). Note : `System.getenv()` en expression Java renvoie l'environnement **initial** du process (une JVM ne peut pas modifier son propre environnement) ; utiliser `env` pour l'environnement de la session.
+
+CA :
+- `env | where { $_.name.startsWith("JAVA") }` ;
+- `(env PATH).value.split(";")` liste les dossiers du `PATH` ;
+- `env --append PATH C:\tools` puis un outil de `C:\tools` est trouvé et `which` l'indique ;
+- `env --set MAVEN_OPTS=-Xmx2g` puis `mvn` reçoit la variable ;
+- `env --unset MAVEN_OPTS`.
+
 ### 3.10 Commandes natives
 
 **FR-37 — Principe : les flux restent des flux.** Une commande native n'est **pas** encapsulée dans un objet : sa sortie standard et sa sortie d'erreur sont traitées comme des flux, à la manière d'un shell classique.
@@ -345,7 +408,7 @@ CA :
 | Situation | stdout | stderr |
 |---|---|---|
 | **Dernière étape** au REPL (`git log`) | Hérité directement du terminal : couleurs, pagination, programmes interactifs (`vim`, `ssh`, `python`) fonctionnent. | Hérité du terminal. |
-| **Étape suivie d'un cmdlet** (`git status \| where …`) | Converti en **flux de lignes `String`** (décodage UTF-8 ou page de code console), en streaming. | **Flux d'erreur PowerJ** (affiché en rouge), jamais mélangé aux objets. |
+| **Étape suivie d'un cmdlet** (`git status \| where …`) | Converti en **flux de lignes `String`** (décodage selon FR-40b), en streaming. | **Flux d'erreur PowerJ** (affiché en rouge), jamais mélangé aux objets. |
 | **Affectation** (`$l = ipconfig`) | Capturé en liste de lignes `String`. | Flux d'erreur PowerJ. |
 | **Natif → natif** (`^cat a.txt \| ^sort`) | Octets transmis **directement** d'un process à l'autre, sans décodage (préserve encodage et binaire). | Flux d'erreur PowerJ. |
 | **Cmdlet → natif** (`ls \| ^more`) | Les objets sont convertis en texte (forme affichée) et écrits sur le stdin du process. | — |
@@ -369,7 +432,17 @@ accessible via `$last` ; `$exit` vaut `$last.exitCode` ; `$?` vaut `true` si le 
 **FR-39 — Applications graphiques.** Un exécutable Windows du sous-système GUI (détecté en lisant l'en-tête PE) est lancé **détaché** : le shell rend la main immédiatement, `$last.pid` est renseigné, `$exit` vaut `null`.
 - CA : `notepad` ouvre le Bloc-notes et le prompt revient aussitôt.
 
-**FR-40 — Arguments.** Les arguments sont passés tels quels après expansion des variables et des jokers (expansion des jokers sur les chemins existants, désactivable en mettant l'argument entre guillemets simples). Sous Windows, la ligne de commande est construite selon les règles de quoting de `CommandLineToArgvW`.
+**FR-40b — Encodage des commandes natives.** Le texte échangé avec les commandes natives (stdout/stderr décodés en `String`, objets écrits sur stdin) utilise l'encodage défini par la **variable d'environnement `POWERJ_NATIVE_ENCODING`** :
+
+| Valeur | Effet |
+|---|---|
+| *(non définie)* ou `auto` | Défaut : page de code de sortie de la console Windows (ex. `cp850` sur un Windows français) ; UTF-8 sous Linux/macOS. |
+| un nom de charset Java (`UTF-8`, `cp850`, `windows-1252`…) | Utilisé pour toutes les commandes natives. |
+
+Une valeur propre à un programme peut être donnée par **`POWERJ_NATIVE_ENCODING_<NOM>`**, où `<NOM>` est le nom de l'exécutable en majuscules, sans extension : `POWERJ_NATIVE_ENCODING_GIT=UTF-8` (git produit de l'UTF-8 alors que `ipconfig` utilise la page de code console). La variable se définit dans l'environnement Windows ou dans la session avec `env --set` (FR-36b), et s'applique dès la commande suivante. Un nom de charset invalide produit une erreur explicite au lancement de la commande. Le flux natif → natif n'est jamais décodé (FR-37).
+- CA : sur un Windows français, `ipconfig | where { $_.contains("Adresse") }` affiche les accents correctement sans configuration ; `env --set POWERJ_NATIVE_ENCODING_GIT=UTF-8` puis `git log --oneline | where { $_.contains("é") }`.
+
+**FR-40 — Arguments.** Les arguments sont passés tels quels après expansion des variables et des jokers (expansion des jokers sur les chemins existants, désactivable en mettant l'argument entre guillemets). Sous Windows, la ligne de commande est construite selon les règles de quoting de `CommandLineToArgvW`.
 
 ### 3.11 Erreurs
 
@@ -484,6 +557,49 @@ PJ> java.net.InetAddress.getLocalHost().hostAddress
 PJ> String.join(", ", (ls).name)
 PJ> (ls -r | where size > 1mb).size()
 ```
+
+### 3.14 Robustesse
+
+Principe : **rien de ce qu'exécute une ligne ne peut faire tomber le shell.** Une commande se termine toujours par l'un de quatre résultats, et la boucle du REPL ne voit jamais d'exception.
+
+**FR-56 — Résultat d'exécution.** Chaque ligne est exécutée par un **superviseur** qui renvoie un résultat d'un type scellé :
+
+```java
+sealed interface Outcome {
+    record Success(List<Object> values)        implements Outcome { }
+    record Failure(PjError error)              implements Outcome { }
+    record Cancelled()                         implements Outcome { }   // Ctrl+C
+    record Abandoned(String commandLine)       implements Outcome { }   // ne répondait plus
+}
+```
+
+La boucle du REPL se réduit à `switch (supervisor.run(line))` sur ces quatre cas (affichage, message d'erreur, `^C`, avertissement). Le superviseur capture **tout `Throwable`**, y compris :
+
+| Problème | Traitement |
+|---|---|
+| Exception Java (cmdlet, appel Java) | Erreur bloquante courte (FR-53), objet dans `$errors`. |
+| `StackOverflowError` (récursion infinie) | Erreur « récursion trop profonde » ; l'interpréteur limite aussi sa propre profondeur d'évaluation. |
+| `OutOfMemoryError` | Une **réserve mémoire** allouée au démarrage est libérée pour permettre au shell de continuer ; les objets de la commande sont relâchés ; message conseillant de filtrer plus tôt dans le pipeline. La réserve est réallouée ensuite. |
+| `LinkageError`, `ExceptionInInitializerError` | Erreur bloquante avec le nom de la classe en cause. |
+| Erreur interne de PowerJ (bug) | Message court + pile complète écrite dans `~/.powerj/logs/powerj.log`. |
+
+**FR-57 — Annulation par Ctrl+C, en trois niveaux.** Toutes les étapes d'une ligne s'exécutent dans une même portée de concurrence structurée (§5.3), ce qui permet de tout annuler d'un coup.
+1. **Coopératif (immédiat)** : un jeton d'annulation (transmis par `ScopedValue`) est vérifié par l'interpréteur à chaque nœud évalué et à chaque appel de bloc `{ }`, par le pipeline entre deux objets et par les cmdlets (`ctx.cancelled()`). Cela couvre les boucles du shell et les appels Java qui rappellent un bloc (`Stream.iterate(0, { $_ + 1 }).forEach(...)`).
+2. **Interruption** : les threads de la commande sont interrompus (`Thread.interrupt`), ce qui débloque les E/S, `sleep`, `HttpClient`, les files d'attente. Les **process natifs** et tous leurs descendants (`ProcessHandle.descendants()`) sont arrêtés, puis tués de force s'ils ne s'arrêtent pas.
+3. **Abandon** : si la commande ne s'est toujours pas arrêtée — typiquement du code du JDK qui ne vérifie pas l'interruption, comme une expression régulière catastrophique ou un tri géant — un **second Ctrl+C** l'abandonne : le shell rend la main avec l'avertissement `commande abandonnée, elle continue en arrière-plan`, sa sortie est ignorée, et elle est arrêtée à la fermeture du shell. (Java ne permet pas de tuer un thread de force ; l'abandon est la seule issue sûre.)
+
+**FR-58 — Appels Java dangereux pour le shell.** Certaines méthodes du JDK agiraient sur le shell lui-même plutôt que sur la commande. Elles sont **interceptées lors de la résolution de l'appel** (§5.4), sans mécanisme de sécurité supplémentaire :
+
+| Appel | Traitement |
+|---|---|
+| `System.exit(n)`, `Runtime.getRuntime().exit(n)`, `Runtime.getRuntime().halt(n)` | Équivaut à la commande `exit n` (fermeture propre, historique sauvegardé). |
+| `System.setOut(…)`, `System.setErr(…)`, `System.setIn(…)` | Refusé, avec un message explicatif (casserait l'affichage du terminal). |
+
+Le code Java qui écrit sur `System.out` / `System.err` (`System.out.println("x")`) s'affiche normalement, sans corrompre la ligne en cours de saisie : au démarrage, ces flux sont reliés au terminal JLine.
+
+**FR-59 — Terminal et historique toujours restaurés.** L'historique est écrit après chaque commande (FR-09), donc un arrêt brutal ne perd rien. À la sortie, y compris sur erreur fatale de la JVM ou fermeture de la fenêtre, un hook d'arrêt remet le terminal dans son état initial (mode raw désactivé, couleurs réinitialisées).
+
+**FR-60 — Journal de diagnostic.** Les erreurs internes et les avertissements sont journalisés dans `~/.powerj/logs/powerj.log` (rotation, 5 fichiers maximum). `--debug` affiche aussi ces détails à l'écran.
 
 ---
 
@@ -643,6 +759,7 @@ ligne saisie
 - **Conversion des arguments** : table de conversions (FR-50) exprimée par `switch` sur les types ; choix de surcharge par score de spécificité.
 - **Blocs → interfaces fonctionnelles** : adaptation via `MethodHandleProxies.asInterfaceInstance` (ou `LambdaMetafactory` pour les interfaces fréquentes du JDK).
 - **Déroulage** (FR-30b) : appliqué à la sortie de chaque étape par l'exécuteur du pipeline.
+- **Interceptions** (FR-58) : table des méthodes redirigées ou refusées (`System.exit`, `Runtime.halt`, `System.setOut`…), consultée à la résolution d'un appel ; vérification du jeton d'annulation (FR-57) à chaque invocation d'un bloc.
 
 ### 5.5 Dépendances
 
@@ -702,9 +819,16 @@ Dossier utilisateur `~/.powerj/` (créé au premier lancement) :
 | `history` | Historique des commandes (FR-09). |
 | `modules/` | Jars des modules tiers (§4.4). |
 | `config.properties` | `history.size=10000`, `lang=fr`, `native.prefer=find,sort`, `colors.cmdlet=green`… |
+| `logs/` | Journal de diagnostic (FR-60). |
 | `profile.pj` | Lignes exécutées au démarrage (affectations de variables, alias : `alias ll = ls -a`). |
 
-Le dossier peut être déplacé via la variable d'environnement `POWERJ_HOME`.
+Variables d'environnement lues par PowerJ :
+
+| Variable | Rôle |
+|---|---|
+| `POWERJ_HOME` | Emplacement du dossier de configuration (défaut `~/.powerj`). |
+| `POWERJ_NATIVE_ENCODING` | Encodage des commandes natives (FR-40b). |
+| `POWERJ_NATIVE_ENCODING_<NOM>` | Encodage pour un exécutable précis (FR-40b). |
 
 ---
 
@@ -712,7 +836,7 @@ Le dossier peut être déplacé via la variable d'environnement `POWERJ_HOME`.
 
 | ID | Exigence |
 |---|---|
-| NFR-01 | Démarrage jusqu'au prompt < 1 s sur un poste standard (AOT cache / CDS du JDK). |
+| NFR-01 | Temps de démarrage : pas d'exigence en v1 (quelques secondes acceptables). L'optimisation (cache AOT du JDK, index des classes en tâche de fond) est prévue dans un second temps. |
 | NFR-02 | Latence de frappe imperceptible ; complétion < 50 ms. |
 | NFR-03 | Windows 10/11 x64 prioritaire ; UTF-8 de bout en bout (console en page de code 65001). |
 | NFR-04 | `ls -r` sur 100 000 fichiers sans dépassement mémoire (streaming). |
@@ -755,7 +879,7 @@ Chaque étape :
 
 ### Étape 1 — Édition de ligne et historique
 
-**Contenu :** JLine, FR-01 à FR-11 (prompt, multi-ligne, Ctrl+C, édition, ↑/↓, Ctrl+R, historique persistant, `history`, `!!`, `!n`).
+**Contenu :** JLine, FR-01 à FR-11 (prompt, multi-ligne, Ctrl+C, Ctrl+D, édition, ↑/↓, Ctrl+R, historique persistant, `history`, `!!`, `!n`) ; superviseur et résultat `Outcome` (FR-56), restauration du terminal (FR-59), journal (FR-60).
 
 **Recette :**
 1. Taper `bonjour`, `test un`, `test deux` (affichage d'une erreur « commande inconnue » attendu).
@@ -763,10 +887,11 @@ Chaque étape :
 3. Ctrl+R puis `un` : `test un` est proposé.
 4. Quitter, relancer : ↑ retrouve les lignes.
 5. `history` liste les entrées ; `!!` ré-exécute la dernière.
+6. Ctrl+C sur une ligne en cours de saisie l'efface ; Ctrl+D sur une ligne vide quitte le shell.
 
 ### Étape 2 — Commandes natives
 
-**Contenu :** lexer/parser minimal (commandes, arguments, chaînes, variables), résolution `PATH`, exécution avec stdout/stderr hérités, flux d'erreur, `$last` (`NativeRun`), `$exit`, `$?`, affectation `$x = …` (capture des lignes), applications GUI détachées, `which`, redirections `>`, `2>`. FR-13 à FR-15, FR-31, FR-34, FR-37 à FR-40.
+**Contenu :** lexer/parser minimal (commandes, arguments, chaînes, variables), résolution `PATH`, exécution avec stdout/stderr hérités, flux d'erreur, `$last` (`NativeRun`), `$exit`, `$?`, affectation `$x = …` (capture des lignes), applications GUI détachées, `which`, redirections `>`, `2>`, encodage des commandes natives, navigation `cd`/`pwd`, enchaînement `;` `&&` `||`, Ctrl+C sur une commande native. FR-03, FR-04b, FR-04c, FR-13 à FR-15, FR-31, FR-32b, FR-34, FR-37 à FR-40b, FR-57 (niveaux 1-2 pour les natifs).
 
 **Recette :**
 1. `git --version` affiche la version.
@@ -777,10 +902,14 @@ Chaque étape :
 6. `git log > log.txt` crée le fichier.
 7. `notepad` : le Bloc-notes s'ouvre et le prompt revient immédiatement.
 8. `which git` affiche le chemin de l'exécutable.
+9. `cd C:\Windows`, `cd ..`, `cd -`, `cd ~`, `pwd` ; `cd "C:\\Program Files"`.
+10. `ipconfig` dans une variable (`$l = ipconfig`) puis `$l` : les accents sont corrects sur un Windows français.
+11. `^cmd /c "exit 1" || "échec"` affiche `échec` ; `git --version && "ok"` affiche la version puis `ok` ; `^cmd /c "exit 1" && "jamais"` n'affiche rien.
+12. `ping -t localhost` puis Ctrl+C : `ping` s'arrête et le prompt revient.
 
 ### Étape 3 — Modèle objet et cmdlet `ls`
 
-**Contenu :** `powerj-api` (FR : §4.2), registre des cmdlets, priorité cmdlet > natif, `^`, liaison des options Unix (FR-18 à FR-20), accès aux propriétés des objets (FR-27 à FR-29 : records, getters, champs), affichage selon le type (FR-30), déroulage (FR-30b), cmdlet `ls` (FR-35), `help` (FR-45).
+**Contenu :** `powerj-api` (FR : §4.2), registre des cmdlets, cmdlet `env` (FR-36b) et réglage de l'encodage par variable (FR-40b), priorité cmdlet > natif, `^`, liaison des options Unix (FR-18 à FR-20), accès aux propriétés des objets (FR-27 à FR-29 : records, getters, champs), affichage selon le type (FR-30), déroulage (FR-30b), cmdlet `ls` (FR-35), `help` (FR-45).
 
 **Recette :**
 1. `ls` affiche un tableau `name size modified dir`.
@@ -790,10 +919,13 @@ Chaque étape :
 5. `ls --recurce` : erreur avec suggestion `--recurse`.
 6. `help ls` et `ls --help` affichent l'aide.
 7. `^ls` exécute le `ls` natif (si Git Bash installé) ; `which ls` indique `cmdlet`.
+8. `env`, `env PATH`, `env --set MAVEN_OPTS=-Xmx2g` puis `env MAVEN_OPTS`, `env --unset MAVEN_OPTS`.
+9. `env --append PATH C:\tools` : un outil de `C:\tools` devient exécutable et `which` le trouve.
+10. `env --set POWERJ_NATIVE_ENCODING_GIT=UTF-8` puis `$l = git log --oneline` : accents corrects.
 
 ### Étape 4 — Pipeline et cmdlet `where`
 
-**Contenu :** pipeline streaming (threads virtuels, Structured Concurrency, files bornées), langage d'expression (FR-32, FR-33), littéraux d'unités (FR-19), cmdlet `where` (FR-36), natifs dans le pipeline (lignes `String`, cmdlet → natif, natif → natif), `2>&1`, Ctrl+C sur un pipeline, `--on-error`.
+**Contenu :** pipeline streaming (threads virtuels, Structured Concurrency, files bornées), langage d'expression (FR-32, FR-33), littéraux d'unités (FR-19), cmdlet `where` (FR-36), natifs dans le pipeline (lignes `String`, cmdlet → natif, natif → natif), `2>&1`, Ctrl+C sur un pipeline, `--on-error`, mode non interactif (FR-04d).
 
 **Recette :**
 1. `ls -r | where { $_.size > 1mb }`.
@@ -802,12 +934,14 @@ Chaque étape :
 4. `git status --porcelain | where { $_.startsWith(" M ") }`.
 5. `ipconfig | where { $_.contains("IPv4") }`.
 6. `ls | ^more` : sortie paginée.
-7. `ls -r C:\ | where { $_.ext == 'log' }` puis Ctrl+C : arrêt immédiat.
+7. `ls -r C:\ | where { $_.ext == "log" }` puis Ctrl+C : arrêt immédiat.
 8. `git commandeinconnue 2> err.txt` : `err.txt` contient le message.
+9. `env | where { $_.name.startsWith("JAVA") }`.
+10. Depuis `cmd.exe` : `powerj -c "ls | where { $_.size > 1mb }"` ; `powerj -c "^cmd /c exit 3"` puis `echo %ERRORLEVEL%` affiche 3 ; `dir /b | powerj -c "where { $_.endsWith(\".txt\") }"`.
 
 ### Étape 5 — Interopérabilité Java
 
-**Contenu :** §3.13 (FR-46 à FR-55) : appels statiques, champs statiques, `import`, `new`, appels d'instance, surcharges et conversions, varargs, casts, blocs → interfaces fonctionnelles, exceptions, `help members` / `help <classe>` ; runtime jlink `java.se` complet.
+**Contenu :** §3.13 (FR-46 à FR-55) : appels statiques, champs statiques, `import`, `new`, appels d'instance, surcharges et conversions, varargs, casts, blocs → interfaces fonctionnelles, exceptions, `help members` / `help <classe>` ; runtime jlink `java.se` complet ; robustesse des appels Java : annulation coopérative et abandon (FR-57), interceptions (FR-58), erreurs graves (FR-56).
 
 **Recette :**
 1. `java.util.List.of("apple", "banana", "orange") | where { $_.contains("b") }` affiche `banana`.
@@ -820,6 +954,9 @@ Chaque étape :
 8. `Integer.parseInt("x")` : erreur lisible `NumberFormatException`, pile visible avec `--debug`.
 9. `java -version` lance toujours le `java` natif (s'il est installé).
 10. `help members $l` et `help java.util.List`.
+11. `Stream.iterate(0, { $_ + 1 }).forEach({ $_ })` puis Ctrl+C : le prompt revient.
+12. `System.exit(0)` : le shell se ferme proprement (historique sauvegardé) ; `System.setOut(null)` : refusé avec un message.
+13. `new ArrayList().addAll(Collections.nCopies(2000000000, "x"))` : erreur mémoire, le shell reste utilisable.
 
 ### Étape 6 — Autocomplétion Tab et coloration
 
@@ -893,9 +1030,12 @@ nom_qualifie  = ident { "." ident } ;
 variable_acces= postfixe ;
 variable      = "$" ( ident | "_" | "?" ) ;
 liste         = "[" [ expression { "," expression } ] "]" ;
-litteral      = chaine | nombre | unite | "true" | "false" | "null" | "now" ;
+litteral      = chaine | caractere | nombre | unite | "true" | "false" | "null" | "now" ;
 unite         = nombre ( "b" | "kb" | "mb" | "gb" | "tb" | "s" | "m" | "h" | "d" ) ;
-chaine        = "'" { car } "'" | '"' { car | "$" ident | "$(" pipeline ")" } '"' ;
+chaine        = '"' { car | echappement | "$" ident | "$(" pipeline ")" } '"' | bloc_texte ;
+echappement   = "\\" ( "\\" | '"' | "n" | "t" | "r" | "$" | "u" hex hex hex hex ) ;
+caractere     = "'" ( car | echappement ) "'" ;
+mot           = { car_sans_espace } ;   (* argument non quoté : pris tel quel, "\" littéral *)
 ```
 
 ### 12.2 Sessions d'exemple (périmètre `ls` + `where` + natifs)
@@ -917,7 +1057,6 @@ PJ C:\dev> (ls).name.stream().map({ $_.toUpperCase() }).sorted().toList()
 
 | Cmdlet | Description | Record de sortie envisagé |
 |---|---|---|
-| `cd`, `pwd` | Changer / afficher le répertoire courant (internes au début) | `Location` |
 | `cat` | Lire un fichier ligne par ligne | `String` |
 | `find` | Recherche avancée (`--name --since --size --type`) | `FileEntry` |
 | `cp`, `mv`, `rm`, `mkdir`, `touch` | Opérations sur fichiers | `FileEntry` |
@@ -964,9 +1103,8 @@ find src --name *.java --since 7d | where { $_.size > 2kb } | group { $_.path.pa
 ### 12.5 Questions ouvertes pour le PM
 
 1. **Couleurs et thème** : faut-il un thème clair / sombre configurable dès la v1 ?
-2. **`cd` / `pwd`** : ils sont indispensables pour tester `ls` confortablement ; les intégrer comme commandes internes dès l'étape 3 (hors quota de 2 cmdlets) ?
-3. **Signature de code** de l'exe et de l'installeur (évite l'avertissement SmartScreen) : certificat disponible ?
-4. **Nom de l'installeur et éditeur** affichés dans « Programmes et fonctionnalités ».
-5. **Dictionnaires littéraux** (`{k: v}`) : utiles en v1 ou reportés ? (Avec l'interop, `java.util.Map.of("k", "v")` couvre déjà le besoin.)
-6. **Licence** du module `powerj-api` pour les auteurs de modules tiers (même licence que le projet ?).
-7. **Interop et effets de bord** : faut-il une option de configuration pour désactiver l'interop Java (`interop.enabled=false`) dans des contextes restreints ?
+2. **Signature de code** de l'exe et de l'installeur (évite l'avertissement SmartScreen) : certificat disponible ?
+3. **Nom de l'installeur et éditeur** affichés dans « Programmes et fonctionnalités ».
+4. **Dictionnaires littéraux** (`{k: v}`) : utiles en v1 ou reportés ? (Avec l'interop, `java.util.Map.of("k", "v")` couvre déjà le besoin.)
+5. **Licence** du module `powerj-api` pour les auteurs de modules tiers (même licence que le projet ?).
+6. **Interop et effets de bord** : faut-il une option de configuration pour désactiver l'interop Java (`interop.enabled=false`) dans des contextes restreints ?
