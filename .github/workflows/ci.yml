@@ -93,6 +93,8 @@ jobs:
           foreach ($attendu in 'C:\Windows', 'ligne : deux', 'secours') {
             if (-not (Select-String -Path out.txt -SimpleMatch $attendu -Quiet)) { throw "absent de la sortie : $attendu" }
           }
+          # Le code 3 attendu de powerj.exe ne doit pas devenir le code retour de l'étape.
+          exit 0
 
       - name: Archive portable powerj.exe
         uses: actions/upload-artifact@v5
