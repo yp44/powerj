@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Version du document** | 0.1 (brouillon soumis au PM) |
+| **Version du document** | 0.2 (ajout de l'interopérabilité Java) |
 | **Statut** | À valider |
 | **Plateforme cible** | Windows 10/11 x64 (`powerj.exe`), Linux/macOS en bonus |
 | **Socle technique** | Java 27, Maven 3.9, JLine 3 |
@@ -28,7 +28,7 @@
 
 ## 1. Vision et objectifs
 
-PowerJ est un **shell interactif orienté objet** écrit en Java. Comme PowerShell, ses commandes internes (*cmdlets*) ne produisent pas du texte mais des **objets** — des `record` Java — dont on peut extraire, filtrer et combiner les attributs dans un pipeline. Contrairement à PowerShell :
+PowerJ est un **shell interactif orienté objet** écrit en Java. Comme PowerShell, ses commandes internes (*cmdlets*) ne produisent pas du texte mais des **objets Java** — de préférence des `record` — dont on peut extraire, filtrer et combiner les attributs dans un pipeline. **Toute l'API Java du JRE est directement appelable** depuis la ligne de commande (`java.util.List.of("apple", "banana")`, `Math.max(3, 7)`). Contrairement à PowerShell :
 
 - les commandes portent des **noms courts, familiers aux utilisateurs Unix** (`ls`, `where`…) plutôt que des noms Verbe-Nom verbeux (`Get-ChildItem`, `Where-Object`) ;
 - les options suivent la **convention Unix** (`-r`, `--recurse`) ;
@@ -45,6 +45,13 @@ Evaluator.java     11,8 KB   2026-10-06 09:40      false
 PJ C:\dev\powerj> git status --porcelain | where { $_ like ' M *' }
  M src/core/Parser.java
  M src/core/Evaluator.java
+
+PJ C:\dev\powerj> java.util.List.of("apple", "banana", "orange") | where { $_ like 'b*' }
+banana
+
+PJ C:\dev\powerj> import java.time.*
+PJ C:\dev\powerj> LocalDate.now().plusDays(10).dayOfWeek
+FRIDAY
 ```
 
 ### 1.1 Objectifs de la v1
@@ -53,10 +60,11 @@ PJ C:\dev\powerj> git status --porcelain | where { $_ like ' M *' }
 |---|---|
 | OBJ-1 | Shell interactif livré sous forme de `powerj.exe` installable sous Windows. |
 | OBJ-2 | Édition de ligne confortable : historique persistant, ↑/↓, **Ctrl+R**, autocomplétion **Tab**. |
-| OBJ-3 | Pipeline d'objets typés (records Java) avec accès aux attributs (`$_.size`). |
+| OBJ-3 | Pipeline d'objets Java typés (records de préférence, mais tout objet) avec accès aux attributs (`$_.size`). |
 | OBJ-4 | Mélange transparent cmdlets ↔ commandes natives. |
 | OBJ-5 | Extensibilité : un développeur tiers ajoute des cmdlets en déposant un `.jar`. |
 | OBJ-6 | Base de code exemplaire en Java moderne (Java 27). |
+| OBJ-7 | Accès direct à toute l'API Java publique du JRE (méthodes statiques, constructeurs, méthodes d'instance). |
 
 ### 1.2 Non-objectifs de la v1
 
@@ -76,9 +84,11 @@ PJ C:\dev\powerj> git status --porcelain | where { $_ like ' M *' }
 | **Commande native** | Programme externe trouvé dans le `PATH` (`git.exe`, `notepad.exe`…). Il produit du texte sur stdout/stderr. |
 | **Préfixe `^`** | Force l'exécution de la commande native même si un cmdlet porte le même nom (`^ls`). |
 | **Pipeline** | Chaîne d'étapes séparées par `|` ; chaque étape reçoit le flux de sortie de la précédente. |
-| **Flux de sortie** | Suite d'objets produits par une étape (records, ou lignes `String` pour une commande native). |
+| **Flux de sortie** | Suite d'objets Java produits par une étape (records, objets quelconques, ou lignes `String` pour une commande native). |
+| **Expression Java** | Appel d'une méthode, d'un constructeur ou d'un champ Java directement dans la ligne (`Math.max(3, 7)`, `new java.io.File("x")`). |
+| **Déroulage** | Émission un par un des éléments d'une collection dans un pipeline. |
 | **Flux d'erreur** | Suite de messages d'erreur, affichés séparément (en rouge), jamais mélangés au flux de sortie. |
-| **Record de sortie** | Type `record` Java décrivant les objets produits par un cmdlet (ex. `FileEntry`). |
+| **Record de sortie** | Type `record` Java décrivant les objets produits par un cmdlet (ex. `FileEntry`) ; recommandé mais non obligatoire. |
 | **Filtre** | Cmdlet qui transforme ou sélectionne les objets reçus (ex. `where`). |
 | **Bloc d'expression** | Expression entre accolades `{ … }` évaluée pour chaque objet, `$_` désignant l'objet courant. |
 | **Module** | Archive `.jar` apportant un ou plusieurs cmdlets tiers. |
@@ -180,27 +190,61 @@ Noms d'options insensibles à la casse ; une option longue peut être abrégée 
 **FR-24 — Complétion des propriétés et variables.** Après `$` → variables définies. Après `$_.` dans un bloc `{ }` → composants du record produit par l'étape précédente (type de sortie statique du cmdlet amont). Après `$var.` → composants du type de la valeur de `$var`.
 - CA : `ls | where { $_.<Tab>` propose `name size modified path dir ext`.
 
+**FR-24b — Complétion Java.** Dans une expression Java (§3.13) :
+- après `java.` / `javax.` / un nom de package → sous-packages et classes publiques (index des packages exportés du runtime et des modules chargés) ;
+- après `Classe.` → méthodes et champs **statiques** ;
+- après `$x.` ou `expr().` → méthodes publiques et propriétés (getters, champs) du type réel de la valeur, ou du type de retour statique connu ;
+- après `new ` → classes instanciables ; après `import ` → packages et classes.
+
+Le menu affiche la signature (`of(E...) : List<E>`). Les classes importées (§FR-47) sont proposées par leur nom simple.
+- CA : `java.util.Li<Tab>` propose `List LinkedList …` ; `List.<Tab>` propose `of copyOf` ; `$l = List.of(1); $l.<Tab>` propose `size() get(int) stream() …`.
+
 **FR-25 — Arguments des commandes natives.** Tab complète les chemins de fichiers.
 
 **FR-26 — Ergonomie.** Premier Tab : complète le préfixe commun ; Tab suivant : menu des candidats, Tab/Shift+Tab pour s'y déplacer ; chaque candidat affiche une courte description (synopsis du cmdlet, type de l'option). Temps de réponse < 50 ms.
 
 ### 3.7 Modèle objet
 
-**FR-27 — Records exclusivement.** Les objets circulant dans un pipeline sont :
-- des **`record` Java** (cas général) ;
-- des scalaires : `String`, nombres, `Boolean`, `Path`, `Instant`, `Duration` ;
-- des listes (`List`) et dictionnaires (`Map`) issus de littéraux ou de conversions futures (JSON).
+**FR-27 — Tout objet Java.** N'importe quel objet Java peut circuler dans un pipeline ou être stocké dans une variable : records, `String`, nombres, `List`, `Map`, `java.io.File`, `LocalDate`, objets d'un module tiers…
 
-Les **JavaBeans (getters/setters) ne sont pas supportés** : un cmdlet dont le type de sortie n'est pas un record est rejeté au chargement.
+Les **records restent le format recommandé** pour les sorties des cmdlets (affichage en tableau, complétion des attributs, documentation automatique), mais ils ne sont pas obligatoires : un cmdlet peut produire n'importe quel type.
 
-**FR-28 — Accès aux attributs.** `$x.nom` lit le composant `nom` du record (insensible à la casse) ; l'accès se chaîne (`$x.path.parent`). Sur une liste, l'accès s'applique à chaque élément (`(ls).name` → liste des noms). Indexation : `$f[0]`, `$f[-1]`. Attribut inexistant → erreur `FileEntry n'a pas d'attribut 'siz' (attributs : name, size, …)`.
+**FR-28 — Accès aux attributs et méthodes.**
+- `$x.nom` (sans parenthèses) est une **propriété**, résolue dans cet ordre, insensible à la casse :
+  1. composant de record `nom()` ;
+  2. getter `getNom()` ou `isNom()` (booléen) ;
+  3. champ public `nom` ;
+  4. sur une `Map` : valeur associée à la clé `"nom"`.
+- `$x.nom(args)` (avec parenthèses) est toujours un **appel de méthode** (§3.13).
+- L'accès se chaîne : `$x.path.parent`, `$f.toPath().fileName`.
+- Sur une collection, l'accès à une propriété s'applique à chaque élément (`(ls).name` → liste des noms), sauf si la propriété existe sur la collection elle-même (`$l.empty` → `isEmpty()`).
+- Indexation : `$f[0]`, `$f[-1]` sur `List`, tableau ou `String` ; `$m['clé']` sur `Map`.
+- Propriété inexistante → erreur `FileEntry n'a pas de propriété 'siz' (propriétés : name, size, …)`.
 
 **FR-29 — Introspection.** `help members` sur une valeur (`$f | help members` ou `help members FileEntry`) liste les composants : nom, type, description (Javadoc / annotation `@Doc`).
 
-**FR-30 — Affichage par défaut.** En fin de pipeline, les objets sont affichés :
-- **en tableau** si le record a ≤ 5 composants affichables, colonnes alignées, largeur adaptée au terminal ;
-- **en liste** `nom : valeur` sinon ;
-- un record peut déclarer ses colonnes par défaut via `@Display(columns = {"name", "size", "modified"})`.
+**FR-30 — Affichage par défaut.** En fin de pipeline, chaque objet est affiché selon son type :
+- **record** : en tableau si ≤ 5 composants affichables (colonnes alignées, largeur adaptée au terminal), sinon en liste `nom : valeur` ; un record peut déclarer ses colonnes via `@Display(columns = {"name", "size", "modified"})` ;
+- **`Map`** : tableau `clé / valeur` ;
+- **scalaires** (`String`, nombres, booléens, dates, `Path`, enums) : une ligne, forme lisible ;
+- **autres objets** : `toString()` ; `help members` permet d'explorer leurs propriétés.
+
+Des objets successifs du même type record sont regroupés dans un même tableau.
+
+**FR-30b — Déroulage des collections.** Lorsqu'une étape de pipeline produit un `Iterable` (`List`, `Set`…), un tableau, un `Stream`, un `Iterator` ou un `Optional`, ses éléments sont **émis un par un** dans le flux (`Optional` vide → rien). `String` et `Map` ne sont **jamais** déroulés.
+En **affectation**, l'objet est conservé tel quel :
+
+```text
+PJ> java.util.List.of("apple", "banana", "orange") | where { $_ like 'b*' }
+banana
+PJ> $l = java.util.List.of("apple", "banana")
+PJ> $l.size()
+2
+PJ> $l | where { $_.length() > 5 }
+banana
+```
+
+Le déroulage est paresseux pour `Stream` et `Iterator` (pas de matérialisation en mémoire).
 
 Tailles et durées en format lisible (`14,2 KB`, `2 h 05 min`), dates en heure locale.
 
@@ -333,6 +377,87 @@ Les erreurs sont conservées dans `$errors` (50 dernières). Format : `ls : acc�
 
 **FR-45 — `help`.** `help` liste les cmdlets par catégorie avec leur résumé ; `help ls` affiche le synopsis, les options, le record de sortie et des exemples ; `ls --help` est équivalent. Ces informations sont générées depuis les métadonnées du cmdlet (annotations), donc disponibles pour les cmdlets tiers.
 
+### 3.13 Interopérabilité Java
+
+PowerJ donne un accès direct à **toute l'API Java publique** disponible dans le runtime : méthodes statiques, constructeurs, champs et méthodes d'instance. Le résultat est un objet Java ordinaire qui s'intègre au pipeline (FR-27, FR-30b).
+
+**FR-46 — Appels statiques.** Un nom qualifié suivi de parenthèses appelle une méthode statique ; sans parenthèses, il lit un champ statique ou désigne la classe :
+
+```text
+PJ> java.util.List.of("apple", "banana", "orange")
+apple
+banana
+orange
+PJ> java.lang.Math.max(3, 7)
+7
+PJ> java.lang.Math.PI
+3.141592653589793
+PJ> java.time.DayOfWeek.MONDAY
+MONDAY
+```
+
+**Règle lexicale (désambiguïsation avec les commandes).** En position de commande, un mot de la forme `ident(.ident)+` est une **expression Java** s'il est **immédiatement** suivi de `(` (sans espace), ou s'il désigne une classe ou un champ statique d'une classe connue. Sinon, la résolution des commandes (FR-13) s'applique. Ainsi `java -version` et `notepad.exe fichier.txt` restent des commandes natives, tandis que `java.lang.Math.max(1, 2)` est un appel Java. En cas de doute, une expression peut toujours être mise entre parenthèses : `(Math.max(1, 2))`.
+
+**FR-47 — Imports.** `import java.util.*` ou `import java.time.LocalDate` rend les classes utilisables par leur nom simple pour le reste de la session (ou depuis `profile.pj`). `java.lang.*` est importé par défaut. `import` sans argument liste les imports actifs. Un nom simple ambigu (deux imports) produit une erreur listant les candidats.
+
+```text
+PJ> import java.time.*
+PJ> LocalDate.now().plusDays(10).dayOfWeek
+FRIDAY
+PJ> Math.max(3, 7)
+7
+```
+
+**FR-48 — Instanciation.** `new Classe(args)` appelle un constructeur public : `new java.io.File("C:\\temp")`, `new StringBuilder("ab").reverse()`.
+
+**FR-49 — Appels d'instance.** Toute valeur expose ses méthodes publiques : `$l.size()`, `"abc".toUpperCase().length()`, `$f[0].path.toFile().length()`, `(ls)[0].modified.atZone(ZoneId.systemDefault()).year`. Les propriétés (FR-28) et les appels se combinent librement. Un appel de méthode peut apparaître partout où une expression est attendue, y compris dans les blocs `{ }` de `where`.
+
+**FR-50 — Résolution des surcharges et conversions.**
+- Les valeurs PowerJ sont converties vers les types de paramètres : entier → `int`/`long`/`short`/`byte`/`Integer`/`Long`/`BigInteger` (si sans perte) ; décimal → `double`/`float`/`BigDecimal` ; chaîne → `String`, `CharSequence`, `char` (si 1 caractère), `Path`, `File`, enum (par nom) ; liste PowerJ → `List`, `Collection`, tableau ; taille (FR-19) → `long` ; durée → `Duration`.
+- **varargs** supportés (`List.of("a", "b", "c")`, `String.format("%s-%s", 1, 2)`).
+- Parmi les surcharges applicables, la plus spécifique est choisie (règles proches de JLS §15.12) ; en cas d'ambiguïté, erreur listant les signatures candidates ; aucun candidat → erreur listant les surcharges existantes.
+- Une conversion explicite est possible par cast : `[long] 5`, `[java.util.ArrayList] $l` (vérification à l'exécution).
+
+**FR-51 — Blocs `{ }` vers interfaces fonctionnelles.** Un bloc passé à un paramètre dont le type est une interface fonctionnelle (`Predicate`, `Function`, `Comparator`, `Runnable`, `Supplier`…) est converti automatiquement :
+- 0 paramètre → aucun argument ; 1 paramètre → `$_` ; 2 paramètres → `$a` et `$b` ; au-delà → `$args[0]`, `$args[1]`… ;
+- la valeur du bloc est convertie vers le type de retour de la méthode abstraite (FR-50).
+
+```text
+PJ> $l = List.of("apple", "banana", "kiwi")
+PJ> $l.stream().filter({ $_.length() > 4 }).map({ $_.toUpperCase() }).toList()
+APPLE
+BANANA
+PJ> $m = new java.util.ArrayList($l); $m.sort({ $a.length() - $b.length() }); $m
+kiwi
+apple
+banana
+```
+
+**FR-52 — Périmètre et sécurité.**
+- Accessibles : classes et membres **`public`** des packages **exportés** par les modules du runtime (`java.se` complet, cf. §7) et par les modules tiers chargés (§4.4).
+- Pas d'accès réflexif forcé (`setAccessible`), ni aux packages internes (`jdk.internal.*`, `sun.*`).
+- Les méthodes `default` des interfaces et les méthodes héritées sont accessibles normalement ; l'appel passe par l'interface publique quand la classe d'implémentation n'est pas exportée (ex. `List.of(...)` renvoie une classe interne, ses méthodes sont appelées via `java.util.List`).
+
+**FR-53 — Exceptions.** Une exception levée par un appel Java est une **erreur bloquante** affichée sous forme courte : `java.lang.NumberFormatException : For input string: "x"` (pile complète en mode `--debug`). L'objet exception est conservé dans `$errors` (`$errors[0].cause`, `$errors[0].stackTrace`).
+
+**FR-54 — Introspection.**
+- `help members $x` : méthodes publiques (avec signatures), propriétés dérivées (composants de record, getters, champs) du type réel de `$x`.
+- `help java.util.List` (ou `help List` après import) : constructeurs, méthodes statiques et d'instance, champs.
+- `$x.getClass()` reste disponible.
+
+**FR-55 — Exemples de session.**
+
+```text
+PJ> import java.nio.file.*
+PJ> Files.readAllLines(Path.of("notes.txt")) | where { $_ like '*TODO*' }
+PJ> Files.size(Path.of("gros.iso")) / 1mb
+PJ> new java.io.File("C:\\Windows").listFiles() | where { $_.directory and $_.name like 'S*' }
+PJ> java.util.UUID.randomUUID()
+PJ> java.net.InetAddress.getLocalHost().hostAddress
+PJ> String.join(", ", (ls).name)
+PJ> (ls -r | where size > 1mb).size()
+```
+
 ---
 
 ## 4. API d'extension (cmdlets tiers)
@@ -340,7 +465,7 @@ Les erreurs sont conservées dans `$errors` (50 dernières). Format : `ls : acc�
 ### 4.1 Principes
 
 - Le module Maven **`powerj-api`** est la **seule dépendance** nécessaire pour écrire un cmdlet. Il est publié séparément et versionné sémantiquement.
-- Un cmdlet est une classe qui implémente `Cmdlet<I, O>` où **`O` est un record** (vérifié au chargement).
+- Un cmdlet est une classe qui implémente `Cmdlet<P, I, O>` ; le type de sortie `O` est libre (**un record est recommandé** pour bénéficier de l'affichage en tableau et de la complétion des attributs).
 - Les options sont déclarées par un **record de paramètres** dont les composants sont annotés `@Option`.
 - Les modules sont découverts par `ServiceLoader` et chargés dans un **`ModuleLayer` isolé** par jar.
 
@@ -349,8 +474,9 @@ Les erreurs sont conservées dans `$errors` (50 dernières). Format : `ls : acc�
 ```java
 package io.powerj.api;
 
-/** I : type des objets reçus (Void si le cmdlet ne lit pas le pipeline). O : record produit. */
-public interface Cmdlet<P extends Record, I, O extends Record> {
+/** P : record de paramètres. I : type des objets reçus (Void si le cmdlet ne lit pas le pipeline).
+ *  O : type des objets produits (record recommandé, tout type accepté). */
+public interface Cmdlet<P extends Record, I, O> {
     default void begin(P params, CmdletContext<O> ctx) throws Exception { }
     default void process(P params, I input, CmdletContext<O> ctx) throws Exception { }
     default void end(P params, CmdletContext<O> ctx) throws Exception { }
@@ -442,7 +568,8 @@ Yves   Bonjour Yves !   2026-10-07 10:12:03
 
 - Au démarrage, chaque `~/.powerj/modules/*.jar` est chargé dans son propre `ModuleLayer` (isolation des dépendances entre modules).
 - `mod-load <chemin.jar>` charge un module à chaud ; `mod-list` liste les modules chargés et leurs cmdlets.
-- Un module invalide (sortie non-record, nom en conflit, exception au chargement) est signalé par un avertissement ; les autres modules sont chargés normalement.
+- Les classes publiques exportées par un module chargé sont aussi utilisables en expression Java (§3.13) : `import com.example.greet.*`.
+- Un module invalide (nom en conflit, exception au chargement) est signalé par un avertissement ; les autres modules sont chargés normalement.
 
 ---
 
@@ -454,7 +581,8 @@ Yves   Bonjour Yves !   2026-10-07 10:12:03
 powerj/                         (POM parent, packaging pom)
 ├── powerj-api/                 API publique pour les cmdlets (aucune dépendance)
 ├── powerj-core/                Lexer, parser, AST, résolution, évaluateur, pipeline,
-│                               accès aux records, formatage, exécution native
+│                               accès aux objets, interop Java, formatage,
+│                               exécution native
 ├── powerj-cmdlets/             Cmdlets intégrés (ls, where)
 ├── powerj-shell/               REPL JLine, complétion, coloration, main
 ├── powerj-sample-module/       Module tiers d'exemple (greet)
@@ -481,7 +609,15 @@ ligne saisie
 - Le contexte de session (répertoire courant, variables, terminal, configuration) est transmis par **Scoped Values**.
 - Les commandes natives sont lancées via `ProcessBuilder` (redirections `INHERIT`, `PIPE` ou pipeline natif → natif via `ProcessBuilder.startPipeline`).
 
-### 5.4 Dépendances
+### 5.4 Interopérabilité Java (`powerj-core`, package `interop`)
+
+- **Résolution des classes** : index des packages exportés construit au démarrage depuis `ModuleLayer.boot()` et les couches des modules tiers (paresseux, en tâche de fond) ; imports de session.
+- **Résolution des membres** : métadonnées par type (méthodes publiques, propriétés dérivées, champs) mises en cache via `ClassValue` ; appels via `MethodHandle` obtenus par `MethodHandles.publicLookup()`, en remontant à l'interface ou la superclasse publique exportée quand la classe concrète ne l'est pas.
+- **Conversion des arguments** : table de conversions (FR-50) exprimée par `switch` sur les types ; choix de surcharge par score de spécificité.
+- **Blocs → interfaces fonctionnelles** : adaptation via `MethodHandleProxies.asInterfaceInstance` (ou `LambdaMetafactory` pour les interfaces fréquentes du JDK).
+- **Déroulage** (FR-30b) : appliqué à la sortie de chaque étape par l'exécuteur du pipeline.
+
+### 5.5 Dépendances
 
 | Librairie | Usage |
 |---|---|
@@ -507,7 +643,9 @@ Les nouveautés de Java sont utilisées **là où elles apportent un bénéfice 
 | **Stream Gatherers** | Opérations de flux sur mesure dans le pipeline (fenêtrage, `first`/`last`, dédoublonnage — utiles dès les cmdlets du backlog). |
 | **FFM API** | Accès console Windows (via JLine) ; lecture de l'en-tête PE pour détecter les applications GUI, sans JNI. |
 | **Sequenced Collections** | Historique (`getFirst`/`getLast`/`reversed`), colonnes ordonnées. |
-| **Module import declarations, constructeurs flexibles, `MethodHandle`** | Lisibilité du code ; accès rapide aux composants des records (accesseurs mis en cache). |
+| **`MethodHandles`, `MethodHandleProxies`, `LambdaMetafactory`** | Interopérabilité Java : appels de méthodes/constructeurs rapides et mis en cache, conversion des blocs `{ }` en interfaces fonctionnelles. |
+| **`ClassValue`** | Cache des métadonnées de membres par type, sans fuite de classloader (modules tiers). |
+| **Module import declarations, constructeurs flexibles** | Lisibilité du code. |
 | **Patterns primitifs** | Dans l'évaluateur pour les comparaisons numériques, si finalisés dans le JDK 27. |
 
 **Règle :** une fonctionnalité encore en *preview* dans le JDK 27 n'est activée (`--enable-preview`) qu'après validation du PM. La liste ci-dessus est revérifiée contre les JEP effectivement livrés dans le JDK 27 au démarrage de l'étape 0.
@@ -519,7 +657,7 @@ Les nouveautés de Java sont utilisées **là où elles apportent un bénéfice 
 - **Maven 3.9** ; `maven-enforcer-plugin` impose Java 27 et Maven ≥ 3.9 ; `maven.compiler.release=27`.
 - `mvn verify` : compilation, tests, couverture (JaCoCo).
 - Module `powerj-dist` :
-  1. **jlink** : runtime Java minimal contenant uniquement les modules nécessaires ;
+  1. **jlink** : runtime Java contenant **tous les modules `java.se`** (nécessaire pour que toute l'API standard soit appelable, §3.13), sans les outils de développement (`--strip-debug --no-header-files --no-man-pages`) ;
   2. **jpackage `--type app-image`** puis **`--type exe`** (WiX Toolset) : `powerj.exe` + installeur avec icône, ajout au `PATH`, entrée dans le menu Démarrer, mode console (`--win-console`).
 - **CI GitHub Actions** :
   - job `build` (Linux) : `mvn verify` à chaque push et PR ;
@@ -553,18 +691,20 @@ Le dossier peut être déplacé via la variable d'environnement `POWERJ_HOME`.
 | NFR-04 | `ls -r` sur 100 000 fichiers sans dépassement mémoire (streaming). |
 | NFR-05 | Couverture de tests ≥ 80 % sur `powerj-core`. |
 | NFR-06 | Aucune exception Java brute affichée à l'utilisateur hors mode debug. |
-| NFR-07 | Taille de l'installeur < 60 Mo. |
+| NFR-07 | Taille de l'installeur < 80 Mo (runtime `java.se` complet). |
+| NFR-08 | Premier appel d'une méthode Java < 50 ms ; appels suivants (cache) < 1 ms. |
 
 ---
 
 ## 10. Stratégie de test
 
-- **Unitaires** : lexer, parser, résolution, liaison des options, évaluateur d'expressions, accès aux records, formatage.
+- **Unitaires** : lexer, parser, résolution, liaison des options, évaluateur d'expressions, accès aux propriétés (records, getters, champs, `Map`), formatage, déroulage.
+- **Interop Java** : appels statiques/instance/constructeurs, surcharges et varargs, conversions, blocs → interfaces fonctionnelles, classes non exportées appelées via interface publique, exceptions, règle lexicale (`java -version` vs `java.lang.Math.max(1,2)`).
 - **Cmdlets** : `ls` sur une arborescence temporaire (`@TempDir`), `where` sur des flux construits.
 - **Commandes natives** : tests multiplateformes avec `cmd /c echo` (Windows) / `echo` (Linux), code retour, stderr, natif → natif.
 - **Complétion** : candidats attendus pour des lignes partielles.
 - **Intégration REPL** : terminal JLine « dumb » piloté par script (entrées simulées, sorties vérifiées), y compris historique et Ctrl+R.
-- **Modules** : chargement de `powerj-sample-module`, rejet d'un module dont la sortie n'est pas un record.
+- **Modules** : chargement de `powerj-sample-module`, gestion des collisions de noms, import de ses classes en expression Java.
 - **Recette manuelle** : une fiche par étape (§11), exécutée par le PM sur l'exe produit par la CI.
 
 ---
@@ -613,7 +753,7 @@ Chaque étape :
 
 ### Étape 3 — Modèle objet et cmdlet `ls`
 
-**Contenu :** `powerj-api` (FR : §4.2), registre des cmdlets, priorité cmdlet > natif, `^`, liaison des options Unix (FR-18 à FR-20), accès aux attributs des records (FR-27 à FR-29), affichage tableau/liste (FR-30), cmdlet `ls` (FR-35), `help` (FR-45).
+**Contenu :** `powerj-api` (FR : §4.2), registre des cmdlets, priorité cmdlet > natif, `^`, liaison des options Unix (FR-18 à FR-20), accès aux propriétés des objets (FR-27 à FR-29 : records, getters, champs), affichage selon le type (FR-30), déroulage (FR-30b), cmdlet `ls` (FR-35), `help` (FR-45).
 
 **Recette :**
 1. `ls` affiche un tableau `name size modified dir`.
@@ -638,9 +778,25 @@ Chaque étape :
 7. `ls -r C:\ | where { $_.ext == 'log' }` puis Ctrl+C : arrêt immédiat.
 8. `git commandeinconnue 2> err.txt` : `err.txt` contient le message.
 
-### Étape 5 — Autocomplétion Tab et coloration
+### Étape 5 — Interopérabilité Java
 
-**Contenu :** FR-08, FR-21 à FR-26.
+**Contenu :** §3.13 (FR-46 à FR-55) : appels statiques, champs statiques, `import`, `new`, appels d'instance, surcharges et conversions, varargs, casts, blocs → interfaces fonctionnelles, exceptions, `help members` / `help <classe>` ; runtime jlink `java.se` complet.
+
+**Recette :**
+1. `java.util.List.of("apple", "banana", "orange") | where { $_ like 'b*' }` affiche `banana`.
+2. `$l = java.util.List.of("apple", "banana")` puis `$l.size()` affiche `2`.
+3. `Math.max(3, 7)` et `java.lang.Math.PI`.
+4. `import java.time.*` puis `LocalDate.now().plusDays(10).dayOfWeek`.
+5. `new java.io.File("C:\\Windows").listFiles() | where { $_.directory }`.
+6. `$l.stream().map({ $_.toUpperCase() }).toList()`.
+7. `String.format("%s-%05d", "id", 42)` (varargs + conversion).
+8. `Integer.parseInt("x")` : erreur lisible `NumberFormatException`, pile visible avec `--debug`.
+9. `java -version` lance toujours le `java` natif (s'il est installé).
+10. `help members $l` et `help java.util.List`.
+
+### Étape 6 — Autocomplétion Tab et coloration
+
+**Contenu :** FR-08, FR-21 à FR-26, FR-24b (complétion Java).
 
 **Recette :**
 1. `l<Tab>` propose `ls [pj]` et les natifs commençant par `l`.
@@ -649,9 +805,10 @@ Chaque étape :
 4. `ls | where { $_.<Tab>` propose `name size modified path dir ext`.
 5. `$f = ls` puis `$f[0].<Tab>`.
 6. `^no<Tab>` propose `notepad`.
-7. Vérifier les couleurs : cmdlet, natif, commande inconnue, chaîne, variable.
+7. `java.util.Li<Tab>`, `List.<Tab>`, `$l.<Tab>`, `new java.io.F<Tab>` (complétion Java avec signatures).
+8. Vérifier les couleurs : cmdlet, natif, commande inconnue, chaîne, variable.
 
-### Étape 6 — Modules tiers
+### Étape 7 — Modules tiers
 
 **Contenu :** `powerj-api` publiable seul, chargement de `~/.powerj/modules/*.jar` dans des `ModuleLayer` isolés, `mod-load`, `mod-list`, gestion des collisions (FR-17), module d'exemple `greet` (§4.3).
 
@@ -662,6 +819,7 @@ Chaque étape :
 4. `greet -n Yves | where { $_.message like '*Yves*' }`.
 5. `help greet` affiche l'aide générée.
 6. `mod-list` liste le module.
+7. `import com.example.greet.*` puis `new Greeting("Yves", "Salut", java.time.Instant.now())`.
 
 ### Après ces étapes
 
@@ -674,10 +832,14 @@ Les cmdlets du backlog (§12.3) sont ajoutés **un par mini-itération**, chacun
 ### 12.1 Grammaire (EBNF, v1)
 
 ```ebnf
-ligne         = [ affectation | pipeline ] [ redirection* ] ;
+ligne         = import | [ affectation | pipeline ] [ redirection* ] ;
+import        = "import" nom_qualifie [ ".*" ] ;
 affectation   = variable "=" pipeline ;
 pipeline      = etape { "|" etape } ;
-etape         = commande | expression_parenth ;
+etape         = expr_java | commande | "(" pipeline ")" ;
+(* expr_java est tenté en premier : nom_qualifie collé à "(", "new",
+   cast, ou nom désignant une classe/un champ statique connu (FR-46) *)
+expr_java     = postfixe ;
 commande      = [ "^" ] nom { argument } ;
 argument      = option | valeur | bloc ;
 option        = "-" lettre { lettre } | "--" ident [ "=" valeur ] | "--" ;
@@ -692,9 +854,16 @@ non           = [ "not" ] comparaison ;
 comparaison   = somme [ ( "==" | "!=" | "<" | "<=" | ">" | ">=" | "like" | "=~" | "in" ) somme ] ;
 somme         = produit { ( "+" | "-" ) produit } ;
 produit       = unaire { ( "*" | "/" | "%" ) unaire } ;
-unaire        = [ "-" ] primaire ;
-primaire      = litteral | variable_acces | "(" pipeline ")" | liste ;
-variable_acces= ( variable | "(" pipeline ")" ) { "." ident | "[" expression "]" } ;
+unaire        = [ "-" ] [ cast ] postfixe ;
+cast          = "[" nom_qualifie "]" ;
+postfixe      = primaire { "." ident [ arguments ] | "[" expression "]" } ;
+arguments     = "(" [ arg_java { "," arg_java } ] ")" ;   (* sans espace avant "(" *)
+arg_java      = expression | bloc ;                       (* bloc → interface fonctionnelle *)
+primaire      = litteral | variable | "(" pipeline ")" | liste
+              | "new" nom_qualifie arguments
+              | nom_qualifie [ arguments ] ;              (* classe, champ ou méthode statique *)
+nom_qualifie  = ident { "." ident } ;
+variable_acces= postfixe ;
 variable      = "$" ( ident | "_" | "?" ) ;
 liste         = "[" [ expression { "," expression } ] "]" ;
 litteral      = chaine | nombre | unite | "true" | "false" | "null" | "now" ;
@@ -712,6 +881,10 @@ PJ C:\dev> git branch --list | where { $_ like '*feature*' }
 PJ C:\dev> ls -d | where { $_.name =~ '^[a-m]' } | ^more
 PJ C:\dev> mvn -q verify; $exit
 PJ C:\dev> code .                       # application graphique, rend la main
+PJ C:\dev> java.util.List.of("apple", "banana", "orange") | where { $_ like 'b*' }
+PJ C:\dev> import java.nio.file.*
+PJ C:\dev> ls -r --filter *.log | where { Files.size($_.path) > 10mb }
+PJ C:\dev> (ls).name.stream().map({ $_.toUpperCase() }).sorted().toList()
 ```
 
 ### 12.3 Backlog des cmdlets (hors périmètre actuel)
@@ -755,6 +928,11 @@ find src --name *.java --since 7d | where { $_.size > 2kb } | group { $_.path.pa
 | `$LASTEXITCODE` | `$exit` |
 | `& "C:\outil.exe"` | `^"C:\outil.exe"` |
 | `Get-Member` | `help members` |
+| `[System.Math]::Max(3, 7)` | `Math.max(3, 7)` |
+| `[System.IO.File]::ReadAllLines("a.txt")` | `java.nio.file.Files.readAllLines(Path.of("a.txt"))` |
+| `New-Object System.Text.StringBuilder` | `new StringBuilder()` |
+| `using namespace System.IO` | `import java.io.*` |
+| `[int] "42"` | `[int] "42"` |
 
 ### 12.5 Questions ouvertes pour le PM
 
@@ -762,5 +940,7 @@ find src --name *.java --since 7d | where { $_.size > 2kb } | group { $_.path.pa
 2. **`cd` / `pwd`** : ils sont indispensables pour tester `ls` confortablement ; les intégrer comme commandes internes dès l'étape 3 (hors quota de 2 cmdlets) ?
 3. **Signature de code** de l'exe et de l'installeur (évite l'avertissement SmartScreen) : certificat disponible ?
 4. **Nom de l'installeur et éditeur** affichés dans « Programmes et fonctionnalités ».
-5. **Dictionnaires littéraux** (`{k: v}`) : utiles en v1 ou reportés avec `from-json` ?
+5. **Dictionnaires littéraux** (`{k: v}`) : utiles en v1 ou reportés ? (Avec l'interop, `java.util.Map.of("k", "v")` couvre déjà le besoin.)
 6. **Licence** du module `powerj-api` pour les auteurs de modules tiers (même licence que le projet ?).
+7. **Interop et effets de bord** : faut-il une option de configuration pour désactiver l'interop Java (`interop.enabled=false`) dans des contextes restreints ?
+8. **Classpath additionnel** : autoriser l'ajout de jars « bibliothèques » (sans cmdlets) dans `~/.powerj/lib/` pour les utiliser en interop (ex. Apache Commons) ?
