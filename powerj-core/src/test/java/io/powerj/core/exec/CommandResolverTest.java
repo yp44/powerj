@@ -1,6 +1,7 @@
 package io.powerj.core.exec;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -17,6 +18,7 @@ class CommandResolverTest {
 
     @Test
     void unixSearchesPathForExecutableFiles() throws Exception {
+        assumeFalse(Platform.isWindows(), "permissions POSIX indisponibles sous Windows");
         var bin = Files.createDirectories(tmp.resolve("bin"));
         var tool = Files.createFile(bin.resolve("outil"),
                 PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwxr-xr-x")));
