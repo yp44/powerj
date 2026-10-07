@@ -10,6 +10,7 @@ import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
 
 import io.powerj.core.BuildInfo;
+import io.powerj.core.exec.Session;
 import io.powerj.core.exec.Supervisor;
 
 /** Point d'entrée de {@code powerj.exe}. */
@@ -45,7 +46,9 @@ public final class Main {
         Runtime.getRuntime().addShutdownHook(Thread.ofPlatform().unstarted(() -> close(terminal)));
         try {
             var reader = ShellReader.create(terminal, home, config);
-            var repl = new Repl(reader, new Supervisor(), () -> Path.of("").toAbsolutePath());
+            var session = new Session(Path.of(System.getProperty("user.home")), Path.of("").toAbsolutePath(),
+                    System.getenv());
+            var repl = new Repl(reader, new Supervisor(), session);
             int code = repl.run(BuildInfo.current());
             try {
                 reader.getHistory().save();

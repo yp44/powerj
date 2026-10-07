@@ -27,11 +27,24 @@ jobs:
 
       - name: Test de fumée du lanceur
         run: |
+          cat > smoke.txt <<'EOF'
+          cd /usr
+          pwd
+          $l = sh -c "printf 'un\ndeux\n'"
+          "ligne : $l[1]"
+          sh -c "exit 1" || "secours"
+          sh -c "exit 3"
+          exit $exit
+          EOF
           set +e
-          printf 'bonjour\nexit 3\n' | powerj-dist/target/jpackage/powerj/bin/powerj
+          powerj-dist/target/jpackage/powerj/bin/powerj < smoke.txt > out.txt 2>&1
           code=$?
           set -e
+          cat out.txt
           test "$code" -eq 3 || { echo "code retour attendu 3, obtenu $code"; exit 1; }
+          grep -q '/usr$' out.txt
+          grep -q 'ligne : deux' out.txt
+          grep -q 'secours' out.txt
 
       - uses: actions/upload-artifact@v5
         with:
@@ -62,14 +75,24 @@ jobs:
         run: mvnw.cmd -B -Pdist,installer verify
 
       - name: Test de fumée de powerj.exe
-        shell: cmd
+        shell: pwsh
         run: |
-          (echo bonjour& echo exit 3) | powerj-dist\target\jpackage\powerj\powerj.exe
-          if %ERRORLEVEL% NEQ 3 (
-            echo code retour attendu 3, obtenu %ERRORLEVEL%
-            exit /b 1
-          )
-          exit /b 0
+          @'
+          cd C:\Windows
+          pwd
+          $l = ^cmd /c "echo un& echo deux"
+          "ligne : $l[1]"
+          ^cmd /c "exit 1" || "secours"
+          ^cmd /c "exit 3"
+          exit $exit
+          '@ | Set-Content smoke.txt
+          cmd /c "powerj-dist\target\jpackage\powerj\powerj.exe < smoke.txt > out.txt 2>&1"
+          $code = $LASTEXITCODE
+          Get-Content out.txt
+          if ($code -ne 3) { throw "code retour attendu 3, obtenu $code" }
+          foreach ($attendu in 'C:\Windows', 'ligne : deux', 'secours') {
+            if (-not (Select-String -Path out.txt -SimpleMatch $attendu -Quiet)) { throw "absent de la sortie : $attendu" }
+          }
 
       - name: Archive portable powerj.exe
         uses: actions/upload-artifact@v5

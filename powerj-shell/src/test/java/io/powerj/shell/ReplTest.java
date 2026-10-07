@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 import io.powerj.core.BuildInfo;
+import io.powerj.core.exec.Session;
 import io.powerj.core.exec.Supervisor;
 
 @Timeout(30)
@@ -35,6 +36,11 @@ class ReplTest {
     private String screen;
     private List<String> history;
 
+    private Session session() throws Exception {
+        var cwd = java.nio.file.Files.createDirectories(tmp.resolve("dev"));
+        return new Session(tmp, cwd, System.getenv());
+    }
+
     /** Lance une session complète en tapant {@code keys} ; renvoie le code retour du shell. */
     private int session(String keys) throws Exception {
         if (home == null) {
@@ -42,7 +48,7 @@ class ReplTest {
         }
         try (var terminal = new TestTerminal(keys)) {
             var reader = ShellReader.create(terminal.terminal(), home, ShellConfig.defaults());
-            var repl = new Repl(reader, new Supervisor(), () -> Path.of("C:\\dev"));
+            var repl = new Repl(reader, new Supervisor(), session());
             terminal.startTyping();
             int code = repl.run(BUILD);
             reader.getHistory().save();
@@ -58,7 +64,7 @@ class ReplTest {
     @Test
     void bannerPromptAndExitCode() throws Exception {
         assertThat(session("exit 3" + ENTER)).isEqualTo(3);
-        assertThat(screen).contains("PowerJ 0.1.0 (Java 27)", "PJ C:\\dev> ");
+        assertThat(screen).contains("PowerJ 0.1.0 (Java 27)", "PJ " + tmp.resolve("dev") + "> ");
     }
 
     @Test
@@ -83,7 +89,7 @@ class ReplTest {
         home = new PowerJHome(tmp.resolve("home")).createDirectories();
         try (var terminal = TestTerminal.interactive()) {
             var reader = ShellReader.create(terminal.terminal(), home, ShellConfig.defaults());
-            var repl = new Repl(reader, new Supervisor(), () -> Path.of("C:\\dev"));
+            var repl = new Repl(reader, new Supervisor(), session());
             terminal.startTyping();
             var code = new CompletableFuture<Integer>();
             Thread.ofVirtual().start(() -> code.complete(repl.run(BUILD)));
@@ -112,34 +118,34 @@ class ReplTest {
 
     @Test
     void upArrowRecallsPreviousCommands() throws Exception {
-        session("test un" + ENTER + "test deux" + ENTER + UP + UP + ENTER);
+        session("essai un" + ENTER + "essai deux" + ENTER + UP + UP + ENTER);
 
-        assertThat(history).containsExactly("test un", "test deux", "test un");
+        assertThat(history).containsExactly("essai un", "essai deux", "essai un");
     }
 
     @Test
     void upArrowOnlyProposesEntriesStartingWithTheTypedPrefix() throws Exception {
-        session("ls -r" + ENTER + "git status" + ENTER + "pwd" + ENTER + "gi" + UP + ENTER);
+        session("liste -r" + ENTER + "statut git" + ENTER + "pwd" + ENTER + "st" + UP + ENTER);
 
-        assertThat(history).containsExactly("ls -r", "git status", "pwd", "git status");
+        assertThat(history).containsExactly("liste -r", "statut git", "pwd", "statut git");
     }
 
     @Test
     void ctrlRSearchesBackwardsInHistory() throws Exception {
-        session("bonjour" + ENTER + "ls --filter *.txt" + ENTER + "pwd" + ENTER + CTRL_R + "txt" + ENTER);
+        session("bonjour" + ENTER + "liste --filter *.txt" + ENTER + "pwd" + ENTER + CTRL_R + "txt" + ENTER);
 
-        assertThat(history).last().isEqualTo("ls --filter *.txt");
+        assertThat(history).last().isEqualTo("liste --filter *.txt");
     }
 
     @Test
     void historyIsPersistedBetweenSessions() throws Exception {
-        session("test un" + ENTER + "test deux" + ENTER);
-        assertThat(Files.readString(home.historyFile())).contains("test un", "test deux");
+        session("essai un" + ENTER + "essai deux" + ENTER);
+        assertThat(Files.readString(home.historyFile())).contains("essai un", "essai deux");
 
         session(UP + UP + ENTER);
 
-        assertThat(history).containsExactly("test un", "test deux", "test un");
-        assertThat(screen).contains("commande inconnue : test");
+        assertThat(history).containsExactly("essai un", "essai deux", "essai un");
+        assertThat(screen).contains("commande inconnue : essai");
     }
 
     @Test
@@ -187,9 +193,9 @@ class ReplTest {
 
     @Test
     void incompleteLineContinuesOnTheNextOne() throws Exception {
-        session("ls |" + ENTER + "where { $_.dir" + ENTER + "}" + ENTER);
+        session("liste |" + ENTER + "where { $_.dir" + ENTER + "}" + ENTER);
 
-        assertThat(screen).contains(">> ", "commande inconnue : ls");
-        assertThat(history).containsExactly("ls |\nwhere { $_.dir\n}");
+        assertThat(screen).contains(">> ", "pipeline « | » n'est pas encore disponible");
+        assertThat(history).containsExactly("liste |\nwhere { $_.dir\n}");
     }
 }
