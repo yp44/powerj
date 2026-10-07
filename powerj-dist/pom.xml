@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.powerj</groupId>
+        <artifactId>powerj-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>powerj-dist</artifactId>
+    <packaging>pom</packaging>
+    <name>PowerJ Distribution</name>
+    <description>
+        Construit l'application autonome (runtime jlink + lanceur jpackage) avec le profil "dist",
+        et l'installeur Windows avec le profil "installer".
+    </description>
+
+    <properties>
+        <dist.modules>${project.build.directory}/modules</dist.modules>
+        <dist.jpackage>${project.build.directory}/jpackage</dist.jpackage>
+        <dist.main>io.powerj.shell/io.powerj.shell.Main</dist.main>
+        <!-- Nom de l'exécutable jpackage ; surchargé sous Windows (profil windows). -->
+        <dist.jpackage.exe>${java.home}/bin/jpackage</dist.jpackage.exe>
+        <!-- Options propres à la plateforme pour l'image applicative. -->
+        <dist.platform.args></dist.platform.args>
+        <dist.platform>linux-x64</dist.platform>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.powerj</groupId>
+            <artifactId>powerj-shell</artifactId>
+        </dependency>
+    </dependencies>
+
+    <profiles>
+        <profile>
+            <id>windows</id>
+            <activation>
+                <os>
+                    <family>windows</family>
+                </os>
+            </activation>
+            <properties>
+                <dist.jpackage.exe>${java.home}/bin/jpackage.exe</dist.jpackage.exe>
+                <dist.platform.args>--win-console</dist.platform.args>
+                <dist.platform>windows-x64</dist.platform>
+            </properties>
+        </profile>
+
+        <profile>
+            <id>mac</id>
+            <activation>
+                <os>
+                    <family>mac</family>
+                </os>
+            </activation>
+            <properties>
+                <dist.platform>macos</dist.platform>
+            </properties>
+        </profile>
+
+        <!-- Image applicative autonome : dossier powerj/ (lanceur + runtime Java) et archive zip. -->
+        <profile>
+            <id>dist</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>build-helper-maven-plugin</artifactId>
+                        <version>3.6.1</version>
+                        <executions>
+                            <!-- jpackage exige une version numérique (0.1.0, sans -SNAPSHOT). -->
+                            <execution>
+                                <id>parse-version</id>
+                                <goals>
+                                    <goal>parse-version</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-dependency-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>copy-modules</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>copy-dependencies</goal>
+                                </goals>
+                                <configuration>
+                                    <includeScope>runtime</includeScope>
+                                    <outputDirectory>${dist.modules}</outputDirectory>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-antrun-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>jpackage-app-image</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>run</goal>
+                                </goals>
+                                <configuration>
+                                    <target>
+                                        <delete dir="${dist.jpackage}"/>
+                                        <exec executable="${dist.jpackage.exe}" failonerror="true">
+                                            <arg value="--type"/>
+                                            <arg value="app-image"/>
+                                            <arg value="--name"/>
+                                            <arg value="powerj"/>
+                                            <arg value="--app-version"/>
+                                            <arg value="${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.incrementalVersion}"/>
+                                            <arg value="--vendor"/>
+                                            <arg value="PowerJ"/>
+                                            <arg value="--module-path"/>
+                                            <arg value="${dist.modules}"/>
+                                            <arg value="--module"/>
+                                            <arg value="${dist.main}"/>
+                                            <!-- Toute la bibliothèque Java SE est appelable depuis le shell (spec FR-52). -->
+                                            <arg value="--add-modules"/>
+                                            <arg value="java.se"/>
+                                            <arg value="--jlink-options"/>
+                                            <arg value="--strip-java-debug-attributes --no-header-files --no-man-pages"/>
+                                            <arg value="--dest"/>
+                                            <arg value="${dist.jpackage}"/>
+                                            <arg line="${dist.platform.args}"/>
+                                        </exec>
+                                        <zip destfile="${project.build.directory}/powerj-${project.version}-${dist.platform}.zip">
+                                            <zipfileset dir="${dist.jpackage}" includes="powerj/**" filemode="755"/>
+                                        </zip>
+                                    </target>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!-- Installeur Windows (.exe) construit à partir de l'image applicative ; nécessite WiX. -->
+        <profile>
+            <id>installer</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-antrun-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>jpackage-installer</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>run</goal>
+                                </goals>
+                                <configuration>
+                                    <target>
+                                        <exec executable="${dist.jpackage.exe}" failonerror="true">
+                                            <arg value="--type"/>
+                                            <arg value="exe"/>
+                                            <arg value="--name"/>
+                                            <arg value="powerj"/>
+                                            <arg value="--app-version"/>
+                                            <arg value="${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.incrementalVersion}"/>
+                                            <arg value="--vendor"/>
+                                            <arg value="PowerJ"/>
+                                            <arg value="--app-image"/>
+                                            <arg value="${dist.jpackage}/powerj"/>
+                                            <arg value="--win-menu"/>
+                                            <arg value="--win-menu-group"/>
+                                            <arg value="PowerJ"/>
+                                            <arg value="--win-shortcut"/>
+                                            <arg value="--win-per-user-install"/>
+                                            <arg value="--win-dir-chooser"/>
+                                            <arg value="--dest"/>
+                                            <arg value="${project.build.directory}/installer"/>
+                                        </exec>
+                                    </target>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+</project>
