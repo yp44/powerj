@@ -31,4 +31,12 @@ public interface CmdletContext<O> {
 
     /** {@code true} si l'utilisateur a demandé l'annulation (Ctrl+C). */
     boolean cancelled();
+
+    /**
+     * Compile une expression PowerJ en bloc, comme si elle avait été saisie entre accolades.
+     * Ex. {@code compile("$_.size > 10kb")}.
+     *
+     * @throws IllegalArgumentException si l'expression est syntaxiquement invalide
+     */
+    ScriptBlock compile(String expression);
 }

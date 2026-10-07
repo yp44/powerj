@@ -26,12 +26,15 @@ public sealed interface Token {
     /** {@code )} fermant une sous-expression, avec les accès qui la suivent : {@code (ls).name}. */
     record Close(List<Accessor> accessors) implements Token { }
 
+    /** Bloc {@code { … }} : texte source entre les accolades, analysé ensuite par {@link ExpressionParser}. */
+    record Block(String source) implements Token { }
+
     /** {@code |} (pipeline). */
     record Pipe() implements Token { }
 
-    /** Redirection {@code >}, {@code >>}, {@code 2>}, {@code 2>>}. */
+    /** Redirection {@code >}, {@code >>}, {@code 2>}, {@code 2>>}, ou {@code 2>&1} ({@link Stream#ERR_TO_OUT}). */
     record Redirection(Stream stream, boolean append) implements Token { }
 
-    /** Flux redirigé. */
-    enum Stream { OUT, ERR }
+    /** Flux redirigé ; {@code ERR_TO_OUT} : les erreurs rejoignent la sortie ({@code 2>&1}). */
+    enum Stream { OUT, ERR, ERR_TO_OUT }
 }

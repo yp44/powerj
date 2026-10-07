@@ -6,8 +6,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 
 import io.powerj.api.CmdletContext;
+import io.powerj.api.ScriptBlock;
 
 /** Contexte en mémoire : collecte les objets et les erreurs. */
 final class TestContext<O> implements CmdletContext<O> {
@@ -49,5 +51,15 @@ final class TestContext<O> implements CmdletContext<O> {
     @Override
     public boolean cancelled() {
         return false;
+    }
+
+    /** Compilation simulée : par défaut, non disponible. */
+    Function<String, ScriptBlock> compiler = source -> {
+        throw new UnsupportedOperationException(source);
+    };
+
+    @Override
+    public ScriptBlock compile(String expression) {
+        return compiler.apply(expression);
     }
 }

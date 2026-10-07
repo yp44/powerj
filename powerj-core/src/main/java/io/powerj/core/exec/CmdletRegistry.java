@@ -21,10 +21,15 @@ public final class CmdletRegistry {
 
     /** Cmdlet enregistré avec ses métadonnées. */
     public record Registered(Cmdlet<?, ?, ?> cmdlet, CmdletInfo info, Class<? extends Record> parameters,
-                             Class<?> output, String module) {
+                             Class<?> input, Class<?> output, String module) {
 
         public String name() {
             return info.name();
+        }
+
+        /** {@code true} si le cmdlet lit les objets du pipeline ({@code I} autre que {@code Void}). */
+        public boolean readsInput() {
+            return input != Void.class;
         }
     }
 
@@ -56,14 +61,19 @@ public final class CmdletRegistry {
         if (!(arguments[0] instanceof Class<?> parameters) || !parameters.isRecord()) {
             throw new IllegalArgumentException(type.getName() + " : les paramètres doivent être un record");
         }
-        Class<?> output = arguments[2] instanceof Class<?> c ? c
-                : arguments[2] instanceof ParameterizedType p ? (Class<?>) p.getRawType() : Object.class;
-        var registered = new Registered(cmdlet, info, parameters.asSubclass(Record.class), output,
+        Class<?> input = rawType(arguments[1]);
+        Class<?> output = rawType(arguments[2]);
+        var registered = new Registered(cmdlet, info, parameters.asSubclass(Record.class), input, output,
                 type.getModule().getName() == null ? "(sans module)" : type.getModule().getName());
         if (byName.putIfAbsent(info.name(), registered) != null) {
             LOG.warning(() -> "Cmdlet " + info.name() + " de " + registered.module()
                     + " ignoré : nom déjà utilisé par " + byName.get(info.name()).module());
         }
+    }
+
+    private static Class<?> rawType(Type type) {
+        return type instanceof Class<?> c ? c
+                : type instanceof ParameterizedType p ? (Class<?>) p.getRawType() : Object.class;
     }
 
     private static Type[] cmdletTypeArguments(Class<?> type) {

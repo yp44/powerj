@@ -63,22 +63,47 @@ public final class Parser {
                 throw new SyntaxException("valeur attendue après « $" + name + " = »");
             }
         }
-        Body body = body();
-        List<Redirect> redirects = new ArrayList<>();
-        while (!atEnd() && peek() instanceof Token.Redirection(var stream, var append)) {
-            pos++;
-            if (atEnd() || peek() instanceof Token.Separator || peek() instanceof Token.Redirection) {
-                throw new SyntaxException("fichier attendu après la redirection");
-            }
-            redirects.add(new Redirect(stream, append, argument(next())));
-        }
-        if (!atEnd() && peek() instanceof Token.Pipe) {
-            throw new SyntaxException("le pipeline « | » n'est pas encore disponible dans cette version");
-        }
+        Ast.Pipeline pipeline = pipeline();
         if (!atEnd() && !(peek() instanceof Token.Separator)) {
             throw unexpected(peek());
         }
-        return new Statement(assignTo, body, redirects);
+        return new Statement(assignTo, pipeline);
+    }
+
+    /** Étapes séparées par {@code |}, chacune suivie de ses redirections. */
+    private Ast.Pipeline pipeline() {
+        List<Ast.Stage> stages = new ArrayList<>();
+        List<Redirect> redirects = new ArrayList<>();
+        while (true) {
+            if (atEnd() || peek() instanceof Token.Separator || peek() instanceof Token.Close
+                    || peek() instanceof Token.Pipe) {
+                throw new SyntaxException(stages.isEmpty() ? "commande attendue" : "commande attendue après « | »");
+            }
+            Body body = body();
+            if (!stages.isEmpty() && body instanceof Ast.ExpressionBody) {
+                throw new SyntaxException("une valeur ne peut être que la première étape d'un pipeline");
+            }
+            boolean errorsToOutput = false;
+            while (!atEnd() && peek() instanceof Token.Redirection(var stream, var append)) {
+                pos++;
+                if (stream == Token.Stream.ERR_TO_OUT) {
+                    errorsToOutput = true;
+                    continue;
+                }
+                if (atEnd() || !isArgument(peek()) || peek() instanceof Token.Block) {
+                    throw new SyntaxException("fichier attendu après la redirection");
+                }
+                if (stream == Token.Stream.OUT && !atEnd() && peekAt(1) instanceof Token.Pipe) {
+                    throw new SyntaxException("« > » redirige la sortie de tout le pipeline : le placer à la fin");
+                }
+                redirects.add(new Redirect(stream, append, argument(next())));
+            }
+            stages.add(new Ast.Stage(body, errorsToOutput));
+            if (atEnd() || !(peek() instanceof Token.Pipe)) {
+                return new Ast.Pipeline(stages, redirects);
+            }
+            pos++; // |
+        }
     }
 
     private Body body() {
@@ -93,8 +118,15 @@ public final class Parser {
                 throw new SyntaxException("nom de commande attendu après ^");
             }
             List<Argument> arguments = new ArrayList<>();
-            while (!atEnd() && isArgument(peek())) {
-                arguments.add(argument(next()));
+            while (!atEnd()) {
+                if (isArgument(peek())) {
+                    arguments.add(argument(next()));
+                } else if (isShortFormOperator(name, forceNative, arguments)) {
+                    pos++;
+                    arguments.add(new Ast.WordArgument(">"));
+                } else {
+                    break;
+                }
             }
             return new Ast.Command(name, forceNative, arguments);
         }
@@ -102,14 +134,26 @@ public final class Parser {
             case Token.Word(var text) -> new Ast.Literal(literal(text));
             case Token.Str(var parts) -> new Ast.StringExpression(parts);
             case Token.Var(var name, var accessors) -> new Ast.VariableExpression(name, accessors);
+            case Token.Block(var source) -> ExpressionParser.block(source);
             default -> throw unexpected(first);
         };
         return new Ast.ExpressionBody(expression);
     }
 
+    /**
+     * Dans la forme courte {@code where size > 1mb} (FR-36), le {@code >} qui suit le nom de propriété est
+     * l'opérateur de comparaison, pas une redirection.
+     */
+    private boolean isShortFormOperator(String command, boolean forceNative, List<Argument> arguments) {
+        return !forceNative && command.equals("where") && arguments.size() == 1
+                && arguments.getFirst() instanceof Ast.WordArgument
+                && peek() instanceof Token.Redirection(var stream, var append)
+                && stream == Token.Stream.OUT && !append;
+    }
+
     private static boolean isArgument(Token token) {
         return token instanceof Token.Word || token instanceof Token.Str || token instanceof Token.Var
-                || token instanceof Token.Open;
+                || token instanceof Token.Open || token instanceof Token.Block;
     }
 
     /** {@code ( commande ou expression )} suivi de ses accès. */
@@ -118,7 +162,7 @@ public final class Parser {
         if (atEnd() || peek() instanceof Token.Close) {
             throw new SyntaxException("parenthèses vides");
         }
-        Body inner = body();
+        Ast.Pipeline inner = pipeline();
         if (atEnd() || !(peek() instanceof Token.Close(var accessors))) {
             throw new SyntaxException(atEnd() ? "« ) » manquante" : "« ) » attendue avant « " + describe(peek()) + " »");
         }
@@ -136,6 +180,7 @@ public final class Parser {
             case Token.Str(var parts) -> new Ast.ExpressionArgument(new Ast.StringExpression(parts));
             case Token.Var(var name, var accessors) ->
                     new Ast.ExpressionArgument(new Ast.VariableExpression(name, accessors));
+            case Token.Block(var source) -> new Ast.ExpressionArgument(ExpressionParser.block(source));
             default -> throw unexpected(token);
         };
     }
@@ -171,8 +216,12 @@ public final class Parser {
             case Token.Assign _ -> "=";
             case Token.Separator(var c) -> symbol(c);
             case Token.Pipe _ -> "|";
-            case Token.Redirection(var stream, var append) ->
-                    (stream == Token.Stream.ERR ? "2" : "") + (append ? ">>" : ">");
+            case Token.Redirection(var stream, var append) -> switch (stream) {
+                case OUT -> append ? ">>" : ">";
+                case ERR -> append ? "2>>" : "2>";
+                case ERR_TO_OUT -> "2>&1";
+            };
+            case Token.Block _ -> "{";
             case Token.Open _ -> "(";
             case Token.Close _ -> ")";
         };

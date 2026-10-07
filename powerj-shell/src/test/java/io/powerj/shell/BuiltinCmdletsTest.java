@@ -1,6 +1,7 @@
 package io.powerj.shell;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -95,5 +96,44 @@ class BuiltinCmdletsTest {
     @Test
     void helpListsCategories() throws Exception {
         assertThat(run("help")).contains("Fichiers", "ls", "Système", "env");
+    }
+
+    @Test
+    void whereWithBlocks() throws Exception {
+        assertThat(run("(ls -r | where { $_.name.endsWith(\".md\") && !$_.dir }).name")).isEqualTo("spec.md\n");
+        assertThat(run("(ls | where { $_.dir }).name")).isEqualTo("docs\n");
+        assertThat(run("(ls -r | where { $_.size > 6 && $_.modified > now - 1d }).name")).isEqualTo("notes.txt\n");
+        assertThatThrownBy(() -> run("ls | where { List.of(\"txt\").size() }")).hasMessageContaining("« List » inconnu");
+    }
+
+    @Test
+    void whereShortForm() throws Exception {
+        assertThat(run("(ls -r | where size > 6).name")).isEqualTo("notes.txt\n");
+        assertThat(run("(ls -r | where ext == md).name")).isEqualTo("spec.md\n");
+        assertThat(run("(ls -r | where size >= 6).name")).isEqualTo("spec.md\nnotes.txt\n");
+        assertThat(run("(ls -r | where name != \"docs\" | where dir == false).name")).isEqualTo("spec.md\nnotes.txt\n");
+        run("ls | where size");
+        assertThat(errors).singleElement().asString().contains("where : condition attendue");
+        run("ls | where size ~ 3");
+        assertThat(errors).singleElement().asString().contains("where : condition attendue");
+    }
+
+    @Test
+    void whereErrorsAreNonBlocking() throws Exception {
+        assertThat(run("ls | where { $_.size / 0 > 1 }")).isEmpty();
+        assertThat(errors).hasSize(2).allSatisfy(e -> assertThat(e).startsWith("where : calcul impossible"));
+        run("ls | where { $_.size / 0 > 1 } --on-error silent");
+        assertThat(errors).isEmpty();
+        run("ls | where { $_.size / 0 > 1 } --on-error stop");
+        assertThat(errors).singleElement().asString().startsWith("where : calcul impossible");
+    }
+
+    @Test
+    void whereOnEnvAndStrings() throws Exception {
+        assertThat(run("(env | where { $_.name.startsWith(\"POWERJ_T\") }).value")).isEqualTo("1\n");
+        run("$l = (ls).name");
+        assertThat(run("$l | where { $_.contains(\"o\") }")).isEqualTo("docs\nnotes.txt\n");
+        assertThat(run("where --help")).contains("where — Filtre les objets", "ls | where size > 10kb");
+        assertThat(run("help")).contains("Filtres", "where");
     }
 }

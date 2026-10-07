@@ -317,7 +317,7 @@ Les comparaisons de chaînes sont **sensibles à la casse**, comme en Java (`equ
 | Appartenance | `List.of("png", "jpg").contains($_.ext)` |
 | Joker de fichier | `FileSystems.getDefault().getPathMatcher("glob:*.java").matches($_.path.fileName)` (ou option `--filter` de `ls`) |
 
-Note : `!` en début de ligne reste l'expansion d'historique (FR-11) ; à l'intérieur d'une expression, c'est la négation. `&&` et `||` ne sont pas des opérateurs d'enchaînement de commandes en v1.
+Note : `!` en début de ligne reste l'expansion d'historique (FR-11) ; à l'intérieur d'une expression, c'est la négation. Dans un bloc `{ }`, `&&` et `||` sont les opérateurs logiques ; hors bloc, ils enchaînent des commandes (FR-04c).
 
 **FR-34 — Redirections (hors blocs).** `> fichier` (écrase), `>> fichier` (ajoute) pour le flux de sortie ; `2> fichier`, `2>&1` pour le flux d'erreur. Les objets redirigés vers un fichier sont écrits sous leur forme affichée.
 
@@ -748,9 +748,9 @@ ligne saisie
 ### 5.3 Exécution du pipeline
 
 - Chaque étape s'exécute dans un **thread virtuel** ; les étapes sont reliées par des **files bornées** (contre-pression : un `ls -r C:\` ne remplit pas la mémoire si l'aval est lent).
-- L'ensemble des étapes est piloté par **Structured Concurrency** : une erreur bloquante ou Ctrl+C annule toutes les étapes et tue les process natifs.
-- Le contexte de session (répertoire courant, variables, terminal, configuration) est transmis par **Scoped Values**.
-- Les commandes natives sont lancées via `ProcessBuilder` (redirections `INHERIT`, `PIPE` ou pipeline natif → natif via `ProcessBuilder.startPipeline`).
+- La dernière étape s'exécute dans le fil qui reçoit Ctrl+C ; quand elle s'arrête (fin, erreur bloquante, Ctrl+C), elle ferme sa file d'entrée, ce qui arrête en cascade les étapes amont (fil interrompu, process natifs tués). Une étape qui cesse de lire (`ls | ^more` puis `q`) arrête de même l'amont. Ce cycle de vie sera confié à **Structured Concurrency** (`StructuredTaskScope`) quand l'API sera finale (elle est en preview, non utilisée sans accord du PM).
+- L'objet courant `$_` d'un bloc est lié par une **Scoped Value** pendant l'évaluation.
+- Les commandes natives sont lancées via `ProcessBuilder` (redirections `INHERIT`, `PIPE`) ; les natives consécutives forment un groupe lancé par `ProcessBuilder.startPipeline` (octets transmis directement) ; les objets envoyés à un natif sont écrits sur son stdin sous leur forme affichée.
 
 ### 5.4 Interopérabilité Java (`powerj-core`, package `interop`)
 
@@ -782,7 +782,7 @@ Les nouveautés de Java sont utilisées **là où elles apportent un bénéfice 
 | **Sealed interfaces** | Hiérarchies fermées : `Token`, `Node` (AST), `Resolved` (`CmdletCall` / `NativeCall` / `Builtin`), `Value`. Le compilateur garantit l'exhaustivité des traitements. |
 | **Pattern matching `switch` + record patterns + `_`** | Évaluateur d'expressions, formateur, moteur de complétion : `case BinaryOp(var l, Op.GT, var r) -> …`, `case FileEntry(var name, _, _, _, true, _) -> …`. |
 | **Threads virtuels** | Une étape de pipeline = un thread virtuel ; lecture des flux stdout/stderr des process natifs. |
-| **Structured Concurrency** | Cycle de vie du pipeline : annulation globale sur Ctrl+C ou erreur bloquante. |
+| **Structured Concurrency** | Cycle de vie du pipeline : annulation globale sur Ctrl+C ou erreur bloquante — dès que l'API sera finale (en attendant : annulation en cascade par les files, §5.3). |
 | **Scoped Values** | Contexte de session immuable par exécution, à la place de `ThreadLocal`. |
 | **Stream Gatherers** | Opérations de flux sur mesure dans le pipeline (fenêtrage, `first`/`last`, dédoublonnage — utiles dès les cmdlets du backlog). |
 | **FFM API** | Accès console Windows (via JLine) ; lecture de l'en-tête PE pour détecter les applications GUI, sans JNI. |
@@ -925,7 +925,7 @@ Chaque étape :
 
 ### Étape 4 — Pipeline et cmdlet `where`
 
-**Contenu :** pipeline streaming (threads virtuels, Structured Concurrency, files bornées), langage d'expression (FR-32, FR-33), littéraux d'unités (FR-19), cmdlet `where` (FR-36), natifs dans le pipeline (lignes `String`, cmdlet → natif, natif → natif), `2>&1`, Ctrl+C sur un pipeline, `--on-error`, mode non interactif (FR-04d).
+**Contenu :** pipeline streaming (threads virtuels, files bornées, annulation en cascade), langage d'expression (FR-32, FR-33), littéraux d'unités (FR-19), cmdlet `where` (FR-36), natifs dans le pipeline (lignes `String`, cmdlet → natif, natif → natif), `2>&1`, Ctrl+C sur un pipeline, `--on-error`, mode non interactif (FR-04d).
 
 **Recette :**
 1. `ls -r | where { $_.size > 1mb }`.

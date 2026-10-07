@@ -20,15 +20,39 @@ public final class Ast {
     public record Step(Connector connector, Statement statement) { }
 
     /**
-     * Instruction : affectation éventuelle, corps, redirections.
+     * Instruction : affectation éventuelle et pipeline.
      *
      * @param assignTo variable affectée ({@code $x = …}), si présente
      */
-    public record Statement(Optional<String> assignTo, Body body, List<Redirect> redirects) {
-        public Statement {
+    public record Statement(Optional<String> assignTo, Pipeline pipeline) {
+
+        /** Corps de la première étape (raccourci pour une instruction sans pipeline). */
+        public Body body() {
+            return pipeline.stages().getFirst().body();
+        }
+
+        public List<Redirect> redirects() {
+            return pipeline.redirects();
+        }
+    }
+
+    /**
+     * Étapes reliées par {@code |}, et redirections de l'ensemble ({@code >} s'applique à la dernière étape,
+     * {@code 2>} aux erreurs de toutes les étapes).
+     */
+    public record Pipeline(List<Stage> stages, List<Redirect> redirects) {
+        public Pipeline {
+            stages = List.copyOf(stages);
             redirects = List.copyOf(redirects);
         }
     }
+
+    /**
+     * Étape d'un pipeline.
+     *
+     * @param errorsToOutput {@code 2>&1} : le flux d'erreur de l'étape rejoint sa sortie
+     */
+    public record Stage(Body body, boolean errorsToOutput) { }
 
     /** Corps d'une instruction : commande ou expression. */
     public sealed interface Body { }
@@ -56,7 +80,7 @@ public final class Ast {
     /** Argument calculé : chaîne quotée ou variable. */
     public record ExpressionArgument(Expression expression) implements Argument { }
 
-    /** Expression (limitée à l'étape 2 : littéraux, chaînes, variables). */
+    /** Expression : valeur d'un argument, d'une instruction ou d'un bloc {@code { … }}. */
     public sealed interface Expression { }
 
     public record Literal(Object value) implements Expression { }
@@ -65,8 +89,59 @@ public final class Ast {
 
     public record VariableExpression(String name, List<Accessor> accessors) implements Expression { }
 
-    /** Commande ou expression entre parenthèses, dont on prend la valeur : {@code (ls).name}, {@code (pwd)}. */
-    public record SubExpression(Body body, List<Accessor> accessors) implements Expression { }
+    /** Pipeline entre parenthèses, dont on prend la valeur : {@code (ls).name}, {@code (ls | where {…})}. */
+    public record SubExpression(Pipeline pipeline, List<Accessor> accessors) implements Expression { }
+
+    /** Bloc {@code { … }} : sa valeur est un {@link io.powerj.api.ScriptBlock} évalué plus tard. */
+    public record BlockExpression(String source, Expression body) implements Expression { }
+
+    /** {@code cible.nom} : propriété (FR-28). */
+    public record Get(Expression target, String name) implements Expression { }
+
+    /** {@code cible[index]}. */
+    public record At(Expression target, Expression index) implements Expression { }
+
+    /** {@code cible.méthode(arguments)} : appel de méthode d'instance Java. */
+    public record Invoke(Expression target, String method, List<Expression> arguments) implements Expression {
+        public Invoke {
+            arguments = List.copyOf(arguments);
+        }
+    }
+
+    /** Opération binaire Java (FR-33). */
+    public record Binary(Operator operator, Expression left, Expression right) implements Expression { }
+
+    /** {@code !x} ou {@code -x}. */
+    public record Unary(Operator operator, Expression operand) implements Expression { }
+
+    /** {@code condition ? siVrai : siFaux}. */
+    public record Conditional(Expression condition, Expression whenTrue, Expression whenFalse) implements Expression { }
+
+    /** Liste {@code [1, 2, 3]}. */
+    public record ListLiteral(List<Expression> elements) implements Expression {
+        public ListLiteral {
+            elements = List.copyOf(elements);
+        }
+    }
+
+    /** {@code now} : instant de l'évaluation. */
+    public record Now() implements Expression { }
+
+    /** Opérateurs des expressions, avec leur symbole. */
+    public enum Operator {
+        OR("||"), AND("&&"), EQ("=="), NE("!="), LT("<"), LE("<="), GT(">"), GE(">="),
+        ADD("+"), SUB("-"), MUL("*"), DIV("/"), REM("%"), NOT("!"), NEG("-");
+
+        private final String symbol;
+
+        Operator(String symbol) {
+            this.symbol = symbol;
+        }
+
+        public String symbol() {
+            return symbol;
+        }
+    }
 
     /** Redirection d'un flux vers un fichier. */
     public record Redirect(Token.Stream stream, boolean append, Argument target) { }

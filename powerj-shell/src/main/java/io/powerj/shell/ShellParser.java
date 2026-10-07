@@ -8,6 +8,8 @@ import org.jline.reader.EOFError;
 import org.jline.reader.ParsedLine;
 import org.jline.reader.Parser;
 
+import io.powerj.core.lang.Lexer;
+
 /**
  * Analyseur fourni à JLine : signale les saisies incomplètes (prompt de continuation {@code >>})
  * et découpe la ligne en mots. L'analyse du langage lui-même arrivera aux étapes suivantes.
@@ -55,12 +57,12 @@ final class ShellParser implements Parser {
         int wordsBeforeCursor = 0;
         int i = 0;
         while (i < line.length()) {
-            if (Character.isWhitespace(line.charAt(i))) {
+            if (Lexer.isBlank(line.charAt(i))) {
                 i++;
                 continue;
             }
             int start = i;
-            while (i < line.length() && !Character.isWhitespace(line.charAt(i))) {
+            while (i < line.length() && !Lexer.isBlank(line.charAt(i))) {
                 i++;
             }
             if (cursor >= start && cursor <= i) {

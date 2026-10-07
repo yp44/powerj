@@ -5,7 +5,12 @@ Shell interactif orienté objet écrit en Java 27 : les commandes renvoient des 
 ```text
 PJ C:\dev> ls -r --filter *.java | where { $_.size > 10kb }
 PJ C:\dev> git status --porcelain | where { $_.startsWith(" M ") }
-PJ C:\dev> java.util.List.of("apple", "banana", "orange") | where { $_.contains("b") }
+PJ C:\dev> java.util.List.of("apple", "banana", "orange") | where { $_.contains("b") }    # étape 5
+```
+
+```text
+C:\> powerj -c "ls -r | where size > 1mb"
+C:\> dir /b | powerj -c "where { $_.endsWith(\".txt\") }"
 ```
 
 - Spécification : [docs/SPECIFICATION.md](docs/SPECIFICATION.md)
@@ -13,7 +18,7 @@ PJ C:\dev> java.util.List.of("apple", "banana", "orange") | where { $_.contains(
 
 ## État
 
-Étape 3 : premiers cmdlets — `ls` (objets `FileEntry`) et `env` —, accès aux propriétés (`(ls).name`, `$f[0].path.parent`), affichage en tableau, options façon Unix (`-ra`, `--rec`, `--filter=*.java`), `help`, `help members`. Étapes précédentes : commandes natives, `cd`, `;` `&&` `||`, variables, redirections, édition de ligne et historique. Voir le plan de développement (§11 de la spécification).
+Étape 4 : pipeline `|` en streaming (cmdlets et commandes natives mélangés, natif → natif sans décodage), blocs `{ }` à la syntaxe Java (`$_.name.endsWith(".java") && !$_.dir`, tailles `10kb`, durées `7d`, `now`), cmdlet `where` (et sa forme courte `where size > 10kb`), `2>&1`, Ctrl+C sur un pipeline, mode non interactif (`powerj -c "…"`, `powerj script.pj`, entrée standard lue par la première étape). Étapes précédentes : cmdlets `ls` et `env`, objets et propriétés, affichage en tableau, `help` ; commandes natives, `cd`, `;` `&&` `||`, variables, redirections ; édition de ligne et historique. Voir le plan de développement (§11 de la spécification).
 
 ## Construire
 

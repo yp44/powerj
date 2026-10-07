@@ -35,6 +35,10 @@ jobs:
           sh -c "exit 1" || "secours"
           which ls
           (ls / --dirs).name
+          $u = (ls / | where name == usr).name
+          "filtre : $u"
+          $t = printf "b\na\nc\n" | sort | where { $_ != "c" }
+          "tri : $t"
           sh -c "exit 3"
           exit $exit
           EOF
@@ -49,6 +53,20 @@ jobs:
           grep -q 'secours' out.txt
           grep -q 'ls → cmdlet (io.powerj.cmdlets)' out.txt
           grep -q 'usr$' out.txt
+          grep -q 'filtre : usr' out.txt
+          grep -q 'tri : \[a, b\]' out.txt
+
+      - name: Test de fumée du mode non interactif
+        run: |
+          pj=powerj-dist/target/jpackage/powerj/bin/powerj
+          set +e
+          $pj -c 'sh -c "exit 3"'
+          code=$?
+          set -e
+          test "$code" -eq 3 || { echo "code retour attendu 3, obtenu $code"; exit 1; }
+          printf 'x.txt\ny.log\nz.txt\n' | $pj -c 'where { $_.endsWith(".txt") }' > stdin.txt
+          cat stdin.txt
+          test "$(cat stdin.txt)" = "$(printf 'x.txt\nz.txt')"
 
       - uses: actions/upload-artifact@v5
         with:
@@ -89,6 +107,10 @@ jobs:
           ^cmd /c "exit 1" || "secours"
           which ls
           (ls C:\Windows --dirs).name
+          $u = (ls C:\ | where name == Windows).name
+          "filtre : $u"
+          $t = ^cmd /c "echo b& echo a& echo c" | ^sort | where { $_ != "c" }
+          "tri : $t"
           ^cmd /c "exit 3"
           exit $exit
           '@ | Set-Content smoke.txt
@@ -96,10 +118,23 @@ jobs:
           $code = $LASTEXITCODE
           Get-Content out.txt
           if ($code -ne 3) { throw "code retour attendu 3, obtenu $code" }
-          foreach ($attendu in 'C:\Windows', 'ligne : deux', 'secours', 'cmdlet (io.powerj.cmdlets)', 'System32') {
+          foreach ($attendu in 'C:\Windows', 'ligne : deux', 'secours', 'cmdlet (io.powerj.cmdlets)', 'System32',
+                               'filtre : Windows', 'tri : [a, b]') {
             if (-not (Select-String -Path out.txt -SimpleMatch $attendu -Quiet)) { throw "absent de la sortie : $attendu" }
           }
           # Le code 3 attendu de powerj.exe ne doit pas devenir le code retour de l'étape.
+          exit 0
+
+      - name: Test de fumée du mode non interactif
+        shell: pwsh
+        run: |
+          $pj = "powerj-dist\target\jpackage\powerj\powerj.exe"
+          & $pj -c '^cmd /c exit 3'
+          if ($LASTEXITCODE -ne 3) { throw "code retour attendu 3, obtenu $LASTEXITCODE" }
+          'where { $_.endsWith(".txt") }' | Set-Content filtre.pj
+          $lignes = 'x.txt', 'y.log', 'z.txt' | & $pj filtre.pj
+          $lignes
+          if (($lignes -join ',') -ne 'x.txt,z.txt') { throw "filtrage de l'entrée standard incorrect : $lignes" }
           exit 0
 
       - name: Archive portable powerj.exe
