@@ -20,6 +20,12 @@ public sealed interface Token {
     /** Séparateur d'instructions {@code ;}, {@code &&} ou {@code ||}. */
     record Separator(Connector connector) implements Token { }
 
+    /** {@code (} ouvrant une sous-expression. */
+    record Open() implements Token { }
+
+    /** {@code )} fermant une sous-expression, avec les accès qui la suivent : {@code (ls).name}. */
+    record Close(List<Accessor> accessors) implements Token { }
+
     /** {@code |} (pipeline). */
     record Pipe() implements Token { }
 

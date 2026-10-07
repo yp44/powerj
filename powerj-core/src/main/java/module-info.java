@@ -8,4 +8,6 @@ module io.powerj.core {
     exports io.powerj.core;
     exports io.powerj.core.exec;
     exports io.powerj.core.lang;
+
+    uses io.powerj.api.CmdletProvider;
 }

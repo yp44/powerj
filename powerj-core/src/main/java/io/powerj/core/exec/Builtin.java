@@ -7,8 +7,8 @@ import java.util.List;
 public interface Builtin {
 
     /**
-     * @param args arguments déjà évalués
+     * @param args arguments déjà évalués : mots ({@code String}) ou valeurs d'expressions
      * @return valeurs produites (affichées, ou affectées à une variable)
      */
-    List<Object> run(List<String> args, Session session) throws Exception;
+    List<Object> run(List<Object> args, Session session) throws Exception;
 }

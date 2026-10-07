@@ -82,6 +82,9 @@ public final class Parser {
     }
 
     private Body body() {
+        if (peek() instanceof Token.Open) {
+            return new Ast.ExpressionBody(subExpression());
+        }
         Token first = next();
         if (first instanceof Token.Word(var text) && !isLiteral(text)) {
             boolean forceNative = text.startsWith("^");
@@ -105,10 +108,29 @@ public final class Parser {
     }
 
     private static boolean isArgument(Token token) {
-        return token instanceof Token.Word || token instanceof Token.Str || token instanceof Token.Var;
+        return token instanceof Token.Word || token instanceof Token.Str || token instanceof Token.Var
+                || token instanceof Token.Open;
+    }
+
+    /** {@code ( commande ou expression )} suivi de ses accès. */
+    private Ast.SubExpression subExpression() {
+        pos++; // (
+        if (atEnd() || peek() instanceof Token.Close) {
+            throw new SyntaxException("parenthèses vides");
+        }
+        Body inner = body();
+        if (atEnd() || !(peek() instanceof Token.Close(var accessors))) {
+            throw new SyntaxException(atEnd() ? "« ) » manquante" : "« ) » attendue avant « " + describe(peek()) + " »");
+        }
+        pos++;
+        return new Ast.SubExpression(inner, accessors);
     }
 
     private Argument argument(Token token) {
+        if (token instanceof Token.Open) {
+            pos--;
+            return new Ast.ExpressionArgument(subExpression());
+        }
         return switch (token) {
             case Token.Word(var text) -> new Ast.WordArgument(text);
             case Token.Str(var parts) -> new Ast.ExpressionArgument(new Ast.StringExpression(parts));
@@ -151,6 +173,8 @@ public final class Parser {
             case Token.Pipe _ -> "|";
             case Token.Redirection(var stream, var append) ->
                     (stream == Token.Stream.ERR ? "2" : "") + (append ? ">>" : ">");
+            case Token.Open _ -> "(";
+            case Token.Close _ -> ")";
         };
     }
 

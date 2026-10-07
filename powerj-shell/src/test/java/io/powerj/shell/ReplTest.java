@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 import io.powerj.core.BuildInfo;
+import io.powerj.core.exec.CmdletRegistry;
 import io.powerj.core.exec.Session;
 import io.powerj.core.exec.Supervisor;
 
@@ -48,7 +49,7 @@ class ReplTest {
         }
         try (var terminal = new TestTerminal(keys)) {
             var reader = ShellReader.create(terminal.terminal(), home, ShellConfig.defaults());
-            var repl = new Repl(reader, new Supervisor(), session());
+            var repl = new Repl(reader, new Supervisor(), session(), CmdletRegistry.discover());
             terminal.startTyping();
             int code = repl.run(BUILD);
             reader.getHistory().save();
@@ -89,7 +90,7 @@ class ReplTest {
         home = new PowerJHome(tmp.resolve("home")).createDirectories();
         try (var terminal = TestTerminal.interactive()) {
             var reader = ShellReader.create(terminal.terminal(), home, ShellConfig.defaults());
-            var repl = new Repl(reader, new Supervisor(), session());
+            var repl = new Repl(reader, new Supervisor(), session(), CmdletRegistry.discover());
             terminal.startTyping();
             var code = new CompletableFuture<Integer>();
             Thread.ofVirtual().start(() -> code.complete(repl.run(BUILD)));

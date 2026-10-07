@@ -1,8 +1,8 @@
 package io.powerj.core.exec;
 
 import java.lang.reflect.Array;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.lang.reflect.RecordComponent;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -50,7 +50,10 @@ public final class PropertyAccess {
             }
             return values;
         }
-        throw new PjException(target.getClass().getSimpleName() + " n'a pas de propriété '" + name + "'");
+        List<String> known = Members.of(target).stream().filter(m -> !m.kind().equals("méthode"))
+                .map(Members.Member::name).limit(12).toList();
+        throw new PjException(target.getClass().getSimpleName() + " n'a pas de propriété '" + name + "'"
+                + (known.isEmpty() ? "" : " (propriétés : " + String.join(", ", known) + ")"));
     }
 
     private record Lookup(boolean found, Object value) {
@@ -63,33 +66,27 @@ public final class PropertyAccess {
             if (type.isRecord()) {
                 for (RecordComponent component : type.getRecordComponents()) {
                     if (component.getName().equalsIgnoreCase(name)) {
-                        return new Lookup(true, component.getAccessor().invoke(target));
+                        Method accessor = component.getAccessor();
+                        accessor.trySetAccessible();
+                        return new Lookup(true, accessor.invoke(target));
                     }
                 }
             }
-            for (Method method : type.getMethods()) {
-                if (method.getParameterCount() == 0 && !Modifier.isStatic(method.getModifiers())
-                        && isGetterFor(method, name) && method.getDeclaringClass().getModule().isExported(
-                                method.getDeclaringClass().getPackageName())) {
-                    return new Lookup(true, method.invoke(target));
-                }
+            var getter = Members.getter(type, name);
+            if (getter.isPresent()) {
+                return new Lookup(true, getter.get().invoke(target));
             }
-            for (var field : type.getFields()) {
-                if (field.getName().equalsIgnoreCase(name) && !Modifier.isStatic(field.getModifiers())) {
-                    return new Lookup(true, field.get(target));
-                }
+            var field = Members.field(type, name);
+            if (field.isPresent()) {
+                return new Lookup(true, field.get().get(target));
             }
+        } catch (InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            throw new PjException(PjError.of("lecture de la propriété '" + name + "' : " + cause, cause));
         } catch (ReflectiveOperationException e) {
             throw new PjException(PjError.of("lecture de la propriété '" + name + "' impossible : " + e, e));
         }
         return Lookup.MISSING;
-    }
-
-    private static boolean isGetterFor(Method method, String name) {
-        String m = method.getName();
-        return m.equalsIgnoreCase("get" + name)
-                || (m.equalsIgnoreCase("is" + name)
-                    && (method.getReturnType() == boolean.class || method.getReturnType() == Boolean.class));
     }
 
     static Object index(Object target, int index) {
