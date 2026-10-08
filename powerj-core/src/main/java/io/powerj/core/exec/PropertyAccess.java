@@ -12,10 +12,10 @@ import java.util.Map;
 import io.powerj.core.lang.Accessor;
 
 /**
- * {@code .propriété} and {@code [index]} access on a value (specification FR-28). A property is resolved in
+ * {@code .property} and {@code [index]} access on a value (specification FR-28). A property is resolved in
  * this order: record component, getter {@code getNom()}/{@code isNom()}, public field, {@code Map} key.
  * The property always applies to the object itself: for each element of a list, write
- * {@code liste*.nom}.
+ * {@code list*.name}.
  */
 public final class PropertyAccess {
 

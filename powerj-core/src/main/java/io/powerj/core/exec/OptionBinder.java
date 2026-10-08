@@ -108,7 +108,7 @@ public final class OptionBinder {
                     }
                     given[index] = true;
                 } else {
-                    // Options courtes, éventuellement groupées : -ra, -f *.java, -fvaleur
+                    // Short options, possibly grouped: -ra, -f *.java, -fvaleur
                     String letters = word.substring(1);
                     for (int k = 0; k < letters.length(); k++) {
                         OptionSpec spec = byShortName(command, specs, letters.charAt(k));
@@ -136,7 +136,7 @@ public final class OptionBinder {
                 OptionSpec spec = positionals.get(nextPositional);
                 int index = specs.indexOf(spec);
                 if (given[index] && !spec.isList()) {
-                    // l'option a déjà reçu sa valeur par son nom : on passe au positionnel suivant
+                    // the option already received its value by name: move on to the next positional
                     nextPositional++;
                     i--;
                     continue;
@@ -274,7 +274,7 @@ public final class OptionBinder {
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static Object convertScalar(String command, OptionSpec spec, Class<?> type, Object value) {
         if (value == null || type.isInstance(value)) {
-            return value; // dont Object : valeur transmise telle quelle (bloc { }, objet)
+            return value; // including Object: value passed as is ({ } block, object)
         }
         String text = Values.text(value);
         try {
@@ -293,7 +293,7 @@ public final class OptionBinder {
                 return Integer.valueOf(text);
             }
             if (type == long.class || type == Long.class) {
-                // taille avec unité : 10kb, 1.5mb (FR-19)
+                // size with unit: 10kb, 1.5mb (FR-19)
                 return Units.parse(text).filter(Long.class::isInstance).orElseGet(() -> Long.valueOf(text));
             }
             if (type == double.class || type == Double.class) {

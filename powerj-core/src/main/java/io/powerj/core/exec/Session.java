@@ -39,7 +39,7 @@ public final class Session {
     public Session(Path home, Path currentDirectory, Map<String, String> environment) {
         this.home = home.toAbsolutePath().normalize();
         this.currentDirectory = currentDirectory.toAbsolutePath().normalize();
-        // Les noms de variables d'environnement ne tiennent pas compte de la casse sous Windows.
+        // Environment variable names are case-insensitive on Windows.
         this.environment = Platform.isWindows() ? new TreeMap<>(String.CASE_INSENSITIVE_ORDER) : new TreeMap<>();
         this.environment.putAll(environment);
     }

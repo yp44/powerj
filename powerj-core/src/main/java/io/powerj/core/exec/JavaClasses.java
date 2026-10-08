@@ -200,7 +200,7 @@ public final class JavaClasses {
     private Optional<Class<?>> qualified(String name) {
         return qualifiedNames.computeIfAbsent(name, n -> {
             if (!Character.isUpperCase(n.charAt(n.lastIndexOf('.') + 1))) {
-                return Optional.empty(); // un package, pas une classe : évite des recherches inutiles
+                return Optional.empty(); // a package, not a class: avoids useless lookups
             }
             try {
                 Class<?> type = Class.forName(n, false, ClassLoader.getPlatformClassLoader());

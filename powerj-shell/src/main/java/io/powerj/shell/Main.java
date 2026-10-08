@@ -31,7 +31,7 @@ import io.powerj.core.exec.StandardInput;
 import io.powerj.core.exec.Supervisor;
 
 /**
- * Entry point of {@code powerj.exe}: interactive shell without arguments; {@code -c "ligne"} or a
+ * Entry point of {@code powerj.exe}: interactive shell without arguments; {@code -c "line"} or a
  * {@code .pj} file for non-interactive mode; {@code --debug} for error details.
  */
 public final class Main {
@@ -57,7 +57,7 @@ public final class Main {
         System.exit(runScript(rest));
     }
 
-    /** {@code powerj -c "ligne"} or {@code powerj fichier.pj} (FR-04d). */
+    /** {@code powerj -c "line"} or {@code powerj file.pj} (FR-04d). */
     private static int runScript(List<String> args) {
         List<String> lines;
         if (args.getFirst().equals("-c")) {
@@ -84,8 +84,8 @@ public final class Main {
         var err = new PrintWriter(new OutputStreamWriter(new FileOutputStream(FileDescriptor.err), outCharset), true);
         Optional<Iterator<String>> input = Optional.empty();
         if (!StandardInput.isTerminal()) {
-            // Les lignes reçues viennent en général d'une commande native (dir /b | powerj -c …) : même
-            // décodage que pour elles (FR-40b), POWERJ_NATIVE_ENCODING_STDIN pour un réglage spécifique.
+            // Incoming lines usually come from a native command (dir /b | powerj -c …): same
+            // decoding as for those (FR-40b), POWERJ_NATIVE_ENCODING_STDIN for a specific setting.
             Charset charset = new NativeEncoding().forProgram(Path.of("stdin"), System.getenv());
             var reader = new BufferedReader(new InputStreamReader(System.in, charset));
             input = Optional.of(reader.lines().iterator());
@@ -122,7 +122,7 @@ public final class Main {
         Terminal terminal;
         try {
             var builder = TerminalBuilder.builder().system(true).name("PowerJ");
-            // Entrée ou sortie redirigée (fichier, pipe) : UTF-8, quelle que soit la page de code du système.
+            // Redirected input or output (file, pipe): UTF-8, whatever the system code page.
             if (!isInteractiveConsole()) {
                 builder.encoding(StandardCharsets.UTF_8).stdinEncoding(StandardCharsets.UTF_8)
                         .stdoutEncoding(StandardCharsets.UTF_8).stderrEncoding(StandardCharsets.UTF_8);
@@ -133,9 +133,9 @@ public final class Main {
             System.err.println("PowerJ : terminal indisponible (" + e.getMessage() + ")");
             return 1;
         }
-        // Le terminal est restauré (mode brut désactivé) même en cas d'arrêt brutal (FR-59).
+        // The terminal is restored (raw mode disabled) even on an abrupt shutdown (FR-59).
         Runtime.getRuntime().addShutdownHook(Thread.ofPlatform().unstarted(() -> close(terminal)));
-        // System.out.println(…) appelé depuis une expression Java passe par le terminal JLine (FR-58).
+        // System.out.println(…) called from a Java expression goes through the JLine terminal (FR-58).
         System.setOut(terminalStream(terminal));
         System.setErr(terminalStream(terminal));
         try {

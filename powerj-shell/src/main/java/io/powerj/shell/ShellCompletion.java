@@ -94,12 +94,12 @@ final class ShellCompletion {
 
         @Override
         public void setErrorPattern(Pattern errorPattern) {
-            // non utilisé
+            // unused
         }
 
         @Override
         public void setErrorIndex(int errorIndex) {
-            // non utilisé
+            // unused
         }
     }
 }

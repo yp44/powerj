@@ -21,6 +21,6 @@ public @interface CmdletInfo {
     /** One-line summary. */
     String summary();
 
-    /** Examples displayed by {@code help <nom>}. */
+    /** Examples displayed by {@code help <name>}. */
     String[] examples() default {};
 }

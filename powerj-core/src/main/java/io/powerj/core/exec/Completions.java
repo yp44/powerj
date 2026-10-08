@@ -81,7 +81,7 @@ public final class Completions {
         return interpreter.session();
     }
 
-    // --- Analyse du contexte ---
+    // --- Context analysis ---
 
     private enum FrameKind { COMMAND, BLOCK, EXPRESSION }
 
@@ -135,7 +135,7 @@ public final class Completions {
                 case '|' -> {
                     if (frame.kind == FrameKind.COMMAND) {
                         if (i + 1 < cursor && line.charAt(i + 1) == '|') {
-                            frame.stageStarts.clear(); // || : nouvelle instruction
+                            frame.stageStarts.clear(); // ||: new statement
                             i++;
                         }
                         frame.stageStarts.add(i + 1);
@@ -177,14 +177,14 @@ public final class Completions {
         return -1;
     }
 
-    // --- Point d'entrée ---
+    // --- Entry point ---
 
     /** Suggestions for the word that ends at the cursor. */
     public Result complete(String line, int cursor) {
         try {
             return doComplete(line, Math.min(cursor, line.length()));
         } catch (RuntimeException e) {
-            return Result.none(cursor); // la complétion ne doit jamais casser la saisie
+            return Result.none(cursor); // completion must never break the input
         }
     }
 
@@ -253,7 +253,7 @@ public final class Completions {
         }
         Matcher assignment = ASSIGNMENT.matcher(line).region(start, at);
         if (assignment.lookingAt()) {
-            start = assignment.end(); // $x = … : c'est ce qui suit le = qui compte
+            start = assignment.end(); // $x = …: what follows the = is what counts
         }
         return start < at && io.powerj.core.lang.Lexer.expressionAt(line, start, session().java()::isStaticReference);
     }
@@ -314,7 +314,7 @@ public final class Completions {
         return -1;
     }
 
-    // --- Commandes, options, arguments ---
+    // --- Commands, options, arguments ---
 
     private Result commands(String line, Frame frame, int identStart, String fragment) {
         String before = line.substring(frame.stageStart(), identStart).strip();
@@ -360,7 +360,7 @@ public final class Completions {
             if (expecting.isPresent()) {
                 return optionValues(expecting.get(), line, wordStart, cursor);
             }
-            // Paramètre positionnel textuel (souvent un chemin : ls docs) ; pas pour un bloc (where, map).
+            // Textual positional parameter (often a path: ls docs); not for a block (where, map).
             boolean pathPositional = specs.stream().anyMatch(s -> s.isPositional()
                     && (s.component().getType() == Path.class || s.component().getType() == String.class
                         || isPathList(s) || s.isList() && s.component().getGenericType().getTypeName().contains("String")));
@@ -369,7 +369,7 @@ public final class Completions {
         if (interpreter.builtinNames().contains(name) && !name.equals("cd")) {
             return Result.none(cursor);
         }
-        return paths(line, wordStart, cursor); // cd et commandes natives : chemins (FR-25)
+        return paths(line, wordStart, cursor); // cd and native commands: paths (FR-25)
     }
 
     private static boolean isArgumentBoundary(char c) {
@@ -398,7 +398,7 @@ public final class Completions {
         List<Candidate> candidates = new ArrayList<>();
         for (var spec : specs) {
             if (spec.isPositional() && spec.shortName() == '\0' && !spec.isFlag()) {
-                continue; // purement positionnel
+                continue; // purely positional
             }
             boolean used = words.stream().anyMatch(w -> w.equals("--" + spec.longName())
                     || w.startsWith("--" + spec.longName() + "=")
@@ -466,7 +466,7 @@ public final class Completions {
         return new Result(start, word, candidates);
     }
 
-    // --- Chemins ---
+    // --- Paths ---
 
     /** File paths for the word starting at {@code start} (possibly quoted). */
     private Result paths(String line, int start, int cursor) {
@@ -526,7 +526,7 @@ public final class Completions {
         return out.toString();
     }
 
-    // --- Variables et identifiants ---
+    // --- Variables and identifiers ---
 
     private Result variables(int start, String word, boolean inBlock) {
         List<Candidate> candidates = new ArrayList<>();
@@ -630,7 +630,7 @@ public final class Completions {
                     return output;
                 }
                 if (name.equals("where")) {
-                    continue; // where laisse passer les objets tels quels
+                    continue; // where lets objects through unchanged
                 }
                 return null;
             }
@@ -732,7 +732,7 @@ public final class Completions {
             case TypeInfo.Instance(var type, var value) -> {
                 if (value != null) {
                     try {
-                        Object property = PropertyAccess.property(value, name); // getter : lecture sans effet attendu
+                        Object property = PropertyAccess.property(value, name); // getter: read with no expected side effect
                         yield property == null ? propertyType(type, name) : new TypeInfo.Instance(property.getClass(), property);
                     } catch (RuntimeException e) {
                         yield new TypeInfo.Unknown();
@@ -793,12 +793,12 @@ public final class Completions {
             }
             case TypeInfo.Instance(var type, _) when type.isArray() -> instance(type.componentType());
             case TypeInfo.Instance(var type, var value) when !(value instanceof Collection<?>) && index == null ->
-                    target; // *. sur une valeur seule : elle-même
+                    target; // *. on a single value: the value itself
             default -> new TypeInfo.Unknown();
         };
     }
 
-    // --- Membres ---
+    // --- Members ---
 
     private List<Candidate> members(TypeInfo type) {
         return switch (type) {
@@ -826,11 +826,11 @@ public final class Completions {
         }
         JavaInvoker.instanceMethods(type).forEach((name, methods) -> {
             if (name.equals("equals") || name.equals("hashCode")) {
-                return; // bruit dans le menu
+                return; // noise in the menu
             }
             for (Method method : methods) {
                 if (method.getParameterCount() == 0 && components.contains(name)) {
-                    continue; // accesseur de record : déjà proposé comme propriété
+                    continue; // record accessor: already offered as a property
                 }
                 candidates.add(methodCandidate(method));
             }
@@ -879,7 +879,7 @@ public final class Completions {
         return candidates;
     }
 
-    /** After {@code Classe::} or {@code $x::}: method names (and {@code new} for a class). */
+    /** After {@code Class::} or {@code $x::}: method names (and {@code new} for a class). */
     private static List<Candidate> methodReferences(TypeInfo type) {
         TreeSet<String> names = new TreeSet<>();
         switch (type) {

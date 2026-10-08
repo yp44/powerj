@@ -40,7 +40,7 @@ final class CmdletRunner {
         } catch (PjException | CancellationException | InterruptedException e) {
             throw e;
         } catch (IllegalArgumentException e) {
-            // Convention : un cmdlet signale un usage incorrect par IllegalArgumentException.
+            // Convention: a cmdlet reports incorrect usage with IllegalArgumentException.
             throw new PjException(PjError.of(registered.name() + " : " + e.getMessage(), e));
         }
         return !context.hadErrors;

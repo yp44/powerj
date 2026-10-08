@@ -103,7 +103,7 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
     private void listDirectory(Path dir, Params params, Optional<PathMatcher> filter, CmdletContext<FileEntry> context) {
         for (Path child : children(dir, params, context)) {
             entry(child).filter(e -> keep(e, params, filter)).ifPresent(context::emit);
-            // Pas de suivi des liens symboliques : évite les boucles infinies.
+            // Symbolic links are not followed: avoids infinite loops.
             if (params.recurse() && Files.isDirectory(child, LinkOption.NOFOLLOW_LINKS)) {
                 listDirectory(child, params, filter, context);
             }
@@ -145,7 +145,7 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
                     attributes.lastModifiedTime().toInstant(), path.toAbsolutePath(), dir,
                     FileEntry.extensionOf(name, dir)));
         } catch (IOException _) {
-            return Optional.empty(); // fichier disparu entre la liste et la lecture
+            return Optional.empty(); // file vanished between listing and reading
         }
     }
 
@@ -158,7 +158,7 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
     }
 
     private static PathMatcher glob(String pattern) {
-        // Insensible à la casse sous Windows comme ailleurs : *.TXT trouve a.txt.
+        // Case-insensitive on Windows as elsewhere: *.TXT matches a.txt.
         PathMatcher matcher = FileSystems.getDefault().getPathMatcher("glob:" + pattern.toLowerCase(Locale.ROOT));
         return p -> matcher.matches(Path.of(p.toString().toLowerCase(Locale.ROOT)));
     }

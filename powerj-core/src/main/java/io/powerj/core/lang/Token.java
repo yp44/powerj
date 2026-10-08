@@ -12,7 +12,7 @@ public sealed interface Token {
      */
     record Expr(Ast.Expression expression) implements Token { }
 
-    /** {@code $nom =} at the start of a statement: assignment. */
+    /** {@code $name =} at the start of a statement: assignment. */
     record AssignTo(String variable) implements Token { }
 
     /** Statement separator {@code ;}, {@code &&} or {@code ||}. */

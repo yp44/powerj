@@ -124,19 +124,19 @@ final class Evaluator {
         return values;
     }
 
-    // --- Noms Java ---
+    // --- Java names ---
 
     private Object name(String name) {
         if (LOCALS.isBound() && LOCALS.get().containsKey(name)) {
             Object value = LOCALS.get().get(name);
-            return value == NULL ? null : value; // paramètre de lambda : prioritaire sur les classes
+            return value == NULL ? null : value; // lambda parameter: takes precedence over classes
         }
         JavaClasses java = session.java();
         java.checkAmbiguity(name);
         return java.simpleClass(name).<Object>map(ClassRef::new).orElseGet(() -> new PackageRef(name));
     }
 
-    /** {@code x.nom}: static field, nested class, continuation of a qualified name, or property (FR-28). */
+    /** {@code x.name}: static field, nested class, continuation of a qualified name, or property (FR-28). */
     private Object get(Object target, String name) {
         return switch (target) {
             case ClassRef(var type) -> JavaClasses.staticField(type, name).map(field -> {
@@ -177,7 +177,7 @@ final class Evaluator {
         };
     }
 
-    /** {@code Classe::méthode}, {@code $objet::méthode}, {@code FileEntry::name} (FR-33b). */
+    /** {@code Class::method}, {@code $object::method}, {@code FileEntry::name} (FR-33b). */
     private static Object methodReference(Object target, String method) {
         return switch (target) {
             case ClassRef(var type) -> new MethodReference.OfClass(type, method);
@@ -202,7 +202,7 @@ final class Evaluator {
                 + " (une variable s'écrit $" + name + ")");
     }
 
-    /** {@code [type] valeur}: explicit conversion (FR-50). */
+    /** {@code [type] value}: explicit conversion (FR-50). */
     private static Object cast(Class<?> type, Object value) {
         if (value == null) {
             if (type.isPrimitive()) {
@@ -233,7 +233,7 @@ final class Evaluator {
                 + type.getSimpleName());
     }
 
-    // --- Variables et chaînes ---
+    // --- Variables and strings ---
 
     private Object variable(String name) {
         if (name.equals("_")) {

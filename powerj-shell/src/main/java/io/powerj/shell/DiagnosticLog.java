@@ -35,7 +35,7 @@ final class DiagnosticLog {
             file.setEncoding("UTF-8");
             root.addHandler(file);
         } catch (IOException | SecurityException e) {
-            // Pas de journal possible : le shell reste utilisable.
+            // No log possible: the shell remains usable.
             System.err.println("PowerJ : journal indisponible dans " + logsDir + " (" + e.getMessage() + ")");
         }
         if (debug) {

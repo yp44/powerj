@@ -10,7 +10,7 @@ import org.jline.reader.History;
 
 /**
  * History expansion at the start of the line only (specification FR-11): {@code !!}, {@code !n}
- * and {@code !texte}, optionally followed by the rest of the line. A {@code !} elsewhere in the line
+ * and {@code !text}, optionally followed by the rest of the line. A {@code !} elsewhere in the line
  * remains a negation ({@code where { !$_.dir }}).
  */
 final class HistoryExpander implements Expander {
@@ -29,7 +29,7 @@ final class HistoryExpander implements Expander {
             case String n when n.chars().allMatch(Character::isDigit) -> byNumber(history, n);
             case String prefix -> lastStartingWith(history, prefix);
         };
-        // JLine ignore l'exception et laisse la ligne telle quelle : le REPL signalera l'échec.
+        // JLine ignores the exception and leaves the line as is: the REPL will report the failure.
         return command.map(c -> c + m.group(2))
                 .orElseThrow(() -> new IllegalArgumentException("!" + event + " : introuvable"));
     }

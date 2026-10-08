@@ -24,7 +24,7 @@ interface Source {
 
             @Override
             public void abort() {
-                // l'itérateur reste disponible pour l'instruction suivante
+                // the iterator remains available for the next statement
             }
         };
     }

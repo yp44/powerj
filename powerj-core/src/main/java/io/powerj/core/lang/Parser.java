@@ -52,7 +52,7 @@ public final class Parser {
         while (!atEnd()) {
             if (peek() instanceof Token.Separator(var c)) {
                 if (c == Connector.ALWAYS) {
-                    pos++; // « ; » superflu
+                    pos++; // superfluous ";"
                     continue;
                 }
                 throw new SyntaxException("« " + symbol(c) + " » sans commande avant");

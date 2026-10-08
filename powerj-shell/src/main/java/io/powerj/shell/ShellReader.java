@@ -28,9 +28,9 @@ final class ShellReader {
                 .variable(LineReader.HISTORY_SIZE, config.historySize())
                 .variable(LineReader.HISTORY_FILE_SIZE, config.historySize())
                 .variable(LineReader.SECONDARY_PROMPT_PATTERN, CONTINUATION_PROMPT)
-                .option(LineReader.Option.HISTORY_INCREMENTAL, true)   // écrit après chaque commande (FR-09)
-                .option(LineReader.Option.HISTORY_IGNORE_DUPS, true)   // doublons consécutifs (FR-10)
-                .option(LineReader.Option.HISTORY_IGNORE_SPACE, true)  // ligne commençant par un espace
+                .option(LineReader.Option.HISTORY_INCREMENTAL, true)   // written after each command (FR-09)
+                .option(LineReader.Option.HISTORY_IGNORE_DUPS, true)   // consecutive duplicates (FR-10)
+                .option(LineReader.Option.HISTORY_IGNORE_SPACE, true)  // line starting with a space
                 .option(LineReader.Option.DISABLE_EVENT_EXPANSION, false)
                 .build();
         bindPrefixHistorySearch(reader, terminal);

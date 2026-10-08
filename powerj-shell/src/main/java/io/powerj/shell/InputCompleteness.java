@@ -32,7 +32,7 @@ final class InputCompleteness {
             char c = input.charAt(i);
             if (inString) {
                 if (c == '\\') {
-                    i++; // caractère échappé, y compris \"
+                    i++; // escaped character, including \"
                 } else if (c == '"') {
                     inString = false;
                 }

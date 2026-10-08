@@ -9,6 +9,6 @@ public sealed interface StringPart {
 
     record Interpolation(String variable, List<Accessor> accessors) implements StringPart { }
 
-    /** {@code $(expression ou commande)}: value inserted into the string. */
+    /** {@code $(expression or command)}: value inserted into the string. */
     record Embedded(Ast.Expression expression) implements StringPart { }
 }

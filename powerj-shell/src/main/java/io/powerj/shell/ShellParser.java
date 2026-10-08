@@ -118,7 +118,7 @@ final class ShellParser implements Parser {
 
     @Override
     public boolean isEscapeChar(char ch) {
-        return false; // l'antislash n'échappe rien hors des chaînes (FR-32b)
+        return false; // the backslash escapes nothing outside strings (FR-32b)
     }
 
     static Words split(String line, int cursor) {
@@ -145,7 +145,7 @@ final class ShellParser implements Parser {
             words.add(line.substring(start, i));
         }
         if (wordIndex < 0) {
-            // Curseur sur un blanc : mot vide à cette position (utile à la future complétion).
+            // Cursor on whitespace: empty word at this position (useful for future completion).
             wordIndex = wordsBeforeCursor;
             words.add(wordIndex, "");
         }

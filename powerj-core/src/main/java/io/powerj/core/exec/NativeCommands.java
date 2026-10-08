@@ -77,7 +77,7 @@ public final class NativeCommands {
                     }
                 }
             } catch (IOException | SecurityException _) {
-                // dossier illisible : ignoré
+                // unreadable directory: ignored
             }
         }
         return java.util.Collections.unmodifiableSortedSet((TreeSet<String>) names);

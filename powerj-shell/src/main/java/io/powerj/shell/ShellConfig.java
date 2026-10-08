@@ -57,7 +57,7 @@ public record ShellConfig(int historySize) {
                 return value;
             }
         } catch (NumberFormatException _) {
-            // valeur invalide : signalée ci-dessous
+            // invalid value: reported below
         }
         LOG.warning(() -> "Valeur invalide pour " + key + " : '" + text + "', " + defaultValue + " utilisé");
         return defaultValue;

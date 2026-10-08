@@ -220,7 +220,7 @@ public final class NativeRunner {
                         elapsed(start)));
             }
             if (writer != null) {
-                // Le premier process ne lit plus : l'étape qui l'alimente doit s'arrêter.
+                // The first process no longer reads: the stage feeding it must stop.
                 input.abort();
                 writer.interrupt();
                 writer.join();
@@ -250,12 +250,12 @@ public final class NativeRunner {
             while ((value = input.next()) != Source.END) {
                 formatter.accept(value);
                 if (writer.checkError()) {
-                    return; // le process a fermé son entrée
+                    return; // the process closed its input
                 }
             }
             complete = true;
         } catch (InterruptedException | java.util.concurrent.CancellationException _) {
-            // arrêt du pipeline
+            // pipeline stopped
         } finally {
             if (complete) {
                 formatter.close();
@@ -275,7 +275,7 @@ public final class NativeRunner {
                     sink.accept(line);
                 }
             } catch (IOException | java.util.concurrent.CancellationException _) {
-                // process arrêté, ou étape suivante fermée : fin de la lecture
+                // process stopped, or next stage closed: end of reading
             }
         });
     }
@@ -305,7 +305,7 @@ public final class NativeRunner {
         try {
             stream.close();
         } catch (IOException _) {
-            // rien à faire
+            // nothing to do
         }
     }
 }

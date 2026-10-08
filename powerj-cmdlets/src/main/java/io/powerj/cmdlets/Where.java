@@ -56,7 +56,7 @@ public final class Where implements Cmdlet<Where.Params, Object, Object> {
         } catch (CancellationException e) {
             throw e;
         } catch (RuntimeException e) {
-            // FR-36 : une erreur d'évaluation est non bloquante, l'objet est ignoré.
+            // FR-36: an evaluation error is non-blocking, the object is skipped.
             context.error(e.getMessage() + " (objet ignoré : " + abbreviate(input) + ")");
             return;
         }

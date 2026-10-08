@@ -36,7 +36,7 @@ public final class Highlights {
                                 Predicate<String> staticNames) {
         List<Span> spans = new ArrayList<>();
         Deque<Character> nesting = new ArrayDeque<>();
-        List<Map.Entry<Integer, List<String>>> parameters = new ArrayList<>(); // profondeur → paramètres
+        List<Map.Entry<Integer, List<String>>> parameters = new ArrayList<>(); // depth → parameters
         boolean head = true;
         int i = 0;
         while (i < line.length()) {
@@ -73,7 +73,7 @@ public final class Highlights {
                 }
                 case '(' -> {
                     boolean call = i > 0 && Character.isJavaIdentifierPart(line.charAt(i - 1));
-                    nesting.push(call ? '[' : '('); // un appel Java ne contient pas de commande
+                    nesting.push(call ? '[' : '('); // a Java call does not contain a command
                     head = !call;
                     i = call ? lambda(line, i + 1, nesting.size(), parameters) : i + 1;
                     continue;
@@ -106,7 +106,7 @@ public final class Highlights {
             }
             int end = wordEnd(line, i);
             if (!command) {
-                i++; // caractère par caractère : une virgule peut précéder une lambda
+                i++; // character by character: a comma may precede a lambda
                 continue;
             }
             String word = line.substring(i, end);

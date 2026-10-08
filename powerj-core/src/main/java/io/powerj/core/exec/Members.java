@@ -58,7 +58,7 @@ public final class Members {
     }
 
     static boolean isAccessible(Class<?> type) {
-        // Exporté à PowerJ : les packages des modules tiers lui sont ouverts au chargement (ModuleLoader).
+        // Exported to PowerJ: third-party module packages are opened to it at load time (ModuleLoader).
         return Modifier.isPublic(type.getModifiers())
                 && type.getModule().isExported(type.getPackageName(), Members.class.getModule());
     }

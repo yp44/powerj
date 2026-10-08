@@ -68,7 +68,7 @@ public final class Ast {
         }
     }
 
-    /** Expression alone on the line: {@code $exit}, {@code "texte"}, {@code 42}. */
+    /** Expression alone on the line: {@code $exit}, {@code "text"}, {@code 42}. */
     public record ExpressionBody(Expression expression) implements Body { }
 
     /** Command argument. */
@@ -98,14 +98,14 @@ public final class Ast {
      */
     public record Name(String name) implements Expression { }
 
-    /** {@code new Classe(arguments)} (FR-48). */
+    /** {@code new Class(arguments)} (FR-48). */
     public record New(String type, List<Expression> arguments) implements Expression {
         public New {
             arguments = List.copyOf(arguments);
         }
     }
 
-    /** Explicit conversion {@code [type] valeur} (FR-50). */
+    /** Explicit conversion {@code [type] value} (FR-50). */
     public record Cast(String type, Expression operand) implements Expression { }
 
     /**
@@ -127,23 +127,23 @@ public final class Ast {
     /** Method reference: {@code String::length}, {@code $x::equals}, {@code ArrayList::new} (FR-33b). */
     public record MethodRef(Expression target, String method) implements Expression { }
 
-    /** {@code cible.nom}: property (FR-28). */
+    /** {@code target.name}: property (FR-28). */
     public record Get(Expression target, String name) implements Expression { }
 
-    /** {@code liste*.nom}: the property of each element ("spread" operator, as in Groovy). */
+    /** {@code list*.name}: the property of each element ("spread" operator, as in Groovy). */
     public record SpreadGet(Expression target, String name) implements Expression { }
 
-    /** {@code liste*.méthode(arguments)}: the method called on each element. */
+    /** {@code list*.method(arguments)}: the method called on each element. */
     public record SpreadInvoke(Expression target, String method, List<Expression> arguments) implements Expression {
         public SpreadInvoke {
             arguments = List.copyOf(arguments);
         }
     }
 
-    /** {@code cible[index]}. */
+    /** {@code target[index]}. */
     public record At(Expression target, Expression index) implements Expression { }
 
-    /** {@code cible.méthode(arguments)}: Java instance method call. */
+    /** {@code target.method(arguments)}: Java instance method call. */
     public record Invoke(Expression target, String method, List<Expression> arguments) implements Expression {
         public Invoke {
             arguments = List.copyOf(arguments);
@@ -156,7 +156,7 @@ public final class Ast {
     /** {@code !x} or {@code -x}. */
     public record Unary(Operator operator, Expression operand) implements Expression { }
 
-    /** {@code condition ? siVrai : siFaux}. */
+    /** {@code condition ? ifTrue : ifFalse}. */
     public record Conditional(Expression condition, Expression whenTrue, Expression whenFalse) implements Expression { }
 
     /** List {@code [1, 2, 3]}. */

@@ -22,7 +22,7 @@ import java.util.regex.Pattern;
  */
 public final class Lexer {
 
-    /** Method reference {@code Classe::méthode} or {@code nom.Qualifie::méthode}. */
+    /** Method reference {@code Class::method} or {@code qualified.Name::method}. */
     private static final Pattern METHOD_REFERENCE = Pattern.compile(
             "[\\p{L}_][\\p{L}\\p{N}_]*(?:\\.[\\p{L}_][\\p{L}\\p{N}_]*)*::[\\p{L}_]");
 
@@ -89,7 +89,7 @@ public final class Lexer {
         }
         if (startsWith(">=") || startsWith("==")) {
             pos += 2;
-            return new Token.Word(input.substring(pos - 2, pos)); // opérateurs de la forme courte de where
+            return new Token.Word(input.substring(pos - 2, pos)); // operators of the short form of where
         }
         if (startsWith("2>>") || startsWith(">>")) {
             var stream = c == '2' ? Token.Stream.ERR : Token.Stream.OUT;
@@ -131,7 +131,7 @@ public final class Lexer {
         return word();
     }
 
-    /** {@code $nom =} (but not {@code $nom ==}). */
+    /** {@code $name =} (but not {@code $name ==}). */
     private Token.AssignTo assignment() {
         if (peek() != '$' || !isVariableStart(pos + 1)) {
             return null;
@@ -152,7 +152,7 @@ public final class Lexer {
     /**
      * Does an expression start at {@code at}, in command position? Variables, strings, groups,
      * blocks, lists and conversions, characters, numbers, {@code true}/{@code false}/{@code null}/{@code now},
-     * {@code new Classe(…)}, and qualified names attached to {@code (} or designating a class or a static
+     * {@code new Class(…)}, and qualified names attached to {@code (} or designating a class or a static
      * field ({@code Math.max(3, 7)}, {@code java.lang.Math.PI}). Otherwise it is a command
      * ({@code java -version}, {@code notepad.exe x}).
      */
@@ -270,7 +270,7 @@ public final class Lexer {
         if (!atEnd() && (peek() == '?' || peek() == '_') && (pos + 1 >= input.length()
                 || !Character.isLetterOrDigit(input.charAt(pos + 1)))) {
             pos++;
-            return input.substring(start, pos); // $? et $_
+            return input.substring(start, pos); // $? and $_
         }
         while (!atEnd() && (Character.isLetterOrDigit(peek()) || peek() == '_')) {
             pos++;
@@ -372,7 +372,7 @@ public final class Lexer {
         }
         String content = input.substring(contentStart, close).replace("\r\n", "\n").stripIndent();
         pos = close + 3;
-        // Les guillemets du contenu sont du texte : on les échappe pour réutiliser l'analyse des chaînes.
+        // Quotes in the content are text: escape them to reuse the string parsing.
         var quoted = new StringBuilder("\"");
         for (int i = 0; i < content.length(); i++) {
             char c = content.charAt(i);

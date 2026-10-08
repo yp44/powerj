@@ -24,7 +24,7 @@ import io.powerj.core.lang.Token;
 /**
  * Executes a line: statements chained by {@code ;}, {@code &&}, {@code ||} (FR-04c), pipelines
  * {@code |}, built-in commands, cmdlets, native commands, expressions, assignments and redirections. Resolution order
- * of a command (FR-13): built-in command, cmdlet, program on the {@code PATH}; {@code ^nom} forces the
+ * of a command (FR-13): built-in command, cmdlet, program on the {@code PATH}; {@code ^name} forces the
  * program.
  */
 public final class Interpreter {
@@ -85,7 +85,7 @@ public final class Interpreter {
         return modules.loadAll(dir).stream().flatMap(r -> r.warnings().stream()).toList();
     }
 
-    /** {@code mod-load <chemin.jar>}: loads a module at runtime. */
+    /** {@code mod-load <path.jar>}: loads a module at runtime. */
     private List<Object> modLoad(List<Object> args, Session session) {
         if (args.isEmpty()) {
             throw new PjException("mod-load : chemin d'un module (.jar ou dossier) attendu");
@@ -370,8 +370,8 @@ public final class Interpreter {
             return new ObjectStep((_, output, _) -> {
                 Object value = evaluator.evaluate(expression);
                 if (followed && value instanceof io.powerj.api.Collected<?> list) {
-                    // $l | map { … } : une valeur en tête de pipeline est toujours déroulée, comme toute liste ;
-                    // seule une liste passée d'une commande à la suivante reste entière (FR-36d).
+                    // $l | map { … }: a value at the head of a pipeline is always unrolled, like any list;
+                    // only a list passed from one command to the next stays whole (FR-36d).
                     list.forEach(output);
                 } else {
                     output.accept(value);
@@ -486,7 +486,7 @@ public final class Interpreter {
         try {
             pipe.close();
         } catch (java.util.concurrent.CancellationException _) {
-            // pipeline déjà arrêté
+            // pipeline already stopped
         }
     }
 
@@ -498,7 +498,7 @@ public final class Interpreter {
             while (thread.isAlive()) {
                 long remaining = deadline - System.nanoTime();
                 if (remaining <= 0) {
-                    break; // étape bloquée dans un appel non interruptible : abandonnée (FR-57)
+                    break; // stage blocked in a non-interruptible call: abandoned (FR-57)
                 }
                 try {
                     thread.join(java.time.Duration.ofNanos(remaining));

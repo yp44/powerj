@@ -10,11 +10,11 @@ import io.powerj.api.ScriptBlock;
 /**
  * Method reference (FR-33b), resolved on each call according to the arguments received, as in Java:
  * <ul>
- *   <li>{@code Classe::new}: constructor;</li>
- *   <li>{@code Classe::méthode}: static method if it accepts this number of arguments, otherwise an instance
+ *   <li>{@code Class::new}: constructor;</li>
+ *   <li>{@code Class::method}: static method if it accepts this number of arguments, otherwise an instance
  *       method called on the first argument ({@code String::length});</li>
- *   <li>{@code $objet::méthode}: instance method of this object;</li>
- *   <li>{@code Type::méthode} where {@code Type} is not a JDK class ({@code FileEntry::name}):
+ *   <li>{@code $object::method}: instance method of this object;</li>
+ *   <li>{@code Type::method} where {@code Type} is not a JDK class ({@code FileEntry::name}):
  *       instance method of the first argument, which must be of this type.</li>
  * </ul>
  */
@@ -33,7 +33,7 @@ sealed interface MethodReference extends ScriptBlock {
         return toString();
     }
 
-    /** {@code $objet::méthode}. */
+    /** {@code $object::method}. */
     record Bound(Object target, String method) implements MethodReference {
         @Override
         public Object apply(Object[] args) {
@@ -46,7 +46,7 @@ sealed interface MethodReference extends ScriptBlock {
         }
     }
 
-    /** {@code Classe::méthode} or {@code Classe::new}, the class being known. */
+    /** {@code Class::method} or {@code Class::new}, the class being known. */
     record OfClass(Class<?> type, String method) implements MethodReference {
         @Override
         public Object apply(Object[] args) {
@@ -79,7 +79,7 @@ sealed interface MethodReference extends ScriptBlock {
         }
     }
 
-    /** {@code Type::méthode}, the type being known only by its name (output of a cmdlet). */
+    /** {@code Type::method}, the type being known only by its name (output of a cmdlet). */
     record ByTypeName(String typeName, String method) implements MethodReference {
         @Override
         public Object apply(Object[] args) {

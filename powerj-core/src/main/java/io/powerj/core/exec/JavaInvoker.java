@@ -63,7 +63,7 @@ final class JavaInvoker {
         return INSTANCE_METHODS.get(type).getOrDefault(name, List.of()).stream().anyMatch(m -> m.getParameterCount() == 0);
     }
 
-    /** {@code cible.nom(arguments)}. */
+    /** {@code target.name(arguments)}. */
     static Object invokeVirtual(Object target, String name, List<Object> args) {
         if (target == null) {
             throw new PjException("appel de " + name + "() sur une valeur nulle");
@@ -76,7 +76,7 @@ final class JavaInvoker {
         return call(method, target, convertAll(method, args));
     }
 
-    /** {@code Classe.nom(arguments)}. */
+    /** {@code Class.name(arguments)}. */
     static Object invokeStatic(Class<?> type, String name, List<Object> args) {
         List<Executable> candidates = new ArrayList<>();
         for (Method m : type.getMethods()) {
@@ -86,7 +86,7 @@ final class JavaInvoker {
             }
         }
         if (candidates.isEmpty()) {
-            for (Method m : type.getMethods()) { // méthodes statiques héritées d'une superclasse
+            for (Method m : type.getMethods()) { // static methods inherited from a superclass
                 if (m.getName().equals(name) && Modifier.isStatic(m.getModifiers())
                         && JavaClasses.accessible(m.getDeclaringClass())) {
                     candidates.add(m);
@@ -100,7 +100,7 @@ final class JavaInvoker {
         return call(method, null, convertAll(method, args));
     }
 
-    /** {@code new Classe(arguments)}. */
+    /** {@code new Class(arguments)}. */
     static Object construct(Class<?> type, List<Object> args) {
         if (type.isInterface() || Modifier.isAbstract(type.getModifiers())) {
             throw new PjException("new " + type.getSimpleName() + " : classe abstraite ou interface");
@@ -122,7 +122,7 @@ final class JavaInvoker {
     /** Exception thrown by Java code: short blocking error (FR-53). */
     static RuntimeException javaException(Throwable cause) {
         if (cause instanceof PjException || cause instanceof CancellationException) {
-            return (RuntimeException) cause; // levée par un bloc { } appelé depuis Java
+            return (RuntimeException) cause; // thrown by a { } block called from Java
         }
         String message = cause.getMessage();
         return new PjException(PjError.of(cause.getClass().getName() + (message == null ? "" : " : " + message),
@@ -139,7 +139,7 @@ final class JavaInvoker {
         }
     }
 
-    // --- Choix de la surcharge ---
+    // --- Overload selection ---
 
     private record Match(Executable executable, int cost, boolean varargs) { }
 
@@ -208,7 +208,7 @@ final class JavaInvoker {
         Class<?>[] pa = a.getParameterTypes();
         Class<?>[] pb = b.getParameterTypes();
         if (pa.length != pb.length) {
-            return pa.length > pb.length; // varargs : la forme la plus longue est plus précise
+            return pa.length > pb.length; // varargs: the longest form is more specific
         }
         for (int i = 0; i < pa.length; i++) {
             if (!subtype(pa[i], pb[i])) {
@@ -288,7 +288,7 @@ final class JavaInvoker {
             }
             if (isIntegral(n) && (target == int.class || target == long.class || target == short.class
                     || target == byte.class)) {
-                return fits(n, target) ? 9 : NO_MATCH; // sans perte uniquement
+                return fits(n, target) ? 9 : NO_MATCH; // lossless only
             }
             if (target == float.class && (n instanceof Double || n instanceof BigDecimal)) {
                 return 9;

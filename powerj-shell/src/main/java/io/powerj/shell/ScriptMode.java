@@ -16,7 +16,7 @@ import io.powerj.core.exec.ShellIo;
 import io.powerj.core.exec.Supervisor;
 
 /**
- * Non-interactive mode (specification FR-04d): {@code powerj -c "ligne"} or {@code powerj fichier.pj}. No
+ * Non-interactive mode (specification FR-04d): {@code powerj -c "line"} or {@code powerj file.pj}. No
  * prompt or history; a blocking error stops execution.
  * <p>
  * Exit code: that of {@code exit n} if it is called; otherwise 0 if the last line succeeded, the code of
@@ -37,7 +37,7 @@ final class ScriptMode {
                Optional<Iterator<String>> input) {
         this.session = session;
         this.errors = errors;
-        // Les commandes natives écrivent directement sur la sortie du process, même redirigée.
+        // Native commands write directly to the process output, even when redirected.
         this.interpreter = new Interpreter(session, new ShellIo(out, errors, true, () -> width), Map.of(), registry);
         input.ifPresent(interpreter::useStandardInput);
     }

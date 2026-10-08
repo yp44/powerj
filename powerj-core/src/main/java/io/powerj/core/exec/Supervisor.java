@@ -104,7 +104,7 @@ public final class Supervisor {
             try {
                 memoryReserve = new byte[MEMORY_RESERVE_BYTES];
             } catch (OutOfMemoryError _) {
-                // Toujours pas de mémoire : on réessaiera après la prochaine commande.
+                // Still no memory: we will retry after the next command.
             }
         }
     }

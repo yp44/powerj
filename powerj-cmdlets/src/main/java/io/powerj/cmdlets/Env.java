@@ -49,7 +49,7 @@ public final class Env implements Cmdlet<Env.Params, Void, EnvVar> {
             }
         } else if (p.append() != null || p.prepend() != null) {
             String name = p.append() != null ? p.append() : p.prepend();
-            // « env --append PATH C:\tools » : PATH est lu comme valeur de --append, C:\tools en position 0.
+            // "env --append PATH C:\tools": PATH is read as the value of --append, C:\tools at position 0.
             String addition = p.value() != null ? p.value() : p.name();
             if (addition == null) {
                 throw new IllegalArgumentException("valeur attendue : env --append NOM valeur");

@@ -48,7 +48,7 @@ public final class Repl {
         boolean interactive = !terminal.getType().startsWith("dumb");
         var io = new ShellIo(out, this::printError, interactive, () -> terminal.getWidth());
         this.interpreter = new Interpreter(session, io, Map.of("history", this::history), registry);
-        // Complétion (Tab) et coloration de la saisie (FR-08, FR-21 à FR-26).
+        // Completion (Tab) and input highlighting (FR-08, FR-21 to FR-26).
         var completions = new Completions(interpreter);
         completions.warmUp();
         if (reader instanceof LineReaderImpl impl) {
@@ -56,8 +56,8 @@ public final class Repl {
             impl.setCompleter(ShellCompletion.completer());
             impl.setHighlighter(ShellCompletion.highlighter(interpreter));
         }
-        // Ctrl+C pendant l'exécution annule la commande sans quitter le shell (FR-03) ;
-        // pendant la saisie, JLine lève UserInterruptException.
+        // Ctrl+C during execution cancels the command without exiting the shell (FR-03);
+        // during input, JLine throws UserInterruptException.
         terminal.handle(Terminal.Signal.INT, _ -> supervisor.cancel());
     }
 
@@ -80,9 +80,9 @@ public final class Repl {
             try {
                 line = reader.readLine(prompt());
             } catch (UserInterruptException _) {
-                continue; // Ctrl+C pendant la saisie : la ligne est effacée
+                continue; // Ctrl+C during input: the line is cleared
             } catch (EndOfFileException _) {
-                return 0; // Ctrl+D sur une ligne vide, ou fin de l'entrée
+                return 0; // Ctrl+D on an empty line, or end of input
             }
             switch (supervisor.run(line, () -> execute(line))) {
                 case Outcome.Success _ -> { }
@@ -102,7 +102,7 @@ public final class Repl {
 
     private List<Object> execute(String line) throws InterruptedException {
         var trimmed = line.strip();
-        // Une expansion d'historique réussie ne laisse jamais de « ! » en tête de ligne (FR-11).
+        // A successful history expansion never leaves a "!" at the start of the line (FR-11).
         if (trimmed.startsWith("!") && trimmed.length() > 1 && !Character.isWhitespace(trimmed.charAt(1))) {
             throw new PjException("historique : aucune commande ne correspond à " + trimmed.split("\\s+")[0]);
         }

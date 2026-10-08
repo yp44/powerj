@@ -44,7 +44,7 @@ public final class CommandResolver {
                 }
             }
         } catch (InvalidPathException _) {
-            // nom ou entrée de PATH invalide : pas d'exécutable
+            // invalid name or PATH entry: no executable
         }
         return Optional.empty();
     }

@@ -18,7 +18,7 @@ import io.powerj.core.lang.Ast.Operator;
  * {@code $l.size()}, {@code new File("x")}, {@code (ls).name}).
  * <p>
  * Precedence, from lowest to highest: ternary, {@code ||}, {@code &&}, equality, comparison,
- * addition, multiplication, unary and {@code [type]} conversion, access ({@code .nom}, {@code .méthode(…)},
+ * addition, multiplication, unary and {@code [type]} conversion, access ({@code .name}, {@code .method(…)},
  * {@code [i]}).
  * <p>
  * In a command line, outside parentheses, an expression stops where the command syntax resumes:
@@ -207,7 +207,7 @@ public final class ExpressionParser {
         return new Lexer.Scanned<>(expression, parser.pos);
     }
 
-    // --- Grammaire ---
+    // --- Grammar ---
 
     private Expression expression() {
         Expression condition = or();
@@ -303,7 +303,7 @@ public final class ExpressionParser {
         while (!atEnd()) {
             Tok token = peek();
             if (restricted() && token.at() != pos) {
-                return current; // dans une ligne de commande, un espace termine l'expression
+                return current; // in a command line, a space ends the expression
             }
             if (isSymbol(token, ".")) {
                 next();
@@ -423,7 +423,7 @@ public final class ExpressionParser {
         };
     }
 
-    /** {@code new nom.Qualifie(arguments)}. */
+    /** {@code new qualified.Name(arguments)}. */
     private Expression instantiation() {
         String type = qualifiedName("new");
         if (atEnd() || !isSymbol(peek(), "(")) {
@@ -472,14 +472,14 @@ public final class ExpressionParser {
                 next();
                 return inner;
             }
-            // valeur suivie d'un pipeline : ($l | where { … })
+            // value followed by a pipeline: ($l | where { … })
         }
         Ast.Pipeline pipeline = Parser.pipeline(input.substring(open + 1, close), staticNames);
         reset(close + 1);
         return new Ast.SubExpression(pipeline);
     }
 
-    /** {@code [type] valeur} (conversion) or {@code [1, 2, 3]} (list). */
+    /** {@code [type] value} (conversion) or {@code [1, 2, 3]} (list). */
     private Expression castOrList(Tok bracket) {
         int start = skipBlanks(input, bracket.at() + 1);
         int end = start;
@@ -523,7 +523,7 @@ public final class ExpressionParser {
         return function(source, staticNames);
     }
 
-    // --- Outils ---
+    // --- Utilities ---
 
     /** Outside parentheses in a command line. */
     private boolean restricted() {
@@ -535,7 +535,7 @@ public final class ExpressionParser {
             return false;
         }
         if (restricted() && (mode == Mode.ARGUMENT || COMMAND_OPERATORS.contains(symbol))) {
-            return false; // syntaxe des commandes : redirection, enchaînement
+            return false; // command syntax: redirection, chaining
         }
         next();
         return true;
@@ -608,7 +608,7 @@ public final class ExpressionParser {
         return at;
     }
 
-    // --- Découpage ---
+    // --- Tokenizing ---
 
     private Tok scanToken(int start) {
         if (start >= input.length()) {
@@ -641,7 +641,7 @@ public final class ExpressionParser {
                 return new Symbol(symbol, start, start + symbol.length());
             }
         }
-        // Caractère hors expression (|, ;, =…) : selon le contexte, fin de l'expression ou erreur.
+        // Character outside an expression (|, ;, =…): depending on context, end of the expression or error.
         return new Symbol(String.valueOf(c), start, start + 1);
     }
 
@@ -650,7 +650,7 @@ public final class ExpressionParser {
         int end = start;
         if (end < input.length() && (input.charAt(end) == '_' || input.charAt(end) == '?')
                 && (end + 1 >= input.length() || !Character.isLetterOrDigit(input.charAt(end + 1)))) {
-            return new Variable(input.substring(start, end + 1), dollar, end + 1); // $_ et $?
+            return new Variable(input.substring(start, end + 1), dollar, end + 1); // $_ and $?
         }
         while (end < input.length() && (Character.isLetterOrDigit(input.charAt(end)) || input.charAt(end) == '_')) {
             end++;

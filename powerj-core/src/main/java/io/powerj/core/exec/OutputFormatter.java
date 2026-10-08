@@ -22,7 +22,7 @@ import io.powerj.api.Display;
  * Display of values (specification FR-30):
  * <ul>
  *   <li>successive records of the same type: a table (columns from {@link Display}, or all components
- *       if there are at most {@value #MAX_TABLE_COLUMNS}); otherwise a {@code nom : valeur} list;</li>
+ *       if there are at most {@value #MAX_TABLE_COLUMNS}); otherwise a {@code name : value} list;</li>
  *   <li>{@code Map}: key / value table; collections and arrays: one element per line;</li>
  *   <li>scalars: one readable line ({@link Bytes} sizes, local dates, durations).</li>
  * </ul>
@@ -57,9 +57,9 @@ public final class OutputFormatter implements AutoCloseable {
     public void accept(Object value) {
         switch (value) {
             case null -> { }
-            case Path path -> line(path.toString()); // un Path est aussi un Iterable<Path>
+            case Path path -> line(path.toString()); // a Path is also an Iterable<Path>
             case Iterable<?> items -> items.forEach(this::accept);
-            case java.util.stream.BaseStream<?, ?> stream -> { // Stream, IntStream… : éléments affichés
+            case java.util.stream.BaseStream<?, ?> stream -> { // Stream, IntStream…: elements displayed
                 try (stream) {
                     stream.iterator().forEachRemaining(this::accept);
                 }

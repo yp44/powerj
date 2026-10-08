@@ -103,8 +103,8 @@ public final class ModuleLoader {
                 return Result.failure(path.getFileName() + " : module " + root + " déjà chargé");
             }
         }
-        // Modules du runtime et de PowerJ d'abord : un jar qui embarque sa propre copie de powerj-api
-        // utilise celle du shell.
+        // Runtime and PowerJ modules first: a jar that bundles its own copy of powerj-api
+        // uses the shell's one.
         Configuration configuration = Configuration.resolve(ModuleFinder.of(), List.of(parent.configuration()),
                 finder, roots);
         var controller = ModuleLayer.defineModulesWithOneLoader(configuration, List.of(parent),
@@ -124,7 +124,7 @@ public final class ModuleLoader {
         for (CmdletProvider provider : ServiceLoader.load(layer, CmdletProvider.class)) {
             Module module = provider.getClass().getModule();
             if (module.getLayer() != layer) {
-                continue; // fournisseur d'un module parent (cmdlets intégrés)
+                continue; // provider from a parent module (built-in cmdlets)
             }
             found = true;
             List<Cmdlet<?, ?, ?>> provided = new ArrayList<>();

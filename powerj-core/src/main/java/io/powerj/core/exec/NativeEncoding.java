@@ -71,7 +71,7 @@ public final class NativeEncoding {
             try {
                 return Charset.forName(name);
             } catch (IllegalArgumentException _) {
-                // nom suivant
+                // next name
             }
         }
         return Charset.forName(System.getProperty("native.encoding", "UTF-8"));

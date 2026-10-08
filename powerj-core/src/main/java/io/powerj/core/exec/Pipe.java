@@ -91,9 +91,9 @@ final class Pipe implements Source {
     static void unroll(Object value, Pipe target) {
         switch (value) {
             case java.nio.file.Path path -> target.put(path);
-            case io.powerj.api.Collected<?> list -> target.put(list); // collect : la liste passe entière (FR-36d)
+            case io.powerj.api.Collected<?> list -> target.put(list); // collect: the list is passed whole (FR-36d)
             case Iterable<?> items -> items.forEach(target::put);
-            case BaseStream<?, ?> stream -> { // Stream, et IntStream, LongStream, DoubleStream (éléments boxés)
+            case BaseStream<?, ?> stream -> { // Stream, and IntStream, LongStream, DoubleStream (boxed elements)
                 try (stream) {
                     stream.iterator().forEachRemaining(target::put);
                 }
