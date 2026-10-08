@@ -9,24 +9,24 @@ import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
 
 /** {@code env}: session environment variables (specification FR-36b). */
-@CmdletInfo(name = "env", category = "Système", summary = "Affiche ou modifie les variables d'environnement de la session",
+@CmdletInfo(name = "env", category = "System", summary = "Shows or changes the session environment variables",
         examples = {"env", "env PATH", "env --set MAVEN_OPTS=-Xmx2g", "env --append PATH C:\\tools", "env --unset MAVEN_OPTS",
                 "(env PATH).value"})
 public final class Env implements Cmdlet<Env.Params, Void, EnvVar> {
 
     /** Parameters of {@code env}. */
     public record Params(
-            @Option(position = 0, description = "Nom d'une variable à afficher")
+            @Option(position = 0, description = "Name of a variable to show")
             String name,
-            @Option(shortName = 's', description = "Crée ou modifie une variable : NOM=valeur")
+            @Option(shortName = 's', description = "Creates or changes a variable: NAME=value")
             String set,
-            @Option(description = "Supprime une variable")
+            @Option(description = "Removes a variable")
             String unset,
-            @Option(description = "Ajoute une valeur en fin de liste (ex. PATH) : --append NOM valeur")
+            @Option(description = "Appends a value to a list (e.g. PATH): --append NAME value")
             String append,
-            @Option(description = "Ajoute une valeur en tête de liste : --prepend NOM valeur")
+            @Option(description = "Prepends a value to a list: --prepend NAME value")
             String prepend,
-            @Option(position = 1, description = "Valeur utilisée par --append et --prepend")
+            @Option(position = 1, description = "Value used by --append and --prepend")
             String value) {
     }
 
@@ -35,24 +35,24 @@ public final class Env implements Cmdlet<Env.Params, Void, EnvVar> {
         Map<String, String> env = context.environment();
         int actions = count(p.set(), p.unset(), p.append(), p.prepend());
         if (actions > 1) {
-            throw new IllegalArgumentException("une seule action à la fois parmi --set, --unset, --append, --prepend");
+            throw new IllegalArgumentException(Messages.get("env.one.action"));
         }
         if (p.set() != null) {
             int equals = p.set().indexOf('=');
             if (equals <= 0) {
-                throw new IllegalArgumentException("--set attend NOM=valeur");
+                throw new IllegalArgumentException(Messages.get("env.set.format"));
             }
             env.put(p.set().substring(0, equals), p.set().substring(equals + 1));
         } else if (p.unset() != null) {
             if (env.remove(p.unset()) == null) {
-                context.error("variable absente : " + p.unset());
+                context.error(Messages.get("env.variable.missing", p.unset()));
             }
         } else if (p.append() != null || p.prepend() != null) {
             String name = p.append() != null ? p.append() : p.prepend();
             // "env --append PATH C:\tools": PATH is read as the value of --append, C:\tools at position 0.
             String addition = p.value() != null ? p.value() : p.name();
             if (addition == null) {
-                throw new IllegalArgumentException("valeur attendue : env --append NOM valeur");
+                throw new IllegalArgumentException(Messages.get("env.value.expected"));
             }
             String current = env.get(name);
             String separator = File.pathSeparator;
@@ -62,7 +62,7 @@ public final class Env implements Cmdlet<Env.Params, Void, EnvVar> {
         } else if (p.name() != null) {
             String value = env.get(p.name());
             if (value == null) {
-                context.error("variable absente : " + p.name());
+                context.error(Messages.get("env.variable.missing", p.name()));
             } else {
                 context.emit(new EnvVar(canonicalName(env, p.name()), value));
             }

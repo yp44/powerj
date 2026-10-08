@@ -23,23 +23,23 @@ import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
 
 /** {@code ls}: lists files as {@link FileEntry} objects (specification FR-35). */
-@CmdletInfo(name = "ls", category = "Fichiers", summary = "Liste les fichiers et dossiers",
+@CmdletInfo(name = "ls", category = "Files", summary = "Lists files and directories",
         examples = {"ls", "ls -r --filter *.java", "ls C:\\Windows -d", "(ls).name", "$f = ls; $f[0].size"})
 public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
 
     /** Parameters of {@code ls}. */
     public record Params(
-            @Option(position = 0, description = "Dossiers ou fichiers à lister (jokers * et ? acceptés) ; défaut : dossier courant")
+            @Option(position = 0, description = "Directories or files to list (wildcards * and ? accepted); default: current directory")
             List<String> paths,
-            @Option(shortName = 'a', description = "Inclut les fichiers cachés")
+            @Option(shortName = 'a', description = "Includes hidden files")
             boolean all,
-            @Option(shortName = 'r', description = "Parcourt les sous-dossiers")
+            @Option(shortName = 'r', description = "Walks subdirectories")
             boolean recurse,
-            @Option(shortName = 'f', description = "Ne garde que les noms correspondant au motif (ex. *.java)")
+            @Option(shortName = 'f', description = "Keeps only names matching the pattern (e.g. *.java)")
             String filter,
-            @Option(shortName = 'd', description = "Uniquement les dossiers")
+            @Option(shortName = 'd', description = "Directories only")
             boolean dirs,
-            @Option(description = "Uniquement les fichiers")
+            @Option(description = "Files only")
             boolean files) {
     }
 
@@ -50,7 +50,7 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
     @Override
     public void begin(Params params, CmdletContext<FileEntry> context) {
         if (params.dirs() && params.files()) {
-            throw new IllegalArgumentException("--dirs et --files sont incompatibles");
+            throw new IllegalArgumentException(Messages.get("ls.dirs.files.incompatible"));
         }
         Optional<PathMatcher> filter = Optional.ofNullable(params.filter()).map(Ls::glob);
         List<String> paths = params.paths().isEmpty() ? List.of(".") : params.paths();
@@ -74,7 +74,7 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
         } else if (Files.exists(path, LinkOption.NOFOLLOW_LINKS)) {
             entry(path).filter(e -> keep(e, params, filter)).ifPresent(context::emit);
         } else {
-            context.error("introuvable : " + argument);
+            context.error(Messages.get("ls.not.found", argument));
         }
     }
 
@@ -96,7 +96,7 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
             }
         }
         if (!found) {
-            context.error("aucun fichier ne correspond à " + argument);
+            context.error(Messages.get("ls.no.match", argument));
         }
     }
 
@@ -119,11 +119,11 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
                 }
             }
         } catch (AccessDeniedException _) {
-            context.error("accès refusé : " + dir);
+            context.error(Messages.get("ls.access.denied", dir));
         } catch (NoSuchFileException _) {
-            context.error("introuvable : " + dir);
+            context.error(Messages.get("ls.not.found", dir));
         } catch (IOException e) {
-            context.error("lecture impossible de " + dir + " : " + e.getMessage());
+            context.error(Messages.get("ls.read.failed", dir, e.getMessage()));
         }
         children.sort(DIRECTORIES_FIRST);
         return children;
