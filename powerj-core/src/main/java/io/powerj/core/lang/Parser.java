@@ -37,7 +37,7 @@ public final class Parser {
     static Ast.Pipeline pipeline(String text, Predicate<String> staticNames) {
         var parser = new Parser(Lexer.tokenize(text, staticNames));
         if (parser.atEnd()) {
-            throw new SyntaxException("parenthèses vides");
+            throw new SyntaxException(Messages.get("syntax.emptyParentheses"));
         }
         Ast.Pipeline pipeline = parser.pipeline();
         if (!parser.atEnd()) {
@@ -55,18 +55,18 @@ public final class Parser {
                     pos++; // superfluous ";"
                     continue;
                 }
-                throw new SyntaxException("« " + symbol(c) + " » sans commande avant");
+                throw new SyntaxException(Messages.get("syntax.noCommandBefore", symbol(c)));
             }
             steps.add(new Step(connector, statement()));
             if (atEnd()) {
                 break;
             }
             if (!(next() instanceof Token.Separator(var c))) {
-                throw new IllegalStateException("séparateur attendu");
+                throw new IllegalStateException("separator expected");
             }
             connector = c;
             if (atEnd() && c != Connector.ALWAYS) {
-                throw new SyntaxException("commande attendue après « " + symbol(c) + " »");
+                throw new SyntaxException(Messages.get("syntax.commandExpectedAfter", symbol(c)));
             }
         }
         return new Ast.Script(steps);
@@ -78,7 +78,7 @@ public final class Parser {
             pos++;
             assignTo = Optional.of(name);
             if (atEnd() || peek() instanceof Token.Separator) {
-                throw new SyntaxException("valeur attendue après « $" + name + " = »");
+                throw new SyntaxException(Messages.get("syntax.valueExpectedAfterAssignment", name));
             }
         }
         Ast.Pipeline pipeline = pipeline();
@@ -94,16 +94,16 @@ public final class Parser {
         List<Redirect> redirects = new ArrayList<>();
         while (true) {
             if (atEnd() || peek() instanceof Token.Separator || peek() instanceof Token.Pipe) {
-                throw new SyntaxException(stages.isEmpty() ? "commande attendue" : "commande attendue après « | »");
+                throw new SyntaxException(stages.isEmpty() ? Messages.get("syntax.commandExpected")
+                        : Messages.get("syntax.commandExpectedAfter", "|"));
             }
             Body body = body();
             if (!stages.isEmpty() && body instanceof Ast.ExpressionBody(var expression)) {
                 if (expression instanceof Ast.BlockExpression || expression instanceof Ast.Lambda
                         || expression instanceof Ast.MethodRef) {
-                    throw new SyntaxException("un bloc seul n'est pas une étape de pipeline : écrire map { … } pour"
-                            + " transformer chaque objet, ou where { … } pour le filtrer");
+                    throw new SyntaxException(Messages.get("syntax.blockAsStage"));
                 }
-                throw new SyntaxException("une valeur ne peut être que la première étape d'un pipeline");
+                throw new SyntaxException(Messages.get("syntax.valueNotFirstStage"));
             }
             boolean errorsToOutput = false;
             while (!atEnd() && peek() instanceof Token.Redirection(var stream, var append)) {
@@ -113,10 +113,10 @@ public final class Parser {
                     continue;
                 }
                 if (atEnd() || !isArgument(peek())) {
-                    throw new SyntaxException("fichier attendu après la redirection");
+                    throw new SyntaxException(Messages.get("syntax.redirectionFileExpected"));
                 }
                 if (stream == Token.Stream.OUT && peekAt(1) instanceof Token.Pipe) {
-                    throw new SyntaxException("« > » redirige la sortie de tout le pipeline : le placer à la fin");
+                    throw new SyntaxException(Messages.get("syntax.redirectionNotLast"));
                 }
                 redirects.add(new Redirect(stream, append, argument(next())));
             }
@@ -136,7 +136,7 @@ public final class Parser {
                 boolean forceNative = text.startsWith("^");
                 String name = forceNative ? text.substring(1) : text;
                 if (name.isEmpty()) {
-                    throw new SyntaxException("nom de commande attendu après ^");
+                    throw new SyntaxException(Messages.get("syntax.commandNameExpected"));
                 }
                 List<Argument> arguments = new ArrayList<>();
                 while (!atEnd()) {
@@ -179,13 +179,14 @@ public final class Parser {
     }
 
     private SyntaxException unexpected(Token token) {
-        return new SyntaxException("« " + describe(token) + " » inattendu");
+        return new SyntaxException(token instanceof Token.Expr ? Messages.get("syntax.unexpectedExpression")
+                : Messages.get("syntax.unexpected", describe(token)));
     }
 
     private static String describe(Token token) {
         return switch (token) {
             case Token.Word(var text) -> text;
-            case Token.Expr _ -> "expression";
+            case Token.Expr _ -> "expression"; // not displayed: see unexpected
             case Token.AssignTo(var name) -> "$" + name + " =";
             case Token.Separator(var c) -> symbol(c);
             case Token.Pipe _ -> "|";

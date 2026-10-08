@@ -5,8 +5,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Locale;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+
+import io.powerj.api.Language;
 
 import io.powerj.core.lang.Ast.Binary;
 import io.powerj.core.lang.Ast.Get;
@@ -63,17 +67,43 @@ class ExpressionParserTest {
 
     @Test
     void errors() {
-        assertThatThrownBy(() -> ExpressionParser.parse("")).hasMessageContaining("bloc vide");
-        assertThatThrownBy(() -> ExpressionParser.parse("1 +")).hasMessageContaining("expression incomplète");
-        assertThatThrownBy(() -> ExpressionParser.parse("(1")).hasMessageContaining("« ) » manquant");
-        assertThatThrownBy(() -> ExpressionParser.parse("1 2")).hasMessageContaining("« 2 » inattendu");
-        assertThatThrownBy(() -> ExpressionParser.parse("$_.")).hasMessageContaining("nom attendu après « . »");
-        assertThatThrownBy(() -> ExpressionParser.parse("$_ like \"b\"")).hasMessageContaining("« like » inattendu");
-        assertThatThrownBy(() -> ExpressionParser.parse("$_.size = 1")).hasMessageContaining("utiliser ==");
-        assertThatThrownBy(() -> ExpressionParser.parse("new File")).hasMessageContaining("« ( » attendu après new File");
-        assertThatThrownBy(() -> ExpressionParser.parse("$")).hasMessageContaining("nom de variable attendu");
-        assertThatThrownBy(() -> ExpressionParser.parse("1 # 2")).hasMessageContaining("« # » inattendu");
-        assertThatThrownBy(() -> ExpressionParser.parse("\"abc")).hasMessageContaining("chaîne non fermée");
+        assertThatThrownBy(() -> ExpressionParser.parse("")).hasMessageContaining("empty block");
+        assertThatThrownBy(() -> ExpressionParser.parse("1 +")).hasMessageContaining("incomplete expression");
+        assertThatThrownBy(() -> ExpressionParser.parse("(1")).hasMessageContaining("missing \")\"");
+        assertThatThrownBy(() -> ExpressionParser.parse("1 2")).hasMessageContaining("unexpected \"2\"");
+        assertThatThrownBy(() -> ExpressionParser.parse("$_.")).hasMessageContaining("name expected after \".\"");
+        assertThatThrownBy(() -> ExpressionParser.parse("$_ like \"b\"")).hasMessageContaining("unexpected \"like\"");
+        assertThatThrownBy(() -> ExpressionParser.parse("$_.size = 1")).hasMessageContaining("use ==");
+        assertThatThrownBy(() -> ExpressionParser.parse("new File")).hasMessageContaining("\"(\" expected after new File");
+        assertThatThrownBy(() -> ExpressionParser.parse("$")).hasMessageContaining("variable name expected");
+        assertThatThrownBy(() -> ExpressionParser.parse("1 # 2")).hasMessageContaining("unexpected \"#\"");
+        assertThatThrownBy(() -> ExpressionParser.parse("\"abc")).hasMessageContaining("unclosed string");
+    }
+
+    @AfterEach
+    void englishAgain() {
+        Language.set(Locale.ENGLISH);
+    }
+
+    @Test
+    void positionedErrorsAreCompleteSentences() {
+        assertThatThrownBy(() -> ExpressionParser.parse("$_."))
+                .hasMessage("syntax: name expected after \".\" at end of expression");
+        assertThatThrownBy(() -> ExpressionParser.parse("$_. 1"))
+                .hasMessage("syntax: name expected after \".\" at position 5");
+        assertThatThrownBy(() -> ExpressionParser.parse("1 +")).hasMessage("syntax: incomplete expression in { 1 + }");
+        assertThatThrownBy(() -> ExpressionParser.parse("[1, 2 3]"))
+                .hasMessage("syntax: \"]\" expected at position 7");
+    }
+
+    @Test
+    void errorsInFrench() {
+        Language.set(Locale.FRENCH);
+        assertThatThrownBy(() -> ExpressionParser.parse("$_."))
+                .hasMessage("syntaxe : nom attendu après « . » en fin d'expression");
+        assertThatThrownBy(() -> ExpressionParser.parse("$_.size = 1"))
+                .hasMessage("syntaxe : « = » dans une expression : pour comparer, utiliser == (position 9)");
+        assertThatThrownBy(() -> Parser.parse("ls |")).hasMessage("syntaxe : commande attendue après « | »");
     }
 
     @Test
