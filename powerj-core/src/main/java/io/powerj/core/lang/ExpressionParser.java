@@ -13,31 +13,31 @@ import io.powerj.core.lang.Ast.Expression;
 import io.powerj.core.lang.Ast.Operator;
 
 /**
- * Analyse les expressions à la syntaxe Java (spécification FR-32, FR-33, §3.13) : contenu d'un bloc
- * {@code { … }}, et expressions placées dans une ligne de commande ({@code Math.max(3, 7)},
+ * Parses expressions with Java syntax (specification FR-32, FR-33, §3.13): content of a block
+ * {@code { … }}, and expressions placed in a command line ({@code Math.max(3, 7)},
  * {@code $l.size()}, {@code new File("x")}, {@code (ls).name}).
  * <p>
- * Priorités, de la plus faible à la plus forte : ternaire, {@code ||}, {@code &&}, égalité, comparaison,
- * addition, multiplication, unaire et conversion {@code [type]}, accès ({@code .nom}, {@code .méthode(…)},
+ * Precedence, from lowest to highest: ternary, {@code ||}, {@code &&}, equality, comparison,
+ * addition, multiplication, unary and {@code [type]} conversion, access ({@code .nom}, {@code .méthode(…)},
  * {@code [i]}).
  * <p>
- * Dans une ligne de commande, hors parenthèses, une expression s'arrête là où reprend la syntaxe des
- * commandes : {@code |}, {@code ;}, {@code &&}, {@code ||}, {@code >} (redirection), ou un mot qui n'est pas
- * un opérateur. Les accès s'y écrivent collés ({@code $l.size()}, pas {@code $l .size()}).
+ * In a command line, outside parentheses, an expression stops where the command syntax resumes:
+ * {@code |}, {@code ;}, {@code &&}, {@code ||}, {@code >} (redirection), or a word that is not
+ * an operator. Accesses are written attached there ({@code $l.size()}, not {@code $l .size()}).
  */
 public final class ExpressionParser {
 
-    /** Contexte de l'expression. */
+    /** Context of the expression. */
     public enum Mode {
-        /** Contenu d'un bloc ou de parenthèses : grammaire complète. */
+        /** Content of a block or of parentheses: full grammar. */
         BLOCK,
-        /** Tête d'instruction : opérateurs permis, sauf ceux qui ont un sens de commande. */
+        /** Start of statement: operators allowed, except those that have a command meaning. */
         STATEMENT,
-        /** Argument de commande : une valeur et ses accès, sans opérateur. */
+        /** Command argument: a value and its accesses, without operators. */
         ARGUMENT
     }
 
-    /** Élément lexical d'une expression ; {@code at} et {@code end} délimitent son texte. */
+    /** Lexical element of an expression; {@code at} and {@code end} delimit its text. */
     private sealed interface Tok {
         int at();
 
@@ -54,11 +54,11 @@ public final class ExpressionParser {
 
     private record Symbol(String text, int at, int end) implements Tok { }
 
-    /** Symboles, les plus longs d'abord. */
+    /** Symbols, longest first. */
     private static final List<String> SYMBOLS = List.of("->", "::", "==", "!=", "<=", ">=", "&&", "||",
             "<", ">", "+", "-", "*", "/", "%", "!", "?", ":", "(", ")", "[", "]", "{", "}", ",", ".");
 
-    /** Opérateurs qui, hors parenthèses dans une ligne de commande, appartiennent à la syntaxe des commandes. */
+    /** Operators that, outside parentheses in a command line, belong to the command syntax. */
     private static final Set<String> COMMAND_OPERATORS = Set.of("&&", "||", ">", ">=");
 
     private static final Set<String> PRIMITIVES = Set.of("boolean", "byte", "char", "short", "int", "long",
@@ -78,16 +78,16 @@ public final class ExpressionParser {
         this.staticNames = staticNames;
     }
 
-    /** Analyse le contenu complet d'un bloc. */
+    /** Parses the complete content of a block. */
     public static Expression parse(String source) {
         return parse(source, _ -> false);
     }
 
     /**
-     * Analyse le contenu complet d'un bloc.
+     * Parses the complete content of a block.
      *
-     * @param staticNames reconnaît les noms qualifiés désignant une classe ou un champ statique
-     *                    ({@code Math.PI}), pour les commandes placées entre parenthèses
+     * @param staticNames recognizes qualified names designating a class or a static field
+     *                    ({@code Math.PI}), for commands placed in parentheses
      */
     public static Expression parse(String source, Predicate<String> staticNames) {
         var parser = new ExpressionParser(source, 0, Mode.BLOCK, staticNames);
@@ -101,12 +101,12 @@ public final class ExpressionParser {
         return expression;
     }
 
-    /** Bloc {@code { source }} analysé : lambda ({@code f -> …}) ou bloc à {@code $_}. */
+    /** Parsed block {@code { source }}: lambda ({@code f -> …}) or {@code $_} block. */
     public static Expression block(String source) {
         return function(source, _ -> false);
     }
 
-    /** Contenu d'un bloc : lambda si le texte commence par des paramètres et {@code ->}, sinon bloc à {@code $_}. */
+    /** Content of a block: lambda if the text starts with parameters and {@code ->}, otherwise {@code $_} block. */
     public static Expression function(String source, Predicate<String> staticNames) {
         Matcher header = LAMBDA_HEADER.matcher(source);
         if (header.lookingAt()) {
@@ -121,8 +121,8 @@ public final class ExpressionParser {
     }
 
     /**
-     * Noms connus en tête d'une commande entre parenthèses : noms statiques Java, plus les paramètres des
-     * lambdas englobantes ({@code (f.size)} dans {@code f -> …} est une expression, pas la commande
+     * Names known at the start of a parenthesized command: Java static names, plus the parameters of
+     * enclosing lambdas ({@code (f.size)} in {@code f -> …} is an expression, not the command
      * {@code f.size}).
      */
     private record Names(Predicate<String> statics, Set<String> parameters) implements Predicate<String> {
@@ -147,8 +147,8 @@ public final class ExpressionParser {
     }
 
     /**
-     * En-tête de lambda ({@code f ->}, {@code (a, b) ->}) commençant en {@code at} : ses paramètres et la
-     * position qui suit {@code ->}.
+     * Lambda header ({@code f ->}, {@code (a, b) ->}) starting at {@code at}: its parameters and the
+     * position following {@code ->}.
      */
     public static Optional<Map.Entry<List<String>, Integer>> lambdaHeader(String input, int at) {
         Matcher header = LAMBDA_HEADER.matcher(input).region(at, input.length());
@@ -162,12 +162,12 @@ public final class ExpressionParser {
         }
     }
 
-    /** {@code name} est-il un paramètre d'une lambda englobante ? */
+    /** Is {@code name} a parameter of an enclosing lambda? */
     static boolean isParameter(Predicate<String> staticNames, String name) {
         return staticNames instanceof Names(var _, var parameters) && parameters.contains(name);
     }
 
-    /** {@code f ->}, {@code (a, b) ->}, {@code () ->} en tête de texte. */
+    /** {@code f ->}, {@code (a, b) ->}, {@code () ->} at the start of the text. */
     private static final Pattern LAMBDA_HEADER = Pattern.compile(
             "\\s*(?:([\\p{L}_][\\p{L}\\p{N}_]*)|\\(\\s*([\\p{L}_][\\p{L}\\p{N}_]*(?:\\s*,\\s*[\\p{L}_][\\p{L}\\p{N}_]*)*)?\\s*\\))\\s*->");
 
@@ -190,8 +190,8 @@ public final class ExpressionParser {
     }
 
     /**
-     * Analyse l'expression qui commence à {@code start} dans une ligne de commande, et indique où elle
-     * s'arrête.
+     * Parses the expression starting at {@code start} in a command line, and indicates where it
+     * stops.
      */
     static Lexer.Scanned<Expression> scan(String input, int start, Mode mode, Predicate<String> staticNames) {
         var parser = new ExpressionParser(input, start, mode, staticNames);
@@ -199,7 +199,7 @@ public final class ExpressionParser {
         return new Lexer.Scanned<>(expression, parser.pos);
     }
 
-    /** Groupe {@code ( … )} commençant à {@code open} : expression ou pipeline ; utilisé pour {@code $( … )}. */
+    /** Group {@code ( … )} starting at {@code open}: expression or pipeline; used for {@code $( … )}. */
     static Lexer.Scanned<Expression> group(String input, int open, Predicate<String> staticNames) {
         var parser = new ExpressionParser(input, open, Mode.BLOCK, staticNames);
         Tok paren = parser.next();
@@ -352,7 +352,7 @@ public final class ExpressionParser {
     }
 
     /**
-     * Arguments d'un appel Java, jusqu'à {@code )} : expressions ou lambdas sans accolades
+     * Arguments of a Java call, up to {@code )}: expressions or lambdas without braces
      * ({@code s -> s.length()}, {@code (a, b) -> a - b}).
      */
     private List<Expression> callArguments() {
@@ -387,7 +387,7 @@ public final class ExpressionParser {
         return new Ast.Lambda(input.substring(start, pos).strip(), parameters, body);
     }
 
-    /** Arguments séparés par des virgules jusqu'au symbole fermant (le symbole ouvrant est consommé). */
+    /** Comma-separated arguments up to the closing symbol (the opening symbol has been consumed). */
     private List<Expression> arguments(String close) {
         depth++;
         List<Expression> arguments = new ArrayList<>();
@@ -451,8 +451,8 @@ public final class ExpressionParser {
     }
 
     /**
-     * {@code ( … )} : une expression ({@code (1 + 2)}, {@code (Math.max(1, 2))}) ou un pipeline de commandes
-     * ({@code (ls)}, {@code (ls -r | where size > 1mb)}), comme en tête de ligne (FR-46).
+     * {@code ( … )}: an expression ({@code (1 + 2)}, {@code (Math.max(1, 2))}) or a command pipeline
+     * ({@code (ls)}, {@code (ls -r | where size > 1mb)}), as at the start of a line (FR-46).
      */
     private Expression group(Tok paren) {
         int open = paren.at();
@@ -479,7 +479,7 @@ public final class ExpressionParser {
         return new Ast.SubExpression(pipeline);
     }
 
-    /** {@code [type] valeur} (conversion) ou {@code [1, 2, 3]} (liste). */
+    /** {@code [type] valeur} (conversion) or {@code [1, 2, 3]} (list). */
     private Expression castOrList(Tok bracket) {
         int start = skipBlanks(input, bracket.at() + 1);
         int end = start;
@@ -512,7 +512,7 @@ public final class ExpressionParser {
         return qualified.substring(qualified.lastIndexOf('.') + 1);
     }
 
-    /** {@code { … }} : bloc évalué plus tard ({@code ScriptBlock}). */
+    /** {@code { … }}: block evaluated later ({@code ScriptBlock}). */
     private Expression block(Tok brace) {
         int close = matching(input, brace.at());
         if (close < 0) {
@@ -525,7 +525,7 @@ public final class ExpressionParser {
 
     // --- Outils ---
 
-    /** Hors parenthèses dans une ligne de commande. */
+    /** Outside parentheses in a command line. */
     private boolean restricted() {
         return depth == 0 && mode != Mode.BLOCK;
     }
@@ -549,7 +549,7 @@ public final class ExpressionParser {
         next();
     }
 
-    /** {@code *.} collé à un nom : opérateur « spread » ({@code $f*.name}), pas une multiplication. */
+    /** {@code *.} attached to a name: "spread" operator ({@code $f*.name}), not a multiplication. */
     private boolean isSpread(Tok token) {
         int at = token.at();
         return isSymbol(token, "*") && at + 2 < input.length() && input.charAt(at + 1) == '.'
@@ -661,7 +661,7 @@ public final class ExpressionParser {
         return new Variable(input.substring(start, end), dollar, end);
     }
 
-    /** Entier, décimal, suffixe {@code L}, ou littéral d'unité ({@code 10kb}, {@code 7d}). */
+    /** Integer, decimal, {@code L} suffix, or unit literal ({@code 10kb}, {@code 7d}). */
     private Tok number(int start) {
         int end = start;
         while (end < input.length() && Character.isDigit(input.charAt(end))) {
@@ -744,8 +744,8 @@ public final class ExpressionParser {
     }
 
     /**
-     * Position du symbole fermant correspondant à celui ouvert en {@code open} ({@code (}, {@code [} ou
-     * {@code {}), en ignorant le contenu des chaînes et des caractères ; -1 s'il manque.
+     * Position of the closing symbol matching the one opened at {@code open} ({@code (}, {@code [} or
+     * {@code {}), ignoring the content of strings and characters; -1 if it is missing.
      */
     static int matching(String input, int open) {
         List<Character> expected = new ArrayList<>();
@@ -785,7 +785,7 @@ public final class ExpressionParser {
         return -1;
     }
 
-    /** Position qui suit la chaîne ouverte en {@code open} ; -1 si elle n'est pas fermée. */
+    /** Position following the string opened at {@code open}; -1 if it is not closed. */
     private static int skipString(String input, int open) {
         int at = open + 1;
         while (at < input.length()) {
@@ -807,7 +807,7 @@ public final class ExpressionParser {
         return -1;
     }
 
-    /** Fin d'un littéral caractère ({@code 'a'}, {@code '\n'}, {@code 'é'}) en {@code open}, sinon -1. */
+    /** End of a character literal ({@code 'a'}, {@code '\n'}, {@code 'é'}) at {@code open}, otherwise -1. */
     private static int characterEnd(String input, int open) {
         if (open + 2 < input.length() && input.charAt(open + 1) != '\\' && input.charAt(open + 2) == '\'') {
             return open + 3;

@@ -1,10 +1,10 @@
 package io.powerj.core.lang;
 
-/** Accès appliqué à une valeur : propriété {@code .nom} ou index {@code [n]}. */
+/** Access applied to a value: property {@code .nom} or index {@code [n]}. */
 public sealed interface Accessor {
 
     record Property(String name) implements Accessor { }
 
-    /** Index ; négatif = depuis la fin ({@code [-1]} est le dernier élément). */
+    /** Index; negative = from the end ({@code [-1]} is the last element). */
     record Index(int index) implements Accessor { }
 }

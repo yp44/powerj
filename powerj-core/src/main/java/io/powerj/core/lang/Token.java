@@ -1,29 +1,29 @@
 package io.powerj.core.lang;
 
-/** Élément lexical d'une ligne de commande. */
+/** Lexical element of a command line. */
 public sealed interface Token {
 
-    /** Mot non quoté, pris tel quel (l'antislash n'y échappe rien, spécification FR-32b). */
+    /** Unquoted word, taken as is (backslash escapes nothing in it, specification FR-32b). */
     record Word(String text) implements Token { }
 
     /**
-     * Expression : chaîne, variable, littéral, bloc {@code { … }}, groupe {@code ( … )}, appel Java
-     * ({@code Math.max(3, 7)}, {@code new File("x")}), analysée par {@link ExpressionParser}.
+     * Expression: string, variable, literal, block {@code { … }}, group {@code ( … )}, Java call
+     * ({@code Math.max(3, 7)}, {@code new File("x")}), parsed by {@link ExpressionParser}.
      */
     record Expr(Ast.Expression expression) implements Token { }
 
-    /** {@code $nom =} en tête d'instruction : affectation. */
+    /** {@code $nom =} at the start of a statement: assignment. */
     record AssignTo(String variable) implements Token { }
 
-    /** Séparateur d'instructions {@code ;}, {@code &&} ou {@code ||}. */
+    /** Statement separator {@code ;}, {@code &&} or {@code ||}. */
     record Separator(Connector connector) implements Token { }
 
     /** {@code |} (pipeline). */
     record Pipe() implements Token { }
 
-    /** Redirection {@code >}, {@code >>}, {@code 2>}, {@code 2>>}, ou {@code 2>&1} ({@link Stream#ERR_TO_OUT}). */
+    /** Redirection {@code >}, {@code >>}, {@code 2>}, {@code 2>>}, or {@code 2>&1} ({@link Stream#ERR_TO_OUT}). */
     record Redirection(Stream stream, boolean append) implements Token { }
 
-    /** Flux redirigé ; {@code ERR_TO_OUT} : les erreurs rejoignent la sortie ({@code 2>&1}). */
+    /** Redirected stream; {@code ERR_TO_OUT}: errors join the output ({@code 2>&1}). */
     enum Stream { OUT, ERR, ERR_TO_OUT }
 }

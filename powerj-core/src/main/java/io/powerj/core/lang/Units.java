@@ -8,8 +8,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Littéraux d'unités (spécification FR-19) : tailles {@code 512b 2kb 500mb 1gb 1tb} (multiples de 1024,
- * valeur {@code Long} en octets) et durées {@code 250ms 30s 5m 2h 7d} ({@link Duration}).
+ * Unit literals (specification FR-19): sizes {@code 512b 2kb 500mb 1gb 1tb} (multiples of 1024,
+ * {@code Long} value in bytes) and durations {@code 250ms 30s 5m 2h 7d} ({@link Duration}).
  */
 public final class Units {
 
@@ -19,7 +19,7 @@ public final class Units {
     private Units() {
     }
 
-    /** Valeur du littéral, ou vide si le texte n'en est pas un. */
+    /** Value of the literal, or empty if the text is not one. */
     public static Optional<Object> parse(String text) {
         Matcher m = LITERAL.matcher(text);
         if (!m.matches()) {

@@ -11,7 +11,7 @@ import io.powerj.core.lang.Ast.Redirect;
 import io.powerj.core.lang.Ast.Statement;
 import io.powerj.core.lang.Ast.Step;
 
-/** Construit l'{@link Ast} d'une ligne à partir de ses {@link Token}. */
+/** Builds the {@link Ast} of a line from its {@link Token}s. */
 public final class Parser {
 
     private final List<Token> tokens;
@@ -26,14 +26,14 @@ public final class Parser {
     }
 
     /**
-     * @param staticNames reconnaît les noms qualifiés désignant une classe ou un champ statique Java
-     *                    ({@code Math.PI}), expressions en tête d'instruction (FR-46)
+     * @param staticNames recognizes qualified names designating a Java class or static field
+     *                    ({@code Math.PI}), expressions at the start of a statement (FR-46)
      */
     public static Ast.Script parse(String line, Predicate<String> staticNames) {
         return new Parser(Lexer.tokenize(line, staticNames)).script();
     }
 
-    /** Pipeline seul (contenu d'un groupe {@code ( … )}). */
+    /** Pipeline alone (content of a group {@code ( … )}). */
     static Ast.Pipeline pipeline(String text, Predicate<String> staticNames) {
         var parser = new Parser(Lexer.tokenize(text, staticNames));
         if (parser.atEnd()) {
@@ -88,7 +88,7 @@ public final class Parser {
         return new Statement(assignTo, pipeline);
     }
 
-    /** Étapes séparées par {@code |}, chacune suivie de ses redirections. */
+    /** Stages separated by {@code |}, each followed by its redirections. */
     private Ast.Pipeline pipeline() {
         List<Ast.Stage> stages = new ArrayList<>();
         List<Redirect> redirects = new ArrayList<>();
@@ -156,8 +156,8 @@ public final class Parser {
     }
 
     /**
-     * Dans la forme courte {@code where size > 1mb} (FR-36), le {@code >} qui suit le nom de propriété est
-     * l'opérateur de comparaison, pas une redirection.
+     * In the short form {@code where size > 1mb} (FR-36), the {@code >} following the property name is
+     * the comparison operator, not a redirection.
      */
     private boolean isShortFormOperator(String command, boolean forceNative, List<Argument> arguments) {
         return !forceNative && command.equals("where") && arguments.size() == 1

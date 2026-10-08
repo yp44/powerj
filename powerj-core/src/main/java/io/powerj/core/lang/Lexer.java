@@ -8,25 +8,25 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Découpe une ligne en {@link Token}. Règles (spécification §3.8, §12.1) :
+ * Splits a line into {@link Token}s. Rules (specification §3.8, §12.1):
  * <ul>
- *   <li>les mots non quotés sont pris tels quels, antislash compris ({@code cd C:\Users}) ;</li>
+ *   <li>unquoted words are taken as is, backslashes included ({@code cd C:\Users});</li>
  *   <li>{@code ;}, {@code &&}, {@code ||}, {@code |}, {@code >}, {@code >>}, {@code 2>}, {@code 2>>},
- *       {@code 2>&1} sont des opérateurs, même collés à un mot ;</li>
- *   <li>{@code $x =} en tête d'instruction marque une affectation ;</li>
- *   <li>les expressions sont confiées à {@link ExpressionParser} : chaînes {@code "…"}, variables, blocs
- *       {@code { … }}, groupes {@code ( … )}, et en tête d'instruction les littéraux, {@code new}, les
- *       conversions {@code [type]} et les noms Java ({@link #expressionAt}) ;</li>
- *   <li>{@code ==} et {@code >=} sont des mots (forme courte de {@code where}).</li>
+ *       {@code 2>&1} are operators, even when attached to a word;</li>
+ *   <li>{@code $x =} at the start of a statement marks an assignment;</li>
+ *   <li>expressions are handed to {@link ExpressionParser}: strings {@code "…"}, variables, blocks
+ *       {@code { … }}, groups {@code ( … )}, and at the start of a statement literals, {@code new},
+ *       {@code [type]} conversions and Java names ({@link #expressionAt});</li>
+ *   <li>{@code ==} and {@code >=} are words (short form of {@code where}).</li>
  * </ul>
  */
 public final class Lexer {
 
-    /** Référence de méthode {@code Classe::méthode} ou {@code nom.Qualifie::méthode}. */
+    /** Method reference {@code Classe::méthode} or {@code nom.Qualifie::méthode}. */
     private static final Pattern METHOD_REFERENCE = Pattern.compile(
             "[\\p{L}_][\\p{L}\\p{N}_]*(?:\\.[\\p{L}_][\\p{L}\\p{N}_]*)*::[\\p{L}_]");
 
-    /** Nom qualifié {@code ident(.ident)+}, suivi éventuellement de {@code (}. */
+    /** Qualified name {@code ident(.ident)+}, optionally followed by {@code (}. */
     private static final Pattern QUALIFIED = Pattern.compile("[\\p{L}_][\\p{L}\\p{N}_]*(?:\\.[\\p{L}_][\\p{L}\\p{N}_]*)+");
 
     private static final Set<String> KEYWORDS = Set.of("true", "false", "null", "now");
@@ -45,8 +45,8 @@ public final class Lexer {
     }
 
     /**
-     * @param staticNames reconnaît les noms qualifiés désignant une classe ou un champ statique Java
-     *                    ({@code Math.PI}) : en tête d'instruction, ce sont des expressions (FR-46)
+     * @param staticNames recognizes qualified names designating a Java class or static field
+     *                    ({@code Math.PI}): at the start of a statement, they are expressions (FR-46)
      */
     public static List<Token> tokenize(String input, Predicate<String> staticNames) {
         return new Lexer(input, staticNames).run();
@@ -66,8 +66,8 @@ public final class Lexer {
     }
 
     /**
-     * @param head      position de commande (début d'instruction, après {@code |} ou une affectation)
-     * @param statement début d'instruction : une affectation est possible
+     * @param head      command position (start of statement, after {@code |} or an assignment)
+     * @param statement start of statement: an assignment is possible
      */
     private Token next(boolean head, boolean statement) {
         char c = peek();
@@ -131,7 +131,7 @@ public final class Lexer {
         return word();
     }
 
-    /** {@code $nom =} (mais pas {@code $nom ==}). */
+    /** {@code $nom =} (but not {@code $nom ==}). */
     private Token.AssignTo assignment() {
         if (peek() != '$' || !isVariableStart(pos + 1)) {
             return null;
@@ -150,10 +150,10 @@ public final class Lexer {
     }
 
     /**
-     * Une expression commence-t-elle en {@code at}, en position de commande ? Variables, chaînes, groupes,
-     * blocs, listes et conversions, caractères, nombres, {@code true}/{@code false}/{@code null}/{@code now},
-     * {@code new Classe(…)}, et noms qualifiés collés à {@code (} ou désignant une classe ou un champ
-     * statique ({@code Math.max(3, 7)}, {@code java.lang.Math.PI}). Sinon c'est une commande
+     * Does an expression start at {@code at}, in command position? Variables, strings, groups,
+     * blocks, lists and conversions, characters, numbers, {@code true}/{@code false}/{@code null}/{@code now},
+     * {@code new Classe(…)}, and qualified names attached to {@code (} or designating a class or a static
+     * field ({@code Math.max(3, 7)}, {@code java.lang.Math.PI}). Otherwise it is a command
      * ({@code java -version}, {@code notepad.exe x}).
      */
     public static boolean expressionAt(String input, int at, Predicate<String> staticNames) {
@@ -193,7 +193,7 @@ public final class Lexer {
         return ExpressionParser.isParameter(staticNames, word);
     }
 
-    /** En argument : variable, chaîne, groupe, bloc, ou appel Java collé ({@code Path.of("x")}). */
+    /** As an argument: variable, string, group, block, or attached Java call ({@code Path.of("x")}). */
     private boolean argumentExpressionAt() {
         char c = peek();
         if (c == '$') {
@@ -226,8 +226,8 @@ public final class Lexer {
     }
 
     /**
-     * Séparateur : espace, tabulation, fin de ligne, mais aussi les espaces insécables (U+00A0, U+202F), que
-     * le clavier français produit facilement en tapant AltGr+Espace juste après {@code |} (AltGr+6).
+     * Separator: space, tab, end of line, but also non-breaking spaces (U+00A0, U+202F), which
+     * the French keyboard easily produces when typing AltGr+Space right after {@code |} (AltGr+6).
      */
     public static boolean isBlank(char c) {
         return Character.isWhitespace(c) || Character.isSpaceChar(c);
@@ -286,7 +286,7 @@ public final class Lexer {
         return Character.isLetter(c) || c == '_';
     }
 
-    /** Chaîne qui commence en {@code start}, avec ses morceaux, et position qui la suit. */
+    /** String starting at {@code start}, with its parts, and the position following it. */
     static Scanned<List<StringPart>> stringAt(String input, int start, Predicate<String> staticNames) {
         var lexer = new Lexer(input, staticNames);
         lexer.pos = start;
@@ -294,10 +294,10 @@ public final class Lexer {
         return new Scanned<>(parts, lexer.pos);
     }
 
-    /** Élément lu et position qui le suit. */
+    /** Element read and the position following it. */
     record Scanned<T>(T value, int end) { }
 
-    /** {@code "…"} : échappements Java, {@code $var.prop[0]} et {@code $( … )} interpolés. */
+    /** {@code "…"}: Java escapes, {@code $var.prop[0]} and {@code $( … )} interpolated. */
     private List<StringPart> string() {
         if (startsWith("\"\"\"")) {
             return textBlock();
@@ -342,8 +342,8 @@ public final class Lexer {
     }
 
     /**
-     * Bloc de texte {@code """…"""} (FR-33b) : comme en Java, il commence par un retour à la ligne et
-     * l'indentation commune est retirée ; échappements et interpolations s'y appliquent.
+     * Text block {@code """…"""} (FR-33b): as in Java, it starts with a line break and
+     * the common indentation is removed; escapes and interpolations apply within it.
      */
     private List<StringPart> textBlock() {
         int open = pos;
@@ -389,7 +389,7 @@ public final class Lexer {
         return escaped(input, at);
     }
 
-    /** Le caractère en {@code at} est-il précédé d'un nombre impair d'antislashs ? */
+    /** Is the character at {@code at} preceded by an odd number of backslashes? */
     private static boolean escaped(String text, int at) {
         int count = 0;
         for (int i = at - 1; i >= 0 && text.charAt(i) == '\\'; i--) {

@@ -1,11 +1,11 @@
 package io.powerj.core.lang;
 
-/** Façon dont une instruction s'enchaîne à la précédente (spécification FR-04c). */
+/** How a statement is chained to the previous one (specification FR-04c). */
 public enum Connector {
-    /** Début de ligne ou {@code ;} : toujours exécutée. */
+    /** Start of line or {@code ;}: always executed. */
     ALWAYS,
-    /** {@code &&} : exécutée si l'instruction précédente a réussi. */
+    /** {@code &&}: executed if the previous statement succeeded. */
     IF_SUCCESS,
-    /** {@code ||} : exécutée si l'instruction précédente a échoué. */
+    /** {@code ||}: executed if the previous statement failed. */
     IF_FAILURE
 }
