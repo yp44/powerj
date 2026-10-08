@@ -40,7 +40,7 @@ public record BuildInfo(String version, Runtime.Version javaVersion) {
             props.load(in);
             return props.getProperty("version", "dev");
         } catch (IOException e) {
-            throw new UncheckedIOException("Lecture de " + RESOURCE + " impossible", e);
+            throw new UncheckedIOException("Cannot read " + RESOURCE, e);
         }
     }
 }

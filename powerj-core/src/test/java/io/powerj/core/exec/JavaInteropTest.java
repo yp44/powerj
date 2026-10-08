@@ -75,23 +75,23 @@ class JavaInteropTest {
         assertThat(value("LocalDate.now().plusDays(10).dayOfWeek")).isEqualTo(LocalDate.now().plusDays(10).getDayOfWeek());
         assertThat(value("UUID.randomUUID().toString().length()")).isEqualTo(36);
         run("MessageDigest.getInstance(\"SHA-256\")");
-        assertThat(errors).singleElement().asString().contains("« MessageDigest » inconnu");
+        assertThat(errors).singleElement().asString().contains("\"MessageDigest\" unknown");
         run("import java.security.*");
         assertThat(value("MessageDigest.getInstance(\"SHA-256\").algorithm")).isEqualTo("SHA-256");
         assertThat(run("import")).contains("java.util.*", "java.security.*");
         run("import java.awt.List");
-        assertThat(run("help List")).contains("classe java.awt.List");
+        assertThat(run("help List")).contains("class java.awt.List");
     }
 
     @Test
     void importErrors() throws Exception {
         run("import java.nope.*");
-        assertThat(errors).containsExactly("import : package introuvable dans la bibliothèque Java : java.nope");
+        assertThat(errors).containsExactly("import: package not found in the Java library: java.nope");
         run("import io.powerj.core.exec.Session");
-        assertThat(errors).containsExactly("import : classe introuvable dans la bibliothèque Java : io.powerj.core.exec.Session");
+        assertThat(errors).containsExactly("import: class not found in the Java library: io.powerj.core.exec.Session");
         run("import java.awt.*");
         run("List.of(1)");
-        assertThat(errors).singleElement().asString().contains("nom ambigu : List", "java.util.List", "java.awt.List");
+        assertThat(errors).singleElement().asString().contains("ambiguous name: List", "java.util.List", "java.awt.List");
     }
 
     @Test
@@ -130,7 +130,7 @@ class JavaInteropTest {
         run("$l = List.of(1)");
         assertThat(value("[java.util.List] $l")).isEqualTo(List.of(1));
         run("[java.util.ArrayList] $l");
-        assertThat(errors).singleElement().asString().contains("conversion impossible", "ArrayList");
+        assertThat(errors).singleElement().asString().contains("cannot convert", "ArrayList");
     }
 
     @Test
@@ -145,13 +145,13 @@ class JavaInteropTest {
         assertThat(value("Optional.empty().orElseGet(() -> \"vide\")")).isEqualTo("vide");
         assertThat(value("$l.stream().anyMatch({ $_.startsWith(\"k\") })")).isEqualTo(true);
         run("$l.stream().filter({ $_.length() }).toList()");
-        assertThat(errors).singleElement().asString().contains("le bloc doit renvoyer un booléen");
+        assertThat(errors).singleElement().asString().contains("the block must return a boolean");
     }
 
     @Test
     void javaExceptionsAreShortErrorsKeptInErrors() throws Exception {
         run("Integer.parseInt(\"x\")");
-        assertThat(errors).containsExactly("java.lang.NumberFormatException : For input string: \"x\"");
+        assertThat(errors).containsExactly("java.lang.NumberFormatException: For input string: \"x\"");
         assertThat(run("$errors[0].class.simpleName")).isEqualTo("NumberFormatException\n");
         run("$debug = true");
         run("Integer.parseInt(\"y\")");
@@ -173,42 +173,42 @@ class JavaInteropTest {
     @Test
     void commandsStayCommands() throws Exception {
         run("java -version");
-        assertThat(errors).containsExactly("commande inconnue : java");
+        assertThat(errors).containsExactly("unknown command: java");
         run("notepad.exe x");
-        assertThat(errors).containsExactly("commande inconnue : notepad.exe");
+        assertThat(errors).containsExactly("unknown command: notepad.exe");
     }
 
     @Test
     void unknownNamesAndMembers() throws Exception {
         run("java.utl.List.of(1)");
-        assertThat(errors).containsExactly("classe introuvable : java.utl.List");
+        assertThat(errors).containsExactly("class not found: java.utl.List");
         run("Math.nope(1)");
-        assertThat(errors).containsExactly("Math n'a pas de méthode statique nope()");
+        assertThat(errors).containsExactly("Math has no static method nope()");
         run("Math.max(\"a\", 1)");
-        assertThat(errors).singleElement().asString().contains("aucune surcharge de max", "max(int, int)");
+        assertThat(errors).singleElement().asString().contains("no overload of max", "max(int, int)");
         run("new Runnable()");
-        assertThat(errors).singleElement().asString().contains("classe abstraite ou interface");
+        assertThat(errors).singleElement().asString().contains("abstract class or interface");
         run("$x = Math.NOPE");
-        assertThat(errors).containsExactly("Math n'a pas de champ statique NOPE");
+        assertThat(errors).containsExactly("Math has no static field NOPE");
     }
 
     @Test
     void systemExitAndRefusedCalls() throws Exception {
         run("System.setOut(null)");
-        assertThat(errors).singleElement().asString().contains("System.setOut est refusé");
+        assertThat(errors).singleElement().asString().contains("System.setOut is refused");
         run("System.exit(4)");
         assertThat(session.exitRequest()).hasValue(4);
     }
 
     @Test
     void helpForJavaClasses() throws Exception {
-        assertThat(run("help java.util.List")).contains("interface java.util.List", "Méthodes statiques :",
-                "of(Object...) → List", "Méthodes :", "size() → int");
-        assertThat(run("help StringBuilder")).contains("classe java.lang.StringBuilder", "Constructeurs :",
+        assertThat(run("help java.util.List")).contains("interface java.util.List", "Static methods:",
+                "of(Object...) → List", "Methods:", "size() → int");
+        assertThat(run("help StringBuilder")).contains("class java.lang.StringBuilder", "Constructors:",
                 "new StringBuilder(String)");
         assertThat(run("help Math")).contains("static PI : double");
         run("help Nope");
-        assertThat(errors).containsExactly("help : commande ou classe inconnue : Nope");
+        assertThat(errors).containsExactly("help: unknown command or class: Nope");
     }
 
     @Test

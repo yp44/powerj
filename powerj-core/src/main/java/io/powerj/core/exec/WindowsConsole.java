@@ -31,7 +31,7 @@ final class WindowsConsole {
             int codePage = console != 0 ? console : call("GetOEMCP");
             return codePage == 0 ? OptionalInt.empty() : OptionalInt.of(codePage);
         } catch (Throwable t) {
-            LOG.log(Level.FINE, "Page de code console illisible", t);
+            LOG.log(Level.FINE, "Unreadable console code page", t);
             return OptionalInt.empty();
         }
     }

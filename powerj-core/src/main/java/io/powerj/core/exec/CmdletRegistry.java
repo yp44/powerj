@@ -76,9 +76,17 @@ public final class CmdletRegistry {
     /**
      * Loaded module (a {@code mod-list} row).
      *
-     * @param source originating jar or directory; {@code (intégré)} for the modules shipped with PowerJ
+     * @param source originating jar or directory; {@code null} (displayed {@code (built-in)}) for the modules
+     *               shipped with PowerJ
      */
-    public record LoadedModule(String name, String version, List<String> cmdlets, String source) { }
+    public record LoadedModule(String name, String version, List<String> cmdlets, String source) {
+
+        /** Originating jar or directory, or {@code (built-in)} in the current language. */
+        @Override
+        public String source() {
+            return source == null ? Messages.get("module.builtin") : source;
+        }
+    }
 
     private final Map<String, Registered> byName = new LinkedHashMap<>();
     private final Map<String, Registered> byQualifiedName = new LinkedHashMap<>();
@@ -120,7 +128,7 @@ public final class CmdletRegistry {
             try {
                 registered = registered(cmdlet, provider);
             } catch (RuntimeException e) {
-                warnings.add("module " + moduleName + " : cmdlet ignoré : " + e.getMessage());
+                warnings.add(Messages.get("module.cmdletIgnored", moduleName, e.getMessage()));
                 continue;
             }
             add(registered).ifPresent(warnings::add);
@@ -134,7 +142,7 @@ public final class CmdletRegistry {
             names = all;
         }
         modules.put(moduleName, new LoadedModule(moduleName, version, List.copyOf(names),
-                source.map(Path::toString).orElse("(intégré)")));
+                source.map(Path::toString).orElse(null)));
         return warnings;
     }
 
@@ -144,19 +152,19 @@ public final class CmdletRegistry {
         if (owner == null) {
             return Optional.empty();
         }
-        return Optional.of("cmdlet « " + registered.name() + " » du module " + registered.module()
-                + " : nom déjà utilisé par " + owner.module() + " ; accessible par " + registered.qualifiedName());
+        return Optional.of(Messages.get("cmdlet.nameConflict", registered.name(), registered.module(), owner.module(),
+                registered.qualifiedName()));
     }
 
     private static Registered registered(Cmdlet<?, ?, ?> cmdlet, CmdletProvider provider) {
         Class<?> type = cmdlet.getClass();
         CmdletInfo info = type.getAnnotation(CmdletInfo.class);
         if (info == null) {
-            throw new IllegalArgumentException(type.getName() + " n'a pas d'annotation @CmdletInfo");
+            throw new IllegalArgumentException(Messages.get("cmdlet.noAnnotation", type.getName()));
         }
         Type[] arguments = cmdletTypeArguments(type);
         if (!(arguments[0] instanceof Class<?> parameters) || !parameters.isRecord()) {
-            throw new IllegalArgumentException(type.getName() + " : les paramètres doivent être un record");
+            throw new IllegalArgumentException(Messages.get("cmdlet.parametersNotRecord", type.getName()));
         }
         Class<?> input = rawType(arguments[1]);
         Class<?> output = rawType(arguments[2]);
@@ -165,7 +173,7 @@ public final class CmdletRegistry {
     }
 
     private static String moduleName(Module module) {
-        return module.getName() == null ? "(sans module)" : module.getName();
+        return module.getName() == null ? Messages.get("module.unnamed") : module.getName();
     }
 
     /** Short prefix of a module: last segment of its name ({@code com.example.greet} → {@code greet}). */
@@ -186,7 +194,7 @@ public final class CmdletRegistry {
                 }
             }
         }
-        throw new IllegalArgumentException(type.getName() + " doit implémenter Cmdlet<P, I, O> avec des types explicites");
+        throw new IllegalArgumentException(Messages.get("cmdlet.typeArguments", type.getName()));
     }
 
     /** By short name ({@code greet}) or name qualified by the module ({@code greet:greet}, FR-17). */

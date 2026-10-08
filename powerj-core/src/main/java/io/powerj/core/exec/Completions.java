@@ -321,17 +321,20 @@ public final class Completions {
         List<Candidate> candidates = new ArrayList<>();
         if (!before.equals("^")) {
             for (String builtin : new TreeSet<>(interpreter.builtinNames())) {
-                candidates.add(new Candidate(builtin, builtin + " [interne]", "commande interne", true));
+                candidates.add(new Candidate(builtin, builtin + " " + Messages.get("completion.tag.builtin"),
+                        Messages.get("completion.builtin"), true));
             }
             for (var cmdlet : interpreter.registry().all()) {
-                candidates.add(new Candidate(cmdlet.name(), cmdlet.name() + " [pj]", cmdlet.summary(), true));
+                candidates.add(new Candidate(cmdlet.name(), cmdlet.name() + " " + Messages.get("completion.tag.cmdlet"),
+                        cmdlet.summary(), true));
             }
             if (!fragment.isEmpty() && Character.isUpperCase(fragment.charAt(0))) {
-                importedClasses().forEach(c -> candidates.add(new Candidate(c, c, "classe Java", false)));
+                importedClasses().forEach(c -> candidates.add(new Candidate(c, c, Messages.get("completion.javaClass"), false)));
             }
         }
         for (String name : natives.names(session().environment())) {
-            candidates.add(new Candidate(name, name + " [natif]", "programme", true));
+            candidates.add(new Candidate(name, name + " " + Messages.get("completion.tag.native"),
+                    Messages.get("completion.program"), true));
         }
         return new Result(identStart, fragment, candidates);
     }
@@ -411,9 +414,9 @@ public final class Completions {
             }
         }
         if (words.stream().noneMatch(w -> w.startsWith("--on-error"))) {
-            candidates.add(new Candidate("--on-error", "--on-error", "erreurs non bloquantes : stop, continue, silent", true));
+            candidates.add(new Candidate("--on-error", "--on-error", Messages.get("completion.onError"), true));
         }
-        candidates.add(new Candidate("--help", "--help", "aide de la commande", true));
+        candidates.add(new Candidate("--help", "--help", Messages.get("completion.help"), true));
         return candidates;
     }
 
@@ -453,17 +456,19 @@ public final class Completions {
         if (dot < 0) {
             List<Candidate> roots = new ArrayList<>();
             new TreeSet<>(index.packages().stream().map(p -> p.split("\\.")[0]).toList())
-                    .forEach(r -> roots.add(new Candidate(r + ".", r, "package", false)));
+                    .forEach(r -> roots.add(new Candidate(r + ".", r, Messages.get("completion.package"), false)));
             return new Result(start, word, roots);
         }
         String pkg = word.substring(0, dot);
         List<Candidate> candidates = new ArrayList<>();
-        for (Candidate c : packageMembers(pkg)) {
-            String suffix = c.description().equals("package") ? "." : "";
-            candidates.add(new Candidate(pkg + "." + c.value() + suffix, c.display(), c.description(), c.complete()));
+        for (Candidate c : subpackages(pkg)) {
+            candidates.add(new Candidate(pkg + "." + c.value() + ".", c.display(), c.description(), c.complete()));
+        }
+        for (Candidate c : packageClasses(pkg)) {
+            candidates.add(new Candidate(pkg + "." + c.value(), c.display(), c.description(), c.complete()));
         }
         if (index.packages().contains(pkg)) {
-            candidates.add(new Candidate(pkg + ".*", "*", "toutes les classes du package", true));
+            candidates.add(new Candidate(pkg + ".*", "*", Messages.get("completion.allClasses"), true));
         }
         return new Result(start, word, candidates);
     }
@@ -503,7 +508,7 @@ public final class Completions {
                 }
                 boolean dir = Files.isDirectory(entry);
                 String value = dirPart + name + (dir ? String.valueOf(separator) : "");
-                candidates.add(new Candidate(value, name + (dir ? separator : ""), dir ? "dossier" : "", !dir));
+                candidates.add(new Candidate(value, name + (dir ? separator : ""), dir ? Messages.get("completion.directory") : "", !dir));
                 if (candidates.size() >= MAX_FILES) {
                     break;
                 }
@@ -533,7 +538,7 @@ public final class Completions {
     private Result variables(int start, String word, boolean inBlock) {
         List<Candidate> candidates = new ArrayList<>();
         if (inBlock) {
-            candidates.add(new Candidate("$_", "$_", "objet courant", false));
+            candidates.add(new Candidate("$_", "$_", Messages.get("completion.current"), false));
         }
         for (String name : session().variableNames()) {
             Object value;
@@ -552,15 +557,15 @@ public final class Completions {
     private Result identifiers(String line, Frame frame, int start, String fragment) {
         List<Candidate> candidates = new ArrayList<>();
         Scope scope = scope(line, frame);
-        scope.parameters().keySet().forEach(p -> candidates.add(new Candidate(p, p, "paramètre", false)));
+        scope.parameters().keySet().forEach(p -> candidates.add(new Candidate(p, p, Messages.get("completion.parameter"), false)));
         String before = line.substring(Math.max(0, start - 4), start);
         if (before.endsWith("new ")) {
-            importedClasses().forEach(c -> candidates.add(new Candidate(c, c, "classe Java", false)));
+            importedClasses().forEach(c -> candidates.add(new Candidate(c, c, Messages.get("completion.javaClass"), false)));
             return new Result(start, fragment, candidates);
         }
-        KEYWORDS.stream().sorted().forEach(k -> candidates.add(new Candidate(k, k, "mot-clé", false)));
+        KEYWORDS.stream().sorted().forEach(k -> candidates.add(new Candidate(k, k, Messages.get("completion.keyword"), false)));
         if (!fragment.isEmpty() && Character.isUpperCase(fragment.charAt(0))) {
-            importedClasses().forEach(c -> candidates.add(new Candidate(c, c, "classe Java", false)));
+            importedClasses().forEach(c -> candidates.add(new Candidate(c, c, Messages.get("completion.javaClass"), false)));
         }
         return new Result(start, fragment, candidates);
     }
@@ -816,8 +821,8 @@ public final class Completions {
     private static List<Candidate> instanceMembers(Class<?> type) {
         List<Candidate> candidates = new ArrayList<>();
         for (Members.Member m : Members.ofType(type)) {
-            if (!m.kind().equals("méthode")) {
-                candidates.add(new Candidate(m.name(), m.name() + " : " + m.type(), m.kind(), false));
+            if (m.kind() != Members.Kind.METHOD) {
+                candidates.add(new Candidate(m.name(), m.name() + " : " + m.type(), m.kind().toString(), false));
             }
         }
         Set<String> components = new java.util.HashSet<>();
@@ -850,12 +855,13 @@ public final class Completions {
         for (Field field : type.getFields()) {
             if (Modifier.isStatic(field.getModifiers())) {
                 candidates.add(new Candidate(field.getName(), field.getName() + " : " + field.getType().getSimpleName(),
-                        "champ statique", false));
+                        Messages.get("completion.staticField"), false));
             }
         }
         for (Class<?> nested : type.getClasses()) {
             if (JavaClasses.accessible(nested)) {
-                candidates.add(new Candidate(nested.getSimpleName(), nested.getSimpleName(), "classe", false));
+                candidates.add(new Candidate(nested.getSimpleName(), nested.getSimpleName(),
+                        Messages.get("completion.class"), false));
             }
         }
         return candidates;
@@ -864,21 +870,30 @@ public final class Completions {
     private static Candidate methodCandidate(Method method) {
         String value = method.getName() + (method.getParameterCount() == 0 ? "()" : "(");
         return new Candidate(value, JavaInvoker.signature(method) + " : " + method.getReturnType().getSimpleName(),
-                "méthode", false);
+                Messages.get("completion.method"), false);
     }
 
     /** Subpackages and classes of a package ({@code java.util.} → {@code List}, {@code concurrent}…). */
     private List<Candidate> packageMembers(String pkg) {
-        List<Candidate> candidates = new ArrayList<>();
+        List<Candidate> candidates = new ArrayList<>(subpackages(pkg));
+        candidates.addAll(packageClasses(pkg));
+        return candidates;
+    }
+
+    private List<Candidate> subpackages(String pkg) {
         TreeSet<String> subpackages = new TreeSet<>();
         for (String p : index.packages()) {
             if (p.startsWith(pkg + ".")) {
                 subpackages.add(p.substring(pkg.length() + 1).split("\\.")[0]);
             }
         }
-        subpackages.forEach(s -> candidates.add(new Candidate(s, s, "package", false)));
-        index.classes(pkg).forEach(c -> candidates.add(new Candidate(c, c, "classe", false)));
-        return candidates;
+        String description = Messages.get("completion.package");
+        return subpackages.stream().map(s -> new Candidate(s, s, description, false)).toList();
+    }
+
+    private List<Candidate> packageClasses(String pkg) {
+        String description = Messages.get("completion.class");
+        return index.classes(pkg).stream().map(c -> new Candidate(c, c, description, false)).toList();
     }
 
     /** After {@code Class::} or {@code $x::}: method names (and {@code new} for a class). */
@@ -896,6 +911,6 @@ public final class Completions {
             case TypeInfo.Instance(var t, _) -> names.addAll(JavaInvoker.instanceMethods(t).keySet());
             default -> { }
         }
-        return names.stream().map(n -> new Candidate(n, n, "méthode", false)).toList();
+        return names.stream().map(n -> new Candidate(n, n, Messages.get("completion.method"), false)).toList();
     }
 }

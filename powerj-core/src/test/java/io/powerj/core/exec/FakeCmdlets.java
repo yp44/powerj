@@ -16,25 +16,25 @@ final class FakeCmdlets {
 
     public record Item(String name, int size) { }
 
-    @CmdletInfo(name = "items", category = "Test", summary = "Produit des objets de test", examples = "items -n 2")
+    @CmdletInfo(name = "items", category = "Test", summary = "Produces test objects", examples = "items -n 2")
     static final class Items implements Cmdlet<Items.Params, Void, Item> {
 
-        record Params(@Option(shortName = 'n', description = "Nombre d'objets") int count,
-                      @Option(description = "Signale une erreur non bloquante") boolean fail) { }
+        record Params(@Option(shortName = 'n', description = "Number of objects") int count,
+                      @Option(description = "Reports a non-blocking error") boolean fail) { }
 
         @Override
         public void begin(Params params, CmdletContext<Item> context) {
             for (int i = 1; i <= (params.count() == 0 ? 3 : params.count()); i++) {
                 context.emit(new Item("item" + i, i * 10));
                 if (params.fail() && i == 1) {
-                    context.error("problème sur item1");
+                    context.error("problem with item1");
                 }
             }
         }
     }
 
     /** Mini {@code where}: block or text compiled by the context. */
-    @CmdletInfo(name = "filter", category = "Test", summary = "Filtre", examples = "items | filter { $_.size > 10 }")
+    @CmdletInfo(name = "filter", category = "Test", summary = "Filters", examples = "items | filter { $_.size > 10 }")
     static final class Filter implements Cmdlet<Filter.Params, Object, Object> {
 
         record Params(@Option(position = 0) Object condition) { }
@@ -56,7 +56,7 @@ final class FakeCmdlets {
     }
 
     /** Counts the objects received. */
-    @CmdletInfo(name = "count", category = "Test", summary = "Compte", examples = "items | count")
+    @CmdletInfo(name = "count", category = "Test", summary = "Counts", examples = "items | count")
     static final class Count implements Cmdlet<Count.Params, Object, Long> {
 
         record Params() { }
@@ -80,7 +80,7 @@ final class FakeCmdlets {
     }
 
     /** Evaluates a block with {@code $_} = the {@code --with} argument. */
-    @CmdletInfo(name = "eval", category = "Test", summary = "Évalue un bloc", examples = "eval { 1 + 2 }")
+    @CmdletInfo(name = "eval", category = "Test", summary = "Evaluates a block", examples = "eval { 1 + 2 }")
     static final class Eval implements Cmdlet<Eval.Params, Void, Object> {
 
         record Params(@Option(position = 0) Object block, @Option(shortName = 'w') Object with) { }
@@ -92,7 +92,7 @@ final class FakeCmdlets {
     }
 
     /** Produces numbers endlessly (stopped by Ctrl+C or by the next stage). */
-    @CmdletInfo(name = "infinite", category = "Test", summary = "Sans fin", examples = "infinite")
+    @CmdletInfo(name = "infinite", category = "Test", summary = "Endless", examples = "infinite")
     static final class Infinite implements Cmdlet<Infinite.Params, Void, Long> {
 
         record Params() { }
@@ -106,7 +106,7 @@ final class FakeCmdlets {
     }
 
     /** Mini {@code map}: applies a block or a method reference to each object. */
-    @CmdletInfo(name = "eval-each", category = "Test", summary = "Transforme", examples = "items | eval-each Item::name")
+    @CmdletInfo(name = "eval-each", category = "Test", summary = "Transforms", examples = "items | eval-each Item::name")
     static final class EvalEach implements Cmdlet<EvalEach.Params, Object, Object> {
 
         record Params(@Option(position = 0) Object function) { }

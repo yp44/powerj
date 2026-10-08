@@ -19,8 +19,8 @@ public final class Values {
 
     private static String duration(Duration d) {
         if (d.toMinutes() > 0) {
-            return "%d min %02d s".formatted(d.toMinutes(), d.toSecondsPart());
+            return Messages.get("duration.minutes", d.toMinutes(), "%02d".formatted(d.toSecondsPart()));
         }
-        return String.format(Locale.ROOT, "%.3f s", d.toNanos() / 1e9);
+        return Messages.get("duration.seconds", String.format(Locale.ROOT, "%.3f", d.toNanos() / 1e9));
     }
 }

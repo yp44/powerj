@@ -96,7 +96,7 @@ public final class NativeRunner {
         try {
             process = builder.start();
         } catch (IOException e) {
-            throw new PjException(PjError.of("impossible de lancer " + executable + " : " + e.getMessage(), e));
+            throw new PjException(PjError.of(Messages.get("native.startFailed", executable, e.getMessage()), e));
         }
         if (builder.redirectInput() == ProcessBuilder.Redirect.PIPE) {
             closeQuietly(process.getOutputStream());
@@ -181,8 +181,8 @@ public final class NativeRunner {
         try {
             processes = ProcessBuilder.startPipeline(builders);
         } catch (IOException e) {
-            throw new PjException(PjError.of("impossible de lancer " + commands.stream()
-                    .map(c -> c.executable().getFileName().toString()).toList() + " : " + e.getMessage(), e));
+            throw new PjException(PjError.of(Messages.get("native.startFailed", commands.stream()
+                    .map(c -> c.executable().getFileName().toString()).toList(), e.getMessage()), e));
         }
         Runnable stop = () -> processes.forEach(NativeRunner::destroyTree);
         if (output != null) {

@@ -23,7 +23,26 @@ import java.util.Set;
 public final class Members {
 
     /** Member displayed by {@code help members} (specification FR-29). */
-    public record Member(String name, String kind, String type) { }
+    public record Member(String name, Kind kind, String type) { }
+
+    /** Kind of member; its text ({@link #toString}) is in the current language. */
+    public enum Kind {
+        PROPERTY("member.kind.property"),
+        METHOD("member.kind.method"),
+        FIELD("member.kind.field");
+
+        private final String key;
+
+        Kind(String key) {
+            this.key = key;
+        }
+
+        /** Displayed text: {@code property}, {@code method}, {@code field} (translated). */
+        @Override
+        public String toString() {
+            return Messages.get(key);
+        }
+    }
 
     private static final ClassValue<List<Class<?>>> ACCESSIBLE_TYPES = new ClassValue<>() {
         @Override
@@ -106,7 +125,7 @@ public final class Members {
         if (type.isRecord()) {
             for (RecordComponent c : type.getRecordComponents()) {
                 properties.put(c.getName().toLowerCase(Locale.ROOT),
-                        new Member(c.getName(), "propriété", simple(c.getGenericType().getTypeName())));
+                        new Member(c.getName(), Kind.PROPERTY, simple(c.getGenericType().getTypeName())));
             }
         }
         List<Member> methods = new ArrayList<>();
@@ -121,18 +140,18 @@ public final class Members {
                 String property = propertyName(m);
                 if (property != null) {
                     properties.putIfAbsent(property.toLowerCase(Locale.ROOT),
-                            new Member(property, "propriété", simple(m.getGenericReturnType().getTypeName())));
+                            new Member(property, Kind.PROPERTY, simple(m.getGenericReturnType().getTypeName())));
                 }
                 String signature = m.getName() + "(" + String.join(", ",
                         java.util.Arrays.stream(m.getGenericParameterTypes()).map(p -> simple(p.getTypeName())).toList()) + ")";
                 if (seenMethods.add(signature)) {
-                    methods.add(new Member(signature, "méthode", simple(m.getGenericReturnType().getTypeName())));
+                    methods.add(new Member(signature, Kind.METHOD, simple(m.getGenericReturnType().getTypeName())));
                 }
             }
             for (Field f : t.getFields()) {
                 if (!Modifier.isStatic(f.getModifiers())) {
                     properties.putIfAbsent(f.getName().toLowerCase(Locale.ROOT),
-                            new Member(f.getName(), "champ", simple(f.getGenericType().getTypeName())));
+                            new Member(f.getName(), Kind.FIELD, simple(f.getGenericType().getTypeName())));
                 }
             }
         }

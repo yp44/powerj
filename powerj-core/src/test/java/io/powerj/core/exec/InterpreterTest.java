@@ -85,16 +85,16 @@ class InterpreterTest {
         // true / false are literals (as in Java); their value decides the chaining
         assertThat(run("false || \"non\"")).isEqualTo("false" + System.lineSeparator() + "non" + System.lineSeparator());
         assertThat(run("commandeinexistante || \"secours\"")).isEqualTo("secours" + System.lineSeparator());
-        assertThat(errors).containsExactly("commande inconnue : commandeinexistante");
+        assertThat(errors).containsExactly("unknown command: commandeinexistante");
     }
 
     @Test
     void unknownCommand() throws Exception {
         run("commandeinexistante a b");
-        assertThat(errors).containsExactly("commande inconnue : commandeinexistante");
+        assertThat(errors).containsExactly("unknown command: commandeinexistante");
         assertThat(session.lastSucceeded()).isFalse();
         run("^cd");
-        assertThat(errors).containsExactly("commande native introuvable : cd");
+        assertThat(errors).containsExactly("native command not found: cd");
     }
 
     @Test
@@ -111,7 +111,7 @@ class InterpreterTest {
         run("cd");
         assertThat(session.currentDirectory()).isEqualTo(tmp.resolve("home"));
         run("cd /nulle/part");
-        assertThat(errors).containsExactly("cd : dossier introuvable : /nulle/part");
+        assertThat(errors).containsExactly("cd: directory not found: /nulle/part");
     }
 
     @Test
@@ -136,14 +136,14 @@ class InterpreterTest {
         assertThat(Files.readString(tmp.resolve("pwd.txt")).strip()).isEqualTo(tmp.toString());
 
         run("commandeinexistante 2> unknown.txt");
-        assertThat(Files.readString(tmp.resolve("unknown.txt")).strip()).isEqualTo("commande inconnue : commandeinexistante");
+        assertThat(Files.readString(tmp.resolve("unknown.txt")).strip()).isEqualTo("unknown command: commandeinexistante");
     }
 
     @Test
     void whichDescribesCommands() throws Exception {
-        assertThat(run("which cd sh")).contains("cd → commande interne", "sh → natif /");
+        assertThat(run("which cd sh")).contains("cd → built-in command", "sh → native /");
         run("which commandeinexistante");
-        assertThat(errors).containsExactly("which : introuvable : commandeinexistante");
+        assertThat(errors).containsExactly("which: not found: commandeinexistante");
     }
 
     @Test
@@ -157,7 +157,7 @@ class InterpreterTest {
         run("$nom = \"Yves\"");
         assertThat(run("\"Bonjour $nom !\"")).isEqualTo("Bonjour Yves !" + System.lineSeparator());
         run("$inconnue");
-        assertThat(errors).containsExactly("variable inconnue : $inconnue");
+        assertThat(errors).containsExactly("unknown variable: $inconnue");
     }
 
     @Test
@@ -182,7 +182,7 @@ class InterpreterTest {
         long deadline = System.nanoTime() + 10_000_000_000L;
         while (ProcessHandle.current().children().noneMatch(p -> p.info().command().orElse("").endsWith("sleep"))) {
             if (System.nanoTime() > deadline) {
-                throw new AssertionError("sleep n'a pas démarré");
+                throw new AssertionError("sleep did not start");
             }
             Thread.sleep(20);
         }

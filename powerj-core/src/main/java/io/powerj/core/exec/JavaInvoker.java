@@ -66,11 +66,11 @@ final class JavaInvoker {
     /** {@code target.name(arguments)}. */
     static Object invokeVirtual(Object target, String name, List<Object> args) {
         if (target == null) {
-            throw new PjException("appel de " + name + "() sur une valeur nulle");
+            throw new PjException(Messages.get("java.callOnNull", name));
         }
         List<Method> candidates = INSTANCE_METHODS.get(target.getClass()).getOrDefault(name, List.of());
         if (candidates.isEmpty()) {
-            throw new PjException(target.getClass().getSimpleName() + " n'a pas de méthode " + name + "()");
+            throw new PjException(Messages.get("java.noMethod", target.getClass().getSimpleName(), name));
         }
         Method method = (Method) select(candidates, args, name);
         return call(method, target, convertAll(method, args));
@@ -94,7 +94,7 @@ final class JavaInvoker {
             }
         }
         if (candidates.isEmpty()) {
-            throw new PjException(type.getSimpleName() + " n'a pas de méthode statique " + name + "()");
+            throw new PjException(Messages.get("java.noStaticMethod", type.getSimpleName(), name));
         }
         Method method = (Method) select(candidates, args, name);
         return call(method, null, convertAll(method, args));
@@ -103,11 +103,11 @@ final class JavaInvoker {
     /** {@code new Class(arguments)}. */
     static Object construct(Class<?> type, List<Object> args) {
         if (type.isInterface() || Modifier.isAbstract(type.getModifiers())) {
-            throw new PjException("new " + type.getSimpleName() + " : classe abstraite ou interface");
+            throw new PjException(Messages.get("java.abstractClass", type.getSimpleName()));
         }
         List<Executable> candidates = new ArrayList<>(List.of(type.getConstructors()));
         if (candidates.isEmpty()) {
-            throw new PjException("new " + type.getSimpleName() + " : aucun constructeur public");
+            throw new PjException(Messages.get("java.noPublicConstructor", type.getSimpleName()));
         }
         var constructor = (Constructor<?>) select(candidates, args, "new " + type.getSimpleName());
         try {
@@ -115,7 +115,7 @@ final class JavaInvoker {
         } catch (InvocationTargetException e) {
             throw javaException(e.getCause());
         } catch (ReflectiveOperationException e) {
-            throw new PjException(PjError.of("new " + type.getSimpleName() + " impossible : " + e.getMessage(), e));
+            throw new PjException(PjError.of(Messages.get("java.constructFailed", type.getSimpleName(), e.getMessage()), e));
         }
     }
 
@@ -125,8 +125,8 @@ final class JavaInvoker {
             return (RuntimeException) cause; // thrown by a { } block called from Java
         }
         String message = cause.getMessage();
-        return new PjException(PjError.of(cause.getClass().getName() + (message == null ? "" : " : " + message),
-                cause));
+        return new PjException(PjError.of(message == null ? cause.getClass().getName()
+                : Messages.get("java.exception", cause.getClass().getName(), message), cause));
     }
 
     private static Object call(Method method, Object target, Object[] args) {
@@ -135,7 +135,7 @@ final class JavaInvoker {
         } catch (InvocationTargetException e) {
             throw javaException(e.getCause());
         } catch (IllegalAccessException e) {
-            throw new PjException(PjError.of(method.getName() + "() inaccessible : " + e.getMessage(), e));
+            throw new PjException(PjError.of(Messages.get("java.inaccessible", method.getName(), e.getMessage()), e));
         }
     }
 
@@ -164,9 +164,9 @@ final class JavaInvoker {
             }
         }
         if (matches.isEmpty()) {
-            throw new PjException("aucune surcharge de " + name + " ne correspond aux arguments ("
-                    + String.join(", ", args.stream().map(JavaInvoker::typeName).toList()) + ") ; disponibles : "
-                    + String.join(", ", candidates.stream().map(JavaInvoker::signature).distinct().toList()));
+            throw new PjException(Messages.get("java.noOverload", name,
+                    String.join(", ", args.stream().map(JavaInvoker::typeName).toList()),
+                    String.join(", ", candidates.stream().map(JavaInvoker::signature).distinct().toList())));
         }
         int best = matches.stream().mapToInt(Match::cost).min().orElseThrow();
         List<Match> cheapest = matches.stream().filter(m -> m.cost() == best).toList();
@@ -174,8 +174,8 @@ final class JavaInvoker {
                 .filter(m -> cheapest.stream().allMatch(o -> o == m || moreSpecific(m.executable(), o.executable())))
                 .toList();
         if (maximal.isEmpty()) {
-            throw new PjException("appel ambigu de " + name + " : " + String.join(", ",
-                    cheapest.stream().map(m -> signature(m.executable())).toList()));
+            throw new PjException(Messages.get("java.ambiguous", name, String.join(", ",
+                    cheapest.stream().map(m -> signature(m.executable())).toList())));
         }
         return maximal.getFirst().executable();
     }
@@ -333,7 +333,7 @@ final class JavaInvoker {
                 }
                 yield array;
             }
-            default -> throw new PjException("conversion impossible de " + typeName(value) + " en " + type.getSimpleName());
+            default -> throw new PjException(Messages.get("java.conversionFailed", typeName(value), type.getSimpleName()));
         };
     }
 

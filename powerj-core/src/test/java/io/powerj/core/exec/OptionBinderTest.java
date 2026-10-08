@@ -82,22 +82,22 @@ class OptionBinderTest {
     @Test
     void errorsAreExplicit() {
         assertThatThrownBy(() -> bind("--recurce"))
-                .hasMessage("t : option inconnue --recurce, vouliez-vous dire --recurse ?");
-        assertThatThrownBy(() -> bind("-z")).hasMessage("t : option inconnue -z");
-        assertThatThrownBy(() -> bind("--filter")).hasMessage("t : valeur attendue après --filter");
+                .hasMessage("t: unknown option --recurce, did you mean --recurse?");
+        assertThatThrownBy(() -> bind("-z")).hasMessage("t: unknown option -z");
+        assertThatThrownBy(() -> bind("--filter")).hasMessage("t: value expected after --filter");
         assertThatThrownBy(() -> bind("--max-depth", "trois"))
-                .hasMessage("t : valeur invalide pour --max-depth : 'trois'");
-        assertThatThrownBy(() -> bind("--mode", "slow")).hasMessageContaining("--mode accepte [fast, safe]");
-        assertThatThrownBy(() -> bind("--m", "x")).hasMessageContaining("option ambiguë --m");
+                .hasMessage("t: invalid value for --max-depth: 'trois'");
+        assertThatThrownBy(() -> bind("--mode", "slow")).hasMessageContaining("--mode accepts [fast, safe]");
+        assertThatThrownBy(() -> bind("--m", "x")).hasMessageContaining("ambiguous option --m");
     }
 
     @Test
     void mandatoryAndPositionals() {
         assertThatThrownBy(() -> OptionBinder.bind("t", Required.class, List.of("x")))
-                .hasMessage("t : option obligatoire manquante : --name");
+                .hasMessage("t: missing required option: --name");
         var r = OptionBinder.bind("t", Required.class, List.of("un", "--name", "n", "deux"));
         assertThat(r).isEqualTo(new Required("n", "un", "deux"));
         assertThatThrownBy(() -> OptionBinder.bind("t", Required.class, List.of("--name", "n", "1", "2", "3")))
-                .hasMessage("t : argument inattendu : 3");
+                .hasMessage("t: unexpected argument: 3");
     }
 }

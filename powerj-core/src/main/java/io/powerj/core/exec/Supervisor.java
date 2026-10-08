@@ -74,7 +74,7 @@ public final class Supervisor {
         if (current.cancels().incrementAndGet() == 1) {
             current.worker().interrupt();
         } else {
-            LOG.warning(() -> "Commande abandonnée : " + current.commandLine());
+            LOG.warning(() -> "Command abandoned: " + current.commandLine());
             current.outcome().complete(new Outcome.Abandoned(current.commandLine()));
         }
     }
@@ -85,16 +85,13 @@ public final class Supervisor {
             case PjException e -> new Outcome.Failure(e.error());
             case OutOfMemoryError e -> {
                 memoryReserve = null;
-                yield new Outcome.Failure(PjError.of(
-                        "mémoire insuffisante : filtrez les données plus tôt dans le pipeline", e));
+                yield new Outcome.Failure(PjError.of(Messages.get("error.outOfMemory"), e));
             }
-            case StackOverflowError e -> new Outcome.Failure(PjError.of("récursion trop profonde", e));
-            case LinkageError e -> new Outcome.Failure(PjError.of(
-                    "classe inutilisable : " + e.getMessage(), e));
+            case StackOverflowError e -> new Outcome.Failure(PjError.of(Messages.get("error.stackOverflow"), e));
+            case LinkageError e -> new Outcome.Failure(PjError.of(Messages.get("error.linkage", e.getMessage()), e));
             default -> {
-                LOG.log(Level.SEVERE, "Erreur interne en exécutant : " + commandLine, t);
-                yield new Outcome.Failure(PjError.of(
-                        "erreur interne : " + t + " (détails dans le journal)", t));
+                LOG.log(Level.SEVERE, "Internal error while running: " + commandLine, t);
+                yield new Outcome.Failure(PjError.of(Messages.get("error.internal", t), t));
             }
         };
     }

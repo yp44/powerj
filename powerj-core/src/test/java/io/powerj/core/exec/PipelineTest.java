@@ -75,21 +75,21 @@ class PipelineTest {
     void contextCompileForCmdlets() throws Exception {
         assertThat(run("items | filter \"\\$_.size < 20\"")).contains("item1").doesNotContain("item2");
         assertThat(run("items | filter \"\\$_.size <\"")).isEmpty();
-        assertThat(errors).singleElement().asString().contains("filter", "expression incomplète");
+        assertThat(errors).singleElement().asString().contains("filter", "incomplete expression");
     }
 
     @Test
     void evaluationErrorsAreNonBlocking() throws Exception {
         assertThat(run("items | filter { $_.nope > 1 } | count")).isEqualTo("0\n");
-        assertThat(errors).hasSize(3).allSatisfy(e -> assertThat(e).contains("filter : Item n'a pas de propriété 'nope'"));
+        assertThat(errors).hasSize(3).allSatisfy(e -> assertThat(e).contains("filter: Item has no property 'nope'"));
     }
 
     @Test
     void stagesThatDoNotReadInputAreRejected() throws Exception {
         run("items | items");
-        assertThat(errors).containsExactly("« items » ne lit pas les objets du pipeline");
+        assertThat(errors).containsExactly("\"items\" does not read pipeline objects");
         run("items | cd /");
-        assertThat(errors).containsExactly("« cd » ne lit pas les objets du pipeline");
+        assertThat(errors).containsExactly("\"cd\" does not read pipeline objects");
         assertThat(session.lastSucceeded()).isFalse();
     }
 
@@ -152,32 +152,32 @@ class PipelineTest {
     @Test
     void evaluationErrors() throws Exception {
         assertThat(run("eval { 1 / 0 }")).isEmpty();
-        assertThat(errors).singleElement().asString().contains("calcul impossible", "/ by zero");
+        assertThat(errors).singleElement().asString().contains("calculation failed", "/ by zero");
         run("eval { 1 && true }");
-        assertThat(errors).singleElement().asString().contains("« && » attend un booléen, reçu Integer 1");
+        assertThat(errors).singleElement().asString().contains("\"&&\" expects a boolean, got Integer 1");
         run("eval { \"a\" > 1 }");
-        assertThat(errors).singleElement().asString().contains("« > » impossible entre String \"a\" et Integer 1");
+        assertThat(errors).singleElement().asString().contains("\">\" is not possible between String \"a\" and Integer 1");
         run("eval { \"a\".nope() }");
-        assertThat(errors).singleElement().asString().contains("String n'a pas de méthode nope()");
+        assertThat(errors).singleElement().asString().contains("String has no method nope()");
         run("eval { \"a\".charAt(\"x\") }");
-        assertThat(errors).singleElement().asString().contains("aucune surcharge de charAt", "charAt(int)");
+        assertThat(errors).singleElement().asString().contains("no overload of charAt", "charAt(int)");
         run("eval { size > 1 }");
-        assertThat(errors).singleElement().asString().contains("« size » inconnu", "$size");
+        assertThat(errors).singleElement().asString().contains("\"size\" unknown", "$size");
         run("eval { \"a\".charAt(5) }");
         assertThat(errors).singleElement().asString().contains("StringIndexOutOfBoundsException");
         run("eval { $_ }");
         assertThat(errors).isEmpty();
         run("$_");
-        assertThat(errors).singleElement().asString().contains("$_ n'existe que dans un bloc");
+        assertThat(errors).singleElement().asString().contains("$_ only exists in a { } block");
     }
 
     @Test
     void blockSyntaxErrors() {
-        assertThatThrownBy(() -> interpreter.execute("eval { 1 + }")).hasMessageContaining("expression incomplète");
-        assertThatThrownBy(() -> interpreter.execute("eval { }")).hasMessageContaining("bloc vide");
-        assertThatThrownBy(() -> interpreter.execute("eval { $_.size = 1 }")).hasMessageContaining("utiliser ==");
-        assertThatThrownBy(() -> interpreter.execute("eval { 3x }")).hasMessageContaining("nombre invalide : 3x");
-        assertThatThrownBy(() -> interpreter.execute("eval { 'ab' }")).hasMessageContaining("apostrophes");
+        assertThatThrownBy(() -> interpreter.execute("eval { 1 + }")).hasMessageContaining("incomplete expression");
+        assertThatThrownBy(() -> interpreter.execute("eval { }")).hasMessageContaining("empty block");
+        assertThatThrownBy(() -> interpreter.execute("eval { $_.size = 1 }")).hasMessageContaining("use ==");
+        assertThatThrownBy(() -> interpreter.execute("eval { 3x }")).hasMessageContaining("invalid number: 3x");
+        assertThatThrownBy(() -> interpreter.execute("eval { 'ab' }")).hasMessageContaining("single quotes");
     }
 
     @Test
@@ -263,7 +263,7 @@ class PipelineTest {
         assumeFalse(Platform.isWindows());
         run("sh -c \"echo e1 >&2; echo a\" | sh -c \"cat; echo e2 >&2\" | filter { $_.nope } 2> err.txt");
         assertThat(Files.readAllLines(tmp.resolve("err.txt")))
-                .contains("e1", "e2").anyMatch(line -> line.contains("String n'a pas de propriété 'nope'"));
+                .contains("e1", "e2").anyMatch(line -> line.contains("String has no property 'nope'"));
         assertThat(errors).isEmpty();
     }
 

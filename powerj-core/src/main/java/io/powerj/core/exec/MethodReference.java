@@ -60,7 +60,8 @@ sealed interface MethodReference extends ScriptBlock {
             if (args.length > 0 && type.isInstance(args[0])) {
                 return JavaInvoker.invokeVirtual(args[0], method, all.subList(1, all.size()));
             }
-            throw new PjException(this + " : ne s'applique pas à " + describe(args));
+            throw new PjException(args.length == 0 ? Messages.get("methodref.notApplicable.none", this)
+                    : Messages.get("methodref.notApplicable", this, describe(args)));
         }
 
         private boolean hasStatic(int arity) {
@@ -84,7 +85,8 @@ sealed interface MethodReference extends ScriptBlock {
         @Override
         public Object apply(Object[] args) {
             if (args.length == 0 || args[0] == null || !hasType(args[0].getClass())) {
-                throw new PjException(this + " : " + typeName + " attendu, reçu " + describe(args));
+                throw new PjException(args.length == 0 ? Messages.get("methodref.typeExpected.none", this, typeName)
+                        : Messages.get("methodref.typeExpected", this, typeName, describe(args)));
             }
             List<Object> all = Arrays.asList(args);
             return JavaInvoker.invokeVirtual(args[0], method, all.subList(1, all.size()));
@@ -111,7 +113,6 @@ sealed interface MethodReference extends ScriptBlock {
     }
 
     private static String describe(Object[] args) {
-        return args.length == 0 ? "aucun argument"
-                : String.join(", ", Arrays.stream(args).map(JavaInvoker::typeName).toList());
+        return String.join(", ", Arrays.stream(args).map(JavaInvoker::typeName).toList());
     }
 }

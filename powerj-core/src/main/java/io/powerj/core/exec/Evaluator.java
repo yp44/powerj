@@ -143,10 +143,10 @@ final class Evaluator {
                 try {
                     return field.get(null);
                 } catch (IllegalAccessException e) {
-                    throw new PjException(PjError.of(type.getSimpleName() + "." + name + " inaccessible", e));
+                    throw new PjException(PjError.of(Messages.get("java.fieldInaccessible", type.getSimpleName(), name), e));
                 }
             }).or(() -> JavaClasses.nested(type, name).map(ClassRef::new)).orElseThrow(() ->
-                    new PjException(type.getSimpleName() + " n'a pas de champ statique " + name));
+                    new PjException(Messages.get("java.noStaticField", type.getSimpleName(), name)));
             case PackageRef(var prefix) -> {
                 String qualified = prefix + "." + name;
                 yield session.java().find(qualified).<Object>map(ClassRef::new).orElseGet(() -> new PackageRef(qualified));
@@ -165,12 +165,12 @@ final class Evaluator {
                     yield exit(args);
                 }
                 if (type == System.class && REFUSED_SYSTEM_METHODS.contains(method)) {
-                    throw new PjException("System." + method + " est refusé : il casserait l'affichage du shell");
+                    throw new PjException(Messages.get("java.systemRefused", method));
                 }
                 yield JavaInvoker.invokeStatic(type, method, args);
             }
             case PackageRef(var prefix) -> throw prefix.contains(".")
-                    ? new PjException("classe introuvable : " + prefix)
+                    ? new PjException(Messages.get("java.classNotFound", prefix))
                     : unknownName(prefix);
             case Runtime _ when method.equals("exit") || method.equals("halt") -> exit(args);
             case null, default -> JavaInvoker.invokeVirtual(target, method, args);
@@ -182,8 +182,8 @@ final class Evaluator {
         return switch (target) {
             case ClassRef(var type) -> new MethodReference.OfClass(type, method);
             case PackageRef(var name) when !name.contains(".") -> new MethodReference.ByTypeName(name, method);
-            case PackageRef(var name) -> throw new PjException("classe introuvable : " + name);
-            case null -> throw new PjException("référence de méthode ::" + method + " sur une valeur nulle");
+            case PackageRef(var name) -> throw new PjException(Messages.get("java.classNotFound", name));
+            case null -> throw new PjException(Messages.get("methodref.onNull", method));
             default -> new MethodReference.Bound(target, method);
         };
     }
@@ -191,22 +191,21 @@ final class Evaluator {
     /** {@code System.exit(n)} is equivalent to the command {@code exit n} (FR-58). */
     private Object exit(List<Object> args) {
         if (args.size() != 1 || !(args.getFirst() instanceof Integer code)) {
-            throw new PjException("exit : un code entier est attendu, ex. System.exit(0)");
+            throw new PjException(Messages.get("exit.integerExpected"));
         }
         session.requestExit(code);
         return null;
     }
 
     private static PjException unknownName(String name) {
-        return new PjException("« " + name + " » inconnu : ni une classe Java ni une commande ici"
-                + " (une variable s'écrit $" + name + ")");
+        return new PjException(Messages.get("name.unknown", name));
     }
 
     /** {@code [type] value}: explicit conversion (FR-50). */
     private static Object cast(Class<?> type, Object value) {
         if (value == null) {
             if (type.isPrimitive()) {
-                throw new PjException("conversion impossible de null en " + type.getName());
+                throw new PjException(Messages.get("java.conversionFailed", "null", type.getName()));
             }
             return null;
         }
@@ -229,8 +228,7 @@ final class Evaluator {
         if (JavaInvoker.cost(type, value) != JavaInvoker.NO_MATCH) {
             return JavaInvoker.convert(type, value);
         }
-        throw new PjException("conversion impossible : " + Operators.describe(value) + " n'est pas un "
-                + type.getSimpleName());
+        throw new PjException(Messages.get("cast.failed", Operators.describe(value), type.getSimpleName()));
     }
 
     // --- Variables and strings ---
@@ -238,7 +236,7 @@ final class Evaluator {
     private Object variable(String name) {
         if (name.equals("_")) {
             if (!CURRENT.isBound()) {
-                throw new PjException("$_ n'existe que dans un bloc { } appliqué aux objets d'un pipeline");
+                throw new PjException(Messages.get("variable.currentOutsideBlock"));
             }
             return CURRENT.get();
         }
@@ -270,7 +268,7 @@ final class Evaluator {
         if (index instanceof Integer || index instanceof Long || index instanceof Short || index instanceof Byte) {
             return PropertyAccess.index(target, ((Number) index).intValue());
         }
-        throw new PjException("index entier attendu, reçu " + Operators.describe(index));
+        throw new PjException(Messages.get("index.integerExpected", Operators.describe(index)));
     }
 
     /**

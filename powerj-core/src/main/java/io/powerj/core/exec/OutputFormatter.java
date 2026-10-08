@@ -12,11 +12,11 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 import io.powerj.api.Bytes;
 import io.powerj.api.Display;
+import io.powerj.api.Language;
 
 /**
  * Display of values (specification FR-30):
@@ -209,9 +209,12 @@ public final class OutputFormatter implements AutoCloseable {
 
     private void map(Map<?, ?> map) {
         endTable();
-        int keyWidth = Math.max(3, map.keySet().stream().mapToInt(k -> Values.text(k).length()).max().orElse(0));
-        out.println(("%-" + keyWidth + "s  %s").formatted("clé", "valeur"));
-        out.println(("%-" + keyWidth + "s  %s").formatted("---", "------"));
+        String key = Messages.get("table.key");
+        String value = Messages.get("table.value");
+        int keyWidth = Math.max(key.length(),
+                map.keySet().stream().mapToInt(k -> Values.text(k).length()).max().orElse(0));
+        out.println(("%-" + keyWidth + "s  %s").formatted(key, value));
+        out.println(("%-" + keyWidth + "s  %s").formatted("-".repeat(key.length()), "-".repeat(value.length())));
         map.forEach((k, v) -> out.println(("%-" + keyWidth + "s  %s").formatted(Values.text(k), cell(v, false))));
     }
 
@@ -263,7 +266,7 @@ public final class OutputFormatter implements AutoCloseable {
         };
     }
 
-    /** {@code 14 520} → {@code 14,2 KB} (multiples of 1024, locale's decimal separator). */
+    /** {@code 14 520} → {@code 14.2 KB} (multiples of 1024, decimal separator of the current {@link Language}). */
     static String humanBytes(long bytes) {
         if (bytes < 1024) {
             return bytes + " B";
@@ -275,6 +278,6 @@ public final class OutputFormatter implements AutoCloseable {
             value /= 1024;
             unit++;
         }
-        return String.format(Locale.getDefault(Locale.Category.FORMAT), "%.1f %s", value, units[unit]);
+        return String.format(Language.current(), "%.1f %s", value, units[unit]);
     }
 }

@@ -41,7 +41,7 @@ public final class NativeEncoding {
         try {
             return Charset.forName(value.strip());
         } catch (IllegalArgumentException _) {
-            throw new PjException("encodage inconnu '" + value.strip() + "' (variable " + source + ")");
+            throw new PjException(Messages.get("native.unknownEncoding", value.strip(), source));
         }
     }
 

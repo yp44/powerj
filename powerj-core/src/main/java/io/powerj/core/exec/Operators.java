@@ -50,7 +50,7 @@ final class Operators {
         if (value instanceof Boolean b) {
             return b;
         }
-        throw new PjException("« " + op.symbol() + " » attend un booléen, reçu " + describe(value));
+        throw new PjException(Messages.get("operator.booleanExpected", op.symbol(), describe(value)));
     }
 
     /** Value equality ({@code Objects.equals}); numbers compared by value ({@code 1 == 1L}). */
@@ -76,7 +76,7 @@ final class Operators {
                 && (left.getClass().isInstance(right) || right.getClass().isInstance(left))) {
             return comparable.compareTo(right);
         }
-        throw new PjException("« " + op.symbol() + " » impossible entre " + describe(left) + " et " + describe(right));
+        throw new PjException(Messages.get("operator.notBetween", op.symbol(), describe(left), describe(right)));
     }
 
     private static Object add(Object left, Object right) {
@@ -109,8 +109,7 @@ final class Operators {
         try {
             return temporal.plus(duration);
         } catch (DateTimeException e) {
-            throw new PjException(PjError.of("impossible d'ajouter une durée à " + describe(temporal)
-                    + " : " + e.getMessage(), e));
+            throw new PjException(PjError.of(Messages.get("operator.durationFailed", describe(temporal), e.getMessage()), e));
         }
     }
 
@@ -177,7 +176,7 @@ final class Operators {
                 default -> x % y;
             };
         } catch (ArithmeticException e) {
-            throw new PjException(PjError.of("calcul impossible : " + e.getMessage(), e));
+            throw new PjException(PjError.of(Messages.get("operator.arithmeticFailed", e.getMessage()), e));
         }
     }
 
@@ -222,11 +221,11 @@ final class Operators {
     }
 
     private static PjException unsupported(Operator op, Object operand) {
-        return new PjException("« " + op.symbol() + " » impossible sur " + describe(operand));
+        return new PjException(Messages.get("operator.notOn", op.symbol(), describe(operand)));
     }
 
     private static PjException unsupported(Operator op, Object left, Object right) {
-        return new PjException("« " + op.symbol() + " » impossible entre " + describe(left) + " et " + describe(right));
+        return new PjException(Messages.get("operator.notBetween", op.symbol(), describe(left), describe(right)));
     }
 
     /** {@code null}, or type and abbreviated value: {@code String "abc"}. */
