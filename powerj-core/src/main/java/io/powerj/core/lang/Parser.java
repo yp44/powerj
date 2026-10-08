@@ -97,7 +97,12 @@ public final class Parser {
                 throw new SyntaxException(stages.isEmpty() ? "commande attendue" : "commande attendue après « | »");
             }
             Body body = body();
-            if (!stages.isEmpty() && body instanceof Ast.ExpressionBody) {
+            if (!stages.isEmpty() && body instanceof Ast.ExpressionBody(var expression)) {
+                if (expression instanceof Ast.BlockExpression || expression instanceof Ast.Lambda
+                        || expression instanceof Ast.MethodRef) {
+                    throw new SyntaxException("un bloc seul n'est pas une étape de pipeline : écrire map { … } pour"
+                            + " transformer chaque objet, ou where { … } pour le filtrer");
+                }
                 throw new SyntaxException("une valeur ne peut être que la première étape d'un pipeline");
             }
             boolean errorsToOutput = false;

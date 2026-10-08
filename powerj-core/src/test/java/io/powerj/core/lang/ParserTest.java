@@ -72,6 +72,8 @@ class ParserTest {
         assertThatThrownBy(() -> Parser.parse("ls |")).hasMessageContaining("commande attendue après « | »");
         assertThatThrownBy(() -> Parser.parse("| ls")).hasMessageContaining("commande attendue");
         assertThatThrownBy(() -> Parser.parse("ls | $x")).hasMessageContaining("première étape");
+        assertThatThrownBy(() -> Parser.parse("ls | { e -> e.name }")).hasMessageContaining("écrire map { … }");
+        assertThatThrownBy(() -> Parser.parse("ls | { $_.name }")).hasMessageContaining("écrire map { … }");
         assertThatThrownBy(() -> Parser.parse("ls > f | where x")).hasMessageContaining("le placer à la fin");
         assertThatThrownBy(() -> Parser.parse("where }")).hasMessageContaining("« } » sans « { »");
         assertThatThrownBy(() -> Parser.parse("where { $_.x ")).hasMessageContaining("bloc non fermé");
