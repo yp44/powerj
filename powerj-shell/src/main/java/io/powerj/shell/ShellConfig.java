@@ -11,9 +11,9 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Réglages lus dans {@code config.properties} (spécification §8).
+ * Settings read from {@code config.properties} (specification §8).
  *
- * @param historySize nombre maximal d'entrées d'historique conservées
+ * @param historySize maximum number of history entries kept
  */
 public record ShellConfig(int historySize) {
 
@@ -32,7 +32,7 @@ public record ShellConfig(int historySize) {
         return new ShellConfig(DEFAULT_HISTORY_SIZE);
     }
 
-    /** Lit le fichier ; les valeurs absentes ou invalides prennent leur valeur par défaut. */
+    /** Reads the file; missing or invalid values take their default value. */
     public static ShellConfig load(Path file) {
         var props = new Properties();
         try (Reader in = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {

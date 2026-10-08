@@ -1,5 +1,5 @@
 /**
- * Shell interactif PowerJ : boucle de lecture, édition de ligne, historique, point d'entrée.
+ * PowerJ interactive shell: read loop, line editing, history, entry point.
  */
 module io.powerj.shell {
     requires io.powerj.core;

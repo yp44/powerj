@@ -7,27 +7,27 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Option d'un cmdlet, posée sur un composant du record de paramètres. Style Unix : {@code -r},
- * {@code --recurse}, {@code --filter *.java}, {@code --filter=*.java}. Un composant {@code boolean} est
- * un interrupteur sans valeur ; un composant {@code List} positionnel reçoit tous les arguments restants.
+ * Cmdlet option, placed on a component of the parameter record. Unix style: {@code -r},
+ * {@code --recurse}, {@code --filter *.java}, {@code --filter=*.java}. A {@code boolean} component is
+ * a switch without a value; a positional {@code List} component receives all remaining arguments.
  */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.RECORD_COMPONENT)
 public @interface Option {
 
-    /** Lettre de la forme courte ({@code -r}) ; aucune par défaut. */
+    /** Letter of the short form ({@code -r}); none by default. */
     char shortName() default '\0';
 
-    /** Nom de la forme longue ({@code --recurse}) ; par défaut, le nom du composant. */
+    /** Name of the long form ({@code --recurse}); by default, the component name. */
     String longName() default "";
 
-    /** Option obligatoire. */
+    /** Mandatory option. */
     boolean mandatory() default false;
 
-    /** Position ({@code >= 0}) si l'argument peut être donné sans nom d'option. */
+    /** Position ({@code >= 0}) if the argument can be given without an option name. */
     int position() default -1;
 
-    /** Description affichée par l'aide. */
+    /** Description displayed by the help. */
     String description() default "";
 }

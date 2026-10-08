@@ -14,11 +14,11 @@ import io.powerj.api.Option;
 import io.powerj.api.ScriptBlock;
 
 /**
- * {@code where} : ne laisse passer que les objets pour lesquels la condition est vraie (spécification FR-36).
+ * {@code where}: lets through only the objects for which the condition is true (specification FR-36).
  * <pre>
  * where { f -> f.size > 1mb && !f.dir }
  * where { $_.dir }
- * where size > 1mb                      # forme courte, équivaut à where { $_.size > 1mb }
+ * where size > 1mb                      # short form, equivalent to where { $_.size > 1mb }
  * </pre>
  */
 @CmdletInfo(name = "where", category = "Filtres", summary = "Filtre les objets du pipeline selon une condition",
@@ -27,7 +27,7 @@ import io.powerj.api.ScriptBlock;
                 "env | where { $_.name.startsWith(\"JAVA\") }"})
 public final class Where implements Cmdlet<Where.Params, Object, Object> {
 
-    /** Paramètres de {@code where}. */
+    /** Parameters of {@code where}. */
     public record Params(
             @Option(position = 0, mandatory = true,
                     description = "Condition booléenne : lambda { f -> … }, bloc { $_… }, ou forme courte : propriété opérateur valeur")
@@ -39,7 +39,7 @@ public final class Where implements Cmdlet<Where.Params, Object, Object> {
     private static final Pattern LITERAL = Pattern.compile(
             "-?\\d+(\\.\\d+)?(L|b|kb|mb|gb|tb|ms|s|m|h|d)?|true|false|null", Pattern.CASE_INSENSITIVE);
 
-    /** Condition de chaque exécution en cours : un même cmdlet peut servir dans plusieurs pipelines à la fois. */
+    /** Condition of each running execution: the same cmdlet can be used in several pipelines at once. */
     private final Map<Params, ScriptBlock> conditions = new ConcurrentHashMap<>();
 
     @Override
@@ -70,7 +70,7 @@ public final class Where implements Cmdlet<Where.Params, Object, Object> {
         conditions.remove(p);
     }
 
-    /** Bloc donné tel quel, ou bloc compilé depuis la forme courte. */
+    /** Block given as is, or block compiled from the short form. */
     static ScriptBlock condition(List<Object> words, CmdletContext<?> context) {
         if (words.size() == 1 && words.getFirst() instanceof ScriptBlock block) {
             return block;
@@ -86,7 +86,7 @@ public final class Where implements Cmdlet<Where.Params, Object, Object> {
                 + " (opérateurs : == != < <= > >=)");
     }
 
-    /** Valeur de la forme courte en texte d'expression : littéral tel quel, sinon chaîne entre guillemets. */
+    /** Short-form value as expression text: literal as is, otherwise a quoted string. */
     private static String value(Object value) {
         return switch (value) {
             case null -> "null";

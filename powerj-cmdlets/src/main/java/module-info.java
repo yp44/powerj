@@ -1,5 +1,5 @@
 /**
- * Cmdlets intégrés de PowerJ.
+ * Built-in PowerJ cmdlets.
  */
 module io.powerj.cmdlets {
     requires io.powerj.api;

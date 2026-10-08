@@ -5,7 +5,7 @@ import java.util.List;
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletProvider;
 
-/** Déclare les cmdlets du module (découvert par {@code ServiceLoader}). */
+/** Declares the module's cmdlets (discovered by {@code ServiceLoader}). */
 public final class GreetProvider implements CmdletProvider {
 
     @Override

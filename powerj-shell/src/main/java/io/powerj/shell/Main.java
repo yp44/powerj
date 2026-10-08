@@ -31,8 +31,8 @@ import io.powerj.core.exec.StandardInput;
 import io.powerj.core.exec.Supervisor;
 
 /**
- * Point d'entrée de {@code powerj.exe} : shell interactif sans argument ; {@code -c "ligne"} ou un fichier
- * {@code .pj} pour le mode non interactif ; {@code --debug} pour les détails des erreurs.
+ * Entry point of {@code powerj.exe}: interactive shell without arguments; {@code -c "ligne"} or a
+ * {@code .pj} file for non-interactive mode; {@code --debug} for error details.
  */
 public final class Main {
 
@@ -57,7 +57,7 @@ public final class Main {
         System.exit(runScript(rest));
     }
 
-    /** {@code powerj -c "ligne"} ou {@code powerj fichier.pj} (FR-04d). */
+    /** {@code powerj -c "ligne"} or {@code powerj fichier.pj} (FR-04d). */
     private static int runScript(List<String> args) {
         List<String> lines;
         if (args.getFirst().equals("-c")) {
@@ -109,7 +109,7 @@ public final class Main {
         }
     }
 
-    /** Largeur de la console ({@code COLUMNS}), 120 par défaut. */
+    /** Console width ({@code COLUMNS}), 120 by default. */
     private static int columns() {
         try {
             return Integer.parseInt(System.getenv().getOrDefault("COLUMNS", "120"));

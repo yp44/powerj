@@ -22,12 +22,12 @@ import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
 
-/** {@code ls} : liste des fichiers sous forme d'objets {@link FileEntry} (spécification FR-35). */
+/** {@code ls}: lists files as {@link FileEntry} objects (specification FR-35). */
 @CmdletInfo(name = "ls", category = "Fichiers", summary = "Liste les fichiers et dossiers",
         examples = {"ls", "ls -r --filter *.java", "ls C:\\Windows -d", "(ls).name", "$f = ls; $f[0].size"})
 public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
 
-    /** Paramètres de {@code ls}. */
+    /** Parameters of {@code ls}. */
     public record Params(
             @Option(position = 0, description = "Dossiers ou fichiers à lister (jokers * et ? acceptés) ; défaut : dossier courant")
             List<String> paths,
@@ -78,7 +78,7 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
         }
     }
 
-    /** {@code ls *.txt} ou {@code ls src/*.java} : joker sur le dernier élément du chemin. */
+    /** {@code ls *.txt} or {@code ls src/*.java}: wildcard on the last element of the path. */
     private void listWildcard(String argument, Params params, Optional<PathMatcher> filter,
                               CmdletContext<FileEntry> context) {
         int separator = Math.max(argument.lastIndexOf('/'), argument.lastIndexOf('\\'));

@@ -11,8 +11,8 @@ import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 
 /**
- * Journal de diagnostic dans {@code <home>/logs} (spécification FR-60) : rotation sur 5 fichiers.
- * Rien n'est écrit sur la console, sauf en mode {@code --debug}, pour ne pas perturber le terminal.
+ * Diagnostic log in {@code <home>/logs} (specification FR-60): rotation over 5 files.
+ * Nothing is written to the console, except in {@code --debug} mode, so as not to disturb the terminal.
  */
 final class DiagnosticLog {
 

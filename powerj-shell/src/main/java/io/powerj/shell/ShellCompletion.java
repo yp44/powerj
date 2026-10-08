@@ -17,13 +17,13 @@ import io.powerj.core.exec.Completions;
 import io.powerj.core.exec.Highlights;
 import io.powerj.core.exec.Interpreter;
 
-/** Complétion (Tab) et coloration de la saisie (spécification FR-08, FR-21 à FR-26), branchées sur JLine. */
+/** Completion (Tab) and input highlighting (specification FR-08, FR-21 to FR-26), plugged into JLine. */
 final class ShellCompletion {
 
     private ShellCompletion() {
     }
 
-    /** Propositions calculées par {@link ShellParser} au moment de découper la ligne. */
+    /** Suggestions computed by {@link ShellParser} when splitting the line. */
     static Completer completer() {
         return (reader, line, candidates) -> {
             if (line instanceof ShellParser.CompletionLine completion) {
@@ -36,7 +36,7 @@ final class ShellCompletion {
         };
     }
 
-    /** Coloration : cmdlet et commande interne en vert, natif en cyan, inconnu en rouge… (FR-08). */
+    /** Highlighting: cmdlet and built-in command in green, native in cyan, unknown in red… (FR-08). */
     static Highlighter highlighter(Interpreter interpreter) {
         return new Colors(interpreter);
     }
@@ -46,7 +46,7 @@ final class ShellCompletion {
         private static final long CACHE_MILLIS = 2_000;
 
         private final Interpreter interpreter;
-        /** Nature des noms de commande, mise en cache brièvement (la coloration suit chaque touche). */
+        /** Kind of each command name, cached briefly (highlighting follows every keystroke). */
         private final Map<String, Interpreter.CommandKind> kinds = new HashMap<>();
         private long cachedAt;
 

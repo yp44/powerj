@@ -10,7 +10,7 @@ import org.jline.reader.Reference;
 import org.jline.terminal.Terminal;
 import org.jline.utils.InfoCmp.Capability;
 
-/** Construit le lecteur de ligne JLine configuré pour PowerJ (spécification §3.2 et §3.3). */
+/** Builds the JLine line reader configured for PowerJ (specification §3.2 and §3.3). */
 final class ShellReader {
 
     static final String CONTINUATION_PROMPT = ">> ";
@@ -38,8 +38,8 @@ final class ShellReader {
     }
 
     /**
-     * ↑/↓ parcourent l'historique en ne gardant que les entrées qui commencent par le texte déjà saisi
-     * (FR-06) ; sur une saisie multi-ligne, ils se déplacent d'abord entre les lignes.
+     * ↑/↓ browse the history, keeping only the entries that start with the text already typed
+     * (FR-06); on multi-line input, they first move between lines.
      */
     private static void bindPrefixHistorySearch(LineReader reader, Terminal terminal) {
         KeyMap<org.jline.reader.Binding> main = reader.getKeyMaps().get(LineReader.MAIN);

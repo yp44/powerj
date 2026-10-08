@@ -1,5 +1,5 @@
 /**
- * Cœur de PowerJ : analyse, interprétation, exécution des commandes, interopérabilité Java.
+ * PowerJ core: parsing, interpretation, command execution, Java interoperability.
  */
 module io.powerj.core {
     requires transitive io.powerj.api;

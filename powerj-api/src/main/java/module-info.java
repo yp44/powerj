@@ -1,6 +1,6 @@
 /**
- * API publique de PowerJ pour écrire des cmdlets (spécification §4). C'est la seule dépendance
- * nécessaire à un module tiers.
+ * Public PowerJ API for writing cmdlets (specification §4). It is the only dependency
+ * a third-party module needs.
  */
 module io.powerj.api {
     exports io.powerj.api;

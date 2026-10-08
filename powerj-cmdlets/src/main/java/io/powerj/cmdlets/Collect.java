@@ -12,9 +12,9 @@ import io.powerj.api.CmdletInfo;
 import io.powerj.api.Collected;
 
 /**
- * {@code collect} : rassemble tous les objets reçus en une seule liste (spécification FR-36d), comme
- * {@code Stream.toList()}. La liste est toujours une liste, même vide ou d'un seul élément, et l'étape
- * suivante la reçoit entière ({@link Collected} n'est pas déroulée).
+ * {@code collect}: gathers all received objects into a single list (specification FR-36d), like
+ * {@code Stream.toList()}. The list is always a list, even when empty or with a single element, and the next
+ * stage receives it whole ({@link Collected} is not unrolled).
  * <pre>
  * (ls -r | where { f -> !f.dir } | collect).size()
  * ls -r | collect | map { l -> l.stream().sorted((a, b) -> Long.compare(b.size, a.size)).limit(5).toList() }
@@ -25,11 +25,11 @@ import io.powerj.api.Collected;
                 "ls -r | collect | map { l -> l.stream().sorted((a, b) -> Long.compare(b.size, a.size)).limit(5).toList() }"})
 public final class Collect implements Cmdlet<Collect.Params, Object, Collected> {
 
-    /** {@code collect} n'a pas d'option. */
+    /** {@code collect} has no options. */
     public record Params() {
     }
 
-    /** Objets reçus, par exécution (le contexte est propre à chaque exécution ; libéré si elle est annulée). */
+    /** Received objects, per execution (the context is specific to each execution; released if it is cancelled). */
     private final Map<CmdletContext<?>, List<Object>> received = Collections.synchronizedMap(new WeakHashMap<>());
 
     @Override

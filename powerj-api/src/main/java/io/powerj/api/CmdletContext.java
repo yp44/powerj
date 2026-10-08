@@ -5,38 +5,38 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Ce que le shell met à disposition d'un cmdlet pendant son exécution.
+ * What the shell makes available to a cmdlet while it runs.
  *
- * @param <O> type des objets produits
+ * @param <O> type of the produced objects
  */
 public interface CmdletContext<O> {
 
     /**
-     * Écrit un objet sur le flux de sortie. Si l'utilisateur a demandé l'annulation (Ctrl+C), lève
-     * une exception qui arrête proprement le cmdlet.
+     * Writes an object to the output stream. If the user requested cancellation (Ctrl+C), throws
+     * an exception that cleanly stops the cmdlet.
      */
     void emit(O value);
 
-    /** Signale une erreur non bloquante : le cmdlet continue (selon l'option commune {@code --on-error}). */
+    /** Reports a non-blocking error: the cmdlet continues (depending on the common option {@code --on-error}). */
     void error(String message);
 
-    /** Répertoire courant de la session, base des chemins relatifs. */
+    /** Current directory of the session, base for relative paths. */
     Path currentDirectory();
 
-    /** Environnement de la session (modifiable), transmis aux commandes natives lancées ensuite. */
+    /** Environment of the session (modifiable), passed on to native commands launched afterwards. */
     Map<String, String> environment();
 
-    /** Valeur d'une variable de la session. */
+    /** Value of a session variable. */
     Optional<Object> variable(String name);
 
-    /** {@code true} si l'utilisateur a demandé l'annulation (Ctrl+C). */
+    /** {@code true} if the user requested cancellation (Ctrl+C). */
     boolean cancelled();
 
     /**
-     * Compile une expression PowerJ en bloc, comme si elle avait été saisie entre accolades.
-     * Ex. {@code compile("$_.size > 10kb")}.
+     * Compiles a PowerJ expression into a block, as if it had been typed between braces.
+     * E.g. {@code compile("$_.size > 10kb")}.
      *
-     * @throws IllegalArgumentException si l'expression est syntaxiquement invalide
+     * @throws IllegalArgumentException if the expression is syntactically invalid
      */
     ScriptBlock compile(String expression);
 }

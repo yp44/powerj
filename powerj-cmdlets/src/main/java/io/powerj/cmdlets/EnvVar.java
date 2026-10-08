@@ -3,10 +3,10 @@ package io.powerj.cmdlets;
 import java.util.Objects;
 
 /**
- * Variable d'environnement de la session (spécification FR-36b).
+ * Session environment variable (specification FR-36b).
  *
- * @param name  nom
- * @param value valeur
+ * @param name  name
+ * @param value value
  */
 public record EnvVar(String name, String value) {
 

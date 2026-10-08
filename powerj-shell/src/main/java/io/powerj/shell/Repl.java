@@ -26,8 +26,8 @@ import io.powerj.core.exec.Supervisor;
 import io.powerj.core.exec.Values;
 
 /**
- * Boucle de lecture-exécution du shell : lit une ligne avec JLine (historique, Ctrl+R…), l'exécute
- * sous {@link Supervisor} et affiche le résultat. Ne laisse jamais échapper d'exception.
+ * Read-execute loop of the shell: reads a line with JLine (history, Ctrl+R…), executes it
+ * under {@link Supervisor} and displays the result. Never lets an exception escape.
  */
 public final class Repl {
 
@@ -61,15 +61,15 @@ public final class Repl {
         terminal.handle(Terminal.Signal.INT, _ -> supervisor.cancel());
     }
 
-    /** Charge les modules tiers (§4.4) ; les avertissements sont affichés sous la bannière. */
+    /** Loads third-party modules (§4.4); warnings are displayed below the banner. */
     public void loadModules(java.nio.file.Path dir) {
         moduleWarnings = interpreter.loadModules(dir);
     }
 
     /**
-     * Exécute la boucle jusqu'à {@code exit} ou Ctrl+D sur une ligne vide.
+     * Runs the loop until {@code exit} or Ctrl+D on an empty line.
      *
-     * @return le code retour du shell
+     * @return the shell's exit code
      */
     public int run(BuildInfo buildInfo) {
         out.println(buildInfo.banner());
@@ -110,7 +110,7 @@ public final class Repl {
         return List.of();
     }
 
-    /** {@code history} (liste numérotée, numéros réutilisables avec {@code !n}) ou {@code history --clear}. */
+    /** {@code history} (numbered list, numbers reusable with {@code !n}) or {@code history --clear}. */
     private List<Object> history(List<Object> args, Session ignored) throws Exception {
         if (args.equals(List.of("--clear"))) {
             reader.getHistory().purge();
@@ -127,7 +127,7 @@ public final class Repl {
         return lines;
     }
 
-    /** Ligne du flux d'erreur PowerJ, en rouge sur un terminal qui gère les couleurs. */
+    /** Line of the PowerJ error stream, in red on a terminal that supports colors. */
     private void printError(String message) {
         synchronized (out) {
             out.println(new AttributedString(message, AttributedStyle.DEFAULT.foreground(AttributedStyle.RED))

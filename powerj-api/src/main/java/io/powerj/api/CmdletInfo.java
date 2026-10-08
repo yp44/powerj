@@ -6,21 +6,21 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/** Décrit un cmdlet : son nom (seul et unique, court, en minuscules) et sa documentation. */
+/** Describes a cmdlet: its name (single and unique, short, lowercase) and its documentation. */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
 public @interface CmdletInfo {
 
-    /** Nom de la commande, ex. {@code ls}. */
+    /** Command name, e.g. {@code ls}. */
     String name();
 
-    /** Catégorie dans {@code help}. */
+    /** Category in {@code help}. */
     String category() default "Divers";
 
-    /** Résumé d'une ligne. */
+    /** One-line summary. */
     String summary();
 
-    /** Exemples affichés par {@code help <nom>}. */
+    /** Examples displayed by {@code help <nom>}. */
     String[] examples() default {};
 }

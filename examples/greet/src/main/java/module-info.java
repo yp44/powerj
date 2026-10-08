@@ -1,5 +1,5 @@
 /**
- * Module tiers d'exemple pour PowerJ (spécification §4.3) : le cmdlet {@code greet}.
+ * Example third-party module for PowerJ (specification §4.3): the {@code greet} cmdlet.
  */
 module com.example.greet {
     requires io.powerj.api;

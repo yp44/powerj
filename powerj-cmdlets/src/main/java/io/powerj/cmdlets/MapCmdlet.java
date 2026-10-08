@@ -9,19 +9,19 @@ import io.powerj.api.Option;
 import io.powerj.api.ScriptBlock;
 
 /**
- * {@code map} : transforme chaque objet du pipeline, comme {@code Stream.map} (spécification FR-36c).
+ * {@code map}: transforms each object of the pipeline, like {@code Stream.map} (specification FR-36c).
  * <pre>
  * ls -r | map { f -> f.name + " : " + f.name.length() }
  * ls | map FileEntry::name
  * </pre>
- * Un résultat {@code null} n'émet rien ; une collection est déroulée par le pipeline.
+ * A {@code null} result emits nothing; a collection is unrolled by the pipeline.
  */
 @CmdletInfo(name = "map", category = "Filtres", summary = "Transforme chaque objet du pipeline par une lambda",
         examples = {"ls -r | map { f -> f.name + \" : \" + f.name.length() }", "ls | map FileEntry::name",
                 "ls | map { $_.name.toUpperCase() }", "env | map EnvVar::name"})
 public final class MapCmdlet implements Cmdlet<MapCmdlet.Params, Object, Object> {
 
-    /** Paramètres de {@code map}. */
+    /** Parameters of {@code map}. */
     public record Params(
             @Option(position = 0, mandatory = true,
                     description = "Transformation : lambda { f -> … }, bloc { $_… } ou référence de méthode Type::méthode")
