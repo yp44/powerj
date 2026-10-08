@@ -25,27 +25,27 @@ import io.powerj.core.lang.Ast;
 import io.powerj.core.lang.ExpressionParser;
 
 /**
- * Complétion par Tab (spécification FR-21 à FR-25, FR-24b) : commandes, options et valeurs des cmdlets,
- * chemins, variables, membres des objets et API Java. Ne lance aucune commande et n'appelle aucune méthode :
- * les types sont déduits des variables, des types de sortie des cmdlets et des signatures Java.
+ * Tab completion (specification FR-21 to FR-25, FR-24b): commands, cmdlet options and values,
+ * paths, variables, object members and Java API. Runs no command and calls no method:
+ * types are inferred from variables, cmdlet output types and Java signatures.
  */
 public final class Completions {
 
     /**
-     * Proposition.
+     * Suggestion.
      *
-     * @param value       texte inséré (préfixé par le mot en cours)
-     * @param display     texte affiché dans le menu
-     * @param description précision affichée à côté (synopsis, type)
-     * @param complete    {@code true} si le mot est terminé (un espace suit)
+     * @param value       inserted text (prefixed by the current word)
+     * @param display     text shown in the menu
+     * @param description detail shown next to it (synopsis, type)
+     * @param complete    {@code true} if the word is finished (a space follows)
      */
     public record Candidate(String value, String display, String description, boolean complete) { }
 
     /**
-     * Résultat.
+     * Result.
      *
-     * @param start position du début du texte remplacé
-     * @param word  texte que les propositions prolongent (sans guillemets pour un chemin entre guillemets)
+     * @param start start position of the replaced text
+     * @param word  text that the suggestions extend (without quotes for a quoted path)
      */
     public record Result(int start, String word, List<Candidate> candidates) {
         static Result none(int cursor) {
@@ -72,7 +72,7 @@ public final class Completions {
         this.natives = natives;
     }
 
-    /** Prépare en tâche de fond l'index des classes importées par défaut. */
+    /** Prepares, in the background, the index of the classes imported by default. */
     public void warmUp() {
         index.warmUp(JavaClasses.DEFAULT_IMPORTS);
     }
@@ -85,7 +85,7 @@ public final class Completions {
 
     private enum FrameKind { COMMAND, BLOCK, EXPRESSION }
 
-    /** Niveau d'imbrication au curseur : commande, bloc { }, ou parenthèses d'expression. */
+    /** Nesting level at the cursor: command, block { }, or expression parentheses. */
     private static final class Frame {
         final FrameKind kind;
         final int start;
@@ -104,7 +104,7 @@ public final class Completions {
         }
     }
 
-    /** Contexte au curseur. */
+    /** Context at the cursor. */
     private record Context(Frame frame, boolean inString, int stringStart) { }
 
     private static Context analyze(String line, int cursor) {
@@ -161,7 +161,7 @@ public final class Completions {
         return new Context(frame, false, -1);
     }
 
-    /** Fin (exclue) de la chaîne ouverte en {@code open}, ou -1 si elle n'est pas fermée avant {@code limit}. */
+    /** End (exclusive) of the string opened at {@code open}, or -1 if it is not closed before {@code limit}. */
     private static int stringEnd(String line, int open, int limit) {
         int i = open + 1;
         while (i < limit) {
@@ -179,7 +179,7 @@ public final class Completions {
 
     // --- Point d'entrée ---
 
-    /** Propositions pour le mot qui se termine au curseur. */
+    /** Suggestions for the word that ends at the cursor. */
     public Result complete(String line, int cursor) {
         try {
             return doComplete(line, Math.min(cursor, line.length()));
@@ -245,7 +245,7 @@ public final class Completions {
         return Character.isLetterOrDigit(c) || c == '_';
     }
 
-    /** L'étape en cours est-elle une expression ({@code new java.io.F}, {@code Math.max(…)}) et non une commande ? */
+    /** Is the current stage an expression ({@code new java.io.F}, {@code Math.max(…)}) rather than a command? */
     private boolean isExpressionStage(String line, Frame frame, int at) {
         int start = frame.stageStart();
         while (start < at && io.powerj.core.lang.Lexer.isBlank(line.charAt(start))) {
@@ -258,19 +258,19 @@ public final class Completions {
         return start < at && io.powerj.core.lang.Lexer.expressionAt(line, start, session().java()::isStaticReference);
     }
 
-    /** Le mot qui commence en {@code at} est-il le premier de son étape (nom de commande) ? */
+    /** Is the word starting at {@code at} the first one of its stage (command name)? */
     private static boolean isHead(String line, Frame frame, int at) {
         String before = line.substring(frame.stageStart(), at).strip();
         return before.isEmpty() || before.equals("^") || before.matches("\\$[\\p{L}_][\\p{L}\\p{N}_]*\\s*=");
     }
 
-    /** En argument de commande, {@code x.} n'est une expression que pour une variable, un appel ou une classe. */
+    /** As a command argument, {@code x.} is an expression only for a variable, a call or a class. */
     private boolean isExpressionReceiver(String receiver) {
         return receiver.startsWith("$") || receiver.endsWith(")") || receiver.endsWith("]")
                 || session().java().find(receiver).isPresent();
     }
 
-    /** Texte de l'expression qui précède le point (ou {@code ::}) en {@code dot}. */
+    /** Text of the expression preceding the dot (or {@code ::}) at {@code dot}. */
     private static String receiverText(String line, int dot) {
         int i = dot;
         while (i > 0) {
@@ -393,7 +393,7 @@ public final class Completions {
         return spec.isList() && spec.component().getGenericType().getTypeName().contains("Path");
     }
 
-    /** Options du cmdlet, sans celles déjà saisies (FR-22). */
+    /** Options of the cmdlet, excluding those already typed (FR-22). */
     private static List<Candidate> options(List<OptionBinder.OptionSpec> specs, List<String> words) {
         List<Candidate> candidates = new ArrayList<>();
         for (var spec : specs) {
@@ -415,7 +415,7 @@ public final class Completions {
         return candidates;
     }
 
-    /** Option qui attend une valeur, désignée par le dernier mot saisi ({@code --filter}, {@code -f}). */
+    /** Option expecting a value, designated by the last typed word ({@code --filter}, {@code -f}). */
     private static Optional<OptionBinder.OptionSpec> valueOf(List<OptionBinder.OptionSpec> specs, String word) {
         for (var spec : specs) {
             if (spec.isFlag()) {
@@ -429,7 +429,7 @@ public final class Completions {
         return Optional.empty();
     }
 
-    /** Valeurs d'une option selon son type (FR-23) : constantes d'une enum, chemins. */
+    /** Values of an option according to its type (FR-23): enum constants, paths. */
     private Result optionValues(OptionBinder.OptionSpec spec, String line, int start, int cursor) {
         Class<?> type = spec.component().getType();
         if (type.isEnum()) {
@@ -468,7 +468,7 @@ public final class Completions {
 
     // --- Chemins ---
 
-    /** Chemins de fichiers pour le mot qui commence en {@code start} (éventuellement entre guillemets). */
+    /** File paths for the word starting at {@code start} (possibly quoted). */
     private Result paths(String line, int start, int cursor) {
         String raw = line.substring(start, cursor);
         boolean quoted = raw.startsWith("\"");
@@ -546,7 +546,7 @@ public final class Completions {
         return new Result(start, word, candidates);
     }
 
-    /** Dans une expression : paramètres de lambda, classes importées, mots-clés. */
+    /** In an expression: lambda parameters, imported classes, keywords. */
     private Result identifiers(String line, Frame frame, int start, String fragment) {
         List<Candidate> candidates = new ArrayList<>();
         Scope scope = scope(line, frame);
@@ -563,7 +563,7 @@ public final class Completions {
         return new Result(start, fragment, candidates);
     }
 
-    /** Noms simples des classes importées (imports par défaut et {@code import}). */
+    /** Simple names of the imported classes (default imports and {@code import}). */
     private List<String> importedClasses() {
         TreeSet<String> names = new TreeSet<>();
         for (String imported : session().java().imports()) {
@@ -578,11 +578,11 @@ public final class Completions {
 
     // --- Types ---
 
-    /** Ce que désigne une expression, déduit sans l'exécuter. */
+    /** What an expression denotes, inferred without executing it. */
     private sealed interface TypeInfo {
         record Instance(Class<?> type, Object value) implements TypeInfo { }
 
-        /** Liste dont on connaît le type des éléments ({@code (ls)}). */
+        /** List whose element type is known ({@code (ls)}). */
         record ListOf(Class<?> element) implements TypeInfo { }
 
         record Static(Class<?> type) implements TypeInfo { }
@@ -592,7 +592,7 @@ public final class Completions {
         record Unknown() implements TypeInfo { }
     }
 
-    /** Types connus dans un bloc : {@code $_} et paramètres de lambda. */
+    /** Types known in a block: {@code $_} and lambda parameters. */
     private record Scope(Class<?> current, Map<String, Class<?>> parameters) { }
 
     private Scope scope(String line, Frame frame) {
@@ -614,7 +614,7 @@ public final class Completions {
         return new Scope(current, parameters);
     }
 
-    /** Type des objets reçus par l'étape en cours : sortie du cmdlet précédent (FR-24). */
+    /** Type of the objects received by the current stage: output of the previous cmdlet (FR-24). */
     private Class<?> upstreamType(String line, Frame command) {
         List<Integer> starts = command.stageStarts;
         for (int k = starts.size() - 2; k >= 0; k--) {
@@ -697,7 +697,7 @@ public final class Completions {
         }
     }
 
-    /** {@code (ls)} : liste des sorties du dernier cmdlet du pipeline. */
+    /** {@code (ls)}: list of the outputs of the last cmdlet of the pipeline. */
     private TypeInfo pipelineType(Ast.Pipeline pipeline) {
         if (pipeline.stages().getLast().body() instanceof Ast.Command(var name, var forceNative, _)) {
             if (forceNative) {
@@ -777,7 +777,7 @@ public final class Completions {
         return elementOf(target, null);
     }
 
-    /** Élément d'une liste, d'un tableau ({@code $f[0]}) ou cible d'un {@code *.}. */
+    /** Element of a list, of an array ({@code $f[0]}) or target of a {@code *.}. */
     private static TypeInfo elementOf(TypeInfo target, Ast.Expression index) {
         return switch (target) {
             case TypeInfo.ListOf(var element) -> instance(element);
@@ -810,7 +810,7 @@ public final class Completions {
         };
     }
 
-    /** Propriétés (composants, getters, champs) et méthodes d'instance, avec leur signature (FR-24b). */
+    /** Properties (components, getters, fields) and instance methods, with their signature (FR-24b). */
     private static List<Candidate> instanceMembers(Class<?> type) {
         List<Candidate> candidates = new ArrayList<>();
         for (Members.Member m : Members.ofType(type)) {
@@ -865,7 +865,7 @@ public final class Completions {
                 "méthode", false);
     }
 
-    /** Sous-packages et classes d'un package ({@code java.util.} → {@code List}, {@code concurrent}…). */
+    /** Subpackages and classes of a package ({@code java.util.} → {@code List}, {@code concurrent}…). */
     private List<Candidate> packageMembers(String pkg) {
         List<Candidate> candidates = new ArrayList<>();
         TreeSet<String> subpackages = new TreeSet<>();
@@ -879,7 +879,7 @@ public final class Completions {
         return candidates;
     }
 
-    /** Après {@code Classe::} ou {@code $x::} : noms de méthodes (et {@code new} pour une classe). */
+    /** After {@code Classe::} or {@code $x::}: method names (and {@code new} for a class). */
     private static List<Candidate> methodReferences(TypeInfo type) {
         TreeSet<String> names = new TreeSet<>();
         switch (type) {

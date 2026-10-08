@@ -8,10 +8,10 @@ import java.util.TreeMap;
 
 import io.powerj.api.CmdletInfo;
 
-/** Aide générée à partir des métadonnées des cmdlets (spécification FR-29, FR-45). */
+/** Help generated from cmdlet metadata (specification FR-29, FR-45). */
 final class Help {
 
-    /** Commandes internes : nom → (usage, description). */
+    /** Built-in commands: name → (usage, description). */
     private static final Map<String, String[]> BUILTINS = new LinkedHashMap<>();
 
     static {
@@ -69,7 +69,7 @@ final class Help {
         throw new PjException("help : commande ou classe inconnue : " + name);
     }
 
-    /** Constructeurs, méthodes statiques et d'instance, champs publics d'une classe Java (FR-54). */
+    /** Constructors, static and instance methods, public fields of a Java class (FR-54). */
     static List<Object> javaClass(Class<?> type) {
         List<Object> lines = new ArrayList<>();
         String kind = type.isAnnotation() ? "annotation" : type.isInterface() ? "interface" : type.isEnum() ? "enum"

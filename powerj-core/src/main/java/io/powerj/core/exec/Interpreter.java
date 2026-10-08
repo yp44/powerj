@@ -22,17 +22,17 @@ import io.powerj.core.lang.SyntaxException;
 import io.powerj.core.lang.Token;
 
 /**
- * Exécute une ligne : instructions enchaînées par {@code ;}, {@code &&}, {@code ||} (FR-04c), pipelines
- * {@code |}, commandes internes, cmdlets, commandes natives, expressions, affectations et redirections. Ordre de résolution
- * d'une commande (FR-13) : commande interne, cmdlet, programme du {@code PATH} ; {@code ^nom} force le
- * programme.
+ * Executes a line: statements chained by {@code ;}, {@code &&}, {@code ||} (FR-04c), pipelines
+ * {@code |}, built-in commands, cmdlets, native commands, expressions, assignments and redirections. Resolution order
+ * of a command (FR-13): built-in command, cmdlet, program on the {@code PATH}; {@code ^nom} forces the
+ * program.
  */
 public final class Interpreter {
 
-    /** Largeur des tableaux écrits dans un fichier : pas de troncature. */
+    /** Width of the tables written to a file: no truncation. */
     private static final int FILE_WIDTH = 10_000;
 
-    /** Attente maximale de l'arrêt des étapes d'un pipeline annulé. */
+    /** Maximum wait for the stages of a cancelled pipeline to stop. */
     private static final int JOIN_SECONDS = 5;
 
     private final Session session;
@@ -43,14 +43,14 @@ public final class Interpreter {
     private final CommandResolver resolver;
     private final NativeRunner nativeRunner;
     private final Evaluator evaluator;
-    /** Lignes de l'entrée standard en mode non interactif, lues par la première étape ; sinon {@code null}. */
+    /** Standard input lines in non-interactive mode, read by the first stage; otherwise {@code null}. */
     private Source standardInput;
     private boolean inheritStandardInput;
-    /** Une erreur bloquante a eu lieu pendant la dernière ligne (mode non interactif : arrêt du script). */
+    /** A blocking error occurred during the last line (non-interactive mode: the script stops). */
     private volatile boolean blockingError;
 
     /**
-     * @param extraBuiltins commandes internes fournies par le shell (ex. {@code history})
+     * @param extraBuiltins built-in commands provided by the shell (e.g. {@code history})
      */
     public Interpreter(Session session, ShellIo io, Map<String, Builtin> extraBuiltins, CmdletRegistry registry) {
         this(session, io, extraBuiltins, registry, new CommandResolver(), new NativeRunner());
@@ -77,15 +77,15 @@ public final class Interpreter {
     }
 
     /**
-     * Charge les modules tiers du dossier (au démarrage, §4.4).
+     * Loads the third-party modules from the directory (at startup, §4.4).
      *
-     * @return avertissements à afficher (module invalide, nom en conflit)
+     * @return warnings to display (invalid module, conflicting name)
      */
     public List<String> loadModules(Path dir) {
         return modules.loadAll(dir).stream().flatMap(r -> r.warnings().stream()).toList();
     }
 
-    /** {@code mod-load <chemin.jar>} : charge un module à chaud. */
+    /** {@code mod-load <chemin.jar>}: loads a module at runtime. */
     private List<Object> modLoad(List<Object> args, Session session) {
         if (args.isEmpty()) {
             throw new PjException("mod-load : chemin d'un module (.jar ou dossier) attendu");
@@ -106,7 +106,7 @@ public final class Interpreter {
         return loaded;
     }
 
-    /** {@code mod-list} : modules chargés et leurs cmdlets. */
+    /** {@code mod-list}: loaded modules and their cmdlets. */
     private List<Object> modList(List<Object> args, Session session) {
         if (!args.isEmpty()) {
             throw new PjException("mod-list : aucun argument attendu");
@@ -122,15 +122,15 @@ public final class Interpreter {
         return registry;
     }
 
-    /** Nature d'une commande, pour la coloration et la complétion (FR-08, FR-21). */
+    /** Kind of a command, for highlighting and completion (FR-08, FR-21). */
     public enum CommandKind { BUILTIN, CMDLET, NATIVE, UNKNOWN }
 
-    /** Noms des commandes internes. */
+    /** Names of the built-in commands. */
     public java.util.Set<String> builtinNames() {
         return java.util.Collections.unmodifiableSet(builtins.keySet());
     }
 
-    /** Résout un nom de commande comme le ferait l'exécution (FR-13), sans rien lancer. */
+    /** Resolves a command name as execution would (FR-13), without launching anything. */
     public CommandKind commandKind(String name) {
         boolean forceNative = name.startsWith("^");
         String bare = forceNative ? name.substring(1) : name;
@@ -144,8 +144,8 @@ public final class Interpreter {
     }
 
     /**
-     * Mode non interactif (FR-04d) : les lignes de l'entrée standard alimentent la première étape qui lit des
-     * objets, et les commandes natives en tête de pipeline lisent directement l'entrée standard.
+     * Non-interactive mode (FR-04d): the standard input lines feed the first stage that reads
+     * objects, and native commands at the head of the pipeline read standard input directly.
      */
     public void useStandardInput(java.util.Iterator<String> lines) {
         this.standardInput = Source.of(lines);
@@ -153,10 +153,10 @@ public final class Interpreter {
     }
 
     /**
-     * Exécute la ligne. Une erreur dans une instruction est affichée et compte comme un échec (pour
-     * {@code &&} / {@code ||}) ; une erreur de syntaxe empêche toute exécution.
+     * Executes the line. An error in a statement is displayed and counts as a failure (for
+     * {@code &&} / {@code ||}); a syntax error prevents any execution.
      *
-     * @throws InterruptedException si la ligne a été annulée par Ctrl+C
+     * @throws InterruptedException if the line was cancelled by Ctrl+C
      */
     public void execute(String line) throws InterruptedException {
         blockingError = false;
@@ -202,32 +202,32 @@ public final class Interpreter {
         }
     }
 
-    /** {@code true} si la dernière ligne exécutée a rencontré une erreur bloquante (pas seulement un échec). */
+    /** {@code true} if the last executed line hit a blocking error (not just a failure). */
     public boolean hadBlockingError() {
         return blockingError;
     }
 
-    /** Étape préparée : arguments évalués, commande résolue. */
+    /** Prepared stage: arguments evaluated, command resolved. */
     private sealed interface Prepared { }
 
-    /** Étape qui produit des objets (valeur, commande interne, cmdlet). */
+    /** Stage that produces objects (value, built-in command, cmdlet). */
     private record ObjectStep(ObjectStage stage) implements Prepared { }
 
-    /** Étape native. */
+    /** Native stage. */
     private record NativeStep(NativeRunner.Command command) implements Prepared { }
 
     @FunctionalInterface
     private interface ObjectStage {
         /**
-         * @param input  objets reçus, ou {@code null} en première étape
-         * @param output reçoit les objets produits
-         * @param errors reçoit les erreurs non bloquantes
-         * @return succès
+         * @param input  received objects, or {@code null} for the first stage
+         * @param output receives the produced objects
+         * @param errors receives the non-blocking errors
+         * @return success
          */
         boolean run(Source input, Consumer<Object> output, Consumer<String> errors) throws Exception;
     }
 
-    /** Suite d'étapes exécutée par un même fil : une étape objet, ou des natives consécutives. */
+    /** Sequence of stages run by the same thread: an object stage, or consecutive native ones. */
     private sealed interface Segment { }
 
     private record ObjectSegment(ObjectStage stage) implements Segment { }
@@ -235,13 +235,13 @@ public final class Interpreter {
     private record NativeSegment(List<NativeRunner.Command> commands) implements Segment { }
 
     /**
-     * Exécute un pipeline en envoyant chaque valeur produite par la dernière étape à {@code sink}. Les étapes
-     * s'exécutent en parallèle (fils virtuels), reliées par des files bornées ; la dernière s'exécute dans le
-     * fil appelant, qui reçoit l'interruption de Ctrl+C.
+     * Runs a pipeline, sending each value produced by the last stage to {@code sink}. The stages
+     * run in parallel (virtual threads), connected by bounded queues; the last one runs in the
+     * calling thread, which receives the Ctrl+C interruption.
      *
-     * @param capture {@code true} si les valeurs sont capturées (affectation, sous-expression) : la sortie
-     *                d'une commande native est alors lue en lignes au lieu d'être affichée
-     * @return succès : celui de la dernière étape, et aucune erreur bloquante dans les autres
+     * @param capture {@code true} if the values are captured (assignment, subexpression): the output
+     *                of a native command is then read as lines instead of being displayed
+     * @return success: that of the last stage, and no blocking error in the others
      */
     private boolean pipeline(Ast.Pipeline pipeline, Consumer<Object> sink, boolean capture,
                              Optional<NativeRunner.FileTarget> outTarget, Optional<NativeRunner.FileTarget> errTarget)
@@ -311,7 +311,7 @@ public final class Interpreter {
         return succeeded && !blockingErrors.get();
     }
 
-    /** Exécute un segment ; {@code output} est la file vers l'étape suivante, ou {@code null} en fin de pipeline. */
+    /** Runs a segment; {@code output} is the queue to the next stage, or {@code null} at the end of the pipeline. */
     private boolean segment(Segment segment, Source input, Pipe output, Consumer<Object> sink, boolean capture,
                             Optional<NativeRunner.FileTarget> outTarget, Optional<NativeRunner.FileTarget> errTarget,
                             Consumer<String> errors) throws InterruptedException {
@@ -336,7 +336,7 @@ public final class Interpreter {
         };
     }
 
-    /** Résout les étapes et regroupe les commandes natives consécutives. */
+    /** Resolves the stages and groups consecutive native commands. */
     private List<Segment> segments(List<Ast.Stage> stages) throws InterruptedException {
         List<Segment> segments = new ArrayList<>();
         List<NativeRunner.Command> natives = new ArrayList<>();
@@ -359,11 +359,11 @@ public final class Interpreter {
     }
 
     /**
-     * Prépare une étape : évalue ses arguments et résout la commande (FR-13 : commande interne, cmdlet,
-     * programme du {@code PATH}).
+     * Prepares a stage: evaluates its arguments and resolves the command (FR-13: built-in command, cmdlet,
+     * program on the {@code PATH}).
      *
-     * @param index    position dans le pipeline : au-delà de la première, l'étape doit lire des objets
-     * @param followed une étape suit celle-ci
+     * @param index    position in the pipeline: beyond the first, the stage must read objects
+     * @param followed another stage follows this one
      */
     private Prepared prepare(Ast.Stage stage, int index, boolean followed) throws InterruptedException {
         if (stage.body() instanceof Ast.ExpressionBody(var expression)) {
@@ -414,7 +414,7 @@ public final class Interpreter {
         return new NativeStep(new NativeRunner.Command(executable, textArgs, stage.errorsToOutput()));
     }
 
-    /** Commande introuvable ; {@code Math.NOPE} : le champ statique manque plutôt que la commande. */
+    /** Command not found; {@code Math.NOPE}: the static field is missing rather than the command. */
     private PjException unknownCommand(Ast.Command command) {
         if (command.forceNative()) {
             return new PjException("commande native introuvable : " + command.name());
@@ -441,7 +441,7 @@ public final class Interpreter {
         }
     }
 
-    /** Compile le texte d'un bloc pour un cmdlet ({@code CmdletContext.compile}). */
+    /** Compiles the text of a block for a cmdlet ({@code CmdletContext.compile}). */
     private io.powerj.api.ScriptBlock compile(String source) {
         try {
             var function = ExpressionParser.function(source, session.java()::isStaticReference);
@@ -454,12 +454,12 @@ public final class Interpreter {
         }
     }
 
-    /** Le premier process lit-il directement l'entrée standard du shell ? */
+    /** Does the first process read the shell's standard input directly? */
     private boolean inheritsInput() {
         return io.interactive() || inheritStandardInput;
     }
 
-    /** {@code 2>} partagé par plusieurs process : le fichier est vidé une fois, puis chacun y ajoute. */
+    /** {@code 2>} shared by several processes: the file is truncated once, then each one appends to it. */
     private static Optional<NativeRunner.FileTarget> shared(Optional<NativeRunner.FileTarget> target) {
         if (target.isEmpty() || target.get().append()) {
             return target;
@@ -490,7 +490,7 @@ public final class Interpreter {
         }
     }
 
-    /** Attend la fin des étapes (arrêtées si besoin), sans se laisser interrompre. */
+    /** Waits for the stages to finish (stopped if needed), without letting itself be interrupted. */
     private static void joinAll(List<Thread> threads) {
         boolean interrupted = Thread.interrupted();
         long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(JOIN_SECONDS);
@@ -522,7 +522,7 @@ public final class Interpreter {
         }
     }
 
-    /** {@code import java.security.*}, {@code import javax.crypto.Cipher} ; sans argument : imports actifs (FR-47). */
+    /** {@code import java.security.*}, {@code import javax.crypto.Cipher}; without arguments: active imports (FR-47). */
     private List<Object> importClasses(List<Object> args) {
         if (args.isEmpty()) {
             return List.copyOf(session.java().imports());
@@ -573,7 +573,7 @@ public final class Interpreter {
         };
     }
 
-    /** Valeurs d'un pipeline entre parenthèses : {@code (ls).name}. */
+    /** Values of a parenthesized pipeline: {@code (ls).name}. */
     private List<Object> capture(Ast.Pipeline pipeline) throws InterruptedException {
         if (redirect(pipeline, Token.Stream.OUT).isPresent()) {
             throw new PjException("« > » impossible dans une sous-expression ( )");
@@ -605,8 +605,8 @@ public final class Interpreter {
     }
 
     /**
-     * Message d'une erreur bloquante ; l'exception Java d'origine est conservée dans {@code $errors} et sa
-     * pile ajoutée au message si {@code $debug} vaut {@code true} (FR-43, FR-53).
+     * Message of a blocking error; the original Java exception is kept in {@code $errors} and its
+     * stack trace appended to the message if {@code $debug} is {@code true} (FR-43, FR-53).
      */
     private String describe(PjError error) {
         if (error.cause().isEmpty()) {
@@ -652,8 +652,8 @@ public final class Interpreter {
     }
 
     /**
-     * Destination des valeurs d'une instruction : le terminal, ou le fichier d'une redirection {@code >}.
-     * Le fichier n'est ouvert qu'à la première valeur : une commande native redirigée l'écrit elle-même.
+     * Destination of a statement's values: the terminal, or the file of a {@code >} redirection.
+     * The file is opened only at the first value: a redirected native command writes it itself.
      */
     private final class Output implements AutoCloseable {
 

@@ -12,25 +12,25 @@ import io.powerj.core.lang.ExpressionParser;
 import io.powerj.core.lang.Lexer;
 
 /**
- * Découpe une saisie en zones à colorer (spécification FR-08) : commande interne ou cmdlet, programme
- * natif, commande inconnue, option, chaîne, variable. Tolérant : une saisie incomplète (chaîne non fermée,
- * bloc ouvert) est colorée au mieux, jamais rejetée.
+ * Splits an input line into spans to highlight (specification FR-08): built-in command or cmdlet, native
+ * program, unknown command, option, string, variable. Tolerant: incomplete input (unclosed string,
+ * open block) is highlighted as well as possible, never rejected.
  */
 public final class Highlights {
 
-    /** Nature d'une zone. */
+    /** Kind of a span. */
     public enum Kind { BUILTIN, CMDLET, NATIVE, UNKNOWN, OPTION, STRING, VARIABLE }
 
-    /** Zone {@code [start, end[} de la saisie. */
+    /** Span {@code [start, end[} of the input. */
     public record Span(int start, int end, Kind kind) { }
 
     private Highlights() {
     }
 
     /**
-     * @param commands    nature d'un nom de commande ({@link Interpreter#commandKind})
-     * @param staticNames noms Java désignant une classe ou un champ statique (pour ne pas les colorer en
-     *                    commande inconnue)
+     * @param commands    kind of a command name ({@link Interpreter#commandKind})
+     * @param staticNames Java names denoting a class or a static field (so as not to highlight them as an
+     *                    unknown command)
      */
     public static List<Span> of(String line, Function<String, Interpreter.CommandKind> commands,
                                 Predicate<String> staticNames) {
@@ -128,7 +128,7 @@ public final class Highlights {
         return spans;
     }
 
-    /** Note les paramètres d'une lambda dont l'en-tête commence en {@code at} ; renvoie où reprendre. */
+    /** Records the parameters of a lambda whose header starts at {@code at}; returns where to resume. */
     private static int lambda(String line, int at, int depth, List<Map.Entry<Integer, List<String>>> parameters) {
         return ExpressionParser.lambdaHeader(line, at).map(header -> {
             parameters.add(Map.entry(depth, header.getKey()));
@@ -136,7 +136,7 @@ public final class Highlights {
         }).orElse(at);
     }
 
-    /** {@code f.size} dans {@code f -> (f.size)} : une expression sur un paramètre, pas une commande. */
+    /** {@code f.size} in {@code f -> (f.size)}: an expression on a parameter, not a command. */
     private static boolean isParameter(String word, List<Map.Entry<Integer, List<String>>> parameters) {
         int dot = word.indexOf('.');
         String name = dot < 0 ? word : word.substring(0, dot);

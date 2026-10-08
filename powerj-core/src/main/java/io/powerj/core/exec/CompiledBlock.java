@@ -9,26 +9,26 @@ import io.powerj.api.ScriptBlock;
 import io.powerj.core.lang.Ast.Expression;
 
 /**
- * Bloc ou lambda analysé, prêt à être évalué pour chaque objet du pipeline ou appelé par Java (FR-33b).
+ * Parsed block or lambda, ready to be evaluated for each pipeline object or called by Java (FR-33b).
  *
- * @param parameters paramètres déclarés ({@code f -> …}, {@code (a, b) -> …}), ou {@code null} pour un
- *                   bloc sans paramètre déclaré, dont l'unique argument est {@code $_}
- * @param captured   paramètres des lambdas englobantes, capturés à la création comme en Java
+ * @param parameters declared parameters ({@code f -> …}, {@code (a, b) -> …}), or {@code null} for a
+ *                   block without a declared parameter, whose single argument is {@code $_}
+ * @param captured   parameters of the enclosing lambdas, captured at creation as in Java
  *                   ({@code f -> … anyMatch(e -> f.name.endsWith(e))})
  */
 record CompiledBlock(String source, List<String> parameters, Expression body, Evaluator evaluator,
                      Map<String, Object> captured) implements ScriptBlock {
 
     /**
-     * @throws PjException          si l'évaluation échoue (message destiné à l'utilisateur)
-     * @throws CancellationException si l'utilisateur a demandé l'annulation
+     * @throws PjException          if the evaluation fails (message intended for the user)
+     * @throws CancellationException if the user requested cancellation
      */
     @Override
     public Object invoke(Object current) {
         return apply(new Object[] {current});
     }
 
-    /** Appelle le bloc avec les arguments reçus de Java (ou l'objet du pipeline). */
+    /** Calls the block with the arguments received from Java (or the pipeline object). */
     Object apply(Object[] args) {
         if (parameters == null) {
             if (args.length > 1) {

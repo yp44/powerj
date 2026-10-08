@@ -4,7 +4,7 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.List;
 
-/** Commandes internes de base : {@code cd}, {@code pwd}, {@code exit} (spécification FR-04, FR-04b). */
+/** Basic built-in commands: {@code cd}, {@code pwd}, {@code exit} (specification FR-04, FR-04b). */
 final class Builtins {
 
     private Builtins() {
