@@ -21,7 +21,7 @@ Comme aux étapes précédentes : onglet **Actions**, dernière exécution du wo
 | 9 | `env \| where { $_.name.startsWith("JAVA") }` | Les variables dont le nom commence par `JAVA`. |
 | 10 | `^cmd /c "echo dehors& echo erreur 1>&2" 2>&1 \| where { $_.contains("erreur") }` | `erreur` : avec `2>&1`, le flux d'erreur rejoint la sortie et passe dans le pipeline. |
 | 11 | `^cmd /c "echo b& echo a" \| ^sort` | `a` puis `b` : natif → natif, octets transmis directement. |
-| 12 | `$gros = ls -r \| where size > 1mb` puis `$gros.name` puis `(ls \| where { $_.dir }).name` | Le résultat d'un pipeline s'affecte et s'utilise entre parenthèses. |
+| 12 | `$gros = ls -r \| where size > 1mb` puis `$gros*.name` puis `(ls \| where { $_.dir })*.name` | Le résultat d'un pipeline s'affecte et s'utilise entre parenthèses. |
 | 13 | `ls \| where { $_.size > now }` | Pour chaque objet, erreur non bloquante en rouge (`where : « > » impossible entre Long … et Instant …`), puis prompt ; ajouter `--on-error silent` les masque, `--on-error stop` arrête au premier. |
 | 14 | `ls \| where { $_.size = 3 }` | `syntaxe : « = » dans un bloc : pour comparer, utiliser ==` : rien n'est exécuté. |
 | 15 | `ls \| ls` | `« ls » ne lit pas les objets du pipeline`. |

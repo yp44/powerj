@@ -15,6 +15,7 @@ Les deux formes font la même chose ; elles se lisent différemment.
 | Je veux… | J'écris | Pourquoi |
 |---|---|---|
 | un filtre ou une transformation **d'une ligne**, tapé au clavier | `where { $_.dir }`, `map { $_.name }` | `$_` est le plus court ; sans ambiguïté quand l'objet n'apparaît qu'une ou deux fois. |
+| la propriété de **chaque élément** d'une liste | `$f*.name`, `$f*.size` | `.` s'applique à la liste elle-même (`$f.size()` = nombre d'éléments) ; `*.` à chaque élément. |
 | une condition **longue**, qui cite l'objet plusieurs fois | `where { f -> f.size > 1mb && !f.dir && f.ext == "log" }` | Un nom (`f`, `fichier`, `ligne`) se relit mieux qu'une suite de `$_`. |
 | un bloc **dans** un autre bloc | `where { f -> List.of("md", "txt").stream().anyMatch(e -> f.name.endsWith("." + e)) }` | Dans le bloc intérieur, `$_` désignerait `e` : l'objet extérieur doit avoir un nom. |
 | **deux paramètres** (tri, réduction) | `$m.sort((a, b) -> a.length() - b.length())` | Seule une lambda déclare plusieurs paramètres (`$a` / `$b` n'existent plus). |
@@ -44,4 +45,6 @@ Rappels :
 | 10 | `$m.sort({ $a.length() - $b.length() })` | Erreur claire indiquant d'écrire `(a, b) -> …`. |
 | 11 | `$min = 1kb; ls \| where { f -> f.size > $min }` | Variable du shell utilisée dans une lambda. |
 | 12 | `ls \| where f -> f.dir` | Erreur de syntaxe expliquant que les accolades sont obligatoires en argument d'un cmdlet. |
-| 13 | Saisir `$t = """` puis deux lignes de texte puis `"""`, puis `$t.lines().count()` | `2` : bloc de texte multi-ligne. |
+| 13 | `$f = ls -r` puis `$f.size()`, `$f*.size`, `$f*.name*.toUpperCase()`, `$f*.name.size()` | Nombre de fichiers ; taille de chaque fichier ; noms en majuscules ; nombre de noms. `.` s'applique à la liste, `*.` à chaque élément. |
+| 14 | `$f.size` | Erreur : `… n'a pas de propriété 'size' (pour chaque élément : *.size ; méthode : size())`. |
+| 15 | Saisir `$t = """` puis deux lignes de texte puis `"""`, puis `$t.lines().count()` | `2` : bloc de texte multi-ligne. |

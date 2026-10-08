@@ -268,6 +268,19 @@ public final class ExpressionParser {
                 } else {
                     current = new Ast.Get(current, name);
                 }
+            } else if (isSpread(token)) {
+                next(); // *
+                next(); // .
+                if (atEnd() || !(peek() instanceof Ident(var name, var at, _)) || at != pos) {
+                    throw new SyntaxException("nom attendu après « *. »" + where());
+                }
+                next();
+                if (!atEnd() && isSymbol(peek(), "(") && peek().at() == pos) {
+                    next();
+                    current = new Ast.SpreadInvoke(current, name, callArguments());
+                } else {
+                    current = new Ast.SpreadGet(current, name);
+                }
             } else if (isSymbol(token, "::")) {
                 next();
                 if (atEnd() || !(peek() instanceof Ident(var name, var at, _)) || restricted() && at != pos) {
@@ -478,6 +491,13 @@ public final class ExpressionParser {
                     : new SyntaxException("« " + symbol + " » attendu" + where());
         }
         next();
+    }
+
+    /** {@code *.} collé à un nom : opérateur « spread » ({@code $f*.name}), pas une multiplication. */
+    private boolean isSpread(Tok token) {
+        int at = token.at();
+        return isSymbol(token, "*") && at + 2 < input.length() && input.charAt(at + 1) == '.'
+                && Character.isJavaIdentifierStart(input.charAt(at + 2));
     }
 
     private static boolean isSymbol(Tok token, String symbol) {

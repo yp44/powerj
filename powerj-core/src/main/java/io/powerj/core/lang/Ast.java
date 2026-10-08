@@ -130,6 +130,16 @@ public final class Ast {
     /** {@code cible.nom} : propriété (FR-28). */
     public record Get(Expression target, String name) implements Expression { }
 
+    /** {@code liste*.nom} : la propriété de chaque élément (opérateur « spread », comme en Groovy). */
+    public record SpreadGet(Expression target, String name) implements Expression { }
+
+    /** {@code liste*.méthode(arguments)} : la méthode appelée sur chaque élément. */
+    public record SpreadInvoke(Expression target, String method, List<Expression> arguments) implements Expression {
+        public SpreadInvoke {
+            arguments = List.copyOf(arguments);
+        }
+    }
+
     /** {@code cible[index]}. */
     public record At(Expression target, Expression index) implements Expression { }
 

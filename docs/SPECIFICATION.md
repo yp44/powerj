@@ -252,9 +252,11 @@ Les **records restent le format recommandé** pour les sorties des cmdlets (affi
   4. sur une `Map` : valeur associée à la clé `"nom"`.
 - `$x.nom(args)` (avec parenthèses) est toujours un **appel de méthode** (§3.13).
 - L'accès se chaîne : `$x.path.parent`, `$f.toPath().fileName`.
-- Sur une collection, l'accès à une propriété s'applique à chaque élément (`(ls).name` → liste des noms), sauf si la propriété existe sur la collection elle-même (`$l.empty` → `isEmpty()`).
+- **`.` s'applique toujours à l'objet lui-même**, comme en Java : sur une liste, `$f.size()` est le nombre d'éléments et `$f.empty` appelle `isEmpty()`.
+- **`*.` (opérateur « spread », comme en Groovy) s'applique à chaque élément** et renvoie la liste des résultats : `$f*.name` (noms de tous les fichiers), `$f*.size`, `$f*.name*.toUpperCase()`, `$f*.name.size()` (nombre de noms). Une valeur seule compte pour un élément, `null` pour aucun : `(ls -r)*.name` donne toujours une liste, même avec un seul fichier.
+- `$f.name` sur une liste est une erreur explicite : `List n'a pas de propriété 'name' (pour chaque élément : *.name)`. En pipeline, l'équivalent de `*.` est `map` : `ls | map FileEntry::name`.
 - Indexation : `$f[0]`, `$f[-1]` sur `List`, tableau ou `String` ; `$m['clé']` sur `Map`.
-- Propriété inexistante → erreur `FileEntry n'a pas de propriété 'siz' (propriétés : name, size, …)`.
+- Propriété inexistante → erreur `FileEntry n'a pas de propriété 'siz' (propriétés : name, size, …)` ; si une méthode de ce nom existe, le message l'indique : `String n'a pas de propriété 'length' (méthode : length())`.
 
 **FR-29 — Introspection.** `help members` sur une valeur (`$f | help members` ou `help members FileEntry`) liste les composants : nom, type, description (Javadoc / annotation `@Doc`).
 
@@ -389,7 +391,7 @@ Colonnes affichées par défaut : `name size modified dir`. Les dossiers sont li
 CA :
 - `ls` affiche le contenu du répertoire courant en tableau ;
 - `ls -r --filter *.txt` liste récursivement les `.txt` ;
-- `(ls).name` affiche uniquement les noms ;
+- `(ls)*.name` affiche uniquement les noms ;
 - `$f = ls; $f[0].size` affiche la taille du premier élément ;
 - `^ls` exécute le `ls` natif s'il existe (Git Bash, WSL…), sinon erreur `commande native introuvable`.
 
@@ -602,7 +604,7 @@ PJ> Files.size(Path.of("gros.iso")) / 1mb
 PJ> new java.io.File("C:\\Windows").listFiles() | where { $_.directory && $_.name.startsWith("S") }
 PJ> java.util.UUID.randomUUID()
 PJ> java.net.InetAddress.getLocalHost().hostAddress
-PJ> String.join(", ", (ls).name)
+PJ> String.join(", ", (ls)*.name)
 PJ> (ls -r | where size > 1mb).size()
 ```
 
@@ -962,7 +964,7 @@ Chaque étape :
 **Recette :**
 1. `ls` affiche un tableau `name size modified dir`.
 2. `ls -r --filter *.txt` liste récursivement les `.txt`.
-3. `(ls).name` affiche les noms seuls.
+3. `(ls)*.name` affiche les noms seuls.
 4. `$f = ls` puis `$f[0].size` et `$f[0].path.parent`.
 5. `ls --recurce` : erreur avec suggestion `--recurse`.
 6. `help ls` et `ls --help` affichent l'aide.
@@ -1088,7 +1090,7 @@ somme         = produit { ( "+" | "-" ) produit } ;
 produit       = unaire { ( "*" | "/" | "%" ) unaire } ;
 unaire        = [ "-" | "!" ] [ cast ] postfixe ;
 cast          = "[" nom_qualifie "]" ;
-postfixe      = primaire { "." ident [ arguments ] | "[" expression "]" } ;
+postfixe      = primaire { "." ident [ arguments ] | "*." ident [ arguments ] | "::" ident | "[" expression "]" } ;   (* "*." : chaque élément *)
 arguments     = "(" [ arg_java { "," arg_java } ] ")" ;   (* sans espace avant "(" *)
 arg_java      = lambda | expression | bloc ;              (* lambda, bloc, ref_methode → interface fonctionnelle *)
 primaire      = litteral | variable | "(" pipeline ")" | liste | ref_methode
@@ -1119,7 +1121,7 @@ PJ C:\dev> mvn -q verify; $exit
 PJ C:\dev> code .                       # application graphique, rend la main
 PJ C:\dev> java.util.List.of("apple", "banana", "orange") | where { $_.contains("b") }
 PJ C:\dev> ls -r --filter *.log | where { Files.size($_.path) > 10mb }
-PJ C:\dev> (ls).name.stream().map({ $_.toUpperCase() }).sorted().toList()
+PJ C:\dev> (ls)*.name.stream().map({ $_.toUpperCase() }).sorted().toList()
 ```
 
 ### 12.3 Backlog des cmdlets (hors périmètre actuel)

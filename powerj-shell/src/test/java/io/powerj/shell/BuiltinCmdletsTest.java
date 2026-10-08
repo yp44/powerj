@@ -66,7 +66,7 @@ class BuiltinCmdletsTest {
 
     @Test
     void lsReturnsObjects() throws Exception {
-        assertThat(run("(ls).name")).isEqualTo("docs\nnotes.txt\n");
+        assertThat(run("(ls)*.name")).isEqualTo("docs\nnotes.txt\n");
         run("$f = ls -r --files");
         assertThat(run("$f[0].name")).isEqualTo("spec.md\n");
         assertThat(run("$f[-1].size")).isEqualTo("7\n");
@@ -100,19 +100,19 @@ class BuiltinCmdletsTest {
 
     @Test
     void whereWithBlocks() throws Exception {
-        assertThat(run("(ls -r | where { $_.name.endsWith(\".md\") && !$_.dir }).name")).isEqualTo("spec.md\n");
-        assertThat(run("(ls | where { $_.dir }).name")).isEqualTo("docs\n");
-        assertThat(run("(ls -r | where { $_.size > 6 && $_.modified > now - 1d }).name")).isEqualTo("notes.txt\n");
-        assertThat(run("(ls -r | where { List.of(\"md\", \"png\").contains($_.ext) }).name")).isEqualTo("spec.md\n");
+        assertThat(run("(ls -r | where { $_.name.endsWith(\".md\") && !$_.dir })*.name")).isEqualTo("spec.md\n");
+        assertThat(run("(ls | where { $_.dir })*.name")).isEqualTo("docs\n");
+        assertThat(run("(ls -r | where { $_.size > 6 && $_.modified > now - 1d })*.name")).isEqualTo("notes.txt\n");
+        assertThat(run("(ls -r | where { List.of(\"md\", \"png\").contains($_.ext) })*.name")).isEqualTo("spec.md\n");
         assertThatThrownBy(() -> run("ls | where { $_.size = 1 }")).hasMessageContaining("utiliser ==");
     }
 
     @Test
     void whereShortForm() throws Exception {
-        assertThat(run("(ls -r | where size > 6).name")).isEqualTo("notes.txt\n");
-        assertThat(run("(ls -r | where ext == md).name")).isEqualTo("spec.md\n");
-        assertThat(run("(ls -r | where size >= 6).name")).isEqualTo("spec.md\nnotes.txt\n");
-        assertThat(run("(ls -r | where name != \"docs\" | where dir == false).name")).isEqualTo("spec.md\nnotes.txt\n");
+        assertThat(run("(ls -r | where size > 6)*.name")).isEqualTo("notes.txt\n");
+        assertThat(run("(ls -r | where ext == md)*.name")).isEqualTo("spec.md\n");
+        assertThat(run("(ls -r | where size >= 6)*.name")).isEqualTo("spec.md\nnotes.txt\n");
+        assertThat(run("(ls -r | where name != \"docs\" | where dir == false)*.name")).isEqualTo("spec.md\nnotes.txt\n");
         run("ls | where size");
         assertThat(errors).singleElement().asString().contains("where : condition attendue");
         run("ls | where size ~ 3");
@@ -132,7 +132,7 @@ class BuiltinCmdletsTest {
     @Test
     void whereOnEnvAndStrings() throws Exception {
         assertThat(run("(env | where { $_.name.startsWith(\"POWERJ_T\") }).value")).isEqualTo("1\n");
-        run("$l = (ls).name");
+        run("$l = (ls)*.name");
         assertThat(run("$l | where { $_.contains(\"o\") }")).isEqualTo("docs\nnotes.txt\n");
         assertThat(run("where --help")).contains("where — Filtre les objets", "ls | where size > 10kb");
         assertThat(run("help")).contains("Filtres", "where");
@@ -140,7 +140,7 @@ class BuiltinCmdletsTest {
 
     @Test
     void lambdasAndMap() throws Exception {
-        assertThat(run("(ls -r | where { f -> f.name.endsWith(\".md\") && !f.dir }).name")).isEqualTo("spec.md\n");
+        assertThat(run("(ls -r | where { f -> f.name.endsWith(\".md\") && !f.dir })*.name")).isEqualTo("spec.md\n");
         assertThat(run("ls -r | map { f -> f.name + \" : \" + f.name.length() }"))
                 .isEqualTo("docs : 4\nspec.md : 7\nnotes.txt : 9\n");
         assertThat(run("ls | map FileEntry::name")).isEqualTo("docs\nnotes.txt\n");

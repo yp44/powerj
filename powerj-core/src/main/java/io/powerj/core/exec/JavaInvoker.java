@@ -53,6 +53,11 @@ final class JavaInvoker {
     private JavaInvoker() {
     }
 
+    /** Le type a-t-il une méthode publique {@code name()} sans argument ? (aide des messages d'erreur) */
+    static boolean hasNoArgMethod(Class<?> type, String name) {
+        return INSTANCE_METHODS.get(type).getOrDefault(name, List.of()).stream().anyMatch(m -> m.getParameterCount() == 0);
+    }
+
     /** {@code cible.nom(arguments)}. */
     static Object invokeVirtual(Object target, String name, List<Object> args) {
         if (target == null) {

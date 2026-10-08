@@ -34,7 +34,7 @@ jobs:
           "ligne : $l[1]"
           sh -c "exit 1" || "secours"
           which ls
-          (ls / --dirs).name
+          (ls / --dirs)*.name
           $u = (ls / | where name == usr).name
           "filtre : $u"
           $t = printf "b\na\nc\n" | sort | where { $_ != "c" }
@@ -114,7 +114,7 @@ jobs:
           "ligne : $l[1]"
           ^cmd /c "exit 1" || "secours"
           which ls
-          (ls C:\Windows --dirs).name
+          (ls C:\Windows --dirs)*.name
           $u = (ls C:\ | where name == Windows).name
           "filtre : $u"
           $t = ^cmd /c "echo b& echo a& echo c" | ^sort | where { $_ != "c" }

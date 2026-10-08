@@ -67,8 +67,8 @@ class PipelineTest {
     @Test
     void pipelinesInAssignmentsAndSubExpressions() throws Exception {
         run("$big = items | filter { $_.size >= 20 }");
-        assertThat(run("$big.name")).isEqualTo("item2\nitem3\n");
-        assertThat(run("(items | filter { !$_.name.contains(\"2\") }).name")).isEqualTo("item1\nitem3\n");
+        assertThat(run("$big*.name")).isEqualTo("item2\nitem3\n");
+        assertThat(run("(items | filter { !$_.name.contains(\"2\") })*.name")).isEqualTo("item1\nitem3\n");
     }
 
     @Test

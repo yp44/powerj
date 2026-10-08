@@ -95,6 +95,16 @@ class ExpressionParserTest {
     }
 
     @Test
+    void spreadOperator() {
+        assertThat(ExpressionParser.parse("$l*.name")).isEqualTo(new Ast.SpreadGet(new VariableExpression("l", List.of()), "name"));
+        assertThat(ExpressionParser.parse("$l*.name.size()")).isEqualTo(new Invoke(
+                new Ast.SpreadGet(new VariableExpression("l", List.of()), "name"), "size", List.of()));
+        assertThat(ExpressionParser.parse("$l*.trim()")).isEqualTo(
+                new Ast.SpreadInvoke(new VariableExpression("l", List.of()), "trim", List.of()));
+        assertThat(ExpressionParser.parse("2 * 3")).isInstanceOf(Binary.class);
+    }
+
+    @Test
     void units() {
         assertThat(Units.parse("2gb")).contains(2L * 1024 * 1024 * 1024);
         assertThat(Units.parse("30s")).contains(Duration.ofSeconds(30));

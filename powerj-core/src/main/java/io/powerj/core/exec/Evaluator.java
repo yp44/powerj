@@ -79,6 +79,22 @@ final class Evaluator {
             case Ast.Name(var name) -> name(name);
             case Ast.Get(var target, var name) -> get(eval(target), name);
             case Ast.At(var target, var index) -> at(evaluate(target), evaluate(index));
+            case Ast.SpreadGet(var target, var name) -> {
+                List<Object> results = new ArrayList<>();
+                for (Object element : elements(evaluate(target))) {
+                    results.add(PropertyAccess.property(element, name));
+                }
+                yield Collections.unmodifiableList(results);
+            }
+            case Ast.SpreadInvoke(var target, var method, var arguments) -> {
+                List<Object> receivers = elements(evaluate(target));
+                List<Object> args = values(arguments);
+                List<Object> results = new ArrayList<>();
+                for (Object element : receivers) {
+                    results.add(invoke(element, method, args));
+                }
+                yield Collections.unmodifiableList(results);
+            }
             case Ast.Invoke(var target, var method, var arguments) -> invoke(eval(target), method, values(arguments));
             case Ast.New(var type, var arguments) -> JavaInvoker.construct(session.java().require(type), values(arguments));
             case Ast.Cast(var type, var operand) -> cast(session.java().require(type), evaluate(operand));
@@ -255,6 +271,29 @@ final class Evaluator {
             return PropertyAccess.index(target, ((Number) index).intValue());
         }
         throw new PjException("index entier attendu, reçu " + Operators.describe(index));
+    }
+
+    /**
+     * Éléments visés par {@code *.} : ceux d'une collection, d'un tableau, d'un flux ; une valeur seule compte
+     * pour un élément, {@code null} pour aucun.
+     */
+    static List<Object> elements(Object value) {
+        List<Object> elements = new ArrayList<>();
+        switch (value) {
+            case null -> { }
+            case java.nio.file.Path path -> elements.add(path);
+            case Iterable<?> items -> items.forEach(elements::add);
+            case java.util.stream.Stream<?> stream -> stream.forEach(elements::add);
+            case java.util.Iterator<?> iterator -> iterator.forEachRemaining(elements::add);
+            case java.util.Optional<?> optional -> optional.ifPresent(elements::add);
+            case Object array when array.getClass().isArray() -> {
+                for (int i = 0; i < java.lang.reflect.Array.getLength(array); i++) {
+                    elements.add(java.lang.reflect.Array.get(array, i));
+                }
+            }
+            default -> elements.add(value);
+        }
+        return elements;
     }
 
     /** Valeur d'une capture (FR-31) : aucune → null, une → elle-même, plusieurs → liste. */
