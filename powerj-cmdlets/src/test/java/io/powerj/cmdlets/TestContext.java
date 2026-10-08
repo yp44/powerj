@@ -11,7 +11,7 @@ import java.util.function.Function;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.ScriptBlock;
 
-/** Contexte en mémoire : collecte les objets et les erreurs. */
+/** In-memory context: collects the objects and the errors. */
 final class TestContext<O> implements CmdletContext<O> {
 
     final List<O> emitted = new ArrayList<>();
@@ -53,7 +53,7 @@ final class TestContext<O> implements CmdletContext<O> {
         return false;
     }
 
-    /** Compilation simulée : par défaut, non disponible. */
+    /** Simulated compilation: not available by default. */
     Function<String, ScriptBlock> compiler = source -> {
         throw new UnsupportedOperationException(source);
     };

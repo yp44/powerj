@@ -85,7 +85,7 @@ class SupervisorTest {
         var caller = Thread.ofVirtual().start(() -> result.set(supervisor.run("boucle", () -> {
             started.countDown();
             while (!stop.get()) {
-                Thread.onSpinWait(); // ignore l'interruption, comme un calcul du JDK
+                Thread.onSpinWait(); // ignores the interruption, like a JDK computation
             }
             return List.of();
         })));

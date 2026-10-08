@@ -91,10 +91,10 @@ class ParserTest {
         assertThatThrownBy(() -> Parser.parse("(ls")).hasMessageContaining("« ) » manquante");
         assertThatThrownBy(() -> Parser.parse("()")).hasMessageContaining("parenthèses vides");
         assertThatThrownBy(() -> Parser.parse("ls)")).hasMessageContaining("« ) » inattendu");
-        // Une valeur suivie d'un pipeline, entre parenthèses.
+        // A value followed by a pipeline, in parentheses.
         var grouped = (ExpressionBody) only("($l | where { $_ }).size()").body();
         assertThat(((Ast.Invoke) grouped.expression()).target()).isInstanceOf(Ast.SubExpression.class);
-        // Une vraie expression entre parenthèses.
+        // A real expression in parentheses.
         assertThat(only("(1 + 2)").body()).isEqualTo(new ExpressionBody(new Ast.Binary(Ast.Operator.ADD,
                 new Ast.Literal(1), new Ast.Literal(2))));
     }
@@ -112,7 +112,7 @@ class ParserTest {
         assertThat(where.arguments()).singleElement().isEqualTo(new Ast.ExpressionArgument(new Ast.BlockExpression(
                 "$_.size > 1mb", new Ast.Binary(Ast.Operator.GT,
                         new Ast.Get(new Ast.VariableExpression("_", List.of()), "size"), new Ast.Literal(1024L * 1024)))));
-        // Expression Java en première étape.
+        // Java expression as the first stage.
         assertThat(only("java.util.List.of(1, 2) | where { $_ > 1 }").pipeline().stages().getFirst().body())
                 .isInstanceOf(ExpressionBody.class);
         assertThat(((Command) statement.pipeline().stages().get(2).body()).forceNative()).isTrue();
@@ -143,13 +143,13 @@ class ParserTest {
         assertThat(((Command) only("where ext == log").body()).arguments()).containsExactly(
                 new WordArgument("ext"), new WordArgument("=="), new WordArgument("log"));
         assertThat(((Command) only("where size >= 1").body()).arguments()).hasSize(3);
-        // Hors de where, > reste une redirection.
+        // Outside of where, > remains a redirection.
         assertThat(only("echo a > b").redirects()).hasSize(1);
     }
 
     @Test
     void nonBreakingSpacesSeparateWords() {
-        // AltGr+6 puis AltGr+Espace sur un clavier français : « | » suivi d'une espace insécable.
+        // AltGr+6 then AltGr+Space on a French keyboard: "|" followed by a non-breaking space.
         var statement = only("ls -r |\u00a0where {\u00a0$_.size\u202f>\u00a06kb }");
         assertThat(statement.pipeline().stages()).extracting(s -> ((Command) s.body()).name())
                 .containsExactly("ls", "where");

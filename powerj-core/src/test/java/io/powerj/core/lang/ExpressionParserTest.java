@@ -90,7 +90,7 @@ class ExpressionParserTest {
         assertThat(ExpressionParser.parse("$l.sort({ $a.length() - $b.length() })"))
                 .isInstanceOf(Invoke.class)
                 .extracting(e -> ((Invoke) e).arguments().getFirst()).isInstanceOf(Ast.BlockExpression.class);
-        // Dans un bloc, les accès peuvent être séparés par des espaces.
+        // In a block, member accesses may be separated by spaces.
         assertThat(ExpressionParser.parse("$_ .name")).isEqualTo(new Get(CURRENT, "name"));
     }
 
@@ -104,7 +104,7 @@ class ExpressionParserTest {
                 new Binary(Operator.ADD, new Ast.Name("a"), new Get(new Ast.Name("b"), "x"))));
         var nested = (Ast.Lambda) ExpressionParser.function("f -> $l.stream().map(x -> (f.size) + (x)).toList()", _ -> false);
         assertThat(nested.body().toString()).doesNotContain("SubExpression");
-        // hors lambda, (f.size) reste une commande
+        // outside a lambda, (f.size) remains a command
         assertThat(ExpressionParser.parse("(f.size)")).isInstanceOf(Ast.SubExpression.class);
     }
 

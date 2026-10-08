@@ -18,7 +18,7 @@ import io.powerj.core.exec.CmdletRegistry;
 import io.powerj.core.exec.Platform;
 import io.powerj.core.exec.Session;
 
-/** Mode non interactif : {@code powerj -c}, fichier {@code .pj}, entrée standard (FR-04d). */
+/** Non-interactive mode: {@code powerj -c}, {@code .pj} file, standard input (FR-04d). */
 class ScriptModeTest {
 
     @TempDir

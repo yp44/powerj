@@ -100,13 +100,13 @@ class LexerTest {
         assertThat(Lexer.tokenize("Math.max(3, 7)")).singleElement().isInstanceOf(Token.Expr.class);
         assertThat(Lexer.tokenize("new java.io.File(\"x\")")).singleElement().isInstanceOf(Token.Expr.class);
         assertThat(Lexer.tokenize("[long] 5")).singleElement().isEqualTo(e(new Ast.Cast("long", new Ast.Literal(5))));
-        // Sans parenthèses collées, un nom qualifié n'est une expression que s'il désigne une classe ou un champ.
+        // Without attached parentheses, a qualified name is an expression only if it denotes a class or a field.
         assertThat(Lexer.tokenize("notepad.exe fichier.txt")).containsExactly(w("notepad.exe"), w("fichier.txt"));
         assertThat(Lexer.tokenize("java -version")).containsExactly(w("java"), w("-version"));
         assertThat(Lexer.tokenize("Math.PI", Set.of("Math.PI")::contains)).singleElement()
                 .isEqualTo(e(new Ast.Get(new Ast.Name("Math"), "PI")));
         assertThat(Lexer.tokenize("Math.PI")).containsExactly(w("Math.PI"));
-        // En argument : seulement les appels collés.
+        // As an argument: only attached calls.
         assertThat(Lexer.tokenize("cat Path.of(\"a\") a.b")).containsExactly(w("cat"),
                 e(new Ast.Invoke(new Ast.Name("Path"), "of", List.of(new Ast.StringExpression(
                         List.of(new StringPart.Text("a")))))), w("a.b"));

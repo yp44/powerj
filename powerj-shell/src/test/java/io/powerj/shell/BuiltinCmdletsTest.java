@@ -21,7 +21,7 @@ import io.powerj.core.exec.Interpreter;
 import io.powerj.core.exec.Session;
 import io.powerj.core.exec.ShellIo;
 
-/** {@code ls} et {@code env} découverts par ServiceLoader, comme dans le shell réel. */
+/** {@code ls} and {@code env} discovered by ServiceLoader, as in the real shell. */
 class BuiltinCmdletsTest {
 
     @TempDir
@@ -79,7 +79,7 @@ class BuiltinCmdletsTest {
         run("ls --recurce");
         assertThat(errors).containsExactly("ls : option inconnue --recurce, vouliez-vous dire --recurse ?");
         assertThat(run("ls --help")).contains("ls — Liste les fichiers et dossiers", "-r, --recurse", "Sortie : FileEntry");
-        assertThat(run("which ls")).startsWith("ls → cmdlet ("); // nom du module : voir le binaire packagé
+        assertThat(run("which ls")).startsWith("ls → cmdlet ("); // module name: see the packaged binary
     }
 
     @Test
@@ -157,23 +157,23 @@ class BuiltinCmdletsTest {
 
     @Test
     void collectAlwaysProducesOneList() throws Exception {
-        // Toujours une liste : un seul résultat ou aucun ne sont pas « déballés ».
+        // Always a list: a single result or none is not "unwrapped".
         assertThat(run("(ls -r | where { f -> f.name == \"spec.md\" } | collect).size()")).isEqualTo("1\n");
         assertThat(run("(ls | where { f -> f.name == \"absent\" } | collect).size()")).isEqualTo("0\n");
         run("$l = ls -r --files | collect");
         assertThat(session.variable("l")).isInstanceOf(io.powerj.api.Collected.class);
         assertThat(run("$l.size()")).isEqualTo("2\n");
-        // L'étape suivante reçoit la liste entière, en un seul objet.
+        // The next stage receives the whole list, as a single object.
         assertThat(run("ls -r | collect | map { l -> l.size() }")).isEqualTo("3\n");
         assertThat(run("ls -r --files | collect | map { l -> l.stream().map(f -> f.name).sorted().toList() }"))
                 .isEqualTo("notes.txt\nspec.md\n");
         assertThat(run("ls | collect | where { l -> l.size() > 1 } | map { l -> \"ok\" }")).isEqualTo("ok\n");
-        // En tête de pipeline, une variable est déroulée comme toute liste ; seule, elle reste une liste.
+        // At the head of a pipeline, a variable is unrolled like any list; on its own, it remains a list.
         assertThat(run("$l | map { f -> f.name } | where { n -> n.endsWith(\".md\") }")).isEqualTo("spec.md\n");
         run("$m = $l");
         assertThat(session.variable("m")).isSameAs(session.variable("l"));
         assertThat(run("$l.stream() | map { f -> f.name } | where { n -> n.endsWith(\".txt\") }")).isEqualTo("notes.txt\n");
-        // Affichée en fin de pipeline comme ses éléments.
+        // Displayed at the end of a pipeline as its elements.
         assertThat(run("ls | collect")).contains("docs", "notes.txt");
         assertThat(run("collect --help")).contains("collect — Rassemble les objets du pipeline en une seule liste");
         run("ls | collect -x");

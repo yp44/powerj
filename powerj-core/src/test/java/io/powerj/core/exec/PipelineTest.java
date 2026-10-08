@@ -21,7 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
-/** Pipeline {@code |}, blocs {@code { }} et commandes natives dans le pipeline (étape 4). */
+/** Pipeline {@code |}, blocks {@code { }} and native commands in the pipeline (step 4). */
 class PipelineTest {
 
     @TempDir
@@ -110,8 +110,8 @@ class PipelineTest {
         assertThat(eval("-3 + 1")).isEqualTo(-2);
         assertThat(eval("\"a\" + 1 + 2")).isEqualTo("a12");
         assertThat(eval("1 == 1L")).isEqualTo(true);
-        assertThat(eval("\"ab\" == \"a\" + \"b\"")).isEqualTo(true); // égalité de valeur
-        assertThat(eval("\"Ab\" == \"ab\"")).isEqualTo(false); // sensible à la casse
+        assertThat(eval("\"ab\" == \"a\" + \"b\"")).isEqualTo(true); // value equality
+        assertThat(eval("\"Ab\" == \"ab\"")).isEqualTo(false); // case-sensitive
         assertThat(eval("\"b\" > \"a\"")).isEqualTo(true);
         assertThat(eval("2 > 1 && !(1 > 2)")).isEqualTo(true);
         assertThat(eval("false || null == null")).isEqualTo(true);
@@ -186,7 +186,7 @@ class PipelineTest {
         run("$r = eval { $_ + 1 } -w $n");
         assertThat(session.variable("r")).isEqualTo(42);
         assertThat(eval("\"n=$n, \\\"q\\\"\"")).isEqualTo("n=41, \"q\"");
-        assertThat(eval("\"}\" + '}' + \"{\"")).isEqualTo("}}{"); // accolades dans les chaînes
+        assertThat(eval("\"}\" + '}' + \"{\"")).isEqualTo("}}{"); // braces inside strings
     }
 
     @Test
@@ -208,7 +208,7 @@ class PipelineTest {
         assertThat(Thread.getAllStackTraces().keySet()).noneMatch(t -> t.getName().startsWith("powerj-etape"));
     }
 
-    // --- Commandes natives (Linux / macOS) ---
+    // --- Native commands (Linux / macOS) ---
 
     @Test
     void nativeLinesFeedCmdlets() throws Exception {
@@ -290,6 +290,6 @@ class PipelineTest {
     void standardInputFeedsTheFirstStage() throws Exception {
         interpreter.useStandardInput(List.of("alpha", "beta", "gamma").iterator());
         assertThat(run("filter { $_.contains(\"a\") && !$_.startsWith(\"b\") }")).isEqualTo("alpha\ngamma\n");
-        assertThat(run("filter { true } | count")).isEqualTo("0\n"); // entrée déjà consommée
+        assertThat(run("filter { true } | count")).isEqualTo("0\n"); // input already consumed
     }
 }

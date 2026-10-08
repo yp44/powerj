@@ -8,7 +8,7 @@ import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
 import io.powerj.api.ScriptBlock;
 
-/** Cmdlets de test. */
+/** Test cmdlets. */
 final class FakeCmdlets {
 
     private FakeCmdlets() {
@@ -33,7 +33,7 @@ final class FakeCmdlets {
         }
     }
 
-    /** Mini {@code where} : bloc ou texte compilé par le contexte. */
+    /** Mini {@code where}: block or text compiled by the context. */
     @CmdletInfo(name = "filter", category = "Test", summary = "Filtre", examples = "items | filter { $_.size > 10 }")
     static final class Filter implements Cmdlet<Filter.Params, Object, Object> {
 
@@ -55,7 +55,7 @@ final class FakeCmdlets {
         }
     }
 
-    /** Compte les objets reçus. */
+    /** Counts the objects received. */
     @CmdletInfo(name = "count", category = "Test", summary = "Compte", examples = "items | count")
     static final class Count implements Cmdlet<Count.Params, Object, Long> {
 
@@ -79,7 +79,7 @@ final class FakeCmdlets {
         }
     }
 
-    /** Évalue un bloc avec {@code $_} = l'argument {@code --with}. */
+    /** Evaluates a block with {@code $_} = the {@code --with} argument. */
     @CmdletInfo(name = "eval", category = "Test", summary = "Évalue un bloc", examples = "eval { 1 + 2 }")
     static final class Eval implements Cmdlet<Eval.Params, Void, Object> {
 
@@ -91,7 +91,7 @@ final class FakeCmdlets {
         }
     }
 
-    /** Produit des nombres sans fin (arrêt par Ctrl+C ou par l'étape suivante). */
+    /** Produces numbers endlessly (stopped by Ctrl+C or by the next stage). */
     @CmdletInfo(name = "infinite", category = "Test", summary = "Sans fin", examples = "infinite")
     static final class Infinite implements Cmdlet<Infinite.Params, Void, Long> {
 
@@ -105,7 +105,7 @@ final class FakeCmdlets {
         }
     }
 
-    /** Mini {@code map} : applique un bloc ou une référence de méthode à chaque objet. */
+    /** Mini {@code map}: applies a block or a method reference to each object. */
     @CmdletInfo(name = "eval-each", category = "Test", summary = "Transforme", examples = "items | eval-each Item::name")
     static final class EvalEach implements Cmdlet<EvalEach.Params, Object, Object> {
 

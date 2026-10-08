@@ -19,7 +19,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** Interopérabilité Java (spécification §3.13, étape 5). */
+/** Java interoperability (specification §3.13, step 5). */
 class JavaInteropTest {
 
     @TempDir
@@ -37,7 +37,7 @@ class JavaInteropTest {
                 CmdletRegistry.of(FakeCmdlets.all()));
     }
 
-    /** Sorties en mémoire. */
+    /** In-memory outputs. */
     private record PrintWriterIo(StringWriter out, List<String> errors) {
         ShellIo io() {
             return new ShellIo(new PrintWriter(out, true), errors::add, false);
@@ -217,7 +217,7 @@ class JavaInteropTest {
             try {
                 interpreter.execute("Stream.iterate(0, { $_ + 1 }).forEach({ $_ })");
             } catch (Exception _) {
-                // attendu : annulation
+                // expected: cancellation
             }
         });
         Thread.sleep(300);
@@ -228,17 +228,17 @@ class JavaInteropTest {
 
     @Test
     void primitiveStreamsAreUnrolledLikeStreams() throws Exception {
-        // Pipeline : IntStream, LongStream, DoubleStream émettent leurs éléments (boxés).
+        // Pipeline: IntStream, LongStream, DoubleStream emit their elements (boxed).
         assertThat(run("IntStream.range(0, 3) | filter { i -> i > 0 }")).isEqualTo("1\n2\n");
         assertThat(run("LongStream.of(5, 6) | filter { n -> n > 5 }")).isEqualTo("6\n");
         assertThat(run("IntStream.range(0, 4) | count")).isEqualTo("4\n");
-        // Affichage direct d'un flux : ses éléments, pas « IntPipeline$Head@… ».
+        // Displaying a stream directly: its elements, not "IntPipeline$Head@…".
         assertThat(run("IntStream.rangeClosed(1, 3)")).isEqualTo("1\n2\n3\n");
         assertThat(run("Stream.of(\"a\", \"b\")")).isEqualTo("a\nb\n");
         assertThat(run("DoubleStream.of(1.5)")).isEqualTo("1.5\n");
-        // *. sur un flux de primitives.
+        // *. on a stream of primitives.
         assertThat(run("IntStream.range(0, 2)*.toString()")).isEqualTo("0\n1\n");
-        // Optionnels de primitives : déroulés dans un pipeline (vide → rien).
+        // Primitive optionals: unrolled in a pipeline (empty → nothing).
         assertThat(run("IntStream.range(0, 5).max() | filter { m -> m == 4 }")).isEqualTo("4\n");
         assertThat(run("IntStream.empty().max() | count")).isEqualTo("0\n");
         assertThat(errors).isEmpty();
