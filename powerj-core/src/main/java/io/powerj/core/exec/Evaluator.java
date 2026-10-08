@@ -283,9 +283,12 @@ final class Evaluator {
             case null -> { }
             case java.nio.file.Path path -> elements.add(path);
             case Iterable<?> items -> items.forEach(elements::add);
-            case java.util.stream.Stream<?> stream -> stream.forEach(elements::add);
+            case java.util.stream.BaseStream<?, ?> stream -> stream.iterator().forEachRemaining(elements::add);
             case java.util.Iterator<?> iterator -> iterator.forEachRemaining(elements::add);
             case java.util.Optional<?> optional -> optional.ifPresent(elements::add);
+            case java.util.OptionalInt optional -> optional.ifPresent(elements::add);
+            case java.util.OptionalLong optional -> optional.ifPresent(elements::add);
+            case java.util.OptionalDouble optional -> optional.ifPresent(elements::add);
             case Object array when array.getClass().isArray() -> {
                 for (int i = 0; i < java.lang.reflect.Array.getLength(array); i++) {
                     elements.add(java.lang.reflect.Array.get(array, i));

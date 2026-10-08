@@ -268,7 +268,7 @@ Les **records restent le format recommandé** pour les sorties des cmdlets (affi
 
 Des objets successifs du même type record sont regroupés dans un même tableau.
 
-**FR-30b — Déroulage des collections.** Lorsqu'une étape de pipeline produit un `Iterable` (`List`, `Set`…), un tableau, un `Stream`, un `Iterator` ou un `Optional`, ses éléments sont **émis un par un** dans le flux (`Optional` vide → rien). `String` et `Map` ne sont **jamais** déroulés, ni la liste produite par `collect` (FR-36d).
+**FR-30b — Déroulage des collections.** Lorsqu'une étape de pipeline produit un `Iterable` (`List`, `Set`…), un tableau, un flux (`Stream`, `IntStream`, `LongStream`, `DoubleStream` : éléments boxés), un `Iterator` ou un `Optional` (et `OptionalInt`, `OptionalLong`, `OptionalDouble`), ses éléments sont **émis un par un** dans le flux (`Optional` vide → rien). Un flux affiché directement (`IntStream.range(0, 3)`) montre de même ses éléments. `String` et `Map` ne sont **jamais** déroulés, ni la liste produite par `collect` (FR-36d).
 En **affectation**, l'objet est conservé tel quel :
 
 ```text

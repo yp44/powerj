@@ -225,4 +225,22 @@ class JavaInteropTest {
         runner.join(5_000);
         assertThat(runner.isAlive()).isFalse();
     }
+
+    @Test
+    void primitiveStreamsAreUnrolledLikeStreams() throws Exception {
+        // Pipeline : IntStream, LongStream, DoubleStream émettent leurs éléments (boxés).
+        assertThat(run("IntStream.range(0, 3) | filter { i -> i > 0 }")).isEqualTo("1\n2\n");
+        assertThat(run("LongStream.of(5, 6) | filter { n -> n > 5 }")).isEqualTo("6\n");
+        assertThat(run("IntStream.range(0, 4) | count")).isEqualTo("4\n");
+        // Affichage direct d'un flux : ses éléments, pas « IntPipeline$Head@… ».
+        assertThat(run("IntStream.rangeClosed(1, 3)")).isEqualTo("1\n2\n3\n");
+        assertThat(run("Stream.of(\"a\", \"b\")")).isEqualTo("a\nb\n");
+        assertThat(run("DoubleStream.of(1.5)")).isEqualTo("1.5\n");
+        // *. sur un flux de primitives.
+        assertThat(run("IntStream.range(0, 2)*.toString()")).isEqualTo("0\n1\n");
+        // Optionnels de primitives : déroulés dans un pipeline (vide → rien).
+        assertThat(run("IntStream.range(0, 5).max() | filter { m -> m == 4 }")).isEqualTo("4\n");
+        assertThat(run("IntStream.empty().max() | count")).isEqualTo("0\n");
+        assertThat(errors).isEmpty();
+    }
 }
