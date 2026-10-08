@@ -44,6 +44,8 @@ jobs:
           "lambda : $n"
           $r = List.of("b", "a") | map String::toUpperCase | where { s -> s != "B" }
           "reference : $r"
+          $c = (ls / | where name == usr | collect).size()
+          "collect : $c"
           sh -c "exit 3"
           exit $exit
           EOF
@@ -63,6 +65,7 @@ jobs:
           grep -q 'java : 7' out.txt
           grep -q 'lambda : 2' out.txt
           grep -q 'reference : A' out.txt
+          grep -q 'collect : 1' out.txt
 
       - name: Test de fumée du mode non interactif
         run: |
@@ -145,6 +148,8 @@ jobs:
           "lambda : $n"
           $r = List.of("b", "a") | map String::toUpperCase | where { s -> s != "B" }
           "reference : $r"
+          $c = (ls C:\ | where name == Windows | collect).size()
+          "collect : $c"
           ^cmd /c "exit 3"
           exit $exit
           '@ | Set-Content smoke.txt
@@ -153,7 +158,8 @@ jobs:
           Get-Content out.txt
           if ($code -ne 3) { throw "code retour attendu 3, obtenu $code" }
           foreach ($attendu in 'C:\Windows', 'ligne : deux', 'secours', 'cmdlet (io.powerj.cmdlets)', 'System32',
-                               'filtre : Windows', 'tri : [a, b]', 'java : 7', 'lambda : 2', 'reference : A') {
+                               'filtre : Windows', 'tri : [a, b]', 'java : 7', 'lambda : 2', 'reference : A',
+                               'collect : 1') {
             if (-not (Select-String -Path out.txt -SimpleMatch $attendu -Quiet)) { throw "absent de la sortie : $attendu" }
           }
           # Le code 3 attendu de powerj.exe ne doit pas devenir le code retour de l'étape.

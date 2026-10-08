@@ -154,4 +154,24 @@ class BuiltinCmdletsTest {
         assertThat(errors).hasSize(2).allSatisfy(e -> assertThat(e).contains("le bloc doit renvoyer un booléen"));
         assertThat(run("help")).contains("map");
     }
+
+    @Test
+    void collectAlwaysProducesOneList() throws Exception {
+        // Toujours une liste : un seul résultat ou aucun ne sont pas « déballés ».
+        assertThat(run("(ls -r | where { f -> f.name == \"spec.md\" } | collect).size()")).isEqualTo("1\n");
+        assertThat(run("(ls | where { f -> f.name == \"absent\" } | collect).size()")).isEqualTo("0\n");
+        run("$l = ls -r --files | collect");
+        assertThat(session.variable("l")).isInstanceOf(io.powerj.api.Collected.class);
+        assertThat(run("$l.size()")).isEqualTo("2\n");
+        // L'étape suivante reçoit la liste entière, en un seul objet.
+        assertThat(run("ls -r | collect | map { l -> l.size() }")).isEqualTo("3\n");
+        assertThat(run("ls -r --files | collect | map { l -> l.stream().map(f -> f.name).sorted().toList() }"))
+                .isEqualTo("notes.txt\nspec.md\n");
+        assertThat(run("ls | collect | where { l -> l.size() > 1 } | map { l -> \"ok\" }")).isEqualTo("ok\n");
+        // Affichée en fin de pipeline comme ses éléments.
+        assertThat(run("ls | collect")).contains("docs", "notes.txt");
+        assertThat(run("collect --help")).contains("collect — Rassemble les objets du pipeline en une seule liste");
+        run("ls | collect -x");
+        assertThat(errors).containsExactly("collect : option inconnue -x");
+    }
 }
