@@ -199,4 +199,15 @@ class ReplTest {
         assertThat(screen).contains(">> ", "commande inconnue : liste");
         assertThat(history).containsExactly("liste |\nwhere { $_.dir\n}");
     }
+
+    @Test
+    void tabCompletesCommandsOptionsAndProperties() throws Exception {
+        java.nio.file.Files.createDirectories(tmp.resolve("dev"));
+        java.nio.file.Files.writeString(tmp.resolve("dev").resolve("rapport.txt"), "x");
+        session("ls --recu\t" + ENTER + "ls | where { $_.na\t.startsWith(\"r\") }" + ENTER
+                + "ls rap\t" + ENTER);
+        // La ligne exécutée est la ligne complétée.
+        assertThat(history).contains("ls --recurse", "ls | where { $_.name.startsWith(\"r\") }", "ls rapport.txt");
+        assertThat(screen).contains("rapport.txt");
+    }
 }

@@ -94,6 +94,13 @@ public final class Session {
         variables.put(name, value);
     }
 
+    /** Noms des variables définies et automatiques, triés (complétion). */
+    public java.util.SortedSet<String> variableNames() {
+        var names = new java.util.TreeSet<>(variables.keySet());
+        names.addAll(List.of("?", "exit", "last", "pwd", "home", "errors"));
+        return names;
+    }
+
     /** Valeur d'une variable, automatique ({@code $exit}, {@code $last}, {@code $?}…) ou définie. */
     public Object variable(String name) {
         return switch (name) {

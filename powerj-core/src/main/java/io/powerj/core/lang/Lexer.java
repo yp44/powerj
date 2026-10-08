@@ -156,7 +156,7 @@ public final class Lexer {
      * statique ({@code Math.max(3, 7)}, {@code java.lang.Math.PI}). Sinon c'est une commande
      * ({@code java -version}, {@code notepad.exe x}).
      */
-    static boolean expressionAt(String input, int at, Predicate<String> staticNames) {
+    public static boolean expressionAt(String input, int at, Predicate<String> staticNames) {
         if (at >= input.length()) {
             return false;
         }
@@ -190,7 +190,7 @@ public final class Lexer {
             }
             return chainEnd == end && staticNames.test(input.substring(at, chainEnd));
         }
-        return false;
+        return ExpressionParser.isParameter(staticNames, word);
     }
 
     /** En argument : variable, chaîne, groupe, bloc, ou appel Java collé ({@code Path.of("x")}). */

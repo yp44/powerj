@@ -80,6 +80,27 @@ public final class Interpreter {
         return registry;
     }
 
+    /** Nature d'une commande, pour la coloration et la complétion (FR-08, FR-21). */
+    public enum CommandKind { BUILTIN, CMDLET, NATIVE, UNKNOWN }
+
+    /** Noms des commandes internes. */
+    public java.util.Set<String> builtinNames() {
+        return java.util.Collections.unmodifiableSet(builtins.keySet());
+    }
+
+    /** Résout un nom de commande comme le ferait l'exécution (FR-13), sans rien lancer. */
+    public CommandKind commandKind(String name) {
+        boolean forceNative = name.startsWith("^");
+        String bare = forceNative ? name.substring(1) : name;
+        if (!forceNative && builtins.containsKey(bare)) {
+            return CommandKind.BUILTIN;
+        }
+        if (!forceNative && registry.find(bare).isPresent()) {
+            return CommandKind.CMDLET;
+        }
+        return !bare.isEmpty() && resolver.resolve(bare, session).isPresent() ? CommandKind.NATIVE : CommandKind.UNKNOWN;
+    }
+
     /**
      * Mode non interactif (FR-04d) : les lignes de l'entrée standard alimentent la première étape qui lit des
      * objets, et les commandes natives en tête de pipeline lisent directement l'entrée standard.

@@ -95,7 +95,11 @@ public final class Members {
 
     /** Membres d'une valeur : propriétés (composants, getters, champs) puis méthodes. */
     public static List<Member> of(Object value) {
-        Class<?> type = value.getClass();
+        return ofType(value.getClass());
+    }
+
+    /** Membres d'instance d'un type : propriétés (composants, getters, champs) puis méthodes. */
+    public static List<Member> ofType(Class<?> type) {
         Map<String, Member> properties = new LinkedHashMap<>();
         if (type.isRecord()) {
             for (RecordComponent c : type.getRecordComponents()) {
