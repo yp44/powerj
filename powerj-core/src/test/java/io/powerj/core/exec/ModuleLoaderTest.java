@@ -22,6 +22,7 @@ import java.util.stream.Stream;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.CleanupMode;
 import org.junit.jupiter.api.io.TempDir;
 
 import io.powerj.api.CmdletProvider;
@@ -33,7 +34,9 @@ import io.powerj.api.CmdletProvider;
  */
 class ModuleLoaderTest {
 
-    @TempDir
+    // Sous Windows, un jar chargé reste ouvert par sa couche jusqu'à l'arrêt de la JVM : le dossier ne peut
+    // pas être supprimé à la fin du test.
+    @TempDir(cleanup = CleanupMode.NEVER)
     Path tmp;
 
     private final StringWriter out = new StringWriter();

@@ -40,6 +40,6 @@ Le dossier `examples/greet` du dépôt est un modèle complet : un `pom.xml` qui
 
 ## Limites connues de l'étape 7
 
-- Pas de déchargement ni de rechargement d'un module : pour une nouvelle version, remplacer le jar et relancer PowerJ.
+- Pas de déchargement ni de rechargement d'un module : pour une nouvelle version, quitter PowerJ, remplacer le jar et relancer (sous Windows, un jar chargé est verrouillé tant que PowerJ tourne).
 - Collision de noms : le premier module chargé (ordre alphabétique des fichiers au démarrage) garde le nom court ; l'autre cmdlet n'est accessible que par `module:nom`, qui n'est pas proposé par Tab.
 - `powerj-api` est un artefact Maven séparé, mais pas encore publié sur un dépôt public : pour compiler un module hors de ce dépôt, l'installer localement avec `mvnw -pl powerj-api -am install`.
