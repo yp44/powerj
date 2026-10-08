@@ -2,6 +2,8 @@ package io.powerj.core.lang;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
@@ -142,6 +144,22 @@ public final class ExpressionParser {
             statics = outer;
         }
         return new Names(statics, Set.copyOf(names));
+    }
+
+    /**
+     * En-tête de lambda ({@code f ->}, {@code (a, b) ->}) commençant en {@code at} : ses paramètres et la
+     * position qui suit {@code ->}.
+     */
+    public static Optional<Map.Entry<List<String>, Integer>> lambdaHeader(String input, int at) {
+        Matcher header = LAMBDA_HEADER.matcher(input).region(at, input.length());
+        if (!header.lookingAt()) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(Map.entry(parameters(header), header.end()));
+        } catch (SyntaxException e) {
+            return Optional.empty();
+        }
     }
 
     /** {@code name} est-il un paramètre d'une lambda englobante ? */

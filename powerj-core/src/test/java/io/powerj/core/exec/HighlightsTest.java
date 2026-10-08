@@ -15,7 +15,7 @@ class HighlightsTest {
 
     private static List<Span> of(String line) {
         return Highlights.of(line, name -> switch (name) {
-            case "ls", "where" -> Interpreter.CommandKind.CMDLET;
+            case "ls", "where", "map" -> Interpreter.CommandKind.CMDLET;
             case "cd" -> Interpreter.CommandKind.BUILTIN;
             case "git", "^ls" -> Interpreter.CommandKind.NATIVE;
             default -> Interpreter.CommandKind.UNKNOWN;
@@ -56,5 +56,15 @@ class HighlightsTest {
         assertThat(colored("(ls)*.name", Kind.CMDLET)).isEqualTo("ls");
         assertThat(colored("ls | where { f -> f.size > 1 }", Kind.UNKNOWN)).isEmpty();
         assertThat(colored("ls | where { f -> f.size > 1 }", Kind.OPTION)).isEmpty();
+    }
+
+    @Test
+    void parenthesizedLambdaParametersAreNotCommands() {
+        assertThat(colored("(ls -r) | map {f -> (f.size) + \": \" + f.name}", Kind.UNKNOWN)).isEmpty();
+        assertThat(colored("map { (a, b) -> (a) + (b.x) }", Kind.UNKNOWN)).isEmpty();
+        assertThat(colored("$l.stream().map(x -> (x.a)).toList()", Kind.UNKNOWN)).isEmpty();
+        assertThat(colored("$l.stream().reduce(0, (a, b) -> (a) + (b))", Kind.UNKNOWN)).isEmpty();
+        // hors de la lambda, f n'est plus un paramètre
+        assertThat(colored("ls | map { f -> f.name } ; (f.size)", Kind.UNKNOWN)).isEqualTo("f.size");
     }
 }

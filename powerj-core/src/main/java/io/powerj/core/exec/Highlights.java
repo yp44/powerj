@@ -4,9 +4,11 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
+import io.powerj.core.lang.ExpressionParser;
 import io.powerj.core.lang.Lexer;
 
 /**
@@ -34,6 +36,7 @@ public final class Highlights {
                                 Predicate<String> staticNames) {
         List<Span> spans = new ArrayList<>();
         Deque<Character> nesting = new ArrayDeque<>();
+        List<Map.Entry<Integer, List<String>>> parameters = new ArrayList<>(); // profondeur → paramètres
         boolean head = true;
         int i = 0;
         while (i < line.length()) {
@@ -65,20 +68,21 @@ public final class Highlights {
             switch (c) {
                 case '{', '[' -> {
                     nesting.push(c);
-                    i++;
+                    i = c == '{' ? lambda(line, i + 1, nesting.size(), parameters) : i + 1;
                     continue;
                 }
                 case '(' -> {
                     boolean call = i > 0 && Character.isJavaIdentifierPart(line.charAt(i - 1));
                     nesting.push(call ? '[' : '('); // un appel Java ne contient pas de commande
                     head = !call;
-                    i++;
+                    i = call ? lambda(line, i + 1, nesting.size(), parameters) : i + 1;
                     continue;
                 }
                 case '}', ']', ')' -> {
                     if (!nesting.isEmpty()) {
                         nesting.pop();
                     }
+                    parameters.removeIf(scope -> scope.getKey() > nesting.size());
                     head = false;
                     i++;
                     continue;
@@ -90,6 +94,10 @@ public final class Highlights {
                     i++;
                     continue;
                 }
+                case ',' -> {
+                    i = command ? i + 1 : lambda(line, i + 1, nesting.size(), parameters);
+                    continue;
+                }
                 case '=' -> {
                     i++;
                     continue;
@@ -98,12 +106,12 @@ public final class Highlights {
             }
             int end = wordEnd(line, i);
             if (!command) {
-                i = Math.max(end, i + 1);
+                i++; // caractère par caractère : une virgule peut précéder une lambda
                 continue;
             }
             String word = line.substring(i, end);
             if (head) {
-                if (!Lexer.expressionAt(line, i, staticNames) && !word.isEmpty()) {
+                if (!Lexer.expressionAt(line, i, staticNames) && !word.isEmpty() && !isParameter(word, parameters)) {
                     spans.add(new Span(i, end, switch (commands.apply(word)) {
                         case BUILTIN -> Kind.BUILTIN;
                         case CMDLET -> Kind.CMDLET;
@@ -118,6 +126,21 @@ public final class Highlights {
             i = Math.max(end, i + 1);
         }
         return spans;
+    }
+
+    /** Note les paramètres d'une lambda dont l'en-tête commence en {@code at} ; renvoie où reprendre. */
+    private static int lambda(String line, int at, int depth, List<Map.Entry<Integer, List<String>>> parameters) {
+        return ExpressionParser.lambdaHeader(line, at).map(header -> {
+            parameters.add(Map.entry(depth, header.getKey()));
+            return header.getValue();
+        }).orElse(at);
+    }
+
+    /** {@code f.size} dans {@code f -> (f.size)} : une expression sur un paramètre, pas une commande. */
+    private static boolean isParameter(String word, List<Map.Entry<Integer, List<String>>> parameters) {
+        int dot = word.indexOf('.');
+        String name = dot < 0 ? word : word.substring(0, dot);
+        return parameters.stream().anyMatch(scope -> scope.getValue().contains(name));
     }
 
     private static boolean isVariableChar(char c) {
