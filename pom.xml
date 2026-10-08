@@ -18,6 +18,7 @@
         <module>powerj-cmdlets</module>
         <module>powerj-shell</module>
         <module>powerj-dist</module>
+        <module>examples/greet</module>
     </modules>
 
     <properties>

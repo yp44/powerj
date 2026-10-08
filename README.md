@@ -19,7 +19,7 @@ C:\> dir /b | powerj -c "where { $_.endsWith(\".txt\") }"
 
 ## État
 
-Étape 6 : autocomplétion Tab (commandes `[pj]`/`[interne]`/`[natif]`, options, chemins, variables, propriétés de `$_` et des paramètres de lambda, API Java avec signatures) et coloration de la saisie. Étapes 5 et 5b : accès direct à l'API Java du JRE — appels statiques (`Math.max(3, 7)`, `java.util.List.of(…)`), champs (`Math.PI`), `new`, méthodes d'instance (`$l.stream().toList()`), imports par défaut et `import`, surcharges, varargs et conversions, casts `[long] 5`, lambdas à la Java (`ls -r | where { f -> f.size > 1mb }`, `$l.sort((a, b) -> a.length() - b.length())`), références de méthode (`map FileEntry::name`, `String::length`), opérateur `*.` pour chaque élément d'une liste (`$f*.name`), cmdlet `map`, blocs de texte `"""`, exceptions Java lisibles (`$errors`, `$debug`), `help java.util.List`, `$( … )` dans les chaînes, second Ctrl+C pour abandonner un calcul bloqué. Étapes précédentes : pipeline `|` et `where`, mode non interactif ; cmdlets `ls` et `env`, objets et propriétés ; commandes natives, `cd`, `;` `&&` `||`, variables, redirections ; édition de ligne et historique. Voir le plan de développement (§11 de la spécification).
+Étape 7 : modules tiers — un jar déposé dans `~/.powerj/modules/` ajoute ses cmdlets au démarrage (`ModuleLayer` isolé par module), `mod-load` à chaud, `mod-list`, collisions de noms (`module:nom`) ; module d'exemple [`examples/greet`](examples/greet) (artefact CI `greet-module`). Étape 6 : autocomplétion Tab (commandes `[pj]`/`[interne]`/`[natif]`, options, chemins, variables, propriétés de `$_` et des paramètres de lambda, API Java avec signatures) et coloration de la saisie. Étapes 5 et 5b : accès direct à l'API Java du JRE — appels statiques (`Math.max(3, 7)`, `java.util.List.of(…)`), champs (`Math.PI`), `new`, méthodes d'instance (`$l.stream().toList()`), imports par défaut et `import`, surcharges, varargs et conversions, casts `[long] 5`, lambdas à la Java (`ls -r | where { f -> f.size > 1mb }`, `$l.sort((a, b) -> a.length() - b.length())`), références de méthode (`map FileEntry::name`, `String::length`), opérateur `*.` pour chaque élément d'une liste (`$f*.name`), cmdlet `map`, blocs de texte `"""`, exceptions Java lisibles (`$errors`, `$debug`), `help java.util.List`, `$( … )` dans les chaînes, second Ctrl+C pour abandonner un calcul bloqué. Étapes précédentes : pipeline `|` et `where`, mode non interactif ; cmdlets `ls` et `env`, objets et propriétés ; commandes natives, `cd`, `;` `&&` `||`, variables, redirections ; édition de ligne et historique. Voir le plan de développement (§11 de la spécification).
 
 ## Construire
 
@@ -42,6 +42,7 @@ Sans JDK 27 sous la main, on peut vérifier le build avec un JDK plus ancien sup
 |---|---|
 | `powerj-api` | API publique pour écrire des cmdlets |
 | `powerj-core` | Analyse, interprétation, pipeline, interopérabilité Java |
-| `powerj-cmdlets` | Cmdlets intégrés (`ls`, `where`, `env`) |
+| `powerj-cmdlets` | Cmdlets intégrés (`ls`, `where`, `map`, `env`) |
 | `powerj-shell` | REPL et point d'entrée |
 | `powerj-dist` | Distribution : jlink + jpackage |
+| `examples/greet` | Module tiers d'exemple (`greet`), non livré : modèle pour écrire ses propres cmdlets |

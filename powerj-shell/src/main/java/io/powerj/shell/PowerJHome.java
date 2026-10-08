@@ -35,6 +35,11 @@ public record PowerJHome(Path dir) {
         return dir.resolve("config.properties");
     }
 
+    /** Modules tiers chargés au démarrage (§4.4). */
+    public Path modulesDir() {
+        return dir.resolve("modules");
+    }
+
     public Path logsDir() {
         return dir.resolve("logs");
     }

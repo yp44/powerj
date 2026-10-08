@@ -42,6 +42,11 @@ final class ScriptMode {
         input.ifPresent(interpreter::useStandardInput);
     }
 
+    /** Charge les modules tiers (§4.4) ; les avertissements vont sur la sortie d'erreur. */
+    void loadModules(java.nio.file.Path dir) {
+        interpreter.loadModules(dir).forEach(errors);
+    }
+
     /** Exécute les lignes dans l'ordre ; les lignes vides et les commentaires {@code #} sont ignorés. */
     int run(List<String> lines) {
         int code = 0;

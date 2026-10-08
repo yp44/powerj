@@ -39,6 +39,7 @@ public final class Interpreter {
     private final ShellIo io;
     private final Map<String, Builtin> builtins = new LinkedHashMap<>();
     private final CmdletRegistry registry;
+    private final ModuleLoader modules;
     private final CommandResolver resolver;
     private final NativeRunner nativeRunner;
     private final Evaluator evaluator;
@@ -69,7 +70,48 @@ public final class Interpreter {
         builtins.put("which", this::which);
         builtins.put("help", (args, _) -> Help.run(args, registry, session.java()));
         builtins.put("import", (args, _) -> importClasses(args));
+        builtins.put("mod-load", this::modLoad);
+        builtins.put("mod-list", this::modList);
         builtins.putAll(extraBuiltins);
+        this.modules = new ModuleLoader(registry, java.util.Collections.unmodifiableSet(builtins.keySet()));
+    }
+
+    /**
+     * Charge les modules tiers du dossier (au démarrage, §4.4).
+     *
+     * @return avertissements à afficher (module invalide, nom en conflit)
+     */
+    public List<String> loadModules(Path dir) {
+        return modules.loadAll(dir).stream().flatMap(r -> r.warnings().stream()).toList();
+    }
+
+    /** {@code mod-load <chemin.jar>} : charge un module à chaud. */
+    private List<Object> modLoad(List<Object> args, Session session) {
+        if (args.isEmpty()) {
+            throw new PjException("mod-load : chemin d'un module (.jar ou dossier) attendu");
+        }
+        List<Object> loaded = new ArrayList<>();
+        for (Object arg : args) {
+            String text = Values.text(arg);
+            Path path = text.equals("~") ? session.home()
+                    : text.startsWith("~/") || text.startsWith("~\\") ? session.home().resolve(text.substring(2))
+                    : session.currentDirectory().resolve(text);
+            ModuleLoader.Result result = modules.load(path);
+            result.warnings().forEach(io.errors());
+            if (result.cmdlets().isEmpty() && !result.warnings().isEmpty()) {
+                throw new PjException("mod-load : " + path.getFileName() + " non chargé");
+            }
+            loaded.addAll(result.cmdlets());
+        }
+        return loaded;
+    }
+
+    /** {@code mod-list} : modules chargés et leurs cmdlets. */
+    private List<Object> modList(List<Object> args, Session session) {
+        if (!args.isEmpty()) {
+            throw new PjException("mod-list : aucun argument attendu");
+        }
+        return List.copyOf(registry.modules());
     }
 
     public Session session() {
