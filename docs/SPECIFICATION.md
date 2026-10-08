@@ -438,6 +438,7 @@ Rassemble tous les objets reçus en **une seule liste** non modifiable (type `io
 
 - le résultat est **toujours une liste**, même vide ou d'un seul élément (une sous-expression ou une affectation sans `collect` donne l'objet seul quand il n'y en a qu'un) : `(ls -r | where { f -> !f.dir } | collect).size()` ;
 - cette liste n'est **pas déroulée** entre deux étapes (FR-30b) : l'étape suivante la reçoit en un seul objet, `ls -r | collect | map { l -> l.stream().sorted((a, b) -> Long.compare(b.size, a.size)).limit(5).toList() }` (le résultat de `map`, une liste ordinaire, est à nouveau déroulé) ;
+- en revanche, placée **en tête** d'un pipeline (`$l = ls | collect` puis `$l | map { f -> f.name }`), elle est déroulée comme toute liste : seule une liste passée d'une commande à la suivante reste entière ;
 - en fin de pipeline, elle s'affiche comme ses éléments.
 
 CA :

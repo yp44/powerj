@@ -168,6 +168,11 @@ class BuiltinCmdletsTest {
         assertThat(run("ls -r --files | collect | map { l -> l.stream().map(f -> f.name).sorted().toList() }"))
                 .isEqualTo("notes.txt\nspec.md\n");
         assertThat(run("ls | collect | where { l -> l.size() > 1 } | map { l -> \"ok\" }")).isEqualTo("ok\n");
+        // En tête de pipeline, une variable est déroulée comme toute liste ; seule, elle reste une liste.
+        assertThat(run("$l | map { f -> f.name } | where { n -> n.endsWith(\".md\") }")).isEqualTo("spec.md\n");
+        run("$m = $l");
+        assertThat(session.variable("m")).isSameAs(session.variable("l"));
+        assertThat(run("$l.stream() | map { f -> f.name } | where { n -> n.endsWith(\".txt\") }")).isEqualTo("notes.txt\n");
         // Affichée en fin de pipeline comme ses éléments.
         assertThat(run("ls | collect")).contains("docs", "notes.txt");
         assertThat(run("collect --help")).contains("collect — Rassemble les objets du pipeline en une seule liste");

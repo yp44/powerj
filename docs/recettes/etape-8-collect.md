@@ -28,6 +28,7 @@ Sans `collect`, `( … )` et `$l = …` donnent l'objet **seul** quand il n'y a 
 | 4 | `$l.getClass().getSimpleName()` | `Collected` (une `List` non modifiable). |
 | 5 | `ls C:\Windows \| collect \| map { l -> l.size() }` | **Un seul** nombre (la liste arrive entière dans `map`). |
 | 6 | `ls -r --files \| collect \| map { l -> l.stream().sorted((a, b) -> Long.compare(b.size, a.size)).limit(5).toList() }` | Tableau des 5 plus gros fichiers (dossier courant et sous-dossiers). |
+| 6b | `$l = ls C:\Windows --dirs \| collect` puis `$l \| map { f -> f.name }` | Un nom par ligne : en tête de pipeline, la variable est parcourue élément par élément, comme toute liste. Autres façons : `$l*.name`, `$l.stream() \| map { f -> f.name }`, `$l.forEach(f -> System.out.println(f.name))`. |
 | 7 | `ls C:\Windows --dirs \| collect` | Affiché comme `ls C:\Windows --dirs` (une liste s'affiche par ses éléments). |
 | 8 | `ls \| collect \| where { l -> l.size() > 3 } \| map { l -> "plus de 3 : " + l.size() }` | Une ligne si le dossier courant a plus de 3 entrées, rien sinon. |
 | 9 | `ls \| collect \| map { l -> l.` puis Tab Tab | Méthodes de `List` : `size()`, `stream()`, `get(`… |
