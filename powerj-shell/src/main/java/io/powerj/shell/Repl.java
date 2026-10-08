@@ -37,6 +37,7 @@ public final class Repl {
     private final Interpreter interpreter;
     private final Terminal terminal;
     private final PrintWriter out;
+    private List<String> moduleWarnings = List.of();
 
     public Repl(LineReader reader, Supervisor supervisor, Session session, CmdletRegistry registry) {
         this.reader = Objects.requireNonNull(reader, "reader");
@@ -60,6 +61,11 @@ public final class Repl {
         terminal.handle(Terminal.Signal.INT, _ -> supervisor.cancel());
     }
 
+    /** Charge les modules tiers (§4.4) ; les avertissements sont affichés sous la bannière. */
+    public void loadModules(java.nio.file.Path dir) {
+        moduleWarnings = interpreter.loadModules(dir);
+    }
+
     /**
      * Exécute la boucle jusqu'à {@code exit} ou Ctrl+D sur une ligne vide.
      *
@@ -67,6 +73,7 @@ public final class Repl {
      */
     public int run(BuildInfo buildInfo) {
         out.println(buildInfo.banner());
+        moduleWarnings.forEach(this::printError);
         out.flush();
         while (session.exitRequest().isEmpty()) {
             String line;

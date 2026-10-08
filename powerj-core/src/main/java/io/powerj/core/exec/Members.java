@@ -58,7 +58,9 @@ public final class Members {
     }
 
     static boolean isAccessible(Class<?> type) {
-        return Modifier.isPublic(type.getModifiers()) && type.getModule().isExported(type.getPackageName());
+        // Exporté à PowerJ : les packages des modules tiers lui sont ouverts au chargement (ModuleLoader).
+        return Modifier.isPublic(type.getModifiers())
+                && type.getModule().isExported(type.getPackageName(), Members.class.getModule());
     }
 
     /** Getter accessible {@code getNom()} / {@code isNom()} pour la propriété {@code name}. */

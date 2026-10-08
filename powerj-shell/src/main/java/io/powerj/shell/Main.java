@@ -94,6 +94,7 @@ public final class Main {
                 System.getenv());
         int width = console ? columns() : 10_000;
         var script = new ScriptMode(session, CmdletRegistry.discover(), out, err::println, width, input);
+        script.loadModules(PowerJHome.resolve(System.getenv(), Path.of(System.getProperty("user.home"))).modulesDir());
         int code = script.run(lines);
         out.flush();
         err.flush();
@@ -142,6 +143,7 @@ public final class Main {
             var session = new Session(Path.of(System.getProperty("user.home")), Path.of("").toAbsolutePath(),
                     System.getenv());
             var repl = new Repl(reader, new Supervisor(), session, CmdletRegistry.discover());
+            repl.loadModules(home.modulesDir());
             int code = repl.run(BuildInfo.current());
             try {
                 reader.getHistory().save();

@@ -76,6 +76,27 @@ jobs:
           cat stdin.txt
           test "$(cat stdin.txt)" = "$(printf 'x.txt\nz.txt')"
 
+      - name: Test de fumée des modules tiers
+        run: |
+          pj=$PWD/powerj-dist/target/jpackage/powerj/bin/powerj
+          export POWERJ_HOME=$RUNNER_TEMP/pjhome
+          mkdir -p $POWERJ_HOME/modules
+          cp examples/greet/target/greet.jar $POWERJ_HOME/modules/
+          $pj -c 'greet --name Yves -c 2 | where { g -> g.message.contains("Yves") } | map { g -> g.message }' > greet.txt
+          $pj -c 'mod-list' >> greet.txt
+          $pj -c 'new com.example.greet.Greeting("a", "b", null)' >> greet.txt 2>&1 || true
+          cat greet.txt
+          test "$(grep -c 'Bonjour Yves !' greet.txt)" -eq 2
+          grep -q 'com.example.greet .*\[greet\]' greet.txt
+          grep -q 'classe introuvable : com.example.greet.Greeting' greet.txt
+
+      - name: Module d'exemple greet.jar
+        uses: actions/upload-artifact@v5
+        with:
+          name: greet-module
+          path: examples/greet/target/greet.jar
+          if-no-files-found: error
+
       - uses: actions/upload-artifact@v5
         with:
           name: powerj-linux-x64
@@ -148,6 +169,21 @@ jobs:
           $lignes = 'x.txt', 'y.log', 'z.txt' | & $pj filtre.pj
           $lignes
           if (($lignes -join ',') -ne 'x.txt,z.txt') { throw "filtrage de l'entrée standard incorrect : $lignes" }
+          exit 0
+
+      - name: Test de fumée des modules tiers
+        shell: pwsh
+        run: |
+          $pj = "$PWD\powerj-dist\target\jpackage\powerj\powerj.exe"
+          $env:POWERJ_HOME = "$env:RUNNER_TEMP\pjhome"
+          New-Item -ItemType Directory -Force "$env:POWERJ_HOME\modules" | Out-Null
+          Copy-Item examples\greet\target\greet.jar "$env:POWERJ_HOME\modules\"
+          $lignes = & $pj -c 'greet -n Yves -c 2 | map { g -> g.message }'
+          $lignes
+          if (($lignes -join ',') -ne 'Bonjour Yves !,Bonjour Yves !') { throw "greet incorrect : $lignes" }
+          $modules = & $pj -c 'mod-list'
+          $modules
+          if (-not ($modules -match 'com.example.greet')) { throw "mod-list ne liste pas com.example.greet" }
           exit 0
 
       - name: Archive portable powerj.exe

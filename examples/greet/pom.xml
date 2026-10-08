@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.powerj</groupId>
+        <artifactId>powerj-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <!-- Module tiers d'exemple (spécification §4.3) : n'est pas livré avec PowerJ.
+         Installation : copier target/greet.jar dans ~/.powerj/modules/. -->
+    <groupId>com.example</groupId>
+    <artifactId>powerj-example-greet</artifactId>
+    <name>PowerJ Exemple : module greet</name>
+
+    <dependencies>
+        <!-- Seule dépendance nécessaire pour écrire un cmdlet. -->
+        <dependency>
+            <groupId>io.powerj</groupId>
+            <artifactId>powerj-api</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>greet</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <compilerArgs>
+                        <arg>--module-version</arg>
+                        <arg>${project.version}</arg>
+                    </compilerArgs>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Version du document** | 0.6 (alignement Java : lambdas, références de méthode, `map`, booléens stricts) |
+| **Version du document** | 0.7 (modules tiers : chargement, `mod-load`, `mod-list`, collisions) |
 | **Statut** | À valider |
 | **Plateforme cible** | Windows 10/11 x64 (`powerj.exe`), Linux/macOS en bonus |
 | **Socle technique** | Java 27, Maven 3.9, JLine 3 |
@@ -191,7 +191,7 @@ Il n'existe **pas** de forme longue (`pj-ls`, `Get-ChildItem`…).
 
 **FR-16 — Préférence configurable.** La clé `native.prefer` de `config.properties` liste les noms pour lesquels la commande native passe avant le cmdlet (ex. `native.prefer=find,sort`).
 
-**FR-17 — Collisions entre modules.** Si un module déclare un cmdlet dont le nom existe déjà, un avertissement est affiché au chargement ; le premier chargé garde le nom court, l'autre reste accessible par `module:nom` (ex. `docker:ps`).
+**FR-17 — Collisions entre modules.** Si un module déclare un cmdlet dont le nom existe déjà, un avertissement est affiché au chargement ; le premier chargé garde le nom court, l'autre reste accessible par `module:nom` (ex. `docker:ps`), où `module` est le dernier segment du nom du module Java (`com.example.greet` → `greet:greet`). Un cmdlet portant le nom d'une commande interne (`cd`, `help`, `mod-load`…) est ignoré avec un avertissement : il ne pourrait jamais être appelé.
 
 ### 3.5 Paramètres
 
@@ -678,9 +678,11 @@ public interface Cmdlet<P extends Record, I, O> {
 public interface CmdletContext<O> {
     void emit(O value);                 // écrit sur le flux de sortie
     void error(String message);         // erreur non bloquante
-    Path cwd();
+    Path currentDirectory();
+    Map<String, String> environment();  // environnement de la session (FR-36b)
     Optional<Object> variable(String name);
     boolean cancelled();                // Ctrl+C demandé
+    ScriptBlock compile(String expression);
 }
 
 @Retention(RUNTIME) @Target(TYPE)
@@ -706,7 +708,7 @@ public @interface Completion { Class<? extends Completer> value(); }
 public interface CmdletProvider { List<Cmdlet<?, ?, ?>> cmdlets(); }
 ```
 
-> Les signatures exactes seront figées à l'étape 3 ; elles sont données ici pour fixer l'intention.
+> La référence est le code du module `powerj-api` (Javadoc) ; l'annotation `@Completion` n'est pas encore disponible.
 
 ### 4.3 Exemple complet : module `greet`
 
@@ -759,10 +761,12 @@ Yves   Bonjour Yves !   2026-10-07 10:12:03
 
 ### 4.4 Installation et chargement
 
-- Au démarrage, chaque `~/.powerj/modules/*.jar` est chargé dans son propre `ModuleLayer` (isolation des dépendances entre modules).
-- `mod-load <chemin.jar>` charge un module à chaud ; `mod-list` liste les modules chargés et leurs cmdlets.
-- Les classes d'un module ne sont **pas** utilisables en expression Java (§3.13) : seuls ses cmdlets sont exposés. C'est le moyen prévu pour utiliser une bibliothèque externe depuis PowerJ.
-- Un module invalide (nom en conflit, exception au chargement) est signalé par un avertissement ; les autres modules sont chargés normalement.
+- Au démarrage, chaque `~/.powerj/modules/*.jar` est chargé dans son propre `ModuleLayer` (isolation des dépendances entre modules). Un module qui a des dépendances se place dans un **sous-dossier** (`~/.powerj/modules/docker/` contenant le jar du module et ceux de ses dépendances) : le sous-dossier forme une seule couche. Le dossier suit `POWERJ_HOME` (§8).
+- Le jar peut être un module explicite (`module-info.java` avec `provides io.powerj.api.CmdletProvider with …`) ou un jar classique déclarant le service dans `META-INF/services/io.powerj.api.CmdletProvider` (module automatique). Il n'a pas besoin d'exporter ses packages : PowerJ se les fait ouvrir au chargement pour lire les records et les options.
+- Les modules du runtime et de PowerJ sont prioritaires : un jar qui embarque sa propre copie de `powerj-api` utilise celle du shell.
+- `mod-load <chemin>` charge un module (jar ou dossier) à chaud et affiche les cmdlets ajoutés ; `mod-list` liste les modules chargés (nom, version, cmdlets, source), y compris les cmdlets intégrés.
+- Les classes d'un module ne sont **pas** utilisables en expression Java (§3.13) : `new com.example.greet.Greeting(…)` répond « classe introuvable ». Seuls ses cmdlets sont exposés ; les objets qu'ils produisent s'utilisent normalement (`$g.message`, `where`, `map`). C'est le moyen prévu pour utiliser une bibliothèque externe depuis PowerJ.
+- Un module invalide (jar illisible, dépendance manquante, aucun cmdlet, module déjà chargé, nom en conflit, exception au chargement) est signalé par un avertissement ; les autres modules sont chargés normalement.
 
 ---
 
@@ -1051,7 +1055,7 @@ Livrée avec l'étape 5 (même PR, même exe).
 4. `greet -n Yves | where { $_.message.contains("Yves") }`.
 5. `help greet` affiche l'aide générée.
 6. `mod-list` liste le module.
-7. `new com.example.greet.Greeting(...)` : erreur « classe inconnue » (les classes des modules ne sont pas exposées).
+7. `new com.example.greet.Greeting(...)` : erreur « classe introuvable » (les classes des modules ne sont pas exposées).
 
 ### Après ces étapes
 
