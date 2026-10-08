@@ -64,7 +64,7 @@ public final class ExpressionParser {
 
     private final String input;
     private final Mode mode;
-    private final Predicate<String> staticNames;
+    private Predicate<String> staticNames;
     private int pos;
     private int depth;
     private Tok lookahead;
@@ -113,9 +113,40 @@ public final class ExpressionParser {
             if (body.isBlank()) {
                 throw new SyntaxException("corps de lambda attendu après « -> »");
             }
-            return new Ast.Lambda(source.strip(), parameters, parse(body, staticNames));
+            return new Ast.Lambda(source.strip(), parameters, parse(body, withParameters(staticNames, parameters)));
         }
         return new Ast.BlockExpression(source.strip(), parse(source, staticNames));
+    }
+
+    /**
+     * Noms connus en tête d'une commande entre parenthèses : noms statiques Java, plus les paramètres des
+     * lambdas englobantes ({@code (f.size)} dans {@code f -> …} est une expression, pas la commande
+     * {@code f.size}).
+     */
+    private record Names(Predicate<String> statics, Set<String> parameters) implements Predicate<String> {
+        @Override
+        public boolean test(String name) {
+            int dot = name.indexOf('.');
+            return parameters.contains(dot < 0 ? name : name.substring(0, dot)) || statics.test(name);
+        }
+    }
+
+    private static Predicate<String> withParameters(Predicate<String> staticNames, List<String> parameters) {
+        if (parameters.isEmpty()) {
+            return staticNames;
+        }
+        Set<String> names = new java.util.HashSet<>(parameters);
+        Predicate<String> statics = staticNames;
+        if (staticNames instanceof Names(var outer, var outerParameters)) {
+            names.addAll(outerParameters);
+            statics = outer;
+        }
+        return new Names(statics, Set.copyOf(names));
+    }
+
+    /** {@code name} est-il un paramètre d'une lambda englobante ? */
+    static boolean isParameter(Predicate<String> staticNames, String name) {
+        return staticNames instanceof Names(var _, var parameters) && parameters.contains(name);
     }
 
     /** {@code f ->}, {@code (a, b) ->}, {@code () ->} en tête de texte. */
@@ -327,7 +358,14 @@ public final class ExpressionParser {
         }
         List<String> parameters = parameters(header);
         reset(header.end());
-        Expression body = expression();
+        Predicate<String> enclosing = staticNames;
+        staticNames = withParameters(enclosing, parameters);
+        Expression body;
+        try {
+            body = expression();
+        } finally {
+            staticNames = enclosing;
+        }
         return new Ast.Lambda(input.substring(start, pos).strip(), parameters, body);
     }
 

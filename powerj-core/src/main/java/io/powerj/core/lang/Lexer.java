@@ -190,7 +190,7 @@ public final class Lexer {
             }
             return chainEnd == end && staticNames.test(input.substring(at, chainEnd));
         }
-        return false;
+        return ExpressionParser.isParameter(staticNames, word);
     }
 
     /** En argument : variable, chaîne, groupe, bloc, ou appel Java collé ({@code Path.of("x")}). */

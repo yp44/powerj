@@ -95,6 +95,20 @@ class ExpressionParserTest {
     }
 
     @Test
+    void parenthesizedLambdaParameterIsAnExpression() {
+        var f = new Ast.Name("f");
+        assertThat(ExpressionParser.function("f -> (f.size) + 1", _ -> false)).isEqualTo(new Ast.Lambda(
+                "f -> (f.size) + 1", List.of("f"), new Binary(Operator.ADD, new Get(f, "size"), new Literal(1))));
+        assertThat(ExpressionParser.function("(a, b) -> (a) + (b.x)", _ -> false)).isEqualTo(new Ast.Lambda(
+                "(a, b) -> (a) + (b.x)", List.of("a", "b"),
+                new Binary(Operator.ADD, new Ast.Name("a"), new Get(new Ast.Name("b"), "x"))));
+        var nested = (Ast.Lambda) ExpressionParser.function("f -> $l.stream().map(x -> (f.size) + (x)).toList()", _ -> false);
+        assertThat(nested.body().toString()).doesNotContain("SubExpression");
+        // hors lambda, (f.size) reste une commande
+        assertThat(ExpressionParser.parse("(f.size)")).isInstanceOf(Ast.SubExpression.class);
+    }
+
+    @Test
     void spreadOperator() {
         assertThat(ExpressionParser.parse("$l*.name")).isEqualTo(new Ast.SpreadGet(new VariableExpression("l", List.of()), "name"));
         assertThat(ExpressionParser.parse("$l*.name.size()")).isEqualTo(new Invoke(
