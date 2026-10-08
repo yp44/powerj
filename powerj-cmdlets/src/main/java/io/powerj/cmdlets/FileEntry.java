@@ -17,7 +17,7 @@ import io.powerj.api.Display;
  * @param dir      {@code true} pour un dossier
  * @param ext      extension sans le point, {@code ""} si aucune
  */
-@Display(columns = {"name", "size", "modified", "dir"})
+@Display(columns = {"name", "size", "modified", "dir", "path"})
 public record FileEntry(String name, @Bytes long size, Instant modified, Path path, boolean dir, String ext) {
 
     public FileEntry {

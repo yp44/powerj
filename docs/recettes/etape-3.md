@@ -10,7 +10,7 @@ Comme aux étapes précédentes : onglet **Actions**, dernière exécution du wo
 
 | # | Action | Résultat attendu |
 |---|---|---|
-| 1 | `cd ~` puis `ls` | Tableau `name size modified dir` : dossiers d'abord, puis fichiers, par ordre alphabétique ; tailles lisibles (`14,2 KB`), dates locales. |
+| 1 | `cd ~` puis `ls` | Tableau `name size modified dir path` (chemin absolu en dernière colonne) : dossiers d'abord, puis fichiers, par ordre alphabétique ; tailles lisibles (`14,2 KB`), dates locales. |
 | 2 | `ls -a` | Les fichiers cachés apparaissent en plus. |
 | 3 | `ls -r --filter *.txt` (dans un dossier contenant des `.txt`) | Tous les `.txt` des sous-dossiers ; le motif ignore la casse (`*.TXT` aussi). |
 | 4 | `ls -d`, puis `ls --files`, puis `ls C:\Windows *.ini` | Dossiers seuls ; fichiers seuls ; contenu de `C:\Windows` suivi des `.ini` du dossier courant. |

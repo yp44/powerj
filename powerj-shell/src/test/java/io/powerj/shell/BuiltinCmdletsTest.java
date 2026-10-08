@@ -60,7 +60,7 @@ class BuiltinCmdletsTest {
     @Test
     void lsDisplaysATable() throws Exception {
         String table = run("ls");
-        assertThat(table.lines().toList().getFirst()).matches("name\\s+size\\s+modified\\s+dir");
+        assertThat(table.lines().toList().getFirst()).matches("name\\s+size\\s+modified\\s+dir\\s+path");
         assertThat(table).contains("docs", "notes.txt", "7 B", "true", "false");
     }
 

@@ -386,7 +386,7 @@ public record FileEntry(
         String ext) { }    // extension sans le point, "" si aucune
 ```
 
-Colonnes affichées par défaut : `name size modified dir`. Les dossiers sont listés avant les fichiers, par ordre alphabétique. Le parcours est **paresseux** (streaming) : `ls -r C:\ | where …` affiche les premiers résultats immédiatement et Ctrl+C l'interrompt. Un dossier inaccessible produit une erreur non bloquante et le parcours continue.
+Colonnes affichées par défaut : `name size modified dir path` (`path` : chemin absolu, tronqué si la fenêtre est étroite). Les dossiers sont listés avant les fichiers, par ordre alphabétique. Le parcours est **paresseux** (streaming) : `ls -r C:\ | where …` affiche les premiers résultats immédiatement et Ctrl+C l'interrompt. Un dossier inaccessible produit une erreur non bloquante et le parcours continue.
 
 CA :
 - `ls` affiche le contenu du répertoire courant en tableau ;
@@ -962,7 +962,7 @@ Chaque étape :
 **Contenu :** `powerj-api` (FR : §4.2), registre des cmdlets, cmdlet `env` (FR-36b) et réglage de l'encodage par variable (FR-40b), priorité cmdlet > natif, `^`, liaison des options Unix (FR-18 à FR-20), accès aux propriétés des objets (FR-27 à FR-29 : records, getters, champs), affichage selon le type (FR-30), déroulage (FR-30b), cmdlet `ls` (FR-35), `help` (FR-45).
 
 **Recette :**
-1. `ls` affiche un tableau `name size modified dir`.
+1. `ls` affiche un tableau `name size modified dir path`.
 2. `ls -r --filter *.txt` liste récursivement les `.txt`.
 3. `(ls)*.name` affiche les noms seuls.
 4. `$f = ls` puis `$f[0].size` et `$f[0].path.parent`.
