@@ -100,6 +100,8 @@ class CompletionsTest {
         assertThat(values("ls | where { $_.")).contains("name", "size", "modified", "path", "dir", "ext");
         assertThat(values("ls | where { f -> f.na")).contains("name");
         assertThat(values("ls | where { f -> f.name.sta")).contains("startsWith(");
+        assertThat(values("ls | collect | map { l -> l.str")).contains("stream()");
+        assertThat(values("ls | collect | map { l -> l.si")).contains("size()");
         assertThat(values("ls -r | where { $_.dir } | map { $_.ex")).contains("ext");
         assertThat(values("env | where { $_.")).contains("name", "value");
     }

@@ -83,11 +83,12 @@ final class Pipe implements Source {
     /**
      * Émet {@code value}, ou chacun de ses éléments si c'est un {@link Iterable} (sauf {@code Path}), un
      * tableau, un {@link Stream}, un {@link Iterator} ou un {@link Optional}. Les chaînes et les {@code Map}
-     * ne sont jamais déroulées.
+     * ne sont jamais déroulées, ni une liste {@link io.powerj.api.Collected} produite par {@code collect}.
      */
     static void unroll(Object value, Pipe target) {
         switch (value) {
             case java.nio.file.Path path -> target.put(path);
+            case io.powerj.api.Collected<?> list -> target.put(list); // collect : la liste passe entière (FR-36d)
             case Iterable<?> items -> items.forEach(target::put);
             case Stream<?> stream -> {
                 try (stream) {

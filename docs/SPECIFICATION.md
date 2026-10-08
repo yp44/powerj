@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Version du document** | 0.7 (modules tiers : chargement, `mod-load`, `mod-list`, collisions) |
+| **Version du document** | 0.8 (cmdlet `collect`) |
 | **Statut** | À valider |
 | **Plateforme cible** | Windows 10/11 x64 (`powerj.exe`), Linux/macOS en bonus |
 | **Socle technique** | Java 27, Maven 3.9, JLine 3 |
@@ -268,7 +268,7 @@ Les **records restent le format recommandé** pour les sorties des cmdlets (affi
 
 Des objets successifs du même type record sont regroupés dans un même tableau.
 
-**FR-30b — Déroulage des collections.** Lorsqu'une étape de pipeline produit un `Iterable` (`List`, `Set`…), un tableau, un `Stream`, un `Iterator` ou un `Optional`, ses éléments sont **émis un par un** dans le flux (`Optional` vide → rien). `String` et `Map` ne sont **jamais** déroulés.
+**FR-30b — Déroulage des collections.** Lorsqu'une étape de pipeline produit un `Iterable` (`List`, `Set`…), un tableau, un `Stream`, un `Iterator` ou un `Optional`, ses éléments sont **émis un par un** dans le flux (`Optional` vide → rien). `String` et `Map` ne sont **jamais** déroulés, ni la liste produite par `collect` (FR-36d).
 En **affectation**, l'objet est conservé tel quel :
 
 ```text
@@ -427,6 +427,25 @@ CA :
 - `ls -r | map { f -> f.name.length() }` ;
 - `ls | map { $_.name.toUpperCase() } | where { s -> s.startsWith("P") }` ;
 - `env | map EnvVar::name`.
+
+#### FR-36d — `collect` : rassembler les objets en une liste
+
+```text
+collect
+```
+
+Rassemble tous les objets reçus en **une seule liste** non modifiable (type `io.powerj.api.Collected`, une `List`), comme `Stream.toList()`. C'est le moyen de traiter la liste entière après un `|` :
+
+- le résultat est **toujours une liste**, même vide ou d'un seul élément (une sous-expression ou une affectation sans `collect` donne l'objet seul quand il n'y en a qu'un) : `(ls -r | where { f -> !f.dir } | collect).size()` ;
+- cette liste n'est **pas déroulée** entre deux étapes (FR-30b) : l'étape suivante la reçoit en un seul objet, `ls -r | collect | map { l -> l.stream().sorted((a, b) -> Long.compare(b.size, a.size)).limit(5).toList() }` (le résultat de `map`, une liste ordinaire, est à nouveau déroulé) ;
+- en revanche, placée **en tête** d'un pipeline (`$l = ls | collect` puis `$l | map { f -> f.name }`), elle est déroulée comme toute liste : seule une liste passée d'une commande à la suivante reste entière ;
+- en fin de pipeline, elle s'affiche comme ses éléments.
+
+CA :
+- `(ls / | where { f -> f.name == "usr" } | collect).size()` vaut `1` ; sans résultat, `0` ;
+- `$l = ls | collect` puis `$l.size()`, `$l.stream()…` ;
+- `ls | collect | map { l -> l.size() }` affiche un seul nombre ;
+- Tab après `ls | collect | map { l -> l.` propose les méthodes de `List`.
 
 #### FR-36b — `env` : variables d'environnement
 
@@ -1059,7 +1078,12 @@ Livrée avec l'étape 5 (même PR, même exe).
 
 ### Après ces étapes
 
-Les cmdlets du backlog (§12.3) sont ajoutés **un par mini-itération**, chacune avec une courte spécification (options, record de sortie, CA), un exe et une fiche de recette. La v2 introduira le scripting (`if`, `foreach`, fonctions, fichiers `.pj`).
+Les cmdlets du backlog (§12.3) sont ajoutés **un par mini-itération**, chacune avec une courte spécification (options, record de sortie, CA), un exe et une fiche de recette.
+
+| Mini-itération | Cmdlet | Spécification | Recette |
+|---|---|---|---|
+| 8 | `collect` | FR-36d | `docs/recettes/etape-8-collect.md` |
+ La v2 introduira le scripting (`if`, `foreach`, fonctions, fichiers `.pj`).
 
 ---
 
@@ -1138,6 +1162,7 @@ PJ C:\dev> (ls)*.name.stream().map({ $_.toUpperCase() }).sorted().toList()
 | `ps`, `kill` | Processus | `ProcessEntry` |
 | `select` | Projection d'attributs, `--expand` | `Row` |
 | `sort` | Tri (`--desc`) | inchangé |
+| ~~`collect`~~ | Rassembler en une liste — **fait** (FR-36d) | `Collected` |
 | `first`, `last` | N premiers / derniers | inchangé |
 | `group` | Regroupement | `Group<T>` |
 | `count`, `sum`, `avg`, `min`, `max` | Agrégats | `Stats` |

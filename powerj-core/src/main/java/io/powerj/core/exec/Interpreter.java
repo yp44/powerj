@@ -341,7 +341,7 @@ public final class Interpreter {
         List<Segment> segments = new ArrayList<>();
         List<NativeRunner.Command> natives = new ArrayList<>();
         for (int i = 0; i < stages.size(); i++) {
-            Prepared prepared = prepare(stages.get(i), i);
+            Prepared prepared = prepare(stages.get(i), i, i < stages.size() - 1);
             if (prepared instanceof NativeStep(var command)) {
                 natives.add(command);
                 continue;
@@ -362,13 +362,20 @@ public final class Interpreter {
      * Prépare une étape : évalue ses arguments et résout la commande (FR-13 : commande interne, cmdlet,
      * programme du {@code PATH}).
      *
-     * @param index position dans le pipeline : au-delà de la première, l'étape doit lire des objets
+     * @param index    position dans le pipeline : au-delà de la première, l'étape doit lire des objets
+     * @param followed une étape suit celle-ci
      */
-    private Prepared prepare(Ast.Stage stage, int index) throws InterruptedException {
+    private Prepared prepare(Ast.Stage stage, int index, boolean followed) throws InterruptedException {
         if (stage.body() instanceof Ast.ExpressionBody(var expression)) {
             return new ObjectStep((_, output, _) -> {
                 Object value = evaluator.evaluate(expression);
-                output.accept(value);
+                if (followed && value instanceof io.powerj.api.Collected<?> list) {
+                    // $l | map { … } : une valeur en tête de pipeline est toujours déroulée, comme toute liste ;
+                    // seule une liste passée d'une commande à la suivante reste entière (FR-36d).
+                    list.forEach(output);
+                } else {
+                    output.accept(value);
+                }
                 return !(value instanceof Boolean b) || b;
             });
         }
