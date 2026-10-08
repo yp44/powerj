@@ -35,6 +35,7 @@ Comme aux étapes précédentes : onglet **Actions**, dernière exécution du wo
 
 ## Points de syntaxe à connaître
 
+- **Blocs à l'étape 5** : un bloc reçoit son objet dans `$_` (et deux paramètres dans `$a` / `$b`). À partir de l'étape 5b, on pourra aussi nommer le paramètre comme en Java (`{ f -> f.size > 1mb }`), et `$a` / `$b` seront remplacés par `(a, b) -> …` : voir la recette 5b pour savoir quand utiliser l'une ou l'autre forme.
 - En tête de ligne, un nom qualifié **collé** à `(` est un appel Java (`Math.max(1, 2)`) ; sans parenthèses, il l'est s'il désigne une classe ou un champ statique (`Math.PI`). Sinon c'est une commande : `java -version`, `notepad.exe fichier.txt`. En argument d'une commande, seule la forme appel est une expression : `cat Path.of("a.txt")`.
 - Hors parenthèses, une expression en tête de ligne s'arrête là où reprend la syntaxe des commandes : `>` redirige, `&&` et `||` enchaînent, `|` passe au pipeline. Pour comparer ou combiner, utiliser des parenthèses ou un bloc : `($a > 1 && $b)`.
 - Les accès s'écrivent collés : `$l.size()`, pas `$l .size()` (l'espace sépare les arguments d'une commande).

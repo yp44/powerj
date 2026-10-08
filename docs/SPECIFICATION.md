@@ -329,6 +329,22 @@ Note : `!` en début de ligne reste l'expansion d'historique (FR-11) ; à l'int�
 | Lambda sans accolades | `$l.stream().map(s -> s.length())` | Uniquement **entre les parenthèses d'un appel Java** ; en argument de cmdlet, les accolades restent obligatoires (le `>` de `->` serait sinon une redirection). |
 | Référence de méthode | `String::length`, `Path::of`, `ArrayList::new`, `$x::equals` | Comme en Java : statique, d'instance non liée, liée à un objet, constructeur. |
 
+**Quand utiliser `$_`, une lambda ou une référence de méthode.** Les trois formes font la même chose ; on choisit la plus lisible :
+
+| Situation | Forme conseillée | Exemple |
+|---|---|---|
+| Condition ou transformation **courte**, qui ne cite l'objet qu'une ou deux fois | `$_` | `ls \| where { $_.dir }`, `ipconfig \| where { $_.contains("IPv4") }`, `ls \| map { $_.name }` |
+| Expression **longue**, ou qui cite l'objet plusieurs fois : un nom parlant aide à relire | lambda nommée | `ls -r \| where { f -> f.size > 1mb && f.modified > now - 7d && !f.name.startsWith(".") }` |
+| Bloc **imbriqué** dans un autre bloc : `$_` désignerait l'objet du bloc intérieur, pas celui de l'extérieur | lambda nommée (obligatoire pour l'extérieur) | `ls -r \| where { f -> List.of("md", "txt").stream().anyMatch(e -> f.name.endsWith("." + e)) }` |
+| **Deux paramètres ou plus** (`Comparator`, `reduce`, `BiFunction`) | lambda | `$m.sort((a, b) -> a.length() - b.length())` |
+| Aucun paramètre (`Supplier`, `Runnable`) | lambda `() ->` | `Optional.empty().orElseGet(() -> "vide")` |
+| Le bloc se contente d'**appeler une méthode** sur l'objet, ou de le passer à une méthode | référence de méthode | `ls \| map FileEntry::name`, `$l.stream().map(String::toUpperCase)`, `$noms.stream().map(Path::of)` |
+| Argument d'une **méthode Java** (`stream().filter(…)`, `sort(…)`) | lambda sans accolades | `$l.stream().filter(s -> s.length() > 4)` |
+| Argument d'un **cmdlet** (`where`, `map`) | accolades obligatoires | `where { f -> f.size > 1mb }` (jamais `where f -> …`) |
+| Script `.pj` destiné à être relu et maintenu | lambda nommée | `where { fichier -> fichier.ext == "log" }` |
+
+Règle courte : **`$_` pour les filtres d'une ligne au clavier, une lambda nommée dès que l'expression grandit, s'imbrique ou prend deux paramètres, une référence de méthode quand elle suffit.**
+
 - Un paramètre de lambda masque, dans le corps du bloc, une classe de même nom (cas rare : nommer les paramètres en minuscules).
 - `$a`, `$b` et `$args` (étape 5) sont **retirés** : on écrit une lambda à deux paramètres.
 - **Booléens stricts** : là où une condition est attendue (`where`, `filter`, `&&`, `||`, `!`, ternaire), la valeur doit être un `boolean`, comme un `Predicate` Java. `where { f -> f.name }` est une erreur non bloquante (`le bloc doit renvoyer un booléen`) ; écrire `where { f -> !f.name.isEmpty() }`. `null` n'est pas un booléen.
