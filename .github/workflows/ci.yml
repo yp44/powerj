@@ -162,7 +162,7 @@ jobs:
                                'collect : 1') {
             if (-not (Select-String -Path out.txt -SimpleMatch $attendu -Quiet)) { throw "absent de la sortie : $attendu" }
           }
-          # Le code 3 attendu de powerj.exe ne doit pas devenir le code retour de l'étape.
+          # The expected exit code 3 of powerj.exe must not become the step's exit code.
           exit 0
 
       - name: Test de fumée du mode non interactif
