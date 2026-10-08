@@ -121,14 +121,14 @@ final class Help {
         List<Object> lines = new ArrayList<>();
         lines.add("Commandes internes");
         BUILTINS.forEach((name, doc) -> lines.add("  %-10s %s".formatted(name, doc[1])));
-        Map<String, List<CmdletInfo>> byCategory = new TreeMap<>();
+        Map<String, List<CmdletRegistry.Registered>> byCategory = new TreeMap<>();
         for (var registered : registry.all()) {
-            byCategory.computeIfAbsent(registered.info().category(), _ -> new ArrayList<>()).add(registered.info());
+            byCategory.computeIfAbsent(registered.category(), _ -> new ArrayList<>()).add(registered);
         }
-        byCategory.forEach((category, infos) -> {
+        byCategory.forEach((category, cmdlets) -> {
             lines.add("");
             lines.add(category);
-            infos.forEach(info -> lines.add("  %-10s %s".formatted(info.name(), info.summary())));
+            cmdlets.forEach(c -> lines.add("  %-10s %s".formatted(c.name(), c.summary())));
         });
         lines.add("");
         lines.add("help <commande> : détail d'une commande ; help <classe> : API d'une classe Java (help List) ;");
@@ -141,7 +141,7 @@ final class Help {
         CmdletInfo info = registered.info();
         List<OptionBinder.OptionSpec> specs = OptionBinder.specs(registered.parameters());
         List<String> lines = new ArrayList<>();
-        lines.add(info.name() + " — " + info.summary());
+        lines.add(info.name() + " — " + registered.summary());
         var usage = new StringBuilder("Usage : ").append(info.name());
         specs.stream().filter(OptionBinder.OptionSpec::isPositional).forEach(s ->
                 usage.append(" [").append(s.longName()).append(s.isList() ? "..." : "").append("]"));
@@ -154,7 +154,7 @@ final class Help {
         int width = specs.stream().mapToInt(s -> optionLabel(s).length()).max().orElse(10);
         String format = "  %-" + Math.max(width, "--on-error <mode>".length()) + "s  %s";
         for (var spec : specs) {
-            lines.add(format.formatted(optionLabel(spec), spec.description() + (spec.mandatory() ? " (obligatoire)" : "")));
+            lines.add(format.formatted(optionLabel(spec), registered.optionDescription(spec.longName(), spec.description()) + (spec.mandatory() ? " (obligatoire)" : "")));
         }
         lines.add(format.formatted("--on-error <mode>", "erreurs non bloquantes : stop, continue (défaut) ou silent"));
         lines.add("");

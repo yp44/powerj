@@ -32,9 +32,20 @@
 
     <build>
         <resources>
+            <!-- Only build.properties is filtered: message files contain ${…} and @… that must stay as is. -->
             <resource>
                 <directory>src/main/resources</directory>
                 <filtering>true</filtering>
+                <includes>
+                    <include>**/build.properties</include>
+                </includes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+                <excludes>
+                    <exclude>**/build.properties</exclude>
+                </excludes>
             </resource>
         </resources>
     </build>

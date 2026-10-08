@@ -137,7 +137,7 @@ public final class ModuleLoader {
                     provided.add(cmdlet);
                 }
             }
-            warnings.addAll(registry.addModule(module, Optional.of(path), provided));
+            warnings.addAll(registry.addModule(module, Optional.of(path), provider, provided));
         }
         for (var loaded : registry.modules()) {
             if (layer.findModule(loaded.name()).filter(m -> m.getLayer() == layer).isPresent()) {

@@ -324,7 +324,7 @@ public final class Completions {
                 candidates.add(new Candidate(builtin, builtin + " [interne]", "commande interne", true));
             }
             for (var cmdlet : interpreter.registry().all()) {
-                candidates.add(new Candidate(cmdlet.name(), cmdlet.name() + " [pj]", cmdlet.info().summary(), true));
+                candidates.add(new Candidate(cmdlet.name(), cmdlet.name() + " [pj]", cmdlet.summary(), true));
             }
             if (!fragment.isEmpty() && Character.isUpperCase(fragment.charAt(0))) {
                 importedClasses().forEach(c -> candidates.add(new Candidate(c, c, "classe Java", false)));
@@ -354,7 +354,7 @@ public final class Completions {
         if (cmdlet.isPresent()) {
             List<OptionBinder.OptionSpec> specs = OptionBinder.specs(cmdlet.get().parameters());
             if (word.startsWith("-")) {
-                return new Result(wordStart, word, options(specs, words));
+                return new Result(wordStart, word, options(cmdlet.get(), specs, words));
             }
             Optional<OptionBinder.OptionSpec> expecting = valueOf(specs, words.getLast());
             if (expecting.isPresent()) {
@@ -394,7 +394,8 @@ public final class Completions {
     }
 
     /** Options of the cmdlet, excluding those already typed (FR-22). */
-    private static List<Candidate> options(List<OptionBinder.OptionSpec> specs, List<String> words) {
+    private static List<Candidate> options(CmdletRegistry.Registered cmdlet, List<OptionBinder.OptionSpec> specs,
+                                           List<String> words) {
         List<Candidate> candidates = new ArrayList<>();
         for (var spec : specs) {
             if (spec.isPositional() && spec.shortName() == '\0' && !spec.isFlag()) {
@@ -405,7 +406,8 @@ public final class Completions {
                     || (spec.shortName() != '\0' && w.matches("-[^-]*" + spec.shortName() + "[^-]*")));
             if (!used || spec.isList()) {
                 String label = "--" + spec.longName() + (spec.shortName() != '\0' ? ", -" + spec.shortName() : "");
-                candidates.add(new Candidate("--" + spec.longName(), label, spec.description(), true));
+                candidates.add(new Candidate("--" + spec.longName(), label,
+                        cmdlet.optionDescription(spec.longName(), spec.description()), true));
             }
         }
         if (words.stream().noneMatch(w -> w.startsWith("--on-error"))) {
