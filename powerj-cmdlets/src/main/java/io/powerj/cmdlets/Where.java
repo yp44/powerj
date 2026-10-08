@@ -16,20 +16,21 @@ import io.powerj.api.ScriptBlock;
 /**
  * {@code where} : ne laisse passer que les objets pour lesquels la condition est vraie (spécification FR-36).
  * <pre>
- * where { $_.size > 1mb && !$_.dir }
+ * where { f -> f.size > 1mb && !f.dir }
+ * where { $_.dir }
  * where size > 1mb                      # forme courte, équivaut à where { $_.size > 1mb }
  * </pre>
  */
 @CmdletInfo(name = "where", category = "Filtres", summary = "Filtre les objets du pipeline selon une condition",
         examples = {"ls -r | where { $_.size > 1mb }", "ls | where { $_.name.endsWith(\".java\") && !$_.dir }",
-                "ls | where size > 10kb", "git status --porcelain | where { $_.startsWith(\" M \") }",
+                "ls | where { f -> f.size > 1mb && !f.dir }", "ls | where size > 10kb", "git status --porcelain | where { $_.startsWith(\" M \") }",
                 "env | where { $_.name.startsWith(\"JAVA\") }"})
 public final class Where implements Cmdlet<Where.Params, Object, Object> {
 
     /** Paramètres de {@code where}. */
     public record Params(
             @Option(position = 0, mandatory = true,
-                    description = "Condition : bloc { … } évalué pour chaque objet ($_), ou forme courte : propriété opérateur valeur")
+                    description = "Condition booléenne : lambda { f -> … }, bloc { $_… }, ou forme courte : propriété opérateur valeur")
             List<Object> condition) {
     }
 
@@ -113,7 +114,7 @@ public final class Where implements Cmdlet<Where.Params, Object, Object> {
         return quoted.append('"').toString();
     }
 
-    private static String abbreviate(Object value) {
+    static String abbreviate(Object value) {
         String text = String.valueOf(value);
         return text.length() > 40 ? text.substring(0, 39) + "…" : text;
     }

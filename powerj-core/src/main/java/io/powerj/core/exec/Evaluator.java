@@ -16,15 +16,14 @@ import io.powerj.core.lang.StringPart;
 /**
  * Évalue les expressions : arguments, valeurs en tête de ligne, contenu des blocs {@code { … }}, appels
  * Java (spécification §3.13). L'objet courant {@code $_} est lié par {@link #CURRENT} pendant l'évaluation
- * d'un bloc ; {@code $a}, {@code $b} et {@code $args} par {@link #LOCALS} quand Java appelle un bloc à
- * plusieurs paramètres (FR-51).
+ * d'un bloc ; les paramètres d'une lambda ({@code f -> …}) par {@link #LOCALS} (FR-33b).
  */
 final class Evaluator {
 
     /** Objet courant {@code $_} d'un bloc. */
     static final ScopedValue<Object> CURRENT = ScopedValue.newInstance();
 
-    /** Paramètres d'un bloc appelé par Java : {@code $a}, {@code $b}, {@code $args}. */
+    /** Paramètres de la lambda en cours d'évaluation, par nom. */
     static final ScopedValue<Map<String, Object>> LOCALS = ScopedValue.newInstance();
 
     /** Valeur {@code null} dans {@link #LOCALS}. */
@@ -73,7 +72,10 @@ final class Evaluator {
             case Ast.VariableExpression(var name, var accessors) -> PropertyAccess.apply(variable(name), accessors);
             case Ast.StringExpression(var parts) -> interpolate(parts);
             case Ast.SubExpression(var pipeline) -> single(runner.capture(pipeline));
-            case Ast.BlockExpression(var source, var body) -> new CompiledBlock(source, body, this);
+            case Ast.BlockExpression(var source, var body) -> new CompiledBlock(source, null, body, this, captured());
+            case Ast.Lambda(var source, var parameters, var body) ->
+                    new CompiledBlock(source, parameters, body, this, captured());
+            case Ast.MethodRef(var target, var method) -> methodReference(eval(target), method);
             case Ast.Name(var name) -> name(name);
             case Ast.Get(var target, var name) -> get(eval(target), name);
             case Ast.At(var target, var index) -> at(evaluate(target), evaluate(index));
@@ -93,6 +95,11 @@ final class Evaluator {
         };
     }
 
+    /** Paramètres des lambdas en cours, capturés par un bloc ou une lambda créé ici. */
+    private static Map<String, Object> captured() {
+        return LOCALS.isBound() ? LOCALS.get() : Map.of();
+    }
+
     private List<Object> values(List<Expression> expressions) throws InterruptedException {
         List<Object> values = new ArrayList<>(expressions.size());
         for (Expression e : expressions) {
@@ -104,6 +111,10 @@ final class Evaluator {
     // --- Noms Java ---
 
     private Object name(String name) {
+        if (LOCALS.isBound() && LOCALS.get().containsKey(name)) {
+            Object value = LOCALS.get().get(name);
+            return value == NULL ? null : value; // paramètre de lambda : prioritaire sur les classes
+        }
         JavaClasses java = session.java();
         java.checkAmbiguity(name);
         return java.simpleClass(name).<Object>map(ClassRef::new).orElseGet(() -> new PackageRef(name));
@@ -147,6 +158,17 @@ final class Evaluator {
                     : unknownName(prefix);
             case Runtime _ when method.equals("exit") || method.equals("halt") -> exit(args);
             case null, default -> JavaInvoker.invokeVirtual(target, method, args);
+        };
+    }
+
+    /** {@code Classe::méthode}, {@code $objet::méthode}, {@code FileEntry::name} (FR-33b). */
+    private static Object methodReference(Object target, String method) {
+        return switch (target) {
+            case ClassRef(var type) -> new MethodReference.OfClass(type, method);
+            case PackageRef(var name) when !name.contains(".") -> new MethodReference.ByTypeName(name, method);
+            case PackageRef(var name) -> throw new PjException("classe introuvable : " + name);
+            case null -> throw new PjException("référence de méthode ::" + method + " sur une valeur nulle");
+            default -> new MethodReference.Bound(target, method);
         };
     }
 

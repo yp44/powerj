@@ -374,9 +374,13 @@ public final class Interpreter {
     /** Compile le texte d'un bloc pour un cmdlet ({@code CmdletContext.compile}). */
     private io.powerj.api.ScriptBlock compile(String source) {
         try {
-            return new CompiledBlock(source.strip(), ExpressionParser.parse(source, session.java()::isStaticReference), evaluator);
+            var function = ExpressionParser.function(source, session.java()::isStaticReference);
+            return (io.powerj.api.ScriptBlock) evaluator.evaluate(function);
         } catch (SyntaxException e) {
             throw new IllegalArgumentException(e.getMessage(), e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new java.util.concurrent.CancellationException();
         }
     }
 

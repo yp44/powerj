@@ -1,11 +1,9 @@
 package io.powerj.api;
 
-import java.util.Collection;
-import java.util.Map;
-
 /**
- * Bloc d'expression {@code { … }} saisi par l'utilisateur, évalué pour un objet courant {@code $_}
- * (spécification FR-33, FR-36). Exemple : {@code { $_.size > 1mb && !$_.dir }}.
+ * Bloc d'expression saisi par l'utilisateur, évalué pour un objet reçu (spécification FR-33b, FR-36) :
+ * lambda {@code { f -> f.size > 1mb && !f.dir }}, bloc à {@code $_} {@code { $_.dir }}, ou référence de
+ * méthode {@code FileEntry::name}.
  */
 public interface ScriptBlock {
 
@@ -15,24 +13,18 @@ public interface ScriptBlock {
     /** Texte source du bloc, sans les accolades. */
     String source();
 
-    /** Évalue le bloc et interprète le résultat comme une condition ({@link #isTrue(Object)}). */
-    default boolean test(Object current) {
-        return isTrue(invoke(current));
-    }
-
     /**
-     * Vérité d'une valeur (FR-36) : {@code false}, {@code null}, {@code 0}, {@code ""}, une collection ou une
-     * map vide sont faux ; tout le reste est vrai.
+     * Évalue le bloc comme une condition (FR-33b) : le résultat doit être un booléen, comme pour un
+     * {@code Predicate} Java.
+     *
+     * @throws IllegalStateException si le bloc renvoie autre chose qu'un booléen
      */
-    static boolean isTrue(Object value) {
-        return switch (value) {
-            case null -> false;
-            case Boolean b -> b;
-            case Number n -> n.doubleValue() != 0;
-            case CharSequence s -> !s.isEmpty();
-            case Collection<?> c -> !c.isEmpty();
-            case Map<?, ?> m -> !m.isEmpty();
-            default -> true;
-        };
+    default boolean test(Object current) {
+        Object value = invoke(current);
+        if (value instanceof Boolean b) {
+            return b;
+        }
+        throw new IllegalStateException("le bloc doit renvoyer un booléen, reçu "
+                + (value == null ? "null" : value.getClass().getSimpleName() + " " + value));
     }
 }

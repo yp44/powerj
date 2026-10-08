@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Predicate;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import io.powerj.core.lang.Ast.Expression;
 import io.powerj.core.lang.Ast.Operator;
@@ -51,7 +53,7 @@ public final class ExpressionParser {
     private record Symbol(String text, int at, int end) implements Tok { }
 
     /** Symboles, les plus longs d'abord. */
-    private static final List<String> SYMBOLS = List.of("==", "!=", "<=", ">=", "&&", "||",
+    private static final List<String> SYMBOLS = List.of("->", "::", "==", "!=", "<=", ">=", "&&", "||",
             "<", ">", "+", "-", "*", "/", "%", "!", "?", ":", "(", ")", "[", "]", "{", "}", ",", ".");
 
     /** Opérateurs qui, hors parenthèses dans une ligne de commande, appartiennent à la syntaxe des commandes. */
@@ -97,9 +99,45 @@ public final class ExpressionParser {
         return expression;
     }
 
-    /** Bloc {@code { source }} analysé. */
-    public static Ast.BlockExpression block(String source) {
-        return new Ast.BlockExpression(source.strip(), parse(source));
+    /** Bloc {@code { source }} analysé : lambda ({@code f -> …}) ou bloc à {@code $_}. */
+    public static Expression block(String source) {
+        return function(source, _ -> false);
+    }
+
+    /** Contenu d'un bloc : lambda si le texte commence par des paramètres et {@code ->}, sinon bloc à {@code $_}. */
+    public static Expression function(String source, Predicate<String> staticNames) {
+        Matcher header = LAMBDA_HEADER.matcher(source);
+        if (header.lookingAt()) {
+            List<String> parameters = parameters(header);
+            String body = source.substring(header.end());
+            if (body.isBlank()) {
+                throw new SyntaxException("corps de lambda attendu après « -> »");
+            }
+            return new Ast.Lambda(source.strip(), parameters, parse(body, staticNames));
+        }
+        return new Ast.BlockExpression(source.strip(), parse(source, staticNames));
+    }
+
+    /** {@code f ->}, {@code (a, b) ->}, {@code () ->} en tête de texte. */
+    private static final Pattern LAMBDA_HEADER = Pattern.compile(
+            "\\s*(?:([\\p{L}_][\\p{L}\\p{N}_]*)|\\(\\s*([\\p{L}_][\\p{L}\\p{N}_]*(?:\\s*,\\s*[\\p{L}_][\\p{L}\\p{N}_]*)*)?\\s*\\))\\s*->");
+
+    private static List<String> parameters(Matcher header) {
+        if (header.group(1) != null) {
+            return List.of(header.group(1));
+        }
+        if (header.group(2) == null) {
+            return List.of();
+        }
+        List<String> names = new ArrayList<>();
+        for (String name : header.group(2).split(",")) {
+            String trimmed = name.strip();
+            if (names.contains(trimmed)) {
+                throw new SyntaxException("paramètre de lambda en double : " + trimmed);
+            }
+            names.add(trimmed);
+        }
+        return names;
     }
 
     /**
@@ -226,10 +264,17 @@ public final class ExpressionParser {
                 next();
                 if (!atEnd() && isSymbol(peek(), "(") && peek().at() == pos) {
                     next();
-                    current = new Ast.Invoke(current, name, arguments(")"));
+                    current = new Ast.Invoke(current, name, callArguments());
                 } else {
                     current = new Ast.Get(current, name);
                 }
+            } else if (isSymbol(token, "::")) {
+                next();
+                if (atEnd() || !(peek() instanceof Ident(var name, var at, _)) || restricted() && at != pos) {
+                    throw new SyntaxException("nom de méthode attendu après « :: »" + where());
+                }
+                next();
+                current = new Ast.MethodRef(current, name);
             } else if (isSymbol(token, "[")) {
                 next();
                 depth++;
@@ -242,6 +287,35 @@ public final class ExpressionParser {
             }
         }
         return current;
+    }
+
+    /**
+     * Arguments d'un appel Java, jusqu'à {@code )} : expressions ou lambdas sans accolades
+     * ({@code s -> s.length()}, {@code (a, b) -> a - b}).
+     */
+    private List<Expression> callArguments() {
+        depth++;
+        List<Expression> arguments = new ArrayList<>();
+        if (!accept(")")) {
+            do {
+                arguments.add(lambdaOrExpression());
+            } while (accept(","));
+            expect(")");
+        }
+        depth--;
+        return arguments;
+    }
+
+    private Expression lambdaOrExpression() {
+        int start = skipBlanks(input, pos);
+        Matcher header = LAMBDA_HEADER.matcher(input).region(start, input.length());
+        if (!header.lookingAt()) {
+            return expression();
+        }
+        List<String> parameters = parameters(header);
+        reset(header.end());
+        Expression body = expression();
+        return new Ast.Lambda(input.substring(start, pos).strip(), parameters, body);
     }
 
     /** Arguments séparés par des virgules jusqu'au symbole fermant (le symbole ouvrant est consommé). */
@@ -287,7 +361,7 @@ public final class ExpressionParser {
             throw new SyntaxException("« ( » attendu après new " + type);
         }
         next();
-        return new Ast.New(type, arguments(")"));
+        return new Ast.New(type, callArguments());
     }
 
     private String qualifiedName(String after) {
@@ -377,7 +451,7 @@ public final class ExpressionParser {
         }
         String source = input.substring(brace.at() + 1, close);
         reset(close + 1);
-        return new Ast.BlockExpression(source.strip(), parse(source, staticNames));
+        return function(source, staticNames);
     }
 
     // --- Outils ---

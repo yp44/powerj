@@ -136,13 +136,13 @@ class JavaInteropTest {
     @Test
     void blocksBecomeFunctionalInterfaces() throws Exception {
         run("$l = List.of(\"apple\", \"banana\", \"kiwi\")");
-        assertThat(run("$l.stream().filter({ $_.length() > 4 }).map({ $_.toUpperCase() }).toList()"))
+        assertThat(run("$l.stream().filter({ $_.length() > 4 }).map({ s -> s.toUpperCase() }).toList()"))
                 .isEqualTo("APPLE\nBANANA\n");
-        assertThat(run("$m = new java.util.ArrayList($l); $m.sort({ $a.length() - $b.length() }); $m"))
+        assertThat(run("$m = new java.util.ArrayList($l); $m.sort({ (a, b) -> a.length() - b.length() }); $m"))
                 .isEqualTo("kiwi\napple\nbanana\n");
-        assertThat(value("$l.stream().reduce(\"\", { $a + $b.charAt(0) })")).isEqualTo("abk");
-        assertThat(value("Stream.iterate(1, { $_ * 2 }).limit(5).toList()")).isEqualTo(List.of(1, 2, 4, 8, 16));
-        assertThat(value("Optional.empty().orElseGet({ \"vide\" })")).isEqualTo("vide");
+        assertThat(value("$l.stream().reduce(\"\", (acc, s) -> acc + s.charAt(0))")).isEqualTo("abk");
+        assertThat(value("Stream.iterate(1, n -> n * 2).limit(5).toList()")).isEqualTo(List.of(1, 2, 4, 8, 16));
+        assertThat(value("Optional.empty().orElseGet(() -> \"vide\")")).isEqualTo("vide");
         assertThat(value("$l.stream().anyMatch({ $_.startsWith(\"k\") })")).isEqualTo(true);
         run("$l.stream().filter({ $_.length() }).toList()");
         assertThat(errors).singleElement().asString().contains("le bloc doit renvoyer un booléen");

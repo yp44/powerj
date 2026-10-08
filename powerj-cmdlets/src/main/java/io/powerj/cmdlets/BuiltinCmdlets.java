@@ -10,6 +10,6 @@ public final class BuiltinCmdlets implements CmdletProvider {
 
     @Override
     public List<Cmdlet<?, ?, ?>> cmdlets() {
-        return List.of(new Ls(), new Where(), new Env());
+        return List.of(new Ls(), new Where(), new MapCmdlet(), new Env());
     }
 }

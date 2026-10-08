@@ -4,15 +4,14 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Proxy;
-import java.util.Arrays;
-import java.util.Map;
 
 import io.powerj.api.ScriptBlock;
 
 /**
  * Bloc {@code { … }} passé à un paramètre de type interface fonctionnelle ({@code Predicate},
  * {@code Function}, {@code Comparator}…) : converti en implémentation de l'interface (spécification FR-51).
- * Arguments : aucun ; un → {@code $_} ; deux → {@code $a} et {@code $b} ; au-delà → {@code $args[i]}.
+ * Les paramètres de la lambda reçoivent les arguments ; un bloc sans paramètre déclaré reçoit son unique
+ * argument dans {@code $_} ; une référence de méthode est appelée avec les arguments (FR-33b).
  */
 final class FunctionalAdapter {
 
@@ -51,21 +50,11 @@ final class FunctionalAdapter {
     }
 
     private static Object call(ScriptBlock block, Object[] args) {
-        if (block instanceof CompiledBlock compiled) {
-            return switch (args.length) {
-                case 0 -> compiled.invoke(null);
-                case 1 -> compiled.invoke(args[0]);
-                case 2 -> compiled.invokeWith(args[0], Map.of("a", nullSafe(args[0]), "b", nullSafe(args[1]),
-                        "args", Arrays.asList(args)));
-                default -> compiled.invokeWith(args[0], Map.of("args", Arrays.asList(args)));
-            };
-        }
-        return block.invoke(args.length == 0 ? null : args[0]);
-    }
-
-    /** {@code Map.of} refuse {@code null} : valeur marquée, rendue {@code null} à la lecture. */
-    private static Object nullSafe(Object value) {
-        return value == null ? Evaluator.NULL : value;
+        return switch (block) {
+            case CompiledBlock compiled -> compiled.apply(args);
+            case MethodReference reference -> reference.apply(args);
+            default -> block.invoke(args.length == 0 ? null : args[0]);
+        };
     }
 
     /** Valeur du bloc convertie vers le type de retour de la méthode (FR-50). */

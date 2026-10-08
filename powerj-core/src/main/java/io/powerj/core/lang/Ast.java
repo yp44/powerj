@@ -108,8 +108,24 @@ public final class Ast {
     /** Conversion explicite {@code [type] valeur} (FR-50). */
     public record Cast(String type, Expression operand) implements Expression { }
 
-    /** Bloc {@code { … }} : sa valeur est un {@link io.powerj.api.ScriptBlock} évalué plus tard. */
+    /**
+     * Bloc {@code { … }} sans paramètre déclaré : sa valeur est un {@link io.powerj.api.ScriptBlock} évalué plus
+     * tard, l'objet reçu étant {@code $_}.
+     */
     public record BlockExpression(String source, Expression body) implements Expression { }
+
+    /**
+     * Lambda à la Java (FR-33b) : {@code { f -> f.size > 1mb }}, {@code (a, b) -> a.compareTo(b)} entre les
+     * parenthèses d'un appel Java.
+     */
+    public record Lambda(String source, List<String> parameters, Expression body) implements Expression {
+        public Lambda {
+            parameters = List.copyOf(parameters);
+        }
+    }
+
+    /** Référence de méthode : {@code String::length}, {@code $x::equals}, {@code ArrayList::new} (FR-33b). */
+    public record MethodRef(Expression target, String method) implements Expression { }
 
     /** {@code cible.nom} : propriété (FR-28). */
     public record Get(Expression target, String name) implements Expression { }

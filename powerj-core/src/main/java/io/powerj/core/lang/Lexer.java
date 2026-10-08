@@ -22,6 +22,10 @@ import java.util.regex.Pattern;
  */
 public final class Lexer {
 
+    /** Référence de méthode {@code Classe::méthode} ou {@code nom.Qualifie::méthode}. */
+    private static final Pattern METHOD_REFERENCE = Pattern.compile(
+            "[\\p{L}_][\\p{L}\\p{N}_]*(?:\\.[\\p{L}_][\\p{L}\\p{N}_]*)*::[\\p{L}_]");
+
     /** Nom qualifié {@code ident(.ident)+}, suivi éventuellement de {@code (}. */
     private static final Pattern QUALIFIED = Pattern.compile("[\\p{L}_][\\p{L}\\p{N}_]*(?:\\.[\\p{L}_][\\p{L}\\p{N}_]*)+");
 
@@ -74,6 +78,10 @@ public final class Lexer {
         if (startsWith("||")) {
             pos += 2;
             return new Token.Separator(Connector.IF_FAILURE);
+        }
+        if (startsWith("->")) {
+            throw new SyntaxException("« -> » hors d'un bloc : en argument d'une commande, une lambda s'écrit"
+                    + " entre accolades, ex. where { f -> f.size > 1mb }");
         }
         if (startsWith("2>&1")) {
             pos += 4;
@@ -167,7 +175,7 @@ public final class Lexer {
             end++;
         }
         String word = input.substring(at, end);
-        if (KEYWORDS.contains(word)) {
+        if (KEYWORDS.contains(word) || METHOD_REFERENCE.matcher(input).region(at, input.length()).lookingAt()) {
             return true;
         }
         if (word.equals("new") && end < input.length() && isBlank(input.charAt(end))) {
@@ -193,6 +201,9 @@ public final class Lexer {
         }
         if (c == '"' || c == '(' || c == '{') {
             return true;
+        }
+        if (METHOD_REFERENCE.matcher(input).region(pos, input.length()).lookingAt()) {
+            return true; // map FileEntry::name
         }
         Matcher qualified = QUALIFIED.matcher(input).region(pos, input.length());
         return qualified.lookingAt() && qualified.end() < input.length() && input.charAt(qualified.end()) == '(';
@@ -288,6 +299,9 @@ public final class Lexer {
 
     /** {@code "…"} : échappements Java, {@code $var.prop[0]} et {@code $( … )} interpolés. */
     private List<StringPart> string() {
+        if (startsWith("\"\"\"")) {
+            return textBlock();
+        }
         int open = pos++;
         List<StringPart> parts = new ArrayList<>();
         var text = new StringBuilder();
@@ -325,6 +339,63 @@ public final class Lexer {
                 default -> text.append(c);
             }
         }
+    }
+
+    /**
+     * Bloc de texte {@code """…"""} (FR-33b) : comme en Java, il commence par un retour à la ligne et
+     * l'indentation commune est retirée ; échappements et interpolations s'y appliquent.
+     */
+    private List<StringPart> textBlock() {
+        int open = pos;
+        int at = pos + 3;
+        while (at < input.length() && (input.charAt(at) == ' ' || input.charAt(at) == '\t')) {
+            at++;
+        }
+        if (at < input.length() && input.charAt(at) == '\r') {
+            at++;
+        }
+        if (at >= input.length() || input.charAt(at) != '\n') {
+            throw new SyntaxException("un bloc de texte s'ouvre par \"\"\" suivi d'un retour à la ligne (position "
+                    + (open + 1) + ")");
+        }
+        int contentStart = at + 1;
+        int close = contentStart;
+        while (true) {
+            close = input.indexOf("\"\"\"", close);
+            if (close < 0) {
+                throw new SyntaxException("bloc de texte non fermé (ouvert à la position " + (open + 1) + ")");
+            }
+            if (!escaped(close)) {
+                break;
+            }
+            close++;
+        }
+        String content = input.substring(contentStart, close).replace("\r\n", "\n").stripIndent();
+        pos = close + 3;
+        // Les guillemets du contenu sont du texte : on les échappe pour réutiliser l'analyse des chaînes.
+        var quoted = new StringBuilder("\"");
+        for (int i = 0; i < content.length(); i++) {
+            char c = content.charAt(i);
+            if (c == '"' && !escaped(content, i)) {
+                quoted.append('\\');
+            }
+            quoted.append(c);
+        }
+        quoted.append('"');
+        return stringAt(quoted.toString(), 0, staticNames).value();
+    }
+
+    private boolean escaped(int at) {
+        return escaped(input, at);
+    }
+
+    /** Le caractère en {@code at} est-il précédé d'un nombre impair d'antislashs ? */
+    private static boolean escaped(String text, int at) {
+        int count = 0;
+        for (int i = at - 1; i >= 0 && text.charAt(i) == '\\'; i--) {
+            count++;
+        }
+        return count % 2 == 1;
     }
 
     private String escape() {

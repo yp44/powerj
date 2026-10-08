@@ -1008,6 +1008,8 @@ Chaque étape :
 
 ### Étape 5b — Alignement Java
 
+Livrée avec l'étape 5 (même PR, même exe).
+
 **Contenu :** FR-33b (lambdas `f ->` et `(a, b) ->`, lambdas sans accolades dans les appels Java, références de méthode `Classe::méthode`, `$x::méthode`, `Classe::new`, blocs de texte `"""…"""`), booléens stricts (`where`, `&&`, `||`, `!`, ternaire), retrait de `$a` / `$b` / `$args`, cmdlet `map` (FR-36c). Mise à jour des recettes 4 et 5 et des exemples de la spécification.
 
 **Recette :**

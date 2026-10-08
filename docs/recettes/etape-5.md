@@ -15,9 +15,9 @@ Comme aux étapes précédentes : onglet **Actions**, dernière exécution du wo
 | 3 | `Math.max(3, 7)` puis `java.lang.Math.PI` puis `DayOfWeek.MONDAY` | `7`, `3.141592653589793`, `MONDAY`. |
 | 4 | `LocalDate.now().plusDays(10).dayOfWeek` | Le jour de la semaine dans 10 jours (`java.time` est importé par défaut). |
 | 5 | `MessageDigest.getInstance("SHA-256")`, puis `import java.security.*` et de nouveau `MessageDigest.getInstance("SHA-256").algorithm`, puis `import` | D'abord `« MessageDigest » inconnu…`, puis `SHA-256` ; `import` seul liste les imports actifs. |
-| 6 | `new java.io.File("C:\\Windows").listFiles() \| where { $_.directory && $_.name.startsWith("S") }` | Les dossiers de `C:\Windows` commençant par `S` (`System32`…). |
-| 7 | `$l.stream().map({ $_.toUpperCase() }).toList()` | `APPLE` puis `BANANA` : le bloc devient une `Function`. |
-| 8 | `$m = new java.util.ArrayList($l); $m.sort({ $b.length() - $a.length() }); $m` | `banana` puis `apple` : un bloc à deux paramètres (`$a`, `$b`) devient un `Comparator`. |
+| 6 | `new java.io.File("C:\\Windows").listFiles() \| where { f -> f.directory && f.name.startsWith("S") }` | Les dossiers de `C:\Windows` commençant par `S` (`System32`…). |
+| 7 | `$l.stream().map(s -> s.toUpperCase()).toList()` | `APPLE` puis `BANANA` : la lambda devient une `Function`. |
+| 8 | `$m = new java.util.ArrayList($l); $m.sort((a, b) -> b.length() - a.length()); $m` | `banana` puis `apple` : une lambda à deux paramètres devient un `Comparator`. |
 | 9 | `String.format("%s-%05d", "id", 42)` | `id-00042` (varargs et conversions). |
 | 10 | `Integer.parseInt("x")` | Erreur rouge `java.lang.NumberFormatException : For input string: "x"`. Puis `$errors[0].class.name` : `java.lang.NumberFormatException`. |
 | 11 | `$debug = true` puis `Integer.parseInt("x")`, puis `$debug = false` | Le même message, suivi de la pile Java complète. |
@@ -27,7 +27,7 @@ Comme aux étapes précédentes : onglet **Actions**, dernière exécution du wo
 | 15 | `Files.size(Path.of("C:\\Windows\\notepad.exe")) / 1kb` | Taille de `notepad.exe` en Ko. |
 | 16 | `"Il est $(LocalTime.now().hour) h, max = $(Math.max(4, 9))"` | Les valeurs `$( … )` sont insérées dans la chaîne. |
 | 17 | `[long] 5`, puis `[int] 3.9`, puis `[java.util.ArrayList] $l` | `5`, `3`, puis l'erreur `conversion impossible : … n'est pas un ArrayList`. |
-| 18 | `Stream.iterate(0, { $_ + 1 }).forEach({ $_ })` puis Ctrl+C | Arrêt immédiat (`^C`), le shell reste utilisable. |
+| 18 | `Stream.iterate(0, n -> n + 1).forEach(n -> n)` puis Ctrl+C | Arrêt immédiat (`^C`), le shell reste utilisable. |
 | 19 | `BigInteger.valueOf(3).pow(300000000).bitLength()` puis Ctrl+C, puis de nouveau Ctrl+C | Le calcul du JDK ignore la première demande ; la seconde rend la main avec `commande abandonnée, elle continue en arrière-plan : …`. |
 | 20 | `System.out.println("bonjour " + Math.max(1, 2))` | `bonjour 2`, sans abîmer la ligne de saisie. |
 | 21 | `System.setOut(null)` | Refusé : `System.setOut est refusé : il casserait l'affichage du shell`. |
@@ -35,7 +35,7 @@ Comme aux étapes précédentes : onglet **Actions**, dernière exécution du wo
 
 ## Points de syntaxe à connaître
 
-- **Blocs à l'étape 5** : un bloc reçoit son objet dans `$_` (et deux paramètres dans `$a` / `$b`). À partir de l'étape 5b, on pourra aussi nommer le paramètre comme en Java (`{ f -> f.size > 1mb }`), et `$a` / `$b` seront remplacés par `(a, b) -> …` : voir la recette 5b pour savoir quand utiliser l'une ou l'autre forme.
+- **Lambdas** : cet exe inclut l'étape 5b. Les fonctions passées à Java s'écrivent comme en Java (`s -> s.length()`, `(a, b) -> …`, `String::length`) ; `$_` reste le raccourci des filtres courts. Voir la recette 5b pour savoir quand utiliser l'une ou l'autre forme.
 - En tête de ligne, un nom qualifié **collé** à `(` est un appel Java (`Math.max(1, 2)`) ; sans parenthèses, il l'est s'il désigne une classe ou un champ statique (`Math.PI`). Sinon c'est une commande : `java -version`, `notepad.exe fichier.txt`. En argument d'une commande, seule la forme appel est une expression : `cat Path.of("a.txt")`.
 - Hors parenthèses, une expression en tête de ligne s'arrête là où reprend la syntaxe des commandes : `>` redirige, `&&` et `||` enchaînent, `|` passe au pipeline. Pour comparer ou combiner, utiliser des parenthèses ou un bloc : `($a > 1 && $b)`.
 - Les accès s'écrivent collés : `$l.size()`, pas `$l .size()` (l'espace sépare les arguments d'une commande).

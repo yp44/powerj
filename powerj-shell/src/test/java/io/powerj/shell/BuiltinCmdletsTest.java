@@ -137,4 +137,21 @@ class BuiltinCmdletsTest {
         assertThat(run("where --help")).contains("where — Filtre les objets", "ls | where size > 10kb");
         assertThat(run("help")).contains("Filtres", "where");
     }
+
+    @Test
+    void lambdasAndMap() throws Exception {
+        assertThat(run("(ls -r | where { f -> f.name.endsWith(\".md\") && !f.dir }).name")).isEqualTo("spec.md\n");
+        assertThat(run("ls -r | map { f -> f.name + \" : \" + f.name.length() }"))
+                .isEqualTo("docs : 4\nspec.md : 7\nnotes.txt : 9\n");
+        assertThat(run("ls | map FileEntry::name")).isEqualTo("docs\nnotes.txt\n");
+        assertThat(run("ls --files | map { $_.name.toUpperCase() }")).isEqualTo("NOTES.TXT\n");
+        assertThat(run("env POWERJ_TEST | map EnvVar::value")).isEqualTo("1\n");
+        assertThat(run("ls | map { f -> f.name.split(\"\\\\.\") }")).isEqualTo("docs\nnotes\ntxt\n");
+        assertThat(run("ls | map { f -> null }")).isEmpty();
+        run("ls | map 42");
+        assertThat(errors).singleElement().asString().contains("map : transformation attendue");
+        run("ls | where { f -> f.name }");
+        assertThat(errors).hasSize(2).allSatisfy(e -> assertThat(e).contains("le bloc doit renvoyer un booléen"));
+        assertThat(run("help")).contains("map");
+    }
 }

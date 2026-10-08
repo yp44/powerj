@@ -2,7 +2,7 @@
 
 **Objectif :** vérifier que les blocs s'écrivent comme en Java — lambdas nommées, lambdas sans accolades dans les appels Java, références de méthode —, que `$_` reste disponible pour les filtres courts, que les conditions sont strictement booléennes, et le nouveau cmdlet `map`.
 
-> Fiche préparée avec la spécification 0.6 ; l'exe correspondant sera livré par la PR de l'étape 5b.
+> L'étape 5b est livrée avec l'étape 5, dans le même exe : les deux recettes se passent sur la même version.
 
 ## Récupérer les livrables
 
