@@ -15,26 +15,26 @@ import java.util.logging.Logger;
 import java.util.stream.Stream;
 
 /**
- * Index des packages exportés et des classes publiques des modules {@code java.*} du runtime, pour la
- * complétion Java (spécification FR-24b). Les classes d'un package sont listées à la première demande puis
- * mises en cache ; {@link #warmUp} prépare les packages importés en tâche de fond.
+ * Index of the exported packages and public classes of the runtime's {@code java.*} modules, for Java
+ * completion (specification FR-24b). The classes of a package are listed on first request and then
+ * cached; {@link #warmUp} prepares the imported packages in the background.
  */
 public final class JavaIndex {
 
     private static final Logger LOG = Logger.getLogger(JavaIndex.class.getName());
 
-    /** Package exporté → module qui le contient. */
+    /** Exported package → module that contains it. */
     private final Map<String, String> packages = new ConcurrentHashMap<>();
     private final Map<String, List<String>> classes = new ConcurrentHashMap<>();
     private volatile boolean loaded;
 
-    /** Tous les packages exportés par les modules {@code java.*}, triés. */
+    /** All packages exported by the {@code java.*} modules, sorted. */
     public List<String> packages() {
         load();
         return new ArrayList<>(new TreeSet<>(packages.keySet()));
     }
 
-    /** Noms simples des classes publiques de premier niveau d'un package exporté, triés. */
+    /** Simple names of the public top-level classes of an exported package, sorted. */
     public List<String> classes(String pkg) {
         load();
         String module = packages.get(pkg);
@@ -44,7 +44,7 @@ public final class JavaIndex {
         return classes.computeIfAbsent(pkg, p -> listClasses(module, p));
     }
 
-    /** Prépare l'index et les classes des packages donnés, sans bloquer l'appelant. */
+    /** Prepares the index and the classes of the given packages, without blocking the caller. */
     public void warmUp(List<String> packagesToLoad) {
         Thread.ofVirtual().name("powerj-index-java").start(() -> {
             try {

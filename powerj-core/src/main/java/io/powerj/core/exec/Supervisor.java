@@ -8,37 +8,37 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Exécute une commande en capturant tout {@link Throwable} (spécification FR-56), pour que rien de ce
- * qu'exécute une ligne ne puisse faire tomber le shell.
+ * Runs a command while catching any {@link Throwable} (specification FR-56), so that nothing a
+ * line executes can bring down the shell.
  */
 public final class Supervisor {
 
     private static final Logger LOG = Logger.getLogger(Supervisor.class.getName());
 
-    /** Réserve libérée sur {@link OutOfMemoryError} pour laisser au shell de quoi continuer. */
+    /** Reserve released on {@link OutOfMemoryError} to leave the shell enough to keep going. */
     private static final int MEMORY_RESERVE_BYTES = 8 * 1024 * 1024;
 
-    /** Travail exécuté sous supervision. */
+    /** Work executed under supervision. */
     @FunctionalInterface
     public interface Task {
         List<Object> execute() throws Exception;
     }
 
-    /** Pile des fils d'exécution : de la marge pour les expressions profondes. */
+    /** Stack of the execution threads: headroom for deeply nested expressions. */
     private static final long STACK_SIZE = 16L * 1024 * 1024;
 
-    /** Commande en cours : son fil, son résultat, et le nombre de Ctrl+C reçus. */
+    /** Running command: its thread, its result, and the number of Ctrl+C received. */
     private record Running(Thread worker, CompletableFuture<Outcome> outcome, String commandLine, AtomicInteger cancels) { }
 
     private byte[] memoryReserve = new byte[MEMORY_RESERVE_BYTES];
     private volatile Running running;
 
     /**
-     * Exécute la tâche dans un fil dédié et en renvoie le résultat ; ne lève jamais d'exception. Si la tâche
-     * ne réagit pas au premier Ctrl+C, le second l'abandonne (FR-57) : le résultat est
-     * {@link Outcome.Abandoned} et la tâche continue en arrière-plan, sans retenir le shell.
+     * Runs the task in a dedicated thread and returns its result; never throws an exception. If the task
+     * does not react to the first Ctrl+C, the second one abandons it (FR-57): the result is
+     * {@link Outcome.Abandoned} and the task keeps running in the background, without holding up the shell.
      *
-     * @param commandLine ligne saisie, pour le journal et les messages
+     * @param commandLine line entered, for the log and messages
      */
     public Outcome run(String commandLine, Task task) {
         var outcome = new CompletableFuture<Outcome>();
@@ -63,8 +63,8 @@ public final class Supervisor {
     }
 
     /**
-     * Ctrl+C : le premier demande l'annulation de la commande en cours (interruption) ; le suivant
-     * l'abandonne si elle ne s'est pas arrêtée. Sans effet si aucune commande ne tourne.
+     * Ctrl+C: the first one requests cancellation of the running command (interruption); the next one
+     * abandons it if it has not stopped. No effect if no command is running.
      */
     public void cancel() {
         var current = running;

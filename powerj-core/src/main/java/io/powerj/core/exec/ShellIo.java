@@ -6,13 +6,13 @@ import java.util.function.Consumer;
 import java.util.function.IntSupplier;
 
 /**
- * Sorties du shell vues par l'interpréteur.
+ * Shell outputs as seen by the interpreter.
  *
- * @param out         flux de sortie (valeurs affichées)
- * @param errors      flux d'erreur PowerJ : une ligne par message (affichée en rouge par le terminal)
- * @param width       largeur du terminal en caractères, pour les tableaux
- * @param interactive {@code true} si un vrai terminal est attaché : les commandes natives en fin de ligne
- *                    héritent alors directement de la console (couleurs, programmes interactifs)
+ * @param out         output stream (displayed values)
+ * @param errors      PowerJ error stream: one line per message (displayed in red by the terminal)
+ * @param width       terminal width in characters, for tables
+ * @param interactive {@code true} if a real terminal is attached: native commands at the end of the line
+ *                    then inherit the console directly (colors, interactive programs)
  */
 public record ShellIo(PrintWriter out, Consumer<String> errors, boolean interactive, IntSupplier width) {
 
@@ -22,7 +22,7 @@ public record ShellIo(PrintWriter out, Consumer<String> errors, boolean interact
         Objects.requireNonNull(width, "width");
     }
 
-    /** Sorties sans terminal réel : largeur fixe de 120 colonnes. */
+    /** Outputs without a real terminal: fixed width of 120 columns. */
     public ShellIo(PrintWriter out, Consumer<String> errors, boolean interactive) {
         this(out, errors, interactive, () -> 120);
     }

@@ -10,8 +10,8 @@ import java.util.Objects;
 import io.powerj.core.lang.Ast.Operator;
 
 /**
- * Sémantique des opérateurs des blocs (spécification FR-33) : celle de Java, avec l'égalité par valeur,
- * la comparaison des {@link Comparable}, et l'arithmétique des dates et durées.
+ * Semantics of the operators in blocks (specification FR-33): those of Java, with equality by value,
+ * comparison of {@link Comparable}s, and arithmetic on dates and durations.
  */
 final class Operators {
 
@@ -45,7 +45,7 @@ final class Operators {
         };
     }
 
-    /** Opérande de {@code &&}, {@code ||}, {@code !} ou d'un ternaire : un booléen, comme en Java. */
+    /** Operand of {@code &&}, {@code ||}, {@code !} or a ternary: a boolean, as in Java. */
     static boolean bool(Operator op, Object value) {
         if (value instanceof Boolean b) {
             return b;
@@ -53,7 +53,7 @@ final class Operators {
         throw new PjException("« " + op.symbol() + " » attend un booléen, reçu " + describe(value));
     }
 
-    /** Égalité de valeur ({@code Objects.equals}) ; nombres comparés par valeur ({@code 1 == 1L}). */
+    /** Value equality ({@code Objects.equals}); numbers compared by value ({@code 1 == 1L}). */
     static boolean equal(Object left, Object right) {
         if (left instanceof Number && right instanceof Number) {
             return numericCompare(left, right) == 0;
@@ -114,7 +114,7 @@ final class Operators {
         }
     }
 
-    /** Arithmétique Java avec promotion numérique : int, long, double, ou BigInteger / BigDecimal. */
+    /** Java arithmetic with numeric promotion: int, long, double, or BigInteger / BigDecimal. */
     private static Object arithmetic(Operator op, Object left, Object right) {
         if (!isNumeric(left) || !isNumeric(right)) {
             throw unsupported(op, left, right);
@@ -181,7 +181,7 @@ final class Operators {
         }
     }
 
-    /** Comparaison numérique exacte (entiers) ou en double (décimaux). */
+    /** Numeric comparison, exact (integers) or in double (decimals). */
     private static int numericCompare(Object left, Object right) {
         Number a = numeric(left);
         Number b = numeric(right);
@@ -194,7 +194,7 @@ final class Operators {
         return Long.compare(a.longValue(), b.longValue());
     }
 
-    /** {@code char} se comporte comme un nombre en arithmétique et en comparaison, comme en Java. */
+    /** {@code char} behaves like a number in arithmetic and comparisons, as in Java. */
     private static boolean isNumeric(Object value) {
         return value instanceof Number || value instanceof Character;
     }
@@ -229,7 +229,7 @@ final class Operators {
         return new PjException("« " + op.symbol() + " » impossible entre " + describe(left) + " et " + describe(right));
     }
 
-    /** {@code null}, ou type et valeur abrégée : {@code String "abc"}. */
+    /** {@code null}, or type and abbreviated value: {@code String "abc"}. */
     static String describe(Object value) {
         if (value == null) {
             return "null";

@@ -12,9 +12,9 @@ import java.util.Map;
 import io.powerj.core.lang.Accessor;
 
 /**
- * Accès {@code .propriété} et {@code [index]} sur une valeur (spécification FR-28). Propriété résolue dans
- * l'ordre : composant de record, getter {@code getNom()}/{@code isNom()}, champ public, clé de {@code Map}.
- * La propriété s'applique toujours à l'objet lui-même : pour chaque élément d'une liste, on écrit
+ * {@code .propriété} and {@code [index]} access on a value (specification FR-28). A property is resolved in
+ * this order: record component, getter {@code getNom()}/{@code isNom()}, public field, {@code Map} key.
+ * The property always applies to the object itself: for each element of a list, write
  * {@code liste*.nom}.
  */
 public final class PropertyAccess {
@@ -62,7 +62,7 @@ public final class PropertyAccess {
                 + (hints.isEmpty() ? "" : " (" + String.join(" ; ", hints) + ")"));
     }
 
-    /** Nom lisible : {@code List} plutôt qu'une classe interne du JDK ({@code UnmodifiableRandomAccessList}). */
+    /** Readable name: {@code List} rather than an internal JDK class ({@code UnmodifiableRandomAccessList}). */
     private static String typeName(Object value) {
         return switch (value) {
             case List<?> _ -> "List";

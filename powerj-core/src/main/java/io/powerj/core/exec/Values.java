@@ -3,7 +3,7 @@ package io.powerj.core.exec;
 import java.time.Duration;
 import java.util.Locale;
 
-/** Rendu d'une valeur sur une seule ligne : argument de commande, interpolation, cellule de tableau. */
+/** Rendering of a value on a single line: command argument, interpolation, table cell. */
 public final class Values {
 
     private Values() {
