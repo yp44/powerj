@@ -220,7 +220,7 @@ Noms d'options insensibles à la casse ; une option longue peut être abrégée 
 **FR-22 — Complétion des options.** Après `-` ou `--`, Tab propose les options de la commande courante avec leur description, **en excluant celles déjà saisies**. Les options sont lues dans les métadonnées du cmdlet : un cmdlet tiers est donc complété sans code supplémentaire.
 - CA : `ls --<Tab>` propose `--all --filter --recurse`.
 
-**FR-23 — Complétion des valeurs.** Selon le type du paramètre : enum → constantes ; `Path` → chemins de fichiers ; `boolean` → rien. Un cmdlet peut fournir sa propre complétion via `@Completion(MonCompleteur.class)`.
+**FR-23 — Complétion des valeurs.** Selon le type du paramètre : enum → constantes ; `Path` ou texte positionnel → chemins de fichiers ; `boolean` → rien. Un chemin contenant un espace est inséré entre guillemets avec les échappements Java. Un cmdlet pourra fournir sa propre complétion via `@Completion(MonCompleteur.class)` (après la v1).
 
 **FR-24 — Complétion des propriétés et variables.** Après `$` → variables définies. Après `$_.` dans un bloc `{ }` → composants du record produit par l'étape précédente (type de sortie statique du cmdlet amont). Après `$var.` → composants du type de la valeur de `$var`.
 - CA : `ls | where { $_.<Tab>` propose `name size modified path dir ext`.
@@ -1033,7 +1033,7 @@ Livrée avec l'étape 5 (même PR, même exe).
 **Recette :**
 1. `l<Tab>` propose `ls [pj]` et les natifs commençant par `l`.
 2. `ls --<Tab>` propose les options ; `ls -r --<Tab>` ne repropose plus `--recurse`.
-3. `ls C:\Pro<Tab>` complète `C:\Program Files\`.
+3. `ls C:\Pro<Tab>` complète `"C:\\Program Files\\` (entre guillemets à cause de l'espace, FR-32b).
 4. `ls | where { $_.<Tab>` propose `name size modified path dir ext`.
 5. `$f = ls` puis `$f[0].<Tab>`.
 6. `^no<Tab>` propose `notepad`.

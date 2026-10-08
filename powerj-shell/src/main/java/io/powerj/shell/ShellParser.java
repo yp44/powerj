@@ -8,13 +8,80 @@ import org.jline.reader.EOFError;
 import org.jline.reader.ParsedLine;
 import org.jline.reader.Parser;
 
+import io.powerj.core.exec.Completions;
 import io.powerj.core.lang.Lexer;
 
 /**
- * Analyseur fourni à JLine : signale les saisies incomplètes (prompt de continuation {@code >>})
- * et découpe la ligne en mots. L'analyse du langage lui-même arrivera aux étapes suivantes.
+ * Analyseur fourni à JLine : signale les saisies incomplètes (prompt de continuation {@code >>}), découpe
+ * la ligne en mots, et pour la complétion (Tab) délimite le texte à compléter grâce à {@link Completions}.
  */
 final class ShellParser implements Parser {
+
+    private final Completions completions;
+
+    ShellParser() {
+        this(null);
+    }
+
+    ShellParser(Completions completions) {
+        this.completions = completions;
+    }
+
+    /**
+     * Ligne analysée pour la complétion : le mot à compléter et les propositions calculées.
+     *
+     * @param start position du début du texte remplacé (guillemet ouvrant compris pour un chemin quoté)
+     */
+    record CompletionLine(String line, int cursor, int start, Completions.Result result) implements CompletingParsedLine {
+
+        @Override
+        public String word() {
+            return result.word();
+        }
+
+        @Override
+        public int wordCursor() {
+            return result.word().length();
+        }
+
+        @Override
+        public int wordIndex() {
+            return 0;
+        }
+
+        @Override
+        public List<String> words() {
+            return List.of(result.word());
+        }
+
+        /** Un chemin contenant un espace est inséré entre guillemets, avec les échappements Java (FR-32b). */
+        @Override
+        public CharSequence escape(CharSequence candidate, boolean complete) {
+            String text = candidate.toString();
+            boolean quoted = start < line.length() && line.charAt(start) == '"';
+            if (!quoted && text.chars().noneMatch(c -> Lexer.isBlank((char) c))) {
+                return text;
+            }
+            var escaped = new StringBuilder("\"");
+            for (char c : text.toCharArray()) {
+                if (c == '\\' || c == '"' || c == '$') {
+                    escaped.append('\\');
+                }
+                escaped.append(c);
+            }
+            return complete ? escaped.append('"') : escaped;
+        }
+
+        @Override
+        public int rawWordCursor() {
+            return cursor - start;
+        }
+
+        @Override
+        public int rawWordLength() {
+            return cursor - start;
+        }
+    }
 
     /** Ligne découpée en mots séparés par des blancs (sans guillemets ni échappement pour l'instant). */
     record Words(String word, int wordCursor, int wordIndex, List<String> words, String line, int cursor)
@@ -41,6 +108,10 @@ final class ShellParser implements Parser {
         if (context == ParseContext.ACCEPT_LINE
                 && InputCompleteness.check(line) instanceof InputCompleteness.Result.Incomplete(var missing, var open)) {
             throw new EOFError(-1, cursor, "saisie incomplète", missing, open, null);
+        }
+        if (context == ParseContext.COMPLETE && completions != null) {
+            Completions.Result result = completions.complete(line, cursor);
+            return new CompletionLine(line, cursor, result.start(), result);
         }
         return split(line, cursor);
     }

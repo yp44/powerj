@@ -53,6 +53,11 @@ final class JavaInvoker {
     private JavaInvoker() {
     }
 
+    /** Méthodes publiques d'instance accessibles d'un type, par nom (complétion). */
+    static Map<String, List<Method>> instanceMethods(Class<?> type) {
+        return INSTANCE_METHODS.get(type);
+    }
+
     /** Le type a-t-il une méthode publique {@code name()} sans argument ? (aide des messages d'erreur) */
     static boolean hasNoArgMethod(Class<?> type, String name) {
         return INSTANCE_METHODS.get(type).getOrDefault(name, List.of()).stream().anyMatch(m -> m.getParameterCount() == 0);

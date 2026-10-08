@@ -9,12 +9,14 @@ import java.util.Objects;
 import org.jline.reader.EndOfFileException;
 import org.jline.reader.LineReader;
 import org.jline.reader.UserInterruptException;
+import org.jline.reader.impl.LineReaderImpl;
 import org.jline.terminal.Terminal;
 import org.jline.utils.AttributedString;
 import org.jline.utils.AttributedStyle;
 
 import io.powerj.core.BuildInfo;
 import io.powerj.core.exec.CmdletRegistry;
+import io.powerj.core.exec.Completions;
 import io.powerj.core.exec.Interpreter;
 import io.powerj.core.exec.Outcome;
 import io.powerj.core.exec.PjException;
@@ -45,6 +47,14 @@ public final class Repl {
         boolean interactive = !terminal.getType().startsWith("dumb");
         var io = new ShellIo(out, this::printError, interactive, () -> terminal.getWidth());
         this.interpreter = new Interpreter(session, io, Map.of("history", this::history), registry);
+        // Complétion (Tab) et coloration de la saisie (FR-08, FR-21 à FR-26).
+        var completions = new Completions(interpreter);
+        completions.warmUp();
+        if (reader instanceof LineReaderImpl impl) {
+            impl.setParser(new ShellParser(completions));
+            impl.setCompleter(ShellCompletion.completer());
+            impl.setHighlighter(ShellCompletion.highlighter(interpreter));
+        }
         // Ctrl+C pendant l'exécution annule la commande sans quitter le shell (FR-03) ;
         // pendant la saisie, JLine lève UserInterruptException.
         terminal.handle(Terminal.Signal.INT, _ -> supervisor.cancel());
