@@ -89,14 +89,56 @@ public final class Ast {
 
     public record VariableExpression(String name, List<Accessor> accessors) implements Expression { }
 
-    /** Pipeline entre parenthèses, dont on prend la valeur : {@code (ls).name}, {@code (ls | where {…})}. */
-    public record SubExpression(Pipeline pipeline, List<Accessor> accessors) implements Expression { }
+    /** Pipeline entre parenthèses, dont on prend la valeur : {@code (ls)}, {@code (ls | where {…})}. */
+    public record SubExpression(Pipeline pipeline) implements Expression { }
 
-    /** Bloc {@code { … }} : sa valeur est un {@link io.powerj.api.ScriptBlock} évalué plus tard. */
+    /**
+     * Nom nu dans une expression : classe ({@code Math}, {@code LocalDate}) ou début de nom qualifié
+     * ({@code java} dans {@code java.util.List.of(…)}), résolu à l'évaluation (FR-46, FR-47).
+     */
+    public record Name(String name) implements Expression { }
+
+    /** {@code new Classe(arguments)} (FR-48). */
+    public record New(String type, List<Expression> arguments) implements Expression {
+        public New {
+            arguments = List.copyOf(arguments);
+        }
+    }
+
+    /** Conversion explicite {@code [type] valeur} (FR-50). */
+    public record Cast(String type, Expression operand) implements Expression { }
+
+    /**
+     * Bloc {@code { … }} sans paramètre déclaré : sa valeur est un {@link io.powerj.api.ScriptBlock} évalué plus
+     * tard, l'objet reçu étant {@code $_}.
+     */
     public record BlockExpression(String source, Expression body) implements Expression { }
+
+    /**
+     * Lambda à la Java (FR-33b) : {@code { f -> f.size > 1mb }}, {@code (a, b) -> a.compareTo(b)} entre les
+     * parenthèses d'un appel Java.
+     */
+    public record Lambda(String source, List<String> parameters, Expression body) implements Expression {
+        public Lambda {
+            parameters = List.copyOf(parameters);
+        }
+    }
+
+    /** Référence de méthode : {@code String::length}, {@code $x::equals}, {@code ArrayList::new} (FR-33b). */
+    public record MethodRef(Expression target, String method) implements Expression { }
 
     /** {@code cible.nom} : propriété (FR-28). */
     public record Get(Expression target, String name) implements Expression { }
+
+    /** {@code liste*.nom} : la propriété de chaque élément (opérateur « spread », comme en Groovy). */
+    public record SpreadGet(Expression target, String name) implements Expression { }
+
+    /** {@code liste*.méthode(arguments)} : la méthode appelée sur chaque élément. */
+    public record SpreadInvoke(Expression target, String method, List<Expression> arguments) implements Expression {
+        public SpreadInvoke {
+            arguments = List.copyOf(arguments);
+        }
+    }
 
     /** {@code cible[index]}. */
     public record At(Expression target, Expression index) implements Expression { }

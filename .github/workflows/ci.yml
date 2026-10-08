@@ -34,11 +34,16 @@ jobs:
           "ligne : $l[1]"
           sh -c "exit 1" || "secours"
           which ls
-          (ls / --dirs).name
+          (ls / --dirs)*.name
           $u = (ls / | where name == usr).name
           "filtre : $u"
           $t = printf "b\na\nc\n" | sort | where { $_ != "c" }
           "tri : $t"
+          "java : $(Math.max(3, 7))"
+          $n = List.of("a", "bb", "ccc").stream().filter(s -> s.length() > 1).count()
+          "lambda : $n"
+          $r = List.of("b", "a") | map String::toUpperCase | where { s -> s != "B" }
+          "reference : $r"
           sh -c "exit 3"
           exit $exit
           EOF
@@ -55,6 +60,9 @@ jobs:
           grep -q 'usr$' out.txt
           grep -q 'filtre : usr' out.txt
           grep -q 'tri : \[a, b\]' out.txt
+          grep -q 'java : 7' out.txt
+          grep -q 'lambda : 2' out.txt
+          grep -q 'reference : A' out.txt
 
       - name: Test de fumée du mode non interactif
         run: |
@@ -106,11 +114,16 @@ jobs:
           "ligne : $l[1]"
           ^cmd /c "exit 1" || "secours"
           which ls
-          (ls C:\Windows --dirs).name
+          (ls C:\Windows --dirs)*.name
           $u = (ls C:\ | where name == Windows).name
           "filtre : $u"
           $t = ^cmd /c "echo b& echo a& echo c" | ^sort | where { $_ != "c" }
           "tri : $t"
+          "java : $(Math.max(3, 7))"
+          $n = List.of("a", "bb", "ccc").stream().filter(s -> s.length() > 1).count()
+          "lambda : $n"
+          $r = List.of("b", "a") | map String::toUpperCase | where { s -> s != "B" }
+          "reference : $r"
           ^cmd /c "exit 3"
           exit $exit
           '@ | Set-Content smoke.txt
@@ -119,7 +132,7 @@ jobs:
           Get-Content out.txt
           if ($code -ne 3) { throw "code retour attendu 3, obtenu $code" }
           foreach ($attendu in 'C:\Windows', 'ligne : deux', 'secours', 'cmdlet (io.powerj.cmdlets)', 'System32',
-                               'filtre : Windows', 'tri : [a, b]') {
+                               'filtre : Windows', 'tri : [a, b]', 'java : 7', 'lambda : 2', 'reference : A') {
             if (-not (Select-String -Path out.txt -SimpleMatch $attendu -Quiet)) { throw "absent de la sortie : $attendu" }
           }
           # Le code 3 attendu de powerj.exe ne doit pas devenir le code retour de l'étape.

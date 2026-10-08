@@ -1,6 +1,9 @@
 package io.powerj.core.exec;
 
 import java.nio.file.Files;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.List;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -11,7 +14,7 @@ import java.util.TreeMap;
 
 /**
  * État d'une session de shell : répertoire courant, environnement, variables, dernière commande native.
- * N'est utilisée que depuis le fil d'exécution des commandes.
+ * Utilisée depuis le fil d'exécution des commandes ; les étapes d'un pipeline la lisent en parallèle.
  */
 public final class Session {
 
@@ -23,6 +26,10 @@ public final class Session {
     private NativeRun lastNative;
     private boolean lastSucceeded = true;
     private Integer exitRequest;
+    private final JavaClasses java = new JavaClasses();
+    /** Exceptions Java récentes, la plus récente en premier ({@code $errors}, FR-53). */
+    private final Deque<Throwable> errors = new ArrayDeque<>();
+    private static final int MAX_ERRORS = 20;
 
     /**
      * @param home             dossier utilisateur ({@code ~})
@@ -95,6 +102,7 @@ public final class Session {
             case "last" -> lastNative;
             case "pwd" -> currentDirectory;
             case "home" -> home;
+            case "errors" -> recentErrors();
             default -> {
                 if (!variables.containsKey(name)) {
                     throw new PjException("variable inconnue : $" + name);
@@ -102,6 +110,28 @@ public final class Session {
                 yield variables.get(name);
             }
         };
+    }
+
+    /** Classes Java accessibles et imports de la session (FR-47). */
+    public JavaClasses java() {
+        return java;
+    }
+
+    /** Conserve l'exception d'origine d'une erreur pour {@code $errors} (FR-53). */
+    public synchronized void recordError(Throwable error) {
+        errors.addFirst(error);
+        while (errors.size() > MAX_ERRORS) {
+            errors.removeLast();
+        }
+    }
+
+    public synchronized List<Throwable> recentErrors() {
+        return List.copyOf(errors);
+    }
+
+    /** {@code $debug} : afficher la pile Java des erreurs (FR-43). */
+    public boolean debug() {
+        return Boolean.TRUE.equals(variables.get("debug"));
     }
 
     /** Demande la fermeture du shell avec ce code ({@code exit}). */

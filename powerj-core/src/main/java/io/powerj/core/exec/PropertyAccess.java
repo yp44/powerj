@@ -13,8 +13,9 @@ import io.powerj.core.lang.Accessor;
 
 /**
  * Accès {@code .propriété} et {@code [index]} sur une valeur (spécification FR-28). Propriété résolue dans
- * l'ordre : composant de record, getter {@code getNom()}/{@code isNom()}, champ public, clé de {@code Map} ;
- * sur une collection, appliquée à chaque élément.
+ * l'ordre : composant de record, getter {@code getNom()}/{@code isNom()}, champ public, clé de {@code Map}.
+ * La propriété s'applique toujours à l'objet lui-même : pour chaque élément d'une liste, on écrit
+ * {@code liste*.nom}.
  */
 public final class PropertyAccess {
 
@@ -43,17 +44,32 @@ public final class PropertyAccess {
         if (direct.found()) {
             return direct.value();
         }
-        if (target instanceof Collection<?> collection) {
-            List<Object> values = new ArrayList<>(collection.size());
-            for (Object element : collection) {
-                values.add(property(element, name));
-            }
-            return values;
+        List<String> hints = new ArrayList<>();
+        if (target instanceof Collection<?> || target.getClass().isArray()) {
+            hints.add("pour chaque élément : *." + name);
         }
-        List<String> known = Members.of(target).stream().filter(m -> !m.kind().equals("méthode"))
-                .map(Members.Member::name).limit(12).toList();
-        throw new PjException(target.getClass().getSimpleName() + " n'a pas de propriété '" + name + "'"
-                + (known.isEmpty() ? "" : " (propriétés : " + String.join(", ", known) + ")"));
+        if (JavaInvoker.hasNoArgMethod(target.getClass(), name)) {
+            hints.add("méthode : " + name + "()");
+        }
+        if (hints.isEmpty()) {
+            List<String> known = Members.of(target).stream().filter(m -> !m.kind().equals("méthode"))
+                    .map(Members.Member::name).limit(12).toList();
+            if (!known.isEmpty()) {
+                hints.add("propriétés : " + String.join(", ", known));
+            }
+        }
+        throw new PjException(typeName(target) + " n'a pas de propriété '" + name + "'"
+                + (hints.isEmpty() ? "" : " (" + String.join(" ; ", hints) + ")"));
+    }
+
+    /** Nom lisible : {@code List} plutôt qu'une classe interne du JDK ({@code UnmodifiableRandomAccessList}). */
+    private static String typeName(Object value) {
+        return switch (value) {
+            case List<?> _ -> "List";
+            case java.util.Set<?> _ -> "Set";
+            case Collection<?> _ -> "Collection";
+            default -> value.getClass().getSimpleName();
+        };
     }
 
     private record Lookup(boolean found, Object value) {

@@ -72,23 +72,31 @@ class ParserTest {
         assertThatThrownBy(() -> Parser.parse("ls |")).hasMessageContaining("commande attendue après « | »");
         assertThatThrownBy(() -> Parser.parse("| ls")).hasMessageContaining("commande attendue");
         assertThatThrownBy(() -> Parser.parse("ls | $x")).hasMessageContaining("première étape");
+        assertThatThrownBy(() -> Parser.parse("ls | { e -> e.name }")).hasMessageContaining("écrire map { … }");
+        assertThatThrownBy(() -> Parser.parse("ls | { $_.name }")).hasMessageContaining("écrire map { … }");
         assertThatThrownBy(() -> Parser.parse("ls > f | where x")).hasMessageContaining("le placer à la fin");
         assertThatThrownBy(() -> Parser.parse("where }")).hasMessageContaining("« } » sans « { »");
         assertThatThrownBy(() -> Parser.parse("where { $_.x ")).hasMessageContaining("bloc non fermé");
-        assertThatThrownBy(() -> Parser.parse("$x.y = 1")).hasMessageContaining("variable simple");
+        assertThatThrownBy(() -> Parser.parse("$x.y = 1")).hasMessageContaining("affectation : $nom = valeur");
     }
 
     @Test
     void subExpressions() {
-        assertThat(only("(ls).name").body()).isEqualTo(new ExpressionBody(new Ast.SubExpression(
-                pipeline(new Command("ls", false, List.of())), List.of(new Accessor.Property("name")))));
+        assertThat(only("(ls).name").body()).isEqualTo(new ExpressionBody(new Ast.Get(new Ast.SubExpression(
+                pipeline(new Command("ls", false, List.of()))), "name")));
         assertThat(only("help members (ls -r)[0]").body()).isEqualTo(new Command("help", false, List.of(
                 new WordArgument("members"),
-                new Ast.ExpressionArgument(new Ast.SubExpression(pipeline(new Command("ls", false, List.of(new WordArgument("-r")))),
-                        List.of(new Accessor.Index(0)))))));
+                new Ast.ExpressionArgument(new Ast.At(new Ast.SubExpression(pipeline(new Command("ls", false,
+                        List.of(new WordArgument("-r"))))), new Ast.Literal(0))))));
         assertThatThrownBy(() -> Parser.parse("(ls")).hasMessageContaining("« ) » manquante");
         assertThatThrownBy(() -> Parser.parse("()")).hasMessageContaining("parenthèses vides");
         assertThatThrownBy(() -> Parser.parse("ls)")).hasMessageContaining("« ) » inattendu");
+        // Une valeur suivie d'un pipeline, entre parenthèses.
+        var grouped = (ExpressionBody) only("($l | where { $_ }).size()").body();
+        assertThat(((Ast.Invoke) grouped.expression()).target()).isInstanceOf(Ast.SubExpression.class);
+        // Une vraie expression entre parenthèses.
+        assertThat(only("(1 + 2)").body()).isEqualTo(new ExpressionBody(new Ast.Binary(Ast.Operator.ADD,
+                new Ast.Literal(1), new Ast.Literal(2))));
     }
 
     private static Ast.Pipeline pipeline(Ast.Body... bodies) {
@@ -104,13 +112,16 @@ class ParserTest {
         assertThat(where.arguments()).singleElement().isEqualTo(new Ast.ExpressionArgument(new Ast.BlockExpression(
                 "$_.size > 1mb", new Ast.Binary(Ast.Operator.GT,
                         new Ast.Get(new Ast.VariableExpression("_", List.of()), "size"), new Ast.Literal(1024L * 1024)))));
+        // Expression Java en première étape.
+        assertThat(only("java.util.List.of(1, 2) | where { $_ > 1 }").pipeline().stages().getFirst().body())
+                .isInstanceOf(ExpressionBody.class);
         assertThat(((Command) statement.pipeline().stages().get(2).body()).forceNative()).isTrue();
     }
 
     @Test
     void pipelineInsideParentheses() {
         var body = (ExpressionBody) only("(ls | where { $_.dir }).name").body();
-        var sub = (Ast.SubExpression) body.expression();
+        var sub = (Ast.SubExpression) ((Ast.Get) body.expression()).target();
         assertThat(sub.pipeline().stages()).hasSize(2);
     }
 

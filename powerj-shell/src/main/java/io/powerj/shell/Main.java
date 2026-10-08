@@ -6,6 +6,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -20,6 +21,7 @@ import java.util.logging.Logger;
 
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
+import org.jline.utils.WriterOutputStream;
 
 import io.powerj.core.BuildInfo;
 import io.powerj.core.exec.CmdletRegistry;
@@ -132,6 +134,9 @@ public final class Main {
         }
         // Le terminal est restauré (mode brut désactivé) même en cas d'arrêt brutal (FR-59).
         Runtime.getRuntime().addShutdownHook(Thread.ofPlatform().unstarted(() -> close(terminal)));
+        // System.out.println(…) appelé depuis une expression Java passe par le terminal JLine (FR-58).
+        System.setOut(terminalStream(terminal));
+        System.setErr(terminalStream(terminal));
         try {
             var reader = ShellReader.create(terminal, home, config);
             var session = new Session(Path.of(System.getProperty("user.home")), Path.of("").toAbsolutePath(),
@@ -147,6 +152,11 @@ public final class Main {
         } finally {
             close(terminal);
         }
+    }
+
+    private static PrintStream terminalStream(Terminal terminal) {
+        return new PrintStream(new WriterOutputStream(terminal.writer(), terminal.encoding()), true,
+                terminal.encoding());
     }
 
     private static boolean isInteractiveConsole() {

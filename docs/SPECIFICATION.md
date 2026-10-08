@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Version du document** | 0.5 (navigation, enchaînement, environnement, encodage, robustesse, mode non interactif) |
+| **Version du document** | 0.6 (alignement Java : lambdas, références de méthode, `map`, booléens stricts) |
 | **Statut** | À valider |
 | **Plateforme cible** | Windows 10/11 x64 (`powerj.exe`), Linux/macOS en bonus |
 | **Socle technique** | Java 27, Maven 3.9, JLine 3 |
@@ -252,9 +252,11 @@ Les **records restent le format recommandé** pour les sorties des cmdlets (affi
   4. sur une `Map` : valeur associée à la clé `"nom"`.
 - `$x.nom(args)` (avec parenthèses) est toujours un **appel de méthode** (§3.13).
 - L'accès se chaîne : `$x.path.parent`, `$f.toPath().fileName`.
-- Sur une collection, l'accès à une propriété s'applique à chaque élément (`(ls).name` → liste des noms), sauf si la propriété existe sur la collection elle-même (`$l.empty` → `isEmpty()`).
+- **`.` s'applique toujours à l'objet lui-même**, comme en Java : sur une liste, `$f.size()` est le nombre d'éléments et `$f.empty` appelle `isEmpty()`.
+- **`*.` (opérateur « spread », comme en Groovy) s'applique à chaque élément** et renvoie la liste des résultats : `$f*.name` (noms de tous les fichiers), `$f*.size`, `$f*.name*.toUpperCase()`, `$f*.name.size()` (nombre de noms). Une valeur seule compte pour un élément, `null` pour aucun : `(ls -r)*.name` donne toujours une liste, même avec un seul fichier.
+- `$f.name` sur une liste est une erreur explicite : `List n'a pas de propriété 'name' (pour chaque élément : *.name)`. En pipeline, l'équivalent de `*.` est `map` : `ls | map FileEntry::name`.
 - Indexation : `$f[0]`, `$f[-1]` sur `List`, tableau ou `String` ; `$m['clé']` sur `Map`.
-- Propriété inexistante → erreur `FileEntry n'a pas de propriété 'siz' (propriétés : name, size, …)`.
+- Propriété inexistante → erreur `FileEntry n'a pas de propriété 'siz' (propriétés : name, size, …)` ; si une méthode de ce nom existe, le message l'indique : `String n'a pas de propriété 'length' (méthode : length())`.
 
 **FR-29 — Introspection.** `help members` sur une valeur (`$f | help members` ou `help members FileEntry`) liste les composants : nom, type, description (Javadoc / annotation `@Doc`).
 
@@ -319,11 +321,43 @@ Les comparaisons de chaînes sont **sensibles à la casse**, comme en Java (`equ
 
 Note : `!` en début de ligne reste l'expansion d'historique (FR-11) ; à l'intérieur d'une expression, c'est la négation. Dans un bloc `{ }`, `&&` et `||` sont les opérateurs logiques ; hors bloc, ils enchaînent des commandes (FR-04c).
 
+**FR-33b — Blocs et lambdas : la syntaxe Java d'abord.** PowerJ privilégie la syntaxe Java chaque fois qu'elle existe ; les emprunts aux shells sont réservés à ce que Java n'exprime pas (variables `$x`, interpolation `"$x"`, `$?`, redirections, littéraux `10kb` / `7d`).
+
+| Forme | Exemple | Sens |
+|---|---|---|
+| Lambda à un paramètre | `{ f -> f.size > 1mb }` | `f` est l'objet reçu. Paramètres sans `$`, comme en Java ; les variables du shell gardent leur `$` : `{ f -> f.size > $min }`. |
+| Lambda à plusieurs paramètres | `{ (a, b) -> a.length() - b.length() }` | Pour `Comparator`, `BiFunction`, `reduce`… Aucun paramètre : `{ () -> "x" }`. |
+| Raccourci `$_` | `{ $_.dir }` | Bloc sans paramètre déclaré : `$_` est l'objet reçu (un seul paramètre). Pratique pour les filtres courts. |
+| Lambda sans accolades | `$l.stream().map(s -> s.length())` | Uniquement **entre les parenthèses d'un appel Java** ; en argument de cmdlet, les accolades restent obligatoires (le `>` de `->` serait sinon une redirection). |
+| Référence de méthode | `String::length`, `Path::of`, `ArrayList::new`, `$x::equals` | Comme en Java : statique, d'instance non liée, liée à un objet, constructeur. |
+
+**Quand utiliser `$_`, une lambda ou une référence de méthode.** Les trois formes font la même chose ; on choisit la plus lisible :
+
+| Situation | Forme conseillée | Exemple |
+|---|---|---|
+| Condition ou transformation **courte**, qui ne cite l'objet qu'une ou deux fois | `$_` | `ls \| where { $_.dir }`, `ipconfig \| where { $_.contains("IPv4") }`, `ls \| map { $_.name }` |
+| Expression **longue**, ou qui cite l'objet plusieurs fois : un nom parlant aide à relire | lambda nommée | `ls -r \| where { f -> f.size > 1mb && f.modified > now - 7d && !f.name.startsWith(".") }` |
+| Bloc **imbriqué** dans un autre bloc : `$_` désignerait l'objet du bloc intérieur, pas celui de l'extérieur | lambda nommée (obligatoire pour l'extérieur) | `ls -r \| where { f -> List.of("md", "txt").stream().anyMatch(e -> f.name.endsWith("." + e)) }` |
+| **Deux paramètres ou plus** (`Comparator`, `reduce`, `BiFunction`) | lambda | `$m.sort((a, b) -> a.length() - b.length())` |
+| Aucun paramètre (`Supplier`, `Runnable`) | lambda `() ->` | `Optional.empty().orElseGet(() -> "vide")` |
+| Le bloc se contente d'**appeler une méthode** sur l'objet, ou de le passer à une méthode | référence de méthode | `ls \| map FileEntry::name`, `$l.stream().map(String::toUpperCase)`, `$noms.stream().map(Path::of)` |
+| Argument d'une **méthode Java** (`stream().filter(…)`, `sort(…)`) | lambda sans accolades | `$l.stream().filter(s -> s.length() > 4)` |
+| Argument d'un **cmdlet** (`where`, `map`) | accolades obligatoires | `where { f -> f.size > 1mb }` (jamais `where f -> …`) |
+| Script `.pj` destiné à être relu et maintenu | lambda nommée | `where { fichier -> fichier.ext == "log" }` |
+
+Règle courte : **`$_` pour les filtres d'une ligne au clavier, une lambda nommée dès que l'expression grandit, s'imbrique ou prend deux paramètres, une référence de méthode quand elle suffit.**
+
+- Un paramètre de lambda masque, dans le corps du bloc, une classe de même nom (cas rare : nommer les paramètres en minuscules).
+- `$a`, `$b` et `$args` (étape 5) sont **retirés** : on écrit une lambda à deux paramètres.
+- **Booléens stricts** : là où une condition est attendue (`where`, `filter`, `&&`, `||`, `!`, ternaire), la valeur doit être un `boolean`, comme un `Predicate` Java. `where { f -> f.name }` est une erreur non bloquante (`le bloc doit renvoyer un booléen`) ; écrire `where { f -> !f.name.isEmpty() }`. `null` n'est pas un booléen.
+- Les conversions gardent la notation `[type] valeur` : la forme Java `(type) valeur` serait ambiguë avec `(commande)`.
+- **Blocs de texte** : `"""…"""` comme en Java (indentation commune retirée), avec interpolation `$x` et `$( … )`.
+
 **FR-34 — Redirections (hors blocs).** `> fichier` (écrase), `>> fichier` (ajoute) pour le flux de sortie ; `2> fichier`, `2>&1` pour le flux d'erreur. Les objets redirigés vers un fichier sont écrits sous leur forme affichée.
 
 ### 3.9 Cmdlets du périmètre actuel
 
-Seuls **trois cmdlets** sont dans le périmètre de ce document : `ls`, `where` et `env`. Les deux premiers couvrent à eux seuls les mécanismes centraux : production d'objets records, accès aux attributs, pipeline, expressions, mélange avec les commandes natives.
+Seuls **quatre cmdlets** sont dans le périmètre de ce document : `ls`, `where`, `map` et `env`. Les deux premiers couvrent à eux seuls les mécanismes centraux : production d'objets records, accès aux attributs, pipeline, expressions, mélange avec les commandes natives.
 
 #### FR-35 — `ls` : lister des fichiers
 
@@ -352,12 +386,12 @@ public record FileEntry(
         String ext) { }    // extension sans le point, "" si aucune
 ```
 
-Colonnes affichées par défaut : `name size modified dir`. Les dossiers sont listés avant les fichiers, par ordre alphabétique. Le parcours est **paresseux** (streaming) : `ls -r C:\ | where …` affiche les premiers résultats immédiatement et Ctrl+C l'interrompt. Un dossier inaccessible produit une erreur non bloquante et le parcours continue.
+Colonnes affichées par défaut : `name size modified dir path` (`path` : chemin absolu, tronqué si la fenêtre est étroite). Les dossiers sont listés avant les fichiers, par ordre alphabétique. Le parcours est **paresseux** (streaming) : `ls -r C:\ | where …` affiche les premiers résultats immédiatement et Ctrl+C l'interrompt. Un dossier inaccessible produit une erreur non bloquante et le parcours continue.
 
 CA :
 - `ls` affiche le contenu du répertoire courant en tableau ;
 - `ls -r --filter *.txt` liste récursivement les `.txt` ;
-- `(ls).name` affiche uniquement les noms ;
+- `(ls)*.name` affiche uniquement les noms ;
 - `$f = ls; $f[0].size` affiche la taille du premier élément ;
 - `^ls` exécute le `ls` natif s'il existe (Git Bash, WSL…), sinon erreur `commande native introuvable`.
 
@@ -368,16 +402,31 @@ where { <expression> }
 where <attribut> <opérateur> <valeur>        # forme courte
 ```
 
-Évalue l'expression pour chaque objet reçu (`$_`) et ne laisse passer que ceux pour lesquels elle est vraie. Fonctionne sur les records, les scalaires et donc les **lignes `String` produites par une commande native**. La forme courte `where size > 1mb` équivaut à `where { $_.size > 1mb }`.
+Évalue la condition pour chaque objet reçu (paramètre de la lambda, ou `$_`) et ne laisse passer que ceux pour lesquels elle vaut `true`. Fonctionne sur les records, les scalaires et donc les **lignes `String` produites par une commande native**. La forme courte `where size > 1mb` équivaut à `where { $_.size > 1mb }`.
 
-Vérité : `false`, `null`, `0`, `""` et liste vide sont faux ; tout le reste est vrai. Une erreur d'évaluation sur un objet produit une erreur non bloquante et l'objet est ignoré.
+La condition doit renvoyer un `boolean` (FR-33b) ; une autre valeur, ou une erreur d'évaluation, produit une erreur non bloquante et l'objet est ignoré.
 
 CA :
 - `ls -r | where { $_.size > 1mb }` ;
+- `ls -r | where { f -> f.size > 1mb && !f.dir }` ;
 - `ls | where { $_.name.endsWith(".java") && !$_.dir }` ;
 - `ls | where { List.of("png", "jpg").contains($_.ext) }` ;
 - `git status --porcelain | where { $_.startsWith(" M ") }` ;
 - `ipconfig | where { $_.contains("IPv4") }`.
+
+#### FR-36c — `map` : transformer des objets
+
+```text
+map { <lambda ou expression> }
+map <référence de méthode>
+```
+
+Applique le bloc à chaque objet reçu et émet le résultat, comme `Stream.map` : `ls -r | map { f -> f.name + " : " + f.name.length() }`, `ls | map FileEntry::name`. Un résultat `null` n'émet rien ; un résultat collection est déroulé (FR-30b), comme un `flatMap`. Une erreur d'évaluation est non bloquante (objet ignoré).
+
+CA :
+- `ls -r | map { f -> f.name.length() }` ;
+- `ls | map { $_.name.toUpperCase() } | where { s -> s.startsWith("P") }` ;
+- `env | map EnvVar::name`.
 
 #### FR-36b — `env` : variables d'environnement
 
@@ -518,16 +567,17 @@ PJ> new BigDecimal("0.1").add(new BigDecimal("0.2"))
 - Parmi les surcharges applicables, la plus spécifique est choisie (règles proches de JLS §15.12) ; en cas d'ambiguïté, erreur listant les signatures candidates ; aucun candidat → erreur listant les surcharges existantes.
 - Une conversion explicite est possible par cast : `[long] 5`, `[java.util.ArrayList] $l` (vérification à l'exécution).
 
-**FR-51 — Blocs `{ }` vers interfaces fonctionnelles.** Un bloc passé à un paramètre dont le type est une interface fonctionnelle (`Predicate`, `Function`, `Comparator`, `Runnable`, `Supplier`…) est converti automatiquement :
-- 0 paramètre → aucun argument ; 1 paramètre → `$_` ; 2 paramètres → `$a` et `$b` ; au-delà → `$args[0]`, `$args[1]`… ;
-- la valeur du bloc est convertie vers le type de retour de la méthode abstraite (FR-50).
+**FR-51 — Lambdas et références de méthode vers interfaces fonctionnelles.** Une lambda (FR-33b), un bloc ou une référence de méthode passé à un paramètre dont le type est une interface fonctionnelle (`Predicate`, `Function`, `Comparator`, `Runnable`, `Supplier`…) est converti automatiquement :
+- le nombre de paramètres de la lambda doit correspondre à celui de la méthode abstraite ; un bloc sans paramètre déclaré reçoit son unique argument dans `$_` ;
+- la valeur est convertie vers le type de retour de la méthode abstraite (FR-50) ; `boolean` exige un booléen ;
+- une référence de méthode est résolue au moment de l'appel, selon le nombre d'arguments reçus.
 
 ```text
 PJ> $l = List.of("apple", "banana", "kiwi")
-PJ> $l.stream().filter({ $_.length() > 4 }).map({ $_.toUpperCase() }).toList()
+PJ> $l.stream().filter(s -> s.length() > 4).map(String::toUpperCase).toList()
 APPLE
 BANANA
-PJ> $m = new java.util.ArrayList($l); $m.sort({ $a.length() - $b.length() }); $m
+PJ> $m = new ArrayList($l); $m.sort((a, b) -> a.length() - b.length()); $m
 kiwi
 apple
 banana
@@ -554,7 +604,7 @@ PJ> Files.size(Path.of("gros.iso")) / 1mb
 PJ> new java.io.File("C:\\Windows").listFiles() | where { $_.directory && $_.name.startsWith("S") }
 PJ> java.util.UUID.randomUUID()
 PJ> java.net.InetAddress.getLocalHost().hostAddress
-PJ> String.join(", ", (ls).name)
+PJ> String.join(", ", (ls)*.name)
 PJ> (ls -r | where size > 1mb).size()
 ```
 
@@ -752,12 +802,12 @@ ligne saisie
 - L'objet courant `$_` d'un bloc est lié par une **Scoped Value** pendant l'évaluation.
 - Les commandes natives sont lancées via `ProcessBuilder` (redirections `INHERIT`, `PIPE`) ; les natives consécutives forment un groupe lancé par `ProcessBuilder.startPipeline` (octets transmis directement) ; les objets envoyés à un natif sont écrits sur son stdin sous leur forme affichée.
 
-### 5.4 Interopérabilité Java (`powerj-core`, package `interop`)
+### 5.4 Interopérabilité Java (`powerj-core`, `JavaClasses`, `JavaInvoker`, `FunctionalAdapter`)
 
-- **Résolution des classes** : index des packages exportés par les modules `java.*` de `ModuleLayer.boot()` (construit paresseusement, en tâche de fond) ; imports par défaut (FR-47) et imports de session. Les couches des modules tiers ne sont pas indexées.
-- **Résolution des membres** : métadonnées par type (méthodes publiques, propriétés dérivées, champs) mises en cache via `ClassValue` ; appels via `MethodHandle` obtenus par `MethodHandles.publicLookup()`, en remontant à l'interface ou la superclasse publique exportée quand la classe concrète ne l'est pas.
+- **Résolution des classes** : recherche par le chargeur de classes de la plateforme (qui ne voit pas les modules tiers), en ne gardant que les classes publiques des packages exportés par les modules `java.*` ; imports par défaut (FR-47) et imports de session ; résultats mis en cache.
+- **Résolution des membres** : méthodes publiques par type et par nom mises en cache via `ClassValue`, vues à travers l'interface ou la superclasse publique exportée quand la classe concrète ne l'est pas (`List.of(…)`) ; appel par réflexion (`Method.invoke`), suffisant en v1 — les `MethodHandle` restent une optimisation possible si les appels Java deviennent un goulot.
 - **Conversion des arguments** : table de conversions (FR-50) exprimée par `switch` sur les types ; choix de surcharge par score de spécificité.
-- **Blocs → interfaces fonctionnelles** : adaptation via `MethodHandleProxies.asInterfaceInstance` (ou `LambdaMetafactory` pour les interfaces fréquentes du JDK).
+- **Lambdas et références de méthode → interfaces fonctionnelles** : implémentation par `java.lang.reflect.Proxy` de la méthode abstraite unique (méthodes `default` déléguées par `InvocationHandler.invokeDefault`) ; paramètres de la lambda (ou `$_`) liés par `ScopedValue` à chaque appel.
 - **Déroulage** (FR-30b) : appliqué à la sortie de chaque étape par l'exécuteur du pipeline.
 - **Interceptions** (FR-58) : table des méthodes redirigées ou refusées (`System.exit`, `Runtime.halt`, `System.setOut`…), consultée à la résolution d'un appel ; vérification du jeton d'annulation (FR-57) à chaque invocation d'un bloc.
 
@@ -787,7 +837,7 @@ Les nouveautés de Java sont utilisées **là où elles apportent un bénéfice 
 | **Stream Gatherers** | Opérations de flux sur mesure dans le pipeline (fenêtrage, `first`/`last`, dédoublonnage — utiles dès les cmdlets du backlog). |
 | **FFM API** | Accès console Windows (via JLine) ; lecture de l'en-tête PE pour détecter les applications GUI, sans JNI. |
 | **Sequenced Collections** | Historique (`getFirst`/`getLast`/`reversed`), colonnes ordonnées. |
-| **`MethodHandles`, `MethodHandleProxies`, `LambdaMetafactory`** | Interopérabilité Java : appels de méthodes/constructeurs rapides et mis en cache, conversion des blocs `{ }` en interfaces fonctionnelles. |
+| **Réflexion, `Proxy`, `ClassValue`** | Interopérabilité Java : appels de méthodes/constructeurs avec cache par type, conversion des blocs `{ }` en interfaces fonctionnelles (`MethodHandles` : optimisation possible plus tard). |
 | **`ClassValue`** | Cache des métadonnées de membres par type, sans fuite de classloader (modules tiers). |
 | **Module import declarations, constructeurs flexibles** | Lisibilité du code. |
 | **Patterns primitifs** | Dans l'évaluateur pour les comparaisons numériques, si finalisés dans le JDK 27. |
@@ -912,9 +962,9 @@ Chaque étape :
 **Contenu :** `powerj-api` (FR : §4.2), registre des cmdlets, cmdlet `env` (FR-36b) et réglage de l'encodage par variable (FR-40b), priorité cmdlet > natif, `^`, liaison des options Unix (FR-18 à FR-20), accès aux propriétés des objets (FR-27 à FR-29 : records, getters, champs), affichage selon le type (FR-30), déroulage (FR-30b), cmdlet `ls` (FR-35), `help` (FR-45).
 
 **Recette :**
-1. `ls` affiche un tableau `name size modified dir`.
+1. `ls` affiche un tableau `name size modified dir path`.
 2. `ls -r --filter *.txt` liste récursivement les `.txt`.
-3. `(ls).name` affiche les noms seuls.
+3. `(ls)*.name` affiche les noms seuls.
 4. `$f = ls` puis `$f[0].size` et `$f[0].path.parent`.
 5. `ls --recurce` : erreur avec suggestion `--recurse`.
 6. `help ls` et `ls --help` affichent l'aide.
@@ -957,6 +1007,24 @@ Chaque étape :
 11. `Stream.iterate(0, { $_ + 1 }).forEach({ $_ })` puis Ctrl+C : le prompt revient.
 12. `System.exit(0)` : le shell se ferme proprement (historique sauvegardé) ; `System.setOut(null)` : refusé avec un message.
 13. `new ArrayList().addAll(Collections.nCopies(2000000000, "x"))` : erreur mémoire, le shell reste utilisable.
+
+### Étape 5b — Alignement Java
+
+Livrée avec l'étape 5 (même PR, même exe).
+
+**Contenu :** FR-33b (lambdas `f ->` et `(a, b) ->`, lambdas sans accolades dans les appels Java, références de méthode `Classe::méthode`, `$x::méthode`, `Classe::new`, blocs de texte `"""…"""`), booléens stricts (`where`, `&&`, `||`, `!`, ternaire), retrait de `$a` / `$b` / `$args`, cmdlet `map` (FR-36c). Mise à jour des recettes 4 et 5 et des exemples de la spécification.
+
+**Recette :**
+1. `ls -r | where { f -> f.size > 1mb && !f.dir }`.
+2. `ls -r | map { f -> f.name + " : " + f.name.length() }` ; fonctionne aussi quand `ls` ne renvoie qu'un fichier.
+3. `ls | map FileEntry::name` et `env | map EnvVar::name`.
+4. `$l = List.of("apple", "banana", "kiwi")` puis `$l.stream().filter(s -> s.length() > 4).map(String::toUpperCase).toList()`.
+5. `$m = new ArrayList($l); $m.sort((a, b) -> a.length() - b.length()); $m`.
+6. `$l.stream().map(Path::of).toList()` et `Stream.of("a", "b").map(StringBuilder::new).toList()`.
+7. `ls | where { f -> f.name }` : erreur non bloquante `le bloc doit renvoyer un booléen` pour chaque objet.
+8. `$m.sort({ $a.length() - $b.length() })` : erreur claire indiquant d'écrire `(a, b) -> …`.
+9. `$min = 1kb; ls | where { f -> f.size > $min }` (variables du shell dans une lambda).
+10. Bloc de texte multi-ligne : `$t = """` … `"""` puis `$t.lines().count()`.
 
 ### Étape 6 — Autocomplétion Tab et coloration
 
@@ -1008,7 +1076,9 @@ commande      = [ "^" ] nom { argument } ;
 argument      = option | valeur | bloc ;
 option        = "-" lettre { lettre } | "--" ident [ "=" valeur ] | "--" ;
 valeur        = chaine | nombre | unite | variable_acces | liste | mot ;
-bloc          = "{" expression "}" ;
+bloc          = "{" ( lambda | expression ) "}" ;
+lambda        = params "->" expression ;                 (* FR-33b *)
+params        = ident | "(" [ ident { "," ident } ] ")" ;
 redirection   = ( ">" | ">>" | "2>" | "2>>" ) chemin | "2>&1" ;
 
 expression    = ou [ "?" expression ":" expression ] ;
@@ -1020,13 +1090,14 @@ somme         = produit { ( "+" | "-" ) produit } ;
 produit       = unaire { ( "*" | "/" | "%" ) unaire } ;
 unaire        = [ "-" | "!" ] [ cast ] postfixe ;
 cast          = "[" nom_qualifie "]" ;
-postfixe      = primaire { "." ident [ arguments ] | "[" expression "]" } ;
+postfixe      = primaire { "." ident [ arguments ] | "*." ident [ arguments ] | "::" ident | "[" expression "]" } ;   (* "*." : chaque élément *)
 arguments     = "(" [ arg_java { "," arg_java } ] ")" ;   (* sans espace avant "(" *)
-arg_java      = expression | bloc ;                       (* bloc → interface fonctionnelle *)
-primaire      = litteral | variable | "(" pipeline ")" | liste
+arg_java      = lambda | expression | bloc ;              (* lambda, bloc, ref_methode → interface fonctionnelle *)
+primaire      = litteral | variable | "(" pipeline ")" | liste | ref_methode
               | "new" nom_qualifie arguments
               | nom_qualifie [ arguments ] ;              (* classe, champ ou méthode statique *)
 nom_qualifie  = ident { "." ident } ;
+ref_methode   = ( nom_qualifie | variable ) "::" ( ident | "new" ) ;
 variable_acces= postfixe ;
 variable      = "$" ( ident | "_" | "?" ) ;
 liste         = "[" [ expression { "," expression } ] "]" ;
@@ -1050,7 +1121,7 @@ PJ C:\dev> mvn -q verify; $exit
 PJ C:\dev> code .                       # application graphique, rend la main
 PJ C:\dev> java.util.List.of("apple", "banana", "orange") | where { $_.contains("b") }
 PJ C:\dev> ls -r --filter *.log | where { Files.size($_.path) > 10mb }
-PJ C:\dev> (ls).name.stream().map({ $_.toUpperCase() }).sorted().toList()
+PJ C:\dev> (ls)*.name.stream().map({ $_.toUpperCase() }).sorted().toList()
 ```
 
 ### 12.3 Backlog des cmdlets (hors périmètre actuel)
@@ -1066,7 +1137,6 @@ PJ C:\dev> (ls).name.stream().map({ $_.toUpperCase() }).sorted().toList()
 | `first`, `last` | N premiers / derniers | inchangé |
 | `group` | Regroupement | `Group<T>` |
 | `count`, `sum`, `avg`, `min`, `max` | Agrégats | `Stats` |
-| `each` | Transformation par bloc | variable |
 | `uniq` | Dédoublonnage | inchangé |
 | `tee` | Copie dans une variable | inchangé |
 | `table`, `tree` | Formats d'affichage | — |
@@ -1087,7 +1157,8 @@ find src --name *.java --since 7d | where { $_.size > 2kb } | group { $_.path.pa
 | PowerShell | PowerJ |
 |---|---|
 | `Get-ChildItem -Recurse -Filter *.java` | `ls -r --filter *.java` |
-| `Where-Object { $_.Length -gt 1MB }` | `where { $_.size > 1mb }` |
+| `Where-Object { $_.Length -gt 1MB }` | `where { $_.size > 1mb }` ou `where { f -> f.size > 1mb }` |
+| `ForEach-Object { $_.Name }` | `map { f -> f.name }` ou `map FileEntry::name` |
 | `$_.Name -like '*.txt'` | `$_.name.endsWith(".txt")` |
 | `-and`, `-or`, `-not` | `&&`, `\|\|`, `!` |
 | `$_ -match 'IPv4'` | `$_.contains("IPv4")` / `$_.matches(".*IPv4.*")` |

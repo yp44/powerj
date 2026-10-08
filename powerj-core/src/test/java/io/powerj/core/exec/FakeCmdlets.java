@@ -14,7 +14,7 @@ final class FakeCmdlets {
     private FakeCmdlets() {
     }
 
-    record Item(String name, int size) { }
+    public record Item(String name, int size) { }
 
     @CmdletInfo(name = "items", category = "Test", summary = "Produit des objets de test", examples = "items -n 2")
     static final class Items implements Cmdlet<Items.Params, Void, Item> {
@@ -105,7 +105,25 @@ final class FakeCmdlets {
         }
     }
 
+    /** Mini {@code map} : applique un bloc ou une référence de méthode à chaque objet. */
+    @CmdletInfo(name = "eval-each", category = "Test", summary = "Transforme", examples = "items | eval-each Item::name")
+    static final class EvalEach implements Cmdlet<EvalEach.Params, Object, Object> {
+
+        record Params(@Option(position = 0) Object function) { }
+
+        @Override
+        public void process(Params params, Object input, CmdletContext<Object> context) {
+            try {
+                context.emit(((ScriptBlock) params.function()).invoke(input));
+            } catch (java.util.concurrent.CancellationException e) {
+                throw e;
+            } catch (RuntimeException e) {
+                context.error(e.getMessage());
+            }
+        }
+    }
+
     static List<Cmdlet<?, ?, ?>> all() {
-        return List.of(new Items(), new Filter(), new Count(), new Eval(), new Infinite());
+        return List.of(new Items(), new Filter(), new Count(), new Eval(), new Infinite(), new EvalEach());
     }
 }

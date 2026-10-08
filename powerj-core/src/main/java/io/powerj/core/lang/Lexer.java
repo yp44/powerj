@@ -2,33 +2,54 @@ package io.powerj.core.lang;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.function.Predicate;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
- * Découpe une ligne en {@link Token}. Règles (spécification §3.8) :
+ * Découpe une ligne en {@link Token}. Règles (spécification §3.8, §12.1) :
  * <ul>
  *   <li>les mots non quotés sont pris tels quels, antislash compris ({@code cd C:\Users}) ;</li>
- *   <li>les chaînes {@code "…"} suivent les échappements Java et interpolent {@code $var} ;</li>
- *   <li>{@code $nom.prop[0]} est une référence de variable ;</li>
- *   <li>{@code ;}, {@code &&}, {@code ||}, {@code |}, {@code >}, {@code >>}, {@code 2>}, {@code 2>>}
- *       sont des opérateurs, même collés à un mot ;</li>
- *   <li>{@code =} isolé (après une variable) marque une affectation ;</li>
- *   <li>{@code ( … )} délimite une sous-expression, éventuellement suivie d'accès : {@code (ls).name} ;</li>
- *   <li>{@code { … }} délimite un bloc d'expression, analysé par {@link ExpressionParser} ;</li>
- *   <li>{@code 2>&1} envoie les erreurs dans la sortie ; {@code ==} et {@code >=} sont des mots (forme
- *       courte de {@code where}).</li>
+ *   <li>{@code ;}, {@code &&}, {@code ||}, {@code |}, {@code >}, {@code >>}, {@code 2>}, {@code 2>>},
+ *       {@code 2>&1} sont des opérateurs, même collés à un mot ;</li>
+ *   <li>{@code $x =} en tête d'instruction marque une affectation ;</li>
+ *   <li>les expressions sont confiées à {@link ExpressionParser} : chaînes {@code "…"}, variables, blocs
+ *       {@code { … }}, groupes {@code ( … )}, et en tête d'instruction les littéraux, {@code new}, les
+ *       conversions {@code [type]} et les noms Java ({@link #expressionAt}) ;</li>
+ *   <li>{@code ==} et {@code >=} sont des mots (forme courte de {@code where}).</li>
  * </ul>
  */
 public final class Lexer {
 
+    /** Référence de méthode {@code Classe::méthode} ou {@code nom.Qualifie::méthode}. */
+    private static final Pattern METHOD_REFERENCE = Pattern.compile(
+            "[\\p{L}_][\\p{L}\\p{N}_]*(?:\\.[\\p{L}_][\\p{L}\\p{N}_]*)*::[\\p{L}_]");
+
+    /** Nom qualifié {@code ident(.ident)+}, suivi éventuellement de {@code (}. */
+    private static final Pattern QUALIFIED = Pattern.compile("[\\p{L}_][\\p{L}\\p{N}_]*(?:\\.[\\p{L}_][\\p{L}\\p{N}_]*)+");
+
+    private static final Set<String> KEYWORDS = Set.of("true", "false", "null", "now");
+
     private final String input;
+    private final Predicate<String> staticNames;
     private int pos;
 
-    private Lexer(String input) {
+    private Lexer(String input, Predicate<String> staticNames) {
         this.input = input;
+        this.staticNames = staticNames;
     }
 
     public static List<Token> tokenize(String input) {
-        return new Lexer(input).run();
+        return tokenize(input, _ -> false);
+    }
+
+    /**
+     * @param staticNames reconnaît les noms qualifiés désignant une classe ou un champ statique Java
+     *                    ({@code Math.PI}) : en tête d'instruction, ce sont des expressions (FR-46)
+     */
+    public static List<Token> tokenize(String input, Predicate<String> staticNames) {
+        return new Lexer(input, staticNames).run();
     }
 
     private List<Token> run() {
@@ -38,11 +59,17 @@ public final class Lexer {
             if (atEnd()) {
                 return tokens;
             }
-            tokens.add(next());
+            boolean head = tokens.isEmpty() || tokens.getLast() instanceof Token.Separator
+                    || tokens.getLast() instanceof Token.Pipe || tokens.getLast() instanceof Token.AssignTo;
+            tokens.add(next(head, tokens.isEmpty() || tokens.getLast() instanceof Token.Separator));
         }
     }
 
-    private Token next() {
+    /**
+     * @param head      position de commande (début d'instruction, après {@code |} ou une affectation)
+     * @param statement début d'instruction : une affectation est possible
+     */
+    private Token next(boolean head, boolean statement) {
         char c = peek();
         if (startsWith("&&")) {
             pos += 2;
@@ -51,6 +78,10 @@ public final class Lexer {
         if (startsWith("||")) {
             pos += 2;
             return new Token.Separator(Connector.IF_FAILURE);
+        }
+        if (startsWith("->")) {
+            throw new SyntaxException("« -> » hors d'un bloc : en argument d'une commande, une lambda s'écrit"
+                    + " entre accolades, ex. where { f -> f.size > 1mb }");
         }
         if (startsWith("2>&1")) {
             pos += 4;
@@ -70,60 +101,136 @@ public final class Lexer {
             pos += c == '2' ? 2 : 1;
             return new Token.Redirection(stream, false);
         }
-        return switch (c) {
+        switch (c) {
             case ';' -> {
                 pos++;
-                yield new Token.Separator(Connector.ALWAYS);
+                return new Token.Separator(Connector.ALWAYS);
             }
             case '|' -> {
                 pos++;
-                yield new Token.Pipe();
+                return new Token.Pipe();
             }
             case '&' -> throw new SyntaxException("« & » isolé n'est pas supporté (utiliser && ou ;)");
-            case '=' -> {
-                pos++;
-                yield new Token.Assign();
-            }
-            case '(' -> {
-                pos++;
-                yield new Token.Open();
-            }
-            case ')' -> {
-                pos++;
-                yield new Token.Close(accessors());
-            }
-            case '"' -> string();
-            case '{' -> block();
+            case ')' -> throw new SyntaxException("« ) » inattendu (position " + (pos + 1) + ")");
             case '}' -> throw new SyntaxException("« } » sans « { » correspondante (position " + (pos + 1) + ")");
-            case '$' -> isVariableStart(pos + 1) ? variable() : word();
-            default -> word();
-        };
+            case '=' -> throw new SyntaxException("« = » inattendu (position " + (pos + 1) + ") ; affectation : $nom = valeur");
+            default -> { }
+        }
+        if (statement) {
+            var assignment = assignment();
+            if (assignment != null) {
+                return assignment;
+            }
+        }
+        if (head ? expressionAt(input, pos, staticNames) : argumentExpressionAt()) {
+            var scanned = ExpressionParser.scan(input, pos,
+                    head ? ExpressionParser.Mode.STATEMENT : ExpressionParser.Mode.ARGUMENT, staticNames);
+            pos = scanned.end();
+            return new Token.Expr(scanned.value());
+        }
+        return word();
+    }
+
+    /** {@code $nom =} (mais pas {@code $nom ==}). */
+    private Token.AssignTo assignment() {
+        if (peek() != '$' || !isVariableStart(pos + 1)) {
+            return null;
+        }
+        int end = pos + 1;
+        while (end < input.length() && (Character.isLetterOrDigit(input.charAt(end)) || input.charAt(end) == '_')) {
+            end++;
+        }
+        int after = ExpressionParser.skipBlanks(input, end);
+        if (after < input.length() && input.charAt(after) == '=' && !input.startsWith("==", after)) {
+            String name = input.substring(pos + 1, end);
+            pos = after + 1;
+            return new Token.AssignTo(name);
+        }
+        return null;
+    }
+
+    /**
+     * Une expression commence-t-elle en {@code at}, en position de commande ? Variables, chaînes, groupes,
+     * blocs, listes et conversions, caractères, nombres, {@code true}/{@code false}/{@code null}/{@code now},
+     * {@code new Classe(…)}, et noms qualifiés collés à {@code (} ou désignant une classe ou un champ
+     * statique ({@code Math.max(3, 7)}, {@code java.lang.Math.PI}). Sinon c'est une commande
+     * ({@code java -version}, {@code notepad.exe x}).
+     */
+    static boolean expressionAt(String input, int at, Predicate<String> staticNames) {
+        if (at >= input.length()) {
+            return false;
+        }
+        char c = input.charAt(at);
+        if (c == '$') {
+            return at + 1 < input.length() && (isIdentifierStart(input.charAt(at + 1)) || input.charAt(at + 1) == '?');
+        }
+        if (c == '"' || c == '(' || c == '{' || c == '[' || c == '\'' || Character.isDigit(c)) {
+            return true;
+        }
+        if (!isIdentifierStart(c)) {
+            return false;
+        }
+        int end = at;
+        while (end < input.length() && !isWordEnd(input, end)) {
+            end++;
+        }
+        String word = input.substring(at, end);
+        if (KEYWORDS.contains(word) || METHOD_REFERENCE.matcher(input).region(at, input.length()).lookingAt()) {
+            return true;
+        }
+        if (word.equals("new") && end < input.length() && isBlank(input.charAt(end))) {
+            int next = ExpressionParser.skipBlanks(input, end);
+            return next < input.length() && isIdentifierStart(input.charAt(next));
+        }
+        Matcher qualified = QUALIFIED.matcher(input).region(at, input.length());
+        if (qualified.lookingAt()) {
+            int chainEnd = qualified.end();
+            if (chainEnd < input.length() && input.charAt(chainEnd) == '(') {
+                return true;
+            }
+            return chainEnd == end && staticNames.test(input.substring(at, chainEnd));
+        }
+        return false;
+    }
+
+    /** En argument : variable, chaîne, groupe, bloc, ou appel Java collé ({@code Path.of("x")}). */
+    private boolean argumentExpressionAt() {
+        char c = peek();
+        if (c == '$') {
+            return isVariableStart(pos + 1);
+        }
+        if (c == '"' || c == '(' || c == '{') {
+            return true;
+        }
+        if (METHOD_REFERENCE.matcher(input).region(pos, input.length()).lookingAt()) {
+            return true; // map FileEntry::name
+        }
+        Matcher qualified = QUALIFIED.matcher(input).region(pos, input.length());
+        return qualified.lookingAt() && qualified.end() < input.length() && input.charAt(qualified.end()) == '(';
     }
 
     private Token.Word word() {
         int start = pos;
-        while (!atEnd() && !isWordEnd()) {
+        while (!atEnd() && !isWordEnd(input, pos)) {
             pos++;
         }
         return new Token.Word(input.substring(start, pos));
     }
 
-    private boolean isWordEnd() {
-        char c = peek();
+    private static boolean isWordEnd(String input, int at) {
+        char c = input.charAt(at);
         return isBlank(c) || c == ';' || c == '|' || c == '"' || c == '>' || c == '(' || c == ')'
                 || c == '{' || c == '}'
-                || startsWith("&&") || (c == '2' && startsWith("2>") && atWordStart());
+                || input.startsWith("&&", at)
+                || (c == '2' && input.startsWith("2>", at) && (at == 0 || isBlank(input.charAt(at - 1))));
     }
 
-    /** {@code 2>} n'est une redirection qu'en début de mot ({@code a2>b} reste un mot suivi de {@code >}). */
-    private boolean atWordStart() {
-        return pos == 0 || isBlank(input.charAt(pos - 1));
-    }
-
-    private Token.Var variable() {
-        pos++; // $
-        String name = identifier();
-        return new Token.Var(name, accessors());
+    /**
+     * Séparateur : espace, tabulation, fin de ligne, mais aussi les espaces insécables (U+00A0, U+202F), que
+     * le clavier français produit facilement en tapant AltGr+Espace juste après {@code |} (AltGr+6).
+     */
+    public static boolean isBlank(char c) {
+        return Character.isWhitespace(c) || Character.isSpaceChar(c);
     }
 
     private List<Accessor> accessors() {
@@ -179,7 +286,22 @@ public final class Lexer {
         return Character.isLetter(c) || c == '_';
     }
 
-    private Token.Str string() {
+    /** Chaîne qui commence en {@code start}, avec ses morceaux, et position qui la suit. */
+    static Scanned<List<StringPart>> stringAt(String input, int start, Predicate<String> staticNames) {
+        var lexer = new Lexer(input, staticNames);
+        lexer.pos = start;
+        List<StringPart> parts = lexer.string();
+        return new Scanned<>(parts, lexer.pos);
+    }
+
+    /** Élément lu et position qui le suit. */
+    record Scanned<T>(T value, int end) { }
+
+    /** {@code "…"} : échappements Java, {@code $var.prop[0]} et {@code $( … )} interpolés. */
+    private List<StringPart> string() {
+        if (startsWith("\"\"\"")) {
+            return textBlock();
+        }
         int open = pos++;
         List<StringPart> parts = new ArrayList<>();
         var text = new StringBuilder();
@@ -193,17 +315,23 @@ public final class Lexer {
                     if (!text.isEmpty() || parts.isEmpty()) {
                         parts.add(new StringPart.Text(text.toString()));
                     }
-                    return new Token.Str(List.copyOf(parts));
+                    return List.copyOf(parts);
                 }
                 case '\\' -> text.append(escape());
                 case '$' -> {
-                    if (isVariableStart(pos)) {
+                    if (isVariableStart(pos) || (!atEnd() && peek() == '(')) {
                         if (!text.isEmpty()) {
                             parts.add(new StringPart.Text(text.toString()));
                             text.setLength(0);
                         }
-                        String name = identifier();
-                        parts.add(new StringPart.Interpolation(name, accessors()));
+                        if (peek() == '(') {
+                            var group = ExpressionParser.group(input, pos, staticNames);
+                            pos = group.end();
+                            parts.add(new StringPart.Embedded(group.value()));
+                        } else {
+                            String name = identifier();
+                            parts.add(new StringPart.Interpolation(name, accessors()));
+                        }
                     } else {
                         text.append('$');
                     }
@@ -213,48 +341,62 @@ public final class Lexer {
         }
     }
 
-    /** {@code { … }} : texte jusqu'à l'accolade fermante correspondante, chaînes et caractères compris. */
-    private Token.Block block() {
-        int open = pos++;
-        int depth = 1;
-        while (!atEnd()) {
-            char c = input.charAt(pos);
-            switch (c) {
-                case '"' -> {
-                    string(); // valide la chaîne et avance après elle
-                    continue;
-                }
-                case '\'' -> {
-                    pos++;
-                    while (!atEnd() && input.charAt(pos) != '\'') {
-                        pos += input.charAt(pos) == '\\' ? 2 : 1;
-                    }
-                }
-                case '{' -> depth++;
-                case '}' -> {
-                    if (--depth == 0) {
-                        String source = input.substring(open + 1, pos);
-                        pos++;
-                        return new Token.Block(source);
-                    }
-                }
-                default -> { }
-            }
-            pos++;
+    /**
+     * Bloc de texte {@code """…"""} (FR-33b) : comme en Java, il commence par un retour à la ligne et
+     * l'indentation commune est retirée ; échappements et interpolations s'y appliquent.
+     */
+    private List<StringPart> textBlock() {
+        int open = pos;
+        int at = pos + 3;
+        while (at < input.length() && (input.charAt(at) == ' ' || input.charAt(at) == '\t')) {
+            at++;
         }
-        throw new SyntaxException("bloc non fermé (« { » à la position " + (open + 1) + ")");
+        if (at < input.length() && input.charAt(at) == '\r') {
+            at++;
+        }
+        if (at >= input.length() || input.charAt(at) != '\n') {
+            throw new SyntaxException("un bloc de texte s'ouvre par \"\"\" suivi d'un retour à la ligne (position "
+                    + (open + 1) + ")");
+        }
+        int contentStart = at + 1;
+        int close = contentStart;
+        while (true) {
+            close = input.indexOf("\"\"\"", close);
+            if (close < 0) {
+                throw new SyntaxException("bloc de texte non fermé (ouvert à la position " + (open + 1) + ")");
+            }
+            if (!escaped(close)) {
+                break;
+            }
+            close++;
+        }
+        String content = input.substring(contentStart, close).replace("\r\n", "\n").stripIndent();
+        pos = close + 3;
+        // Les guillemets du contenu sont du texte : on les échappe pour réutiliser l'analyse des chaînes.
+        var quoted = new StringBuilder("\"");
+        for (int i = 0; i < content.length(); i++) {
+            char c = content.charAt(i);
+            if (c == '"' && !escaped(content, i)) {
+                quoted.append('\\');
+            }
+            quoted.append(c);
+        }
+        quoted.append('"');
+        return stringAt(quoted.toString(), 0, staticNames).value();
     }
 
-    /** Lit la chaîne qui commence à {@code start} ; utilisé aussi par l'analyse des expressions. */
-    static Scanned<Token.Str> stringAt(String input, int start) {
-        var lexer = new Lexer(input);
-        lexer.pos = start;
-        Token.Str str = lexer.string();
-        return new Scanned<>(str, lexer.pos);
+    private boolean escaped(int at) {
+        return escaped(input, at);
     }
 
-    /** Élément lu et position qui le suit. */
-    record Scanned<T>(T value, int end) { }
+    /** Le caractère en {@code at} est-il précédé d'un nombre impair d'antislashs ? */
+    private static boolean escaped(String text, int at) {
+        int count = 0;
+        for (int i = at - 1; i >= 0 && text.charAt(i) == '\\'; i--) {
+            count++;
+        }
+        return count % 2 == 1;
+    }
 
     private String escape() {
         if (atEnd()) {
@@ -287,14 +429,6 @@ public final class Lexer {
         } catch (NumberFormatException _) {
             throw new SyntaxException("échappement \\u" + hex + " invalide");
         }
-    }
-
-    /**
-     * Séparateur : espace, tabulation, fin de ligne, mais aussi les espaces insécables (U+00A0, U+202F), que
-     * le clavier français produit facilement en tapant AltGr+Espace juste après {@code |} (AltGr+6).
-     */
-    public static boolean isBlank(char c) {
-        return Character.isWhitespace(c) || Character.isSpaceChar(c);
     }
 
     private void skipWhitespace() {

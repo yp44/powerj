@@ -1,33 +1,22 @@
 package io.powerj.core.lang;
 
-import java.util.List;
-
 /** Élément lexical d'une ligne de commande. */
 public sealed interface Token {
 
     /** Mot non quoté, pris tel quel (l'antislash n'y échappe rien, spécification FR-32b). */
     record Word(String text) implements Token { }
 
-    /** Chaîne entre guillemets, échappements Java déjà décodés, avec ses variables interpolées. */
-    record Str(List<StringPart> parts) implements Token { }
+    /**
+     * Expression : chaîne, variable, littéral, bloc {@code { … }}, groupe {@code ( … )}, appel Java
+     * ({@code Math.max(3, 7)}, {@code new File("x")}), analysée par {@link ExpressionParser}.
+     */
+    record Expr(Ast.Expression expression) implements Token { }
 
-    /** Référence de variable avec ses accès : {@code $last.duration}, {@code $l[0]}. */
-    record Var(String name, List<Accessor> accessors) implements Token { }
-
-    /** {@code =} d'une affectation. */
-    record Assign() implements Token { }
+    /** {@code $nom =} en tête d'instruction : affectation. */
+    record AssignTo(String variable) implements Token { }
 
     /** Séparateur d'instructions {@code ;}, {@code &&} ou {@code ||}. */
     record Separator(Connector connector) implements Token { }
-
-    /** {@code (} ouvrant une sous-expression. */
-    record Open() implements Token { }
-
-    /** {@code )} fermant une sous-expression, avec les accès qui la suivent : {@code (ls).name}. */
-    record Close(List<Accessor> accessors) implements Token { }
-
-    /** Bloc {@code { … }} : texte source entre les accolades, analysé ensuite par {@link ExpressionParser}. */
-    record Block(String source) implements Token { }
 
     /** {@code |} (pipeline). */
     record Pipe() implements Token { }

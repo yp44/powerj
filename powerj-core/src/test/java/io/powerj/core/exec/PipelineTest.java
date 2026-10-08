@@ -67,8 +67,8 @@ class PipelineTest {
     @Test
     void pipelinesInAssignmentsAndSubExpressions() throws Exception {
         run("$big = items | filter { $_.size >= 20 }");
-        assertThat(run("$big.name")).isEqualTo("item2\nitem3\n");
-        assertThat(run("(items | filter { !$_.name.contains(\"2\") }).name")).isEqualTo("item1\nitem3\n");
+        assertThat(run("$big*.name")).isEqualTo("item2\nitem3\n");
+        assertThat(run("(items | filter { !$_.name.contains(\"2\") })*.name")).isEqualTo("item1\nitem3\n");
     }
 
     @Test
@@ -160,7 +160,9 @@ class PipelineTest {
         run("eval { \"a\".nope() }");
         assertThat(errors).singleElement().asString().contains("String n'a pas de méthode nope()");
         run("eval { \"a\".charAt(\"x\") }");
-        assertThat(errors).singleElement().asString().contains("aucune méthode charAt", "charAt(int)");
+        assertThat(errors).singleElement().asString().contains("aucune surcharge de charAt", "charAt(int)");
+        run("eval { size > 1 }");
+        assertThat(errors).singleElement().asString().contains("« size » inconnu", "$size");
         run("eval { \"a\".charAt(5) }");
         assertThat(errors).singleElement().asString().contains("StringIndexOutOfBoundsException");
         run("eval { $_ }");
@@ -174,7 +176,6 @@ class PipelineTest {
         assertThatThrownBy(() -> interpreter.execute("eval { 1 + }")).hasMessageContaining("expression incomplète");
         assertThatThrownBy(() -> interpreter.execute("eval { }")).hasMessageContaining("bloc vide");
         assertThatThrownBy(() -> interpreter.execute("eval { $_.size = 1 }")).hasMessageContaining("utiliser ==");
-        assertThatThrownBy(() -> interpreter.execute("eval { size > 1 }")).hasMessageContaining("« size » inconnu");
         assertThatThrownBy(() -> interpreter.execute("eval { 3x }")).hasMessageContaining("nombre invalide : 3x");
         assertThatThrownBy(() -> interpreter.execute("eval { 'ab' }")).hasMessageContaining("apostrophes");
     }
