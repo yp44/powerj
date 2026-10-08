@@ -59,6 +59,12 @@ public final class OutputFormatter implements AutoCloseable {
             case null -> { }
             case Path path -> line(path.toString()); // un Path est aussi un Iterable<Path>
             case Iterable<?> items -> items.forEach(this::accept);
+            case java.util.stream.BaseStream<?, ?> stream -> { // Stream, IntStream… : éléments affichés
+                try (stream) {
+                    stream.iterator().forEachRemaining(this::accept);
+                }
+            }
+            case java.util.Iterator<?> iterator -> iterator.forEachRemaining(this::accept);
             case Object array when array.getClass().isArray() -> {
                 for (int i = 0; i < Array.getLength(array); i++) {
                     accept(Array.get(array, i));

@@ -7,7 +7,10 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.stream.Stream;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
+import java.util.stream.BaseStream;
 
 /**
  * Liaison entre deux étapes d'un pipeline : file bornée (l'étape rapide attend la lente, la mémoire reste
@@ -82,7 +85,7 @@ final class Pipe implements Source {
 
     /**
      * Émet {@code value}, ou chacun de ses éléments si c'est un {@link Iterable} (sauf {@code Path}), un
-     * tableau, un {@link Stream}, un {@link Iterator} ou un {@link Optional}. Les chaînes et les {@code Map}
+     * tableau, un flux ({@code Stream}, {@code IntStream}, {@code LongStream}, {@code DoubleStream}), un {@link Iterator} ou un {@link Optional} (aussi {@code OptionalInt}…). Les chaînes et les {@code Map}
      * ne sont jamais déroulées, ni une liste {@link io.powerj.api.Collected} produite par {@code collect}.
      */
     static void unroll(Object value, Pipe target) {
@@ -90,13 +93,16 @@ final class Pipe implements Source {
             case java.nio.file.Path path -> target.put(path);
             case io.powerj.api.Collected<?> list -> target.put(list); // collect : la liste passe entière (FR-36d)
             case Iterable<?> items -> items.forEach(target::put);
-            case Stream<?> stream -> {
+            case BaseStream<?, ?> stream -> { // Stream, et IntStream, LongStream, DoubleStream (éléments boxés)
                 try (stream) {
-                    stream.forEach(target::put);
+                    stream.iterator().forEachRemaining(target::put);
                 }
             }
             case Iterator<?> iterator -> iterator.forEachRemaining(target::put);
             case Optional<?> optional -> optional.ifPresent(target::put);
+            case OptionalInt optional -> optional.ifPresent(target::put);
+            case OptionalLong optional -> optional.ifPresent(target::put);
+            case OptionalDouble optional -> optional.ifPresent(target::put);
             case Object array when array.getClass().isArray() -> {
                 for (int i = 0; i < java.lang.reflect.Array.getLength(array); i++) {
                     target.put(java.lang.reflect.Array.get(array, i));
