@@ -1,14 +1,14 @@
-# Module d'exemple `greet`
+# Example module `greet`
 
-Module tiers minimal pour PowerJ (spécification §4.3) : le cmdlet `greet --name Yves -c 2`.
+Minimal third-party module for PowerJ (specification §4.3): the `greet --name Yves -c 2` cmdlet.
 
-- `pom.xml` : seule dépendance, `powerj-api`.
-- `module-info.java` : `provides io.powerj.api.CmdletProvider with com.example.greet.GreetProvider`.
-- `GreetParams` : record des options (`@Option`), `Greeting` : record produit, `Greet` : le cmdlet (`@CmdletInfo`).
+- `pom.xml`: single dependency, `powerj-api`.
+- `module-info.java`: `provides io.powerj.api.CmdletProvider with com.example.greet.GreetProvider`.
+- `GreetParams`: options record (`@Option`), `Greeting`: output record, `Greet`: the cmdlet (`@CmdletInfo`).
 
 ```bash
 ./mvnw -pl examples/greet -am package     # → examples/greet/target/greet.jar
 cp examples/greet/target/greet.jar ~/.powerj/modules/
 ```
 
-Ou sans redémarrer PowerJ : `mod-load examples/greet/target/greet.jar`.
+Or without restarting PowerJ: `mod-load examples/greet/target/greet.jar`.

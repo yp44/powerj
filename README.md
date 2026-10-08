@@ -1,6 +1,6 @@
 # PowerJ
 
-Shell interactif orienté objet écrit en Java 27 : les commandes renvoient des **objets Java** (records de préférence) dont on extrait les attributs dans un pipeline, avec des noms de commandes courts façon Unix, un mélange transparent avec les commandes natives et un **accès direct à toute l'API Java du JRE**.
+An interactive object-oriented shell written in Java 27: commands return **Java objects** (preferably records) whose attributes you extract in a pipeline, with short Unix-style command names, transparent mixing with native commands, and **direct access to the entire Java API of the JRE**.
 
 ```text
 PJ C:\dev> ls -r --filter *.java | where { $_.size > 10kb }
@@ -14,35 +14,35 @@ C:\> powerj -c "ls -r | where size > 1mb"
 C:\> dir /b | powerj -c "where { $_.endsWith(\".txt\") }"
 ```
 
-- Spécification : [docs/SPECIFICATION.md](docs/SPECIFICATION.md)
-- Fiches de recette : [docs/recettes/](docs/recettes/)
+- Specification: [docs/SPECIFICATION.md](docs/SPECIFICATION.md)
+- Acceptance checklists: [docs/recettes/](docs/recettes/)
 
-## État
+## Status
 
-Mini-itération 8 : cmdlet `collect` — rassemble les objets d'un pipeline en une seule liste (`(ls -r | collect).size()`, `ls -r | collect | map { l -> l.stream()… }`). Étape 7 : modules tiers — un jar déposé dans `~/.powerj/modules/` ajoute ses cmdlets au démarrage (`ModuleLayer` isolé par module), `mod-load` à chaud, `mod-list`, collisions de noms (`module:nom`) ; module d'exemple [`examples/greet`](examples/greet) (artefact CI `greet-module`). Étape 6 : autocomplétion Tab (commandes `[pj]`/`[interne]`/`[natif]`, options, chemins, variables, propriétés de `$_` et des paramètres de lambda, API Java avec signatures) et coloration de la saisie. Étapes 5 et 5b : accès direct à l'API Java du JRE — appels statiques (`Math.max(3, 7)`, `java.util.List.of(…)`), champs (`Math.PI`), `new`, méthodes d'instance (`$l.stream().toList()`), imports par défaut et `import`, surcharges, varargs et conversions, casts `[long] 5`, lambdas à la Java (`ls -r | where { f -> f.size > 1mb }`, `$l.sort((a, b) -> a.length() - b.length())`), références de méthode (`map FileEntry::name`, `String::length`), opérateur `*.` pour chaque élément d'une liste (`$f*.name`), cmdlet `map`, blocs de texte `"""`, exceptions Java lisibles (`$errors`, `$debug`), `help java.util.List`, `$( … )` dans les chaînes, second Ctrl+C pour abandonner un calcul bloqué. Étapes précédentes : pipeline `|` et `where`, mode non interactif ; cmdlets `ls` et `env`, objets et propriétés ; commandes natives, `cd`, `;` `&&` `||`, variables, redirections ; édition de ligne et historique. Voir le plan de développement (§11 de la spécification).
+Mini-iteration 8: `collect` cmdlet — gathers the objects of a pipeline into a single list (`(ls -r | collect).size()`, `ls -r | collect | map { l -> l.stream()… }`). Step 7: third-party modules — a jar dropped into `~/.powerj/modules/` adds its cmdlets at startup (an isolated `ModuleLayer` per module), hot loading with `mod-load`, `mod-list`, name collisions (`module:nom`); example module [`examples/greet`](examples/greet) (CI artifact `greet-module`). Step 6: Tab completion (commands `[pj]`/`[interne]`/`[natif]`, options, paths, variables, properties of `$_` and of lambda parameters, Java API with signatures) and input highlighting. Steps 5 and 5b: direct access to the JRE's Java API — static calls (`Math.max(3, 7)`, `java.util.List.of(…)`), fields (`Math.PI`), `new`, instance methods (`$l.stream().toList()`), default imports and `import`, overloads, varargs and conversions, casts `[long] 5`, Java-style lambdas (`ls -r | where { f -> f.size > 1mb }`, `$l.sort((a, b) -> a.length() - b.length())`), method references (`map FileEntry::name`, `String::length`), the `*.` operator for each element of a list (`$f*.name`), the `map` cmdlet, `"""` text blocks, readable Java exceptions (`$errors`, `$debug`), `help java.util.List`, `$( … )` in strings, a second Ctrl+C to abort a stuck computation. Earlier steps: pipeline `|` and `where`, non-interactive mode; `ls` and `env` cmdlets, objects and properties; native commands, `cd`, `;` `&&` `||`, variables, redirections; line editing and history. See the development plan (§11 of the specification).
 
-## Construire
+## Building
 
-Prérequis : **JDK 27** (Maven est fourni par le wrapper `mvnw`, version 3.9.11).
+Prerequisites: **JDK 27** (Maven is provided by the `mvnw` wrapper, version 3.9.11).
 
 ```bash
 ./mvnw verify                 # compilation + tests
-./mvnw -Pdist verify          # + image applicative autonome (runtime jlink + lanceur jpackage)
+./mvnw -Pdist verify          # + standalone application image (jlink runtime + jpackage launcher)
 ```
 
-L'image est produite dans `powerj-dist/target/jpackage/powerj/` (lanceur `bin/powerj` sous Linux, `powerj.exe` sous Windows), avec une archive zip dans `powerj-dist/target/`.
+The image is produced in `powerj-dist/target/jpackage/powerj/` (launcher `bin/powerj` on Linux, `powerj.exe` on Windows), with a zip archive in `powerj-dist/target/`.
 
-Sous Windows, l'installeur `.exe` se construit avec `mvnw.cmd -Pdist,installer verify` et nécessite [WiX](https://wixtoolset.org/) (`dotnet tool install --global wix --version 5.0.2`). La CI GitHub Actions le produit à chaque push.
+On Windows, the `.exe` installer is built with `mvnw.cmd -Pdist,installer verify` and requires [WiX](https://wixtoolset.org/) (`dotnet tool install --global wix --version 5.0.2`). The GitHub Actions CI produces it on every push.
 
-Sans JDK 27 sous la main, on peut vérifier le build avec un JDK plus ancien supportant les fonctionnalités utilisées : `./mvnw -Djava.release=25 verify`.
+Without JDK 27 at hand, you can check the build with an older JDK that supports the features used: `./mvnw -Djava.release=25 verify`.
 
 ## Structure
 
-| Module | Rôle |
+| Module | Role |
 |---|---|
-| `powerj-api` | API publique pour écrire des cmdlets |
-| `powerj-core` | Analyse, interprétation, pipeline, interopérabilité Java |
-| `powerj-cmdlets` | Cmdlets intégrés (`ls`, `where`, `map`, `collect`, `env`) |
-| `powerj-shell` | REPL et point d'entrée |
-| `powerj-dist` | Distribution : jlink + jpackage |
-| `examples/greet` | Module tiers d'exemple (`greet`), non livré : modèle pour écrire ses propres cmdlets |
+| `powerj-api` | Public API for writing cmdlets |
+| `powerj-core` | Parsing, interpretation, pipeline, Java interoperability |
+| `powerj-cmdlets` | Built-in cmdlets (`ls`, `where`, `map`, `collect`, `env`) |
+| `powerj-shell` | REPL and entry point |
+| `powerj-dist` | Distribution: jlink + jpackage |
+| `examples/greet` | Example third-party module (`greet`), not shipped: a template for writing your own cmdlets |

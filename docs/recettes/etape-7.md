@@ -1,45 +1,45 @@
-# Recette — Étape 7 : modules tiers
+# Acceptance test — Step 7: third-party modules
 
-**Objectif :** vérifier qu'un module tiers (un jar) ajoute ses cmdlets à PowerJ, au démarrage ou à chaud, sans exposer ses classes en Java, et que les conflits de noms sont signalés.
+**Goal:** verify that a third-party module (a jar) adds its cmdlets to PowerJ, at startup or on the fly, without exposing its classes to Java, and that name conflicts are reported.
 
-## Récupérer les livrables
+## Getting the deliverables
 
-Comme aux étapes précédentes : onglet **Actions**, dernière exécution du workflow **CI**, artefact `powerj-windows-x64-installer` ou `powerj-windows-x64-portable`.
+As in the previous steps: **Actions** tab, latest run of the **CI** workflow, artifact `powerj-windows-x64-installer` or `powerj-windows-x64-portable`.
 
-En plus : l'artefact **`greet-module`** contient `greet.jar`, le module d'exemple (source : `examples/greet`, §4.3 de la spécification).
+In addition: the **`greet-module`** artifact contains `greet.jar`, the example module (source: `examples/greet`, §4.3 of the specification).
 
-## Où placer un module
+## Where to put a module
 
-- Dossier : `%USERPROFILE%\.powerj\modules\` (ou `$POWERJ_HOME\modules\` si la variable `POWERJ_HOME` est définie). Le créer s'il n'existe pas.
-- Un jar seul s'y dépose directement. Un module qui a des dépendances se place dans un **sous-dossier** avec ses dépendances (`modules\docker\docker.jar`, `modules\docker\lib1.jar`…).
-- Les modules sont chargés au démarrage ; `mod-load chemin\vers\module.jar` en charge un sans redémarrer.
+- Folder: `%USERPROFILE%\.powerj\modules\` (or `$POWERJ_HOME\modules\` if the `POWERJ_HOME` variable is set). Create it if it does not exist.
+- A standalone jar is dropped directly into it. A module that has dependencies goes into a **subfolder** together with its dependencies (`modules\docker\docker.jar`, `modules\docker\lib1.jar`…).
+- Modules are loaded at startup; `mod-load chemin\vers\module.jar` loads one without restarting.
 
-## Scénario
+## Scenario
 
-| # | Action | Résultat attendu |
+| # | Action | Expected result |
 |---|---|---|
-| 1 | Copier `greet.jar` dans `%USERPROFILE%\.powerj\modules\`, lancer PowerJ | Démarrage normal, aucun avertissement. |
-| 2 | `greet --name Yves -c 2` | Tableau de deux objets `name message at` : `Yves  Bonjour Yves !  <date>`. |
-| 3 | `gr` puis Tab ; `greet --` puis Tab Tab | `greet` ; puis `--name`, `--count` avec leur description. |
-| 4 | `greet -n Yves \| where { g -> g.message.contains("Yves") }` | Un objet ; `greet` est coloré en vert (cmdlet). |
-| 5 | `greet -n Yves -c 3 \| map { g -> g.message }` | Trois lignes `Bonjour Yves !`. |
-| 6 | `help greet` | Aide générée : options `-n, --name` (obligatoire), `-c, --count`, `Sortie : Greeting (name, message, at)`, `Module : com.example.greet`, exemple. |
-| 7 | `mod-list` | Tableau `name version cmdlets source` : `io.powerj.cmdlets … [ls, where, map, env] (intégré)` et `com.example.greet 0.1.0-SNAPSHOT [greet] C:\Users\…\greet.jar`. |
+| 1 | Copy `greet.jar` into `%USERPROFILE%\.powerj\modules\`, start PowerJ | Normal startup, no warning. |
+| 2 | `greet --name Yves -c 2` | Table of two `name message at` objects: `Yves  Bonjour Yves !  <date>`. |
+| 3 | `gr` then Tab; `greet --` then Tab Tab | `greet`; then `--name`, `--count` with their descriptions. |
+| 4 | `greet -n Yves \| where { g -> g.message.contains("Yves") }` | One object; `greet` is highlighted in green (cmdlet). |
+| 5 | `greet -n Yves -c 3 \| map { g -> g.message }` | Three lines `Bonjour Yves !`. |
+| 6 | `help greet` | Generated help: options `-n, --name` (required), `-c, --count`, `Sortie : Greeting (name, message, at)`, `Module : com.example.greet`, example. |
+| 7 | `mod-list` | Table `name version cmdlets source`: `io.powerj.cmdlets … [ls, where, map, env] (intégré)` and `com.example.greet 0.1.0-SNAPSHOT [greet] C:\Users\…\greet.jar`. |
 | 8 | `which greet` | `greet → cmdlet (com.example.greet)`. |
-| 9 | `new com.example.greet.Greeting("a", "b", null)` | Erreur `classe introuvable : com.example.greet.Greeting` : les classes d'un module ne sont pas exposées en Java. |
-| 10 | `greet` | Erreur `greet : option obligatoire manquante : --name`. |
-| 11 | Retirer `greet.jar` du dossier, relancer ; `mod-load C:\chemin\vers\greet.jar` | Affiche `greet` ; la commande `greet -n A` fonctionne aussitôt. |
-| 12 | `mod-load C:\chemin\vers\greet.jar` une seconde fois | `greet.jar : module com.example.greet déjà chargé`, puis `mod-load : greet.jar non chargé`. |
-| 13 | Copier `greet.jar` **deux fois** dans le dossier (`greet.jar` et `greet-copie.jar`), relancer | Sous la bannière : `greet-copie.jar : module com.example.greet déjà chargé` ; `greet` fonctionne. |
+| 9 | `new com.example.greet.Greeting("a", "b", null)` | Error `classe introuvable : com.example.greet.Greeting`: a module's classes are not exposed to Java. |
+| 10 | `greet` | Error `greet : option obligatoire manquante : --name`. |
+| 11 | Remove `greet.jar` from the folder, restart; `mod-load C:\chemin\vers\greet.jar` | Displays `greet`; the command `greet -n A` works immediately. |
+| 12 | `mod-load C:\chemin\vers\greet.jar` a second time | `greet.jar : module com.example.greet déjà chargé`, then `mod-load : greet.jar non chargé`. |
+| 13 | Copy `greet.jar` **twice** into the folder (`greet.jar` and `greet-copie.jar`), restart | Below the banner: `greet-copie.jar : module com.example.greet déjà chargé`; `greet` works. |
 | 14 | `mod-load C:\Windows\notepad.exe` | `notepad.exe : un module est un fichier .jar (ou un dossier de jars)`. |
-| 15 | `greet:greet -n Q` | Fonctionne : nom qualifié `module:nom`, utile quand deux modules déclarent le même cmdlet (FR-17). |
+| 15 | `greet:greet -n Q` | Works: qualified name `module:nom`, useful when two modules declare the same cmdlet (FR-17). |
 
-## Écrire son propre module
+## Writing your own module
 
-Le dossier `examples/greet` du dépôt est un modèle complet : un `pom.xml` qui ne dépend que de `powerj-api`, un `module-info.java` qui déclare `provides io.powerj.api.CmdletProvider with …`, un record d'options annoté `@Option`, un record de sortie, la classe du cmdlet annotée `@CmdletInfo`. `mvnw -pl examples/greet -am package` produit `examples/greet/target/greet.jar`.
+The repository's `examples/greet` folder is a complete template: a `pom.xml` that depends only on `powerj-api`, a `module-info.java` that declares `provides io.powerj.api.CmdletProvider with …`, an options record annotated with `@Option`, an output record, and the cmdlet class annotated with `@CmdletInfo`. `mvnw -pl examples/greet -am package` produces `examples/greet/target/greet.jar`.
 
-## Limites connues de l'étape 7
+## Known limitations of step 7
 
-- Pas de déchargement ni de rechargement d'un module : pour une nouvelle version, quitter PowerJ, remplacer le jar et relancer (sous Windows, un jar chargé est verrouillé tant que PowerJ tourne).
-- Collision de noms : le premier module chargé (ordre alphabétique des fichiers au démarrage) garde le nom court ; l'autre cmdlet n'est accessible que par `module:nom`, qui n'est pas proposé par Tab.
-- `powerj-api` est un artefact Maven séparé, mais pas encore publié sur un dépôt public : pour compiler un module hors de ce dépôt, l'installer localement avec `mvnw -pl powerj-api -am install`.
+- No unloading or reloading of a module: for a new version, quit PowerJ, replace the jar and restart (on Windows, a loaded jar is locked while PowerJ is running).
+- Name collision: the first module loaded (alphabetical order of the files at startup) keeps the short name; the other cmdlet is only accessible via `module:nom`, which is not suggested by Tab.
+- `powerj-api` is a separate Maven artifact, but not yet published to a public repository: to compile a module outside this repository, install it locally with `mvnw -pl powerj-api -am install`.
