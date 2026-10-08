@@ -11,9 +11,9 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 
 /**
- * Recherche d'un exécutable natif (spécification FR-13) : chemin explicite ({@code .\outil.exe},
- * {@code /usr/bin/git}) relatif au répertoire courant, sinon recherche dans le {@code PATH} de la session,
- * en essayant les extensions de {@code PATHEXT} sous Windows.
+ * Lookup of a native executable (specification FR-13): explicit path ({@code .\outil.exe},
+ * {@code /usr/bin/git}) relative to the current directory, otherwise search in the session's {@code PATH},
+ * trying the {@code PATHEXT} extensions on Windows.
  */
 public final class CommandResolver {
 
@@ -44,7 +44,7 @@ public final class CommandResolver {
                 }
             }
         } catch (InvalidPathException _) {
-            // nom ou entrée de PATH invalide : pas d'exécutable
+            // invalid name or PATH entry: no executable
         }
         return Optional.empty();
     }

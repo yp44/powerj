@@ -7,10 +7,10 @@ import java.util.Objects;
 import java.util.Properties;
 
 /**
- * Informations de construction de PowerJ : sa version et celle de la JVM qui l'exécute.
+ * PowerJ build information: its version and that of the JVM running it.
  *
- * @param version     version de PowerJ (issue du POM Maven)
- * @param javaVersion version du runtime Java en cours d'exécution
+ * @param version     PowerJ version (taken from the Maven POM)
+ * @param javaVersion version of the currently running Java runtime
  */
 public record BuildInfo(String version, Runtime.Version javaVersion) {
 
@@ -21,12 +21,12 @@ public record BuildInfo(String version, Runtime.Version javaVersion) {
         Objects.requireNonNull(javaVersion, "javaVersion");
     }
 
-    /** Informations de la build courante. */
+    /** Information about the current build. */
     public static BuildInfo current() {
         return new BuildInfo(readVersion(), Runtime.version());
     }
 
-    /** Bannière affichée au démarrage du shell, ex. {@code PowerJ 0.1.0 (Java 27)}. */
+    /** Banner displayed when the shell starts, e.g. {@code PowerJ 0.1.0 (Java 27)}. */
     public String banner() {
         return "PowerJ " + version + " (Java " + javaVersion.feature() + ")";
     }

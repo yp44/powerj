@@ -4,8 +4,8 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Erreur présentée à l'utilisateur : un message court, et éventuellement l'exception d'origine
- * (conservée pour {@code $errors} et le mode {@code --debug}).
+ * Error presented to the user: a short message, and possibly the original exception
+ * (kept for {@code $errors} and {@code --debug} mode).
  */
 public record PjError(String message, Optional<Throwable> cause) {
 

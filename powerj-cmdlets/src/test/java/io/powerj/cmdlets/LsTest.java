@@ -27,7 +27,7 @@ class LsTest {
         Files.writeString(tmp.resolve("src/notes.TXT"), "y");
         Path cache = Files.writeString(tmp.resolve(".cache"), "z");
         if (System.getProperty("os.name").startsWith("Windows")) {
-            // Sous Windows, c'est l'attribut « caché » qui compte, pas le point initial.
+            // On Windows, it is the "hidden" attribute that counts, not the leading dot.
             Files.setAttribute(cache, "dos:hidden", true);
         }
         context = new TestContext<>(tmp);

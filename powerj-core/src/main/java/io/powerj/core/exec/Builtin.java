@@ -2,13 +2,13 @@ package io.powerj.core.exec;
 
 import java.util.List;
 
-/** Commande interne du shell ({@code cd}, {@code pwd}, {@code which}, {@code exit}, {@code history}…). */
+/** Built-in shell command ({@code cd}, {@code pwd}, {@code which}, {@code exit}, {@code history}…). */
 @FunctionalInterface
 public interface Builtin {
 
     /**
-     * @param args arguments déjà évalués : mots ({@code String}) ou valeurs d'expressions
-     * @return valeurs produites (affichées, ou affectées à une variable)
+     * @param args already evaluated arguments: words ({@code String}) or expression values
+     * @return produced values (displayed, or assigned to a variable)
      */
     List<Object> run(List<Object> args, Session session) throws Exception;
 }

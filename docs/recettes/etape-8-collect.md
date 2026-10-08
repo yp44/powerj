@@ -1,41 +1,41 @@
-# Recette — Mini-itération 8 : cmdlet `collect`
+# Acceptance test — Mini-iteration 8: `collect` cmdlet
 
-**Objectif :** vérifier que `collect` rassemble les objets d'un pipeline en **une seule liste**, toujours une liste (même d'un seul élément ou vide), et que l'étape suivante reçoit cette liste entière.
+**Goal:** verify that `collect` gathers the objects of a pipeline into **a single list**, always a list (even with a single element or empty), and that the next stage receives this entire list.
 
-## Récupérer les livrables
+## Getting the deliverables
 
-Comme aux étapes précédentes : onglet **Actions**, dernière exécution du workflow **CI**, artefact `powerj-windows-x64-installer` ou `powerj-windows-x64-portable`.
+As in the previous steps: **Actions** tab, latest run of the **CI** workflow, artifact `powerj-windows-x64-installer` or `powerj-windows-x64-portable`.
 
-## Quand utiliser `collect`
+## When to use `collect`
 
-Après un `|`, chaque commande reçoit les objets **un par un** (`where`, `map`). Pour travailler sur **la liste entière** (compter, trier, `stream()`…) :
+After a `|`, each command receives the objects **one by one** (`where`, `map`). To work on **the entire list** (counting, sorting, `stream()`…):
 
-| Besoin | Écriture |
+| Need | Syntax |
 |---|---|
-| Nombre de résultats, même 0 ou 1 | `(ls -r \| where { f -> !f.dir } \| collect).size()` |
-| Garder la liste dans une variable | `$l = ls -r \| collect` puis `$l.stream()…` |
-| Continuer le pipeline avec la liste | `ls -r \| collect \| map { l -> … }` |
+| Number of results, even 0 or 1 | `(ls -r \| where { f -> !f.dir } \| collect).size()` |
+| Keep the list in a variable | `$l = ls -r \| collect` then `$l.stream()…` |
+| Continue the pipeline with the list | `ls -r \| collect \| map { l -> … }` |
 
-Sans `collect`, `( … )` et `$l = …` donnent l'objet **seul** quand il n'y a qu'un résultat : `(ls C:\ | where name == Windows).size()` renvoie la propriété `size` du dossier (`0`), pas le nombre de résultats.
+Without `collect`, `( … )` and `$l = …` give the object **alone** when there is only one result: `(ls C:\ | where name == Windows).size()` returns the folder's `size` property (`0`), not the number of results.
 
-## Scénario
+## Scenario
 
-| # | Action | Résultat attendu |
+| # | Action | Expected result |
 |---|---|---|
-| 1 | `(ls C:\ \| where name == Windows \| collect).size()` | `1` (comparer avec la même commande sans `\| collect` : `0`, la taille du dossier). |
+| 1 | `(ls C:\ \| where name == Windows \| collect).size()` | `1` (compare with the same command without `\| collect`: `0`, the folder's size). |
 | 2 | `(ls C:\ \| where name == absent \| collect).size()` | `0`. |
-| 3 | `$l = ls C:\Windows \| collect` puis `$l.size()` | Le nombre d'entrées de `C:\Windows`. |
-| 4 | `$l.getClass().getSimpleName()` | `Collected` (une `List` non modifiable). |
-| 5 | `ls C:\Windows \| collect \| map { l -> l.size() }` | **Un seul** nombre (la liste arrive entière dans `map`). |
-| 6 | `ls -r --files \| collect \| map { l -> l.stream().sorted((a, b) -> Long.compare(b.size, a.size)).limit(5).toList() }` | Tableau des 5 plus gros fichiers (dossier courant et sous-dossiers). |
-| 6b | `$l = ls C:\Windows --dirs \| collect` puis `$l \| map { f -> f.name }` | Un nom par ligne : en tête de pipeline, la variable est parcourue élément par élément, comme toute liste. Autres façons : `$l*.name`, `$l.stream() \| map { f -> f.name }`, `$l.forEach(f -> System.out.println(f.name))`. |
-| 7 | `ls C:\Windows --dirs \| collect` | Affiché comme `ls C:\Windows --dirs` (une liste s'affiche par ses éléments). |
-| 8 | `ls \| collect \| where { l -> l.size() > 3 } \| map { l -> "plus de 3 : " + l.size() }` | Une ligne si le dossier courant a plus de 3 entrées, rien sinon. |
-| 9 | `ls \| collect \| map { l -> l.` puis Tab Tab | Méthodes de `List` : `size()`, `stream()`, `get(`… |
-| 10 | `help collect` | Aide : résumé, `Sortie : Collected`, exemples. |
-| 11 | `ls \| collect -x` | Erreur `collect : option inconnue -x`. |
+| 3 | `$l = ls C:\Windows \| collect` then `$l.size()` | The number of entries in `C:\Windows`. |
+| 4 | `$l.getClass().getSimpleName()` | `Collected` (an unmodifiable `List`). |
+| 5 | `ls C:\Windows \| collect \| map { l -> l.size() }` | **A single** number (the list arrives whole in `map`). |
+| 6 | `ls -r --files \| collect \| map { l -> l.stream().sorted((a, b) -> Long.compare(b.size, a.size)).limit(5).toList() }` | Table of the 5 largest files (current directory and subfolders). |
+| 6b | `$l = ls C:\Windows --dirs \| collect` then `$l \| map { f -> f.name }` | One name per line: at the head of a pipeline, the variable is iterated element by element, like any list. Other ways: `$l*.name`, `$l.stream() \| map { f -> f.name }`, `$l.forEach(f -> System.out.println(f.name))`. |
+| 7 | `ls C:\Windows --dirs \| collect` | Displayed like `ls C:\Windows --dirs` (a list is displayed through its elements). |
+| 8 | `ls \| collect \| where { l -> l.size() > 3 } \| map { l -> "plus de 3 : " + l.size() }` | One line if the current directory has more than 3 entries, nothing otherwise. |
+| 9 | `ls \| collect \| map { l -> l.` then Tab Tab | Methods of `List`: `size()`, `stream()`, `get(`… |
+| 10 | `help collect` | Help: summary, `Sortie : Collected`, examples. |
+| 11 | `ls \| collect -x` | Error `collect : option inconnue -x`. |
 
-## Limites connues
+## Known limitations
 
-- `collect` attend la fin du pipeline amont avant d'émettre : sur un flux infini, il ne rend jamais la main (Ctrl+C l'arrête).
-- Pas encore de `sort` ni de `first` pour les cas courants (`ls -r | sort { f -> f.size } | first 5`) : passer par `collect | map { l -> l.stream()… }`.
+- `collect` waits for the upstream pipeline to finish before emitting: on an infinite stream, it never returns control (Ctrl+C stops it).
+- No `sort` or `first` yet for common cases (`ls -r | sort { f -> f.size } | first 5`): go through `collect | map { l -> l.stream()… }`.

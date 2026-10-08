@@ -15,7 +15,7 @@ class ExecutableKindTest {
     @TempDir
     Path tmp;
 
-    /** Fabrique un en-tête PE minimal avec le sous-système demandé (2 = GUI, 3 = console). */
+    /** Builds a minimal PE header with the requested subsystem (2 = GUI, 3 = console). */
     private Path pe(String name, int subsystem) throws Exception {
         int peOffset = 0x80;
         ByteBuffer b = ByteBuffer.allocate(512).order(ByteOrder.LITTLE_ENDIAN);

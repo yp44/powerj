@@ -13,20 +13,20 @@ import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.ScriptBlock;
 
-/** Exécute un cmdlet : liaison des options, option commune {@code --on-error} (FR-42), contexte. */
+/** Runs a cmdlet: option binding, common option {@code --on-error} (FR-42), context. */
 final class CmdletRunner {
 
-    /** Gestion des erreurs non bloquantes. */
+    /** Handling of non-blocking errors. */
     enum OnError { STOP, CONTINUE, SILENT }
 
     private CmdletRunner() {
     }
 
     /**
-     * @param input    objets reçus du pipeline, ou {@code null} pour la première étape
-     * @param compiler compile le texte d'un bloc ({@link CmdletContext#compile})
-     * @param sink     reçoit chaque objet produit
-     * @return {@code true} si aucune erreur n'a été signalée
+     * @param input    objects received from the pipeline, or {@code null} for the first stage
+     * @param compiler compiles the text of a block ({@link CmdletContext#compile})
+     * @param sink     receives each produced object
+     * @return {@code true} if no error was reported
      */
     static boolean run(CmdletRegistry.Registered registered, List<Object> args, Session session,
                        Consumer<String> errors, Consumer<Object> sink, Source input,
@@ -40,7 +40,7 @@ final class CmdletRunner {
         } catch (PjException | CancellationException | InterruptedException e) {
             throw e;
         } catch (IllegalArgumentException e) {
-            // Convention : un cmdlet signale un usage incorrect par IllegalArgumentException.
+            // Convention: a cmdlet reports incorrect usage with IllegalArgumentException.
             throw new PjException(PjError.of(registered.name() + " : " + e.getMessage(), e));
         }
         return !context.hadErrors;
@@ -95,7 +95,7 @@ final class CmdletRunner {
         return result;
     }
 
-    /** Contexte fourni au cmdlet. */
+    /** Context provided to the cmdlet. */
     private static final class Context implements CmdletContext<Object> {
 
         private final String command;

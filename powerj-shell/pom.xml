@@ -26,7 +26,7 @@
             <groupId>org.jline</groupId>
             <artifactId>jline-reader</artifactId>
         </dependency>
-        <!-- Terminal natif (console Windows, pty Unix) via l'API FFM, sans JNI. -->
+        <!-- Native terminal (Windows console, Unix pty) through the FFM API, without JNI. -->
         <dependency>
             <groupId>org.jline</groupId>
             <artifactId>jline-terminal-ffm</artifactId>

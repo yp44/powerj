@@ -1,26 +1,26 @@
 package io.powerj.api;
 
 /**
- * Commande PowerJ écrite en Java. Le shell construit le record de paramètres {@code P} à partir des
- * options saisies ({@link Option}), puis appelle {@link #begin}, {@link #process} pour chaque objet reçu
- * du pipeline, et {@link #end}.
+ * PowerJ command written in Java. The shell builds the parameter record {@code P} from the
+ * options typed ({@link Option}), then calls {@link #begin}, {@link #process} for each object received
+ * from the pipeline, and {@link #end}.
  *
- * @param <P> record des paramètres
- * @param <I> type des objets reçus du pipeline ({@link Void} si le cmdlet n'en lit pas)
- * @param <O> type des objets produits ; un {@code record} est recommandé (affichage en tableau,
- *            complétion des propriétés)
+ * @param <P> parameter record
+ * @param <I> type of the objects received from the pipeline ({@link Void} if the cmdlet reads none)
+ * @param <O> type of the produced objects; a {@code record} is recommended (table display,
+ *            property completion)
  */
 public interface Cmdlet<P extends Record, I, O> {
 
-    /** Appelé une fois, avant tout objet reçu. Un cmdlet qui produit des objets le fait souvent ici. */
+    /** Called once, before any object is received. A cmdlet that produces objects often does so here. */
     default void begin(P params, CmdletContext<O> context) throws Exception {
     }
 
-    /** Appelé pour chaque objet reçu du pipeline. */
+    /** Called for each object received from the pipeline. */
     default void process(P params, I input, CmdletContext<O> context) throws Exception {
     }
 
-    /** Appelé une fois, après le dernier objet reçu. */
+    /** Called once, after the last object received. */
     default void end(P params, CmdletContext<O> context) throws Exception {
     }
 }

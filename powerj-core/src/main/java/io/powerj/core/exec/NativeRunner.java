@@ -15,28 +15,28 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 /**
- * Exécute une commande native (spécification §3.10). Les flux restent des flux : stdout et stderr ne
- * sont jamais encapsulés dans un objet.
+ * Runs a native command (specification §3.10). Streams remain streams: stdout and stderr are
+ * never wrapped in an object.
  * <ul>
- *   <li>affichage sur un vrai terminal : stdin/stdout/stderr hérités (couleurs, {@code vim}, {@code ssh}) ;</li>
- *   <li>capture ({@code $x = cmd}) : stdout lu en lignes {@code String}, stderr vers le flux d'erreur ;</li>
- *   <li>redirections {@code >}, {@code >>}, {@code 2>}, {@code 2>>} : octets bruts vers le fichier ;</li>
- *   <li>application graphique Windows : lancée détachée (FR-39).</li>
+ *   <li>display on a real terminal: inherited stdin/stdout/stderr (colors, {@code vim}, {@code ssh});</li>
+ *   <li>capture ({@code $x = cmd}): stdout read as {@code String} lines, stderr to the error stream;</li>
+ *   <li>redirections {@code >}, {@code >>}, {@code 2>}, {@code 2>>}: raw bytes to the file;</li>
+ *   <li>Windows graphical application: launched detached (FR-39).</li>
  * </ul>
- * Ctrl+C (interruption du fil) arrête le process et tous ses descendants (FR-57).
+ * Ctrl+C (thread interruption) stops the process and all its descendants (FR-57).
  */
 public final class NativeRunner {
 
     private static final long GRACE_SECONDS = 2;
 
-    /** Fichier cible d'une redirection. */
+    /** Target file of a redirection. */
     public record FileTarget(Path file, boolean append) {
         ProcessBuilder.Redirect redirect() {
             return append ? ProcessBuilder.Redirect.appendTo(file.toFile()) : ProcessBuilder.Redirect.to(file.toFile());
         }
     }
 
-    /** Résultat : métadonnées, et lignes de stdout si elles ont été capturées. */
+    /** Result: metadata, and stdout lines if they were captured. */
     public record Result(NativeRun run, List<String> capturedLines) { }
 
     private final NativeEncoding encoding;
@@ -49,7 +49,7 @@ public final class NativeRunner {
         this.encoding = encoding;
     }
 
-    /** Commande d'un groupe natif (étapes natives consécutives d'un pipeline). */
+    /** Command of a native group (consecutive native stages of a pipeline). */
     public record Command(Path executable, List<String> args, boolean errorsToOutput) {
         public Command {
             args = List.copyOf(args);
@@ -62,8 +62,8 @@ public final class NativeRunner {
     }
 
     /**
-     * @param errorsToOutput {@code 2>&1} : stderr rejoint stdout
-     * @param inheritInput   le process lit directement l'entrée standard du shell
+     * @param errorsToOutput {@code 2>&1}: stderr joins stdout
+     * @param inheritInput   the process reads the shell's standard input directly
      */
     public Result run(Path executable, List<String> args, Session session, ShellIo io, boolean capture,
                       Optional<FileTarget> stdout, Optional<FileTarget> stderr, boolean errorsToOutput,
@@ -134,16 +134,16 @@ public final class NativeRunner {
     }
 
     /**
-     * Exécute des commandes natives reliées entre elles (FR-37) : les octets passent directement d'un process
-     * au suivant, sans décodage.
+     * Runs native commands connected to one another (FR-37): bytes pass directly from one process
+     * to the next, without decoding.
      *
-     * @param input        objets à écrire sur le stdin du premier process (forme affichée), ou {@code null}
-     * @param inheritInput sans {@code input} : le premier process lit l'entrée standard du shell
-     * @param output       étape suivante, qui reçoit les lignes du dernier process ; {@code null} si le groupe
-     *                     termine le pipeline (les lignes vont alors à {@code sink}, ou au terminal / fichier)
-     * @param errors       destination des lignes d'erreur quand elles ne sont pas héritées
-     * @param stderrFile   fichier de {@code 2>} (en ajout : il est partagé par toutes les étapes)
-     * @return métadonnées de chaque process, dans l'ordre
+     * @param input        objects to write to the first process's stdin (displayed form), or {@code null}
+     * @param inheritInput without {@code input}: the first process reads the shell's standard input
+     * @param output       next stage, which receives the lines of the last process; {@code null} if the group
+     *                     ends the pipeline (the lines then go to {@code sink}, or to the terminal / file)
+     * @param errors       destination of the error lines when they are not inherited
+     * @param stderrFile   file of {@code 2>} (in append mode: it is shared by all stages)
+     * @return metadata of each process, in order
      */
     List<NativeRun> runGroup(List<Command> commands, Session session, ShellIo io, Source input, boolean inheritInput,
                              Pipe output, Consumer<Object> sink, boolean capture, Optional<FileTarget> stdout,
@@ -220,7 +220,7 @@ public final class NativeRunner {
                         elapsed(start)));
             }
             if (writer != null) {
-                // Le premier process ne lit plus : l'étape qui l'alimente doit s'arrêter.
+                // The first process no longer reads: the stage feeding it must stop.
                 input.abort();
                 writer.interrupt();
                 writer.join();
@@ -239,7 +239,7 @@ public final class NativeRunner {
         return runs;
     }
 
-    /** Écrit les objets reçus sur le stdin du process, sous leur forme affichée (FR-37). */
+    /** Writes the objects received to the process's stdin, in their displayed form (FR-37). */
     private static void writeObjects(Source input, Process process, Charset charset, ShellIo io) {
         var writer = new java.io.PrintWriter(new java.io.BufferedWriter(
                 new java.io.OutputStreamWriter(process.getOutputStream(), charset)));
@@ -250,12 +250,12 @@ public final class NativeRunner {
             while ((value = input.next()) != Source.END) {
                 formatter.accept(value);
                 if (writer.checkError()) {
-                    return; // le process a fermé son entrée
+                    return; // the process closed its input
                 }
             }
             complete = true;
         } catch (InterruptedException | java.util.concurrent.CancellationException _) {
-            // arrêt du pipeline
+            // pipeline stopped
         } finally {
             if (complete) {
                 formatter.close();
@@ -275,12 +275,12 @@ public final class NativeRunner {
                     sink.accept(line);
                 }
             } catch (IOException | java.util.concurrent.CancellationException _) {
-                // process arrêté, ou étape suivante fermée : fin de la lecture
+                // process stopped, or next stage closed: end of reading
             }
         });
     }
 
-    /** Arrête le process et ses descendants, de force s'ils ne se terminent pas à temps. */
+    /** Stops the process and its descendants, forcibly if they do not terminate in time. */
     private static void destroyTree(Process process) {
         List<ProcessHandle> descendants = process.descendants().toList();
         descendants.forEach(ProcessHandle::destroy);
@@ -305,7 +305,7 @@ public final class NativeRunner {
         try {
             stream.close();
         } catch (IOException _) {
-            // rien à faire
+            // nothing to do
         }
     }
 }

@@ -13,12 +13,12 @@ import java.util.OptionalLong;
 import java.util.stream.BaseStream;
 
 /**
- * Liaison entre deux étapes d'un pipeline : file bornée (l'étape rapide attend la lente, la mémoire reste
- * constante), fin de flux, et arrêt demandé par l'étape suivante quand elle ne lit plus.
+ * Link between two stages of a pipeline: bounded queue (the fast stage waits for the slow one, memory stays
+ * constant), end of stream, and stop requested by the next stage when it no longer reads.
  */
 final class Pipe implements Source {
 
-    /** Représente {@code null} dans la file. */
+    /** Represents {@code null} in the queue. */
     private static final Object NULL = new Object();
 
     private static final int CAPACITY = 256;
@@ -27,7 +27,7 @@ final class Pipe implements Source {
     private volatile boolean aborted;
     private final List<Runnable> onAbort = new CopyOnWriteArrayList<>();
 
-    /** Action exécutée quand le lecteur abandonne : arrêter l'écrivain (fil interrompu, process arrêtés). */
+    /** Action run when the reader gives up: stop the writer (thread interrupted, processes stopped). */
     void onAbort(Runnable action) {
         onAbort.add(action);
         if (aborted) {
@@ -40,9 +40,9 @@ final class Pipe implements Source {
     }
 
     /**
-     * Ajoute un objet, en attendant de la place.
+     * Adds an object, waiting for space.
      *
-     * @throws CancellationException si le lecteur a abandonné ou si le fil est interrompu
+     * @throws CancellationException if the reader has given up or if the thread is interrupted
      */
     void put(Object value) {
         if (aborted) {
@@ -56,12 +56,12 @@ final class Pipe implements Source {
         }
     }
 
-    /** Ajoute un objet en déroulant les collections, tableaux, flux et optionnels (FR-30b). */
+    /** Adds an object, unrolling collections, arrays, streams and optionals (FR-30b). */
     void putUnrolled(Object value) {
         unroll(value, this);
     }
 
-    /** Signale la fin du flux (sans effet si le lecteur a abandonné). */
+    /** Signals the end of the stream (no effect if the reader has given up). */
     void close() {
         if (!aborted) {
             put(Source.END);
@@ -84,16 +84,16 @@ final class Pipe implements Source {
     }
 
     /**
-     * Émet {@code value}, ou chacun de ses éléments si c'est un {@link Iterable} (sauf {@code Path}), un
-     * tableau, un flux ({@code Stream}, {@code IntStream}, {@code LongStream}, {@code DoubleStream}), un {@link Iterator} ou un {@link Optional} (aussi {@code OptionalInt}…). Les chaînes et les {@code Map}
-     * ne sont jamais déroulées, ni une liste {@link io.powerj.api.Collected} produite par {@code collect}.
+     * Emits {@code value}, or each of its elements if it is an {@link Iterable} (except {@code Path}), an
+     * array, a stream ({@code Stream}, {@code IntStream}, {@code LongStream}, {@code DoubleStream}), an {@link Iterator} or an {@link Optional} (also {@code OptionalInt}…). Strings and {@code Map}s
+     * are never unrolled, nor is a {@link io.powerj.api.Collected} list produced by {@code collect}.
      */
     static void unroll(Object value, Pipe target) {
         switch (value) {
             case java.nio.file.Path path -> target.put(path);
-            case io.powerj.api.Collected<?> list -> target.put(list); // collect : la liste passe entière (FR-36d)
+            case io.powerj.api.Collected<?> list -> target.put(list); // collect: the list is passed whole (FR-36d)
             case Iterable<?> items -> items.forEach(target::put);
-            case BaseStream<?, ?> stream -> { // Stream, et IntStream, LongStream, DoubleStream (éléments boxés)
+            case BaseStream<?, ?> stream -> { // Stream, and IntStream, LongStream, DoubleStream (boxed elements)
                 try (stream) {
                     stream.iterator().forEachRemaining(target::put);
                 }

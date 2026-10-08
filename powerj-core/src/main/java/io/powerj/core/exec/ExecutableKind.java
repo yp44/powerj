@@ -8,8 +8,8 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 
 /**
- * Détecte les applications graphiques Windows (sous-système GUI de l'en-tête PE), lancées détachées
- * (spécification FR-39).
+ * Detects Windows graphical applications (GUI subsystem of the PE header), which are launched detached
+ * (specification FR-39).
  */
 public final class ExecutableKind {
 
@@ -21,7 +21,7 @@ public final class ExecutableKind {
     private ExecutableKind() {
     }
 
-    /** {@code true} si le fichier est un exécutable PE du sous-système graphique Windows. */
+    /** {@code true} if the file is a PE executable of the Windows graphical subsystem. */
     public static boolean isWindowsGui(Path file) {
         try (FileChannel channel = FileChannel.open(file, StandardOpenOption.READ)) {
             return isWindowsGui(channel);

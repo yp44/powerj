@@ -17,15 +17,15 @@ import io.powerj.api.CmdletInfo;
 import io.powerj.api.CmdletProvider;
 
 /**
- * Cmdlets disponibles : ceux des modules du démarrage, découverts par {@link ServiceLoader}, puis ceux des
- * modules tiers chargés par {@link ModuleLoader} (spécification §4). Modifiable à chaud ({@code mod-load}) :
- * les méthodes sont synchronisées.
+ * Available cmdlets: those of the startup modules, discovered by {@link ServiceLoader}, then those of the
+ * third-party modules loaded by {@link ModuleLoader} (specification §4). Modifiable at runtime ({@code mod-load}):
+ * the methods are synchronized.
  */
 public final class CmdletRegistry {
 
     private static final Logger LOG = Logger.getLogger(CmdletRegistry.class.getName());
 
-    /** Cmdlet enregistré avec ses métadonnées. */
+    /** Registered cmdlet with its metadata. */
     public record Registered(Cmdlet<?, ?, ?> cmdlet, CmdletInfo info, Class<? extends Record> parameters,
                              Class<?> input, Class<?> output, String module) {
 
@@ -33,21 +33,21 @@ public final class CmdletRegistry {
             return info.name();
         }
 
-        /** {@code true} si le cmdlet lit les objets du pipeline ({@code I} autre que {@code Void}). */
+        /** {@code true} if the cmdlet reads objects from the pipeline ({@code I} other than {@code Void}). */
         public boolean readsInput() {
             return input != Void.class;
         }
 
-        /** Nom qualifié, toujours utilisable : {@code greet:greet} (FR-17). */
+        /** Qualified name, always usable: {@code greet:greet} (FR-17). */
         public String qualifiedName() {
             return alias(module) + ":" + name();
         }
     }
 
     /**
-     * Module chargé (ligne de {@code mod-list}).
+     * Loaded module (a {@code mod-list} row).
      *
-     * @param source jar ou dossier d'origine ; {@code (intégré)} pour les modules livrés avec PowerJ
+     * @param source originating jar or directory; {@code (intégré)} for the modules shipped with PowerJ
      */
     public record LoadedModule(String name, String version, List<String> cmdlets, String source) { }
 
@@ -55,7 +55,7 @@ public final class CmdletRegistry {
     private final Map<String, Registered> byQualifiedName = new LinkedHashMap<>();
     private final Map<String, LoadedModule> modules = new LinkedHashMap<>();
 
-    /** Cmdlets des modules du démarrage. */
+    /** Cmdlets of the startup modules. */
     public static CmdletRegistry discover() {
         var registry = new CmdletRegistry();
         for (CmdletProvider provider : ServiceLoader.load(CmdletProvider.class)) {
@@ -71,15 +71,15 @@ public final class CmdletRegistry {
         return registry;
     }
 
-    /** Enregistre un cmdlet ; un nom déjà pris garde son premier propriétaire (FR-17). */
+    /** Registers a cmdlet; a name already taken keeps its first owner (FR-17). */
     public void register(Cmdlet<?, ?, ?> cmdlet) {
         add(registered(cmdlet)).ifPresent(LOG::warning);
     }
 
     /**
-     * Enregistre les cmdlets d'un module.
+     * Registers the cmdlets of a module.
      *
-     * @return avertissements (cmdlet invalide, nom déjà utilisé)
+     * @return warnings (invalid cmdlet, name already in use)
      */
     synchronized List<String> addModule(Module module, Optional<Path> source, List<? extends Cmdlet<?, ?, ?>> cmdlets) {
         String moduleName = moduleName(module);
@@ -138,7 +138,7 @@ public final class CmdletRegistry {
         return module.getName() == null ? "(sans module)" : module.getName();
     }
 
-    /** Préfixe court d'un module : dernier segment de son nom ({@code com.example.greet} → {@code greet}). */
+    /** Short prefix of a module: last segment of its name ({@code com.example.greet} → {@code greet}). */
     static String alias(String moduleName) {
         return moduleName.substring(moduleName.lastIndexOf('.') + 1);
     }
@@ -159,7 +159,7 @@ public final class CmdletRegistry {
         throw new IllegalArgumentException(type.getName() + " doit implémenter Cmdlet<P, I, O> avec des types explicites");
     }
 
-    /** Par nom court ({@code greet}) ou qualifié par le module ({@code greet:greet}, FR-17). */
+    /** By short name ({@code greet}) or name qualified by the module ({@code greet:greet}, FR-17). */
     public synchronized Optional<Registered> find(String name) {
         Registered registered = byName.get(name);
         if (registered == null && name.indexOf(':') > 0) {
@@ -168,12 +168,12 @@ public final class CmdletRegistry {
         return Optional.ofNullable(registered);
     }
 
-    /** Cmdlets accessibles par leur nom court. */
+    /** Cmdlets accessible by their short name. */
     public synchronized List<Registered> all() {
         return List.copyOf(byName.values());
     }
 
-    /** Cmdlets masqués par un homonyme, accessibles seulement par leur nom qualifié. */
+    /** Cmdlets shadowed by a namesake, accessible only by their qualified name. */
     public synchronized List<Registered> shadowed() {
         return byQualifiedName.values().stream().filter(r -> byName.get(r.name()) != r).toList();
     }

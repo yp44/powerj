@@ -11,14 +11,14 @@
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
-    <!-- Module tiers d'exemple (spécification §4.3) : n'est pas livré avec PowerJ.
-         Installation : copier target/greet.jar dans ~/.powerj/modules/. -->
+    <!-- Example third-party module (specification §4.3): not shipped with PowerJ.
+         Installation: copy target/greet.jar into ~/.powerj/modules/. -->
     <groupId>com.example</groupId>
     <artifactId>powerj-example-greet</artifactId>
     <name>PowerJ Exemple : module greet</name>
 
     <dependencies>
-        <!-- Seule dépendance nécessaire pour écrire un cmdlet. -->
+        <!-- The only dependency needed to write a cmdlet. -->
         <dependency>
             <groupId>io.powerj</groupId>
             <artifactId>powerj-api</artifactId>

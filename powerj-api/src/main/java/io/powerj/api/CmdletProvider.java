@@ -3,8 +3,8 @@ package io.powerj.api;
 import java.util.List;
 
 /**
- * Fournit des cmdlets au shell. Déclaré par un module via {@code provides io.powerj.api.CmdletProvider
- * with …} et découvert par {@link java.util.ServiceLoader}.
+ * Supplies cmdlets to the shell. Declared by a module via {@code provides io.powerj.api.CmdletProvider
+ * with …} and discovered by {@link java.util.ServiceLoader}.
  */
 public interface CmdletProvider {
 

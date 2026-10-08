@@ -8,20 +8,20 @@ import java.util.List;
 import java.util.RandomAccess;
 
 /**
- * Liste non modifiable émise d'un seul bloc : contrairement aux autres collections, elle n'est <b>pas</b>
- * déroulée entre deux étapes de pipeline (spécification FR-30b, FR-36d). C'est ce que produit
- * {@code collect} : l'étape suivante reçoit la liste entière, en un seul objet.
+ * Unmodifiable list emitted as a single block: unlike other collections, it is <b>not</b>
+ * unrolled between two pipeline stages (specification FR-30b, FR-36d). This is what
+ * {@code collect} produces: the next stage receives the whole list, as a single object.
  * <pre>
  * ls -r | collect | map { l -> l.size() }
  * </pre>
  *
- * @param <T> type des éléments
+ * @param <T> element type
  */
 public final class Collected<T> extends AbstractList<T> implements RandomAccess {
 
     private final List<T> items;
 
-    /** Copie des éléments ({@code null} accepté). */
+    /** Copies the elements ({@code null} allowed). */
     public Collected(Collection<? extends T> items) {
         this.items = Collections.unmodifiableList(new ArrayList<>(items));
     }

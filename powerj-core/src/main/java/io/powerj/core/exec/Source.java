@@ -2,19 +2,19 @@ package io.powerj.core.exec;
 
 import java.util.Iterator;
 
-/** Objets reçus par une étape de pipeline. */
+/** Objects received by a pipeline stage. */
 interface Source {
 
-    /** Marque de fin de flux. */
+    /** End-of-stream marker. */
     Object END = new Object();
 
-    /** Prochain objet, ou {@link #END} quand il n'y en a plus. */
+    /** Next object, or {@link #END} when there are no more. */
     Object next() throws InterruptedException;
 
-    /** L'étape qui lit s'arrête : l'étape qui écrit doit s'arrêter aussi. */
+    /** The reading stage stops: the writing stage must stop too. */
     void abort();
 
-    /** Source alimentée par un itérateur (lignes de l'entrée standard en mode non interactif). */
+    /** Source fed by an iterator (lines of standard input in non-interactive mode). */
     static Source of(Iterator<?> iterator) {
         return new Source() {
             @Override
@@ -24,7 +24,7 @@ interface Source {
 
             @Override
             public void abort() {
-                // l'itérateur reste disponible pour l'instruction suivante
+                // the iterator remains available for the next statement
             }
         };
     }

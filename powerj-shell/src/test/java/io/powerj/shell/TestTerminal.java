@@ -14,7 +14,7 @@ import org.jline.terminal.Size;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.impl.ExternalTerminal;
 
-/** Terminal xterm en mémoire auquel on « tape » une suite de touches. */
+/** In-memory xterm terminal to which a sequence of keys is "typed". */
 final class TestTerminal implements AutoCloseable {
 
     static final String ENTER = "\r";
@@ -29,12 +29,12 @@ final class TestTerminal implements AutoCloseable {
 
     private final PipedOutputStream keyboard;
 
-    /** Terminal dont toutes les touches sont connues d'avance. */
+    /** Terminal whose keys are all known in advance. */
     TestTerminal(String keys) {
         this(new ByteArrayInputStream(keys.getBytes(StandardCharsets.UTF_8)), null);
     }
 
-    /** Terminal « au clavier » : les touches sont envoyées au fil de l'eau avec {@link #type(String)}. */
+    /** "Keyboard" terminal: keys are sent as you go with {@link #type(String)}. */
     static TestTerminal interactive() {
         try {
             var keyboard = new PipedOutputStream();
@@ -46,7 +46,7 @@ final class TestTerminal implements AutoCloseable {
 
     private TestTerminal(InputStream keys, PipedOutputStream keyboard) {
         this.keyboard = keyboard;
-        // Attributs fixés avant de lire la moindre touche : Ctrl+C doit lever le signal INT.
+        // Attributes set before reading any key: Ctrl+C must raise the INT signal.
         var attributes = new Attributes();
         attributes.setLocalFlag(Attributes.LocalFlag.ISIG, true);
         attributes.setControlChar(Attributes.ControlChar.VINTR, 3);
@@ -59,12 +59,12 @@ final class TestTerminal implements AutoCloseable {
         }
     }
 
-    /** Commence à lire les touches ; à appeler une fois le lecteur de ligne configuré. */
+    /** Starts reading the keys; to be called once the line reader is configured. */
     void startTyping() {
         terminal.resume();
     }
 
-    /** Tape des touches (terminal interactif uniquement). */
+    /** Types keys (interactive terminal only). */
     void type(String keys) {
         try {
             keyboard.write(keys.getBytes(StandardCharsets.UTF_8));
@@ -74,7 +74,7 @@ final class TestTerminal implements AutoCloseable {
         }
     }
 
-    /** Ferme le clavier : le lecteur de ligne verra la fin de l'entrée. */
+    /** Closes the keyboard: the line reader will see the end of input. */
     void endOfInput() {
         try {
             keyboard.close();
@@ -87,7 +87,7 @@ final class TestTerminal implements AutoCloseable {
         return terminal;
     }
 
-    /** Tout ce qui a été affiché, séquences d'échappement ANSI retirées. */
+    /** Everything that was displayed, with ANSI escape sequences removed. */
     String screen() {
         terminal.flush();
         return output.toString(StandardCharsets.UTF_8).replaceAll("\033\\[[0-9;?]*[A-Za-z]", "");

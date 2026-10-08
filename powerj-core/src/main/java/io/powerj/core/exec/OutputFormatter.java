@@ -19,15 +19,15 @@ import io.powerj.api.Bytes;
 import io.powerj.api.Display;
 
 /**
- * Affichage des valeurs (spécification FR-30) :
+ * Display of values (specification FR-30):
  * <ul>
- *   <li>records successifs du même type : un tableau (colonnes de {@link Display}, ou tous les composants
- *       s'il y en a au plus {@value #MAX_TABLE_COLUMNS}) ; sinon une liste {@code nom : valeur} ;</li>
- *   <li>{@code Map} : tableau clé / valeur ; collections et tableaux : un élément par ligne ;</li>
- *   <li>scalaires : une ligne lisible (tailles {@link Bytes}, dates locales, durées).</li>
+ *   <li>successive records of the same type: a table (columns from {@link Display}, or all components
+ *       if there are at most {@value #MAX_TABLE_COLUMNS}); otherwise a {@code name : value} list;</li>
+ *   <li>{@code Map}: key / value table; collections and arrays: one element per line;</li>
+ *   <li>scalars: one readable line ({@link Bytes} sizes, local dates, durations).</li>
  * </ul>
- * Les tableaux s'affichent au fil de l'eau : la largeur des colonnes est calculée sur les
- * {@value #WIDTH_SAMPLE} premières lignes, les suivantes sont tronquées à cette largeur.
+ * Tables are displayed as they stream: the column widths are computed from the first
+ * {@value #WIDTH_SAMPLE} lines, and subsequent lines are truncated to these widths.
  */
 public final class OutputFormatter implements AutoCloseable {
 
@@ -48,7 +48,7 @@ public final class OutputFormatter implements AutoCloseable {
     private int[] widths;
     private boolean[] rightAligned;
 
-    /** @param width largeur du terminal en caractères (0 ou moins : 120) */
+    /** @param width terminal width in characters (0 or less: 120) */
     public OutputFormatter(PrintWriter out, int width) {
         this.out = out;
         this.width = width > 0 ? width : 120;
@@ -57,9 +57,9 @@ public final class OutputFormatter implements AutoCloseable {
     public void accept(Object value) {
         switch (value) {
             case null -> { }
-            case Path path -> line(path.toString()); // un Path est aussi un Iterable<Path>
+            case Path path -> line(path.toString()); // a Path is also an Iterable<Path>
             case Iterable<?> items -> items.forEach(this::accept);
-            case java.util.stream.BaseStream<?, ?> stream -> { // Stream, IntStream… : éléments affichés
+            case java.util.stream.BaseStream<?, ?> stream -> { // Stream, IntStream…: elements displayed
                 try (stream) {
                     stream.iterator().forEachRemaining(this::accept);
                 }
@@ -76,7 +76,7 @@ public final class OutputFormatter implements AutoCloseable {
         }
     }
 
-    /** Termine le tableau en cours. */
+    /** Ends the current table. */
     @Override
     public void close() {
         endTable();
@@ -155,7 +155,7 @@ public final class OutputFormatter implements AutoCloseable {
         sample.clear();
     }
 
-    /** Réduit les colonnes les plus larges tant que le tableau dépasse la largeur du terminal. */
+    /** Shrinks the widest columns as long as the table exceeds the terminal width. */
     private void fitToWidth() {
         int total = Arrays.stream(widths).sum() + GAP.length() * (widths.length - 1);
         while (total > width) {
@@ -215,7 +215,7 @@ public final class OutputFormatter implements AutoCloseable {
         map.forEach((k, v) -> out.println(("%-" + keyWidth + "s  %s").formatted(Values.text(k), cell(v, false))));
     }
 
-    /** Colonnes du tableau pour ce type, ou {@code null} s'il s'affiche en liste. */
+    /** Table columns for this type, or {@code null} if it is displayed as a list. */
     private static List<Column> tableColumns(Class<?> type) {
         RecordComponent[] components = type.getRecordComponents();
         Display display = type.getAnnotation(Display.class);
@@ -251,7 +251,7 @@ public final class OutputFormatter implements AutoCloseable {
         }
     }
 
-    /** Valeur sur une ligne, au format lisible. */
+    /** Value on one line, in readable format. */
     static String cell(Object value, boolean bytes) {
         return switch (value) {
             case null -> "";
@@ -263,7 +263,7 @@ public final class OutputFormatter implements AutoCloseable {
         };
     }
 
-    /** {@code 14 520} → {@code 14,2 KB} (multiples de 1024, séparateur décimal de la langue). */
+    /** {@code 14 520} → {@code 14,2 KB} (multiples of 1024, locale's decimal separator). */
     static String humanBytes(long bytes) {
         if (bytes < 1024) {
             return bytes + " B";

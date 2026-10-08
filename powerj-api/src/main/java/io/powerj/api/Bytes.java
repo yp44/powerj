@@ -6,7 +6,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/** Composant numérique exprimant une taille en octets, affichée sous forme lisible ({@code 14,2 KB}). */
+/** Numeric component expressing a size in bytes, displayed in human-readable form ({@code 14,2 KB}). */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.RECORD_COMPONENT)

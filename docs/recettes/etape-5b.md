@@ -1,50 +1,50 @@
-# Recette — Étape 5b : alignement sur Java
+# Acceptance test — Step 5b: alignment with Java
 
-**Objectif :** vérifier que les blocs s'écrivent comme en Java — lambdas nommées, lambdas sans accolades dans les appels Java, références de méthode —, que `$_` reste disponible pour les filtres courts, que les conditions sont strictement booléennes, et le nouveau cmdlet `map`.
+**Goal:** verify that blocks are written as in Java — named lambdas, lambdas without braces in Java calls, method references —, that `$_` remains available for short filters, that conditions are strictly boolean, and the new `map` cmdlet.
 
-> L'étape 5b est livrée avec l'étape 5, dans le même exe : les deux recettes se passent sur la même version.
+> Step 5b ships with step 5, in the same exe: both acceptance tests are run on the same version.
 
-## Récupérer les livrables
+## Getting the deliverables
 
-Comme aux étapes précédentes : onglet **Actions**, dernière exécution du workflow **CI**, artefact `powerj-windows-x64-installer` ou `powerj-windows-x64-portable`.
+As in the previous steps: **Actions** tab, latest run of the **CI** workflow, artifact `powerj-windows-x64-installer` or `powerj-windows-x64-portable`.
 
-## `$_` ou lambda : laquelle utiliser ?
+## `$_` or lambda: which one to use?
 
-Les deux formes font la même chose ; elles se lisent différemment.
+Both forms do the same thing; they read differently.
 
-| Je veux… | J'écris | Pourquoi |
+| I want… | I write | Why |
 |---|---|---|
-| un filtre ou une transformation **d'une ligne**, tapé au clavier | `where { $_.dir }`, `map { $_.name }` | `$_` est le plus court ; sans ambiguïté quand l'objet n'apparaît qu'une ou deux fois. |
-| la propriété de **chaque élément** d'une liste | `$f*.name`, `$f*.size` | `.` s'applique à la liste elle-même (`$f.size()` = nombre d'éléments) ; `*.` à chaque élément. |
-| une condition **longue**, qui cite l'objet plusieurs fois | `where { f -> f.size > 1mb && !f.dir && f.ext == "log" }` | Un nom (`f`, `fichier`, `ligne`) se relit mieux qu'une suite de `$_`. |
-| un bloc **dans** un autre bloc | `where { f -> List.of("md", "txt").stream().anyMatch(e -> f.name.endsWith("." + e)) }` | Dans le bloc intérieur, `$_` désignerait `e` : l'objet extérieur doit avoir un nom. |
-| **deux paramètres** (tri, réduction) | `$m.sort((a, b) -> a.length() - b.length())` | Seule une lambda déclare plusieurs paramètres (`$a` / `$b` n'existent plus). |
-| juste **appeler une méthode** | `map FileEntry::name`, `map(String::toUpperCase)` | La référence de méthode dit tout, sans paramètre à nommer. |
-| passer une fonction à une **méthode Java** | `$l.stream().filter(s -> s.length() > 4)` | Écriture Java exacte ; les accolades sont facultatives entre les parenthèses d'un appel. |
-| passer une fonction à un **cmdlet** | `where { f -> … }`, `map { f -> … }` | Accolades obligatoires : sans elles, le `>` de `->` serait une redirection. |
+| a **one-line** filter or transformation, typed at the keyboard | `where { $_.dir }`, `map { $_.name }` | `$_` is the shortest; unambiguous when the object appears only once or twice. |
+| the property of **each element** of a list | `$f*.name`, `$f*.size` | `.` applies to the list itself (`$f.size()` = number of elements); `*.` to each element. |
+| a **long** condition that mentions the object several times | `where { f -> f.size > 1mb && !f.dir && f.ext == "log" }` | A name (`f`, `fichier`, `ligne`) reads better than a series of `$_`. |
+| a block **inside** another block | `where { f -> List.of("md", "txt").stream().anyMatch(e -> f.name.endsWith("." + e)) }` | In the inner block, `$_` would refer to `e`: the outer object must have a name. |
+| **two parameters** (sorting, reduction) | `$m.sort((a, b) -> a.length() - b.length())` | Only a lambda declares several parameters (`$a` / `$b` no longer exist). |
+| just **call a method** | `map FileEntry::name`, `map(String::toUpperCase)` | The method reference says it all, with no parameter to name. |
+| pass a function to a **Java method** | `$l.stream().filter(s -> s.length() > 4)` | Exact Java syntax; braces are optional between the parentheses of a call. |
+| pass a function to a **cmdlet** | `where { f -> … }`, `map { f -> … }` | Braces are mandatory: without them, the `>` of `->` would be a redirection. |
 
-En résumé : **`$_` pour les filtres courts tapés au clavier ; une lambda nommée dès que l'expression grandit, s'imbrique ou prend deux paramètres ; une référence de méthode quand elle suffit.**
+In short: **`$_` for short filters typed at the keyboard; a named lambda as soon as the expression grows, nests, or takes two parameters; a method reference when it is enough.**
 
-Rappels :
-- Les paramètres de lambda s'écrivent **sans `$`** (comme en Java) ; les variables du shell gardent leur `$` : `$min = 1kb; ls | where { f -> f.size > $min }`.
-- Une condition doit renvoyer un **booléen** (`true` / `false`), comme un `Predicate` Java : `where { f -> f.name }` est une erreur ; écrire `where { f -> !f.name.isEmpty() }`.
+Reminders:
+- Lambda parameters are written **without `$`** (as in Java); shell variables keep their `$`: `$min = 1kb; ls | where { f -> f.size > $min }`.
+- A condition must return a **boolean** (`true` / `false`), like a Java `Predicate`: `where { f -> f.name }` is an error; write `where { f -> !f.name.isEmpty() }`.
 
-## Scénario
+## Scenario
 
-| # | Action | Résultat attendu |
+| # | Action | Expected result |
 |---|---|---|
-| 1 | `ls -r \| where { $_.size > 1mb }` puis `ls -r \| where { f -> f.size > 1mb }` | Même résultat : `$_` et lambda nommée sont équivalents. |
-| 2 | `ls -r \| where { f -> f.size > 1mb && !f.dir && f.modified > now - 7d }` | Fichiers de plus de 1 Mo modifiés depuis 7 jours. |
-| 3 | `ls -r \| map { f -> f.name + " : " + f.name.length() }` | Une ligne par fichier (`notes.txt : 9`) ; fonctionne aussi quand un seul fichier est trouvé. |
-| 4 | `ls \| map FileEntry::name` puis `env \| map EnvVar::name` | Noms des fichiers ; noms des variables d'environnement. |
-| 5 | `ls -r \| where { f -> List.of("md", "txt").stream().anyMatch(e -> f.name.endsWith("." + e)) }` | Fichiers `.md` et `.txt` (lambda imbriquée : `f` reste l'objet extérieur). |
-| 6 | `$l = List.of("apple", "banana", "kiwi")` puis `$l.stream().filter(s -> s.length() > 4).map(String::toUpperCase).toList()` | `APPLE` puis `BANANA`. |
+| 1 | `ls -r \| where { $_.size > 1mb }` then `ls -r \| where { f -> f.size > 1mb }` | Same result: `$_` and a named lambda are equivalent. |
+| 2 | `ls -r \| where { f -> f.size > 1mb && !f.dir && f.modified > now - 7d }` | Files larger than 1 MB modified within the last 7 days. |
+| 3 | `ls -r \| map { f -> f.name + " : " + f.name.length() }` | One line per file (`notes.txt : 9`); also works when only one file is found. |
+| 4 | `ls \| map FileEntry::name` then `env \| map EnvVar::name` | File names; environment variable names. |
+| 5 | `ls -r \| where { f -> List.of("md", "txt").stream().anyMatch(e -> f.name.endsWith("." + e)) }` | `.md` and `.txt` files (nested lambda: `f` remains the outer object). |
+| 6 | `$l = List.of("apple", "banana", "kiwi")` then `$l.stream().filter(s -> s.length() > 4).map(String::toUpperCase).toList()` | `APPLE` then `BANANA`. |
 | 7 | `$m = new ArrayList($l); $m.sort((a, b) -> a.length() - b.length()); $m` | `kiwi`, `apple`, `banana`. |
-| 8 | `$l.stream().map(Path::of).toList()` puis `Stream.of("a", "b").map(StringBuilder::new).toList()` | Références de méthode statique et de constructeur. |
-| 9 | `ls \| where { f -> f.name }` | Pour chaque objet, erreur non bloquante `le bloc doit renvoyer un booléen` ; le shell continue. |
-| 10 | `$m.sort({ $a.length() - $b.length() })` | Erreur claire indiquant d'écrire `(a, b) -> …`. |
-| 11 | `$min = 1kb; ls \| where { f -> f.size > $min }` | Variable du shell utilisée dans une lambda. |
-| 12 | `ls \| where f -> f.dir` | Erreur de syntaxe expliquant que les accolades sont obligatoires en argument d'un cmdlet. |
-| 13 | `$f = ls -r` puis `$f.size()`, `$f*.size`, `$f*.name*.toUpperCase()`, `$f*.name.size()` | Nombre de fichiers ; taille de chaque fichier ; noms en majuscules ; nombre de noms. `.` s'applique à la liste, `*.` à chaque élément. |
-| 14 | `$f.size` | Erreur : `… n'a pas de propriété 'size' (pour chaque élément : *.size ; méthode : size())`. |
-| 15 | Saisir `$t = """` puis deux lignes de texte puis `"""`, puis `$t.lines().count()` | `2` : bloc de texte multi-ligne. |
+| 8 | `$l.stream().map(Path::of).toList()` then `Stream.of("a", "b").map(StringBuilder::new).toList()` | Static method and constructor references. |
+| 9 | `ls \| where { f -> f.name }` | For each object, non-blocking error `le bloc doit renvoyer un booléen`; the shell continues. |
+| 10 | `$m.sort({ $a.length() - $b.length() })` | Clear error saying to write `(a, b) -> …`. |
+| 11 | `$min = 1kb; ls \| where { f -> f.size > $min }` | Shell variable used in a lambda. |
+| 12 | `ls \| where f -> f.dir` | Syntax error explaining that braces are mandatory as a cmdlet argument. |
+| 13 | `$f = ls -r` then `$f.size()`, `$f*.size`, `$f*.name*.toUpperCase()`, `$f*.name.size()` | Number of files; size of each file; uppercase names; number of names. `.` applies to the list, `*.` to each element. |
+| 14 | `$f.size` | Error: `… n'a pas de propriété 'size' (pour chaque élément : *.size ; méthode : size())`. |
+| 15 | Type `$t = """` then two lines of text then `"""`, then `$t.lines().count()` | `2`: multi-line text block. |

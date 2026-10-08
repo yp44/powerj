@@ -21,7 +21,7 @@ import io.powerj.core.exec.Interpreter;
 import io.powerj.core.exec.Session;
 import io.powerj.core.exec.ShellIo;
 
-/** Complétion par Tab (FR-21 à FR-25, FR-24b) avec les cmdlets réels. */
+/** Tab completion (FR-21 to FR-25, FR-24b) with the real cmdlets. */
 class CompletionsTest {
 
     @TempDir
@@ -53,7 +53,7 @@ class CompletionsTest {
         return completions.complete(line, line.length());
     }
 
-    /** Valeurs proposées qui prolongent le mot en cours (le filtrage final est fait par JLine). */
+    /** Proposed values that extend the current word (the final filtering is done by JLine). */
     private List<String> values(String line) {
         var result = complete(line);
         return result.candidates().stream().map(Completions.Candidate::value)

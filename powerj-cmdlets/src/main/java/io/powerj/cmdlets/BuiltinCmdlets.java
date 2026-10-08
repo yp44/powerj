@@ -5,7 +5,7 @@ import java.util.List;
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletProvider;
 
-/** Cmdlets intégrés à PowerJ. */
+/** Cmdlets built into PowerJ. */
 public final class BuiltinCmdlets implements CmdletProvider {
 
     @Override

@@ -20,19 +20,19 @@ import java.util.concurrent.CancellationException;
 import io.powerj.api.ScriptBlock;
 
 /**
- * Appels Java depuis le shell (spécification FR-48 à FR-50, FR-53) : méthodes d'instance et statiques,
- * constructeurs. Parmi les surcharges applicables (avec varargs), celle qui demande les conversions les
- * moins coûteuses est choisie, puis la plus spécifique ; une égalité restante est une ambiguïté.
+ * Java calls from the shell (specification FR-48 to FR-50, FR-53): instance and static methods,
+ * constructors. Among the applicable overloads (with varargs), the one requiring the cheapest
+ * conversions is chosen, then the most specific; a remaining tie is an ambiguity.
  */
 final class JavaInvoker {
 
-    /** Conversion impossible. */
+    /** No possible conversion. */
     static final int NO_MATCH = Integer.MAX_VALUE;
 
     private static final List<Class<?>> NUMERIC_ORDER = List.of(byte.class, short.class, int.class, long.class,
             float.class, double.class);
 
-    /** Méthodes publiques d'instance par type et par nom, vues à travers les types accessibles. */
+    /** Public instance methods by type and by name, seen through the accessible types. */
     private static final ClassValue<Map<String, List<Method>>> INSTANCE_METHODS = new ClassValue<>() {
         @Override
         protected Map<String, List<Method>> computeValue(Class<?> type) {
@@ -53,17 +53,17 @@ final class JavaInvoker {
     private JavaInvoker() {
     }
 
-    /** Méthodes publiques d'instance accessibles d'un type, par nom (complétion). */
+    /** Accessible public instance methods of a type, by name (completion). */
     static Map<String, List<Method>> instanceMethods(Class<?> type) {
         return INSTANCE_METHODS.get(type);
     }
 
-    /** Le type a-t-il une méthode publique {@code name()} sans argument ? (aide des messages d'erreur) */
+    /** Does the type have a public no-argument method {@code name()}? (hint for error messages) */
     static boolean hasNoArgMethod(Class<?> type, String name) {
         return INSTANCE_METHODS.get(type).getOrDefault(name, List.of()).stream().anyMatch(m -> m.getParameterCount() == 0);
     }
 
-    /** {@code cible.nom(arguments)}. */
+    /** {@code target.name(arguments)}. */
     static Object invokeVirtual(Object target, String name, List<Object> args) {
         if (target == null) {
             throw new PjException("appel de " + name + "() sur une valeur nulle");
@@ -76,7 +76,7 @@ final class JavaInvoker {
         return call(method, target, convertAll(method, args));
     }
 
-    /** {@code Classe.nom(arguments)}. */
+    /** {@code Class.name(arguments)}. */
     static Object invokeStatic(Class<?> type, String name, List<Object> args) {
         List<Executable> candidates = new ArrayList<>();
         for (Method m : type.getMethods()) {
@@ -86,7 +86,7 @@ final class JavaInvoker {
             }
         }
         if (candidates.isEmpty()) {
-            for (Method m : type.getMethods()) { // méthodes statiques héritées d'une superclasse
+            for (Method m : type.getMethods()) { // static methods inherited from a superclass
                 if (m.getName().equals(name) && Modifier.isStatic(m.getModifiers())
                         && JavaClasses.accessible(m.getDeclaringClass())) {
                     candidates.add(m);
@@ -100,7 +100,7 @@ final class JavaInvoker {
         return call(method, null, convertAll(method, args));
     }
 
-    /** {@code new Classe(arguments)}. */
+    /** {@code new Class(arguments)}. */
     static Object construct(Class<?> type, List<Object> args) {
         if (type.isInterface() || Modifier.isAbstract(type.getModifiers())) {
             throw new PjException("new " + type.getSimpleName() + " : classe abstraite ou interface");
@@ -119,10 +119,10 @@ final class JavaInvoker {
         }
     }
 
-    /** Exception levée par du code Java : erreur bloquante courte (FR-53). */
+    /** Exception thrown by Java code: short blocking error (FR-53). */
     static RuntimeException javaException(Throwable cause) {
         if (cause instanceof PjException || cause instanceof CancellationException) {
-            return (RuntimeException) cause; // levée par un bloc { } appelé depuis Java
+            return (RuntimeException) cause; // thrown by a { } block called from Java
         }
         String message = cause.getMessage();
         return new PjException(PjError.of(cause.getClass().getName() + (message == null ? "" : " : " + message),
@@ -139,7 +139,7 @@ final class JavaInvoker {
         }
     }
 
-    // --- Choix de la surcharge ---
+    // --- Overload selection ---
 
     private record Match(Executable executable, int cost, boolean varargs) { }
 
@@ -208,7 +208,7 @@ final class JavaInvoker {
         Class<?>[] pa = a.getParameterTypes();
         Class<?>[] pb = b.getParameterTypes();
         if (pa.length != pb.length) {
-            return pa.length > pb.length; // varargs : la forme la plus longue est plus précise
+            return pa.length > pb.length; // varargs: the longest form is more specific
         }
         for (int i = 0; i < pa.length; i++) {
             if (!subtype(pa[i], pb[i])) {
@@ -232,7 +232,7 @@ final class JavaInvoker {
 
     // --- Conversions (FR-50) ---
 
-    /** Coût de conversion d'une valeur vers un type de paramètre, ou {@link #NO_MATCH}. */
+    /** Cost of converting a value to a parameter type, or {@link #NO_MATCH}. */
     static int cost(Class<?> type, Object value) {
         if (value == null) {
             return type.isPrimitive() ? NO_MATCH : 2;
@@ -288,7 +288,7 @@ final class JavaInvoker {
             }
             if (isIntegral(n) && (target == int.class || target == long.class || target == short.class
                     || target == byte.class)) {
-                return fits(n, target) ? 9 : NO_MATCH; // sans perte uniquement
+                return fits(n, target) ? 9 : NO_MATCH; // lossless only
             }
             if (target == float.class && (n instanceof Double || n instanceof BigDecimal)) {
                 return 9;
@@ -307,7 +307,7 @@ final class JavaInvoker {
         return NO_MATCH;
     }
 
-    /** Convertit une valeur dont le coût de conversion est connu. */
+    /** Converts a value whose conversion cost is known. */
     static Object convert(Class<?> type, Object value) {
         if (value == null) {
             return null;
@@ -442,7 +442,7 @@ final class JavaInvoker {
         };
     }
 
-    /** Type primitif d'une classe enveloppe ({@code Integer} → {@code int}), ou {@code null}. */
+    /** Primitive type of a wrapper class ({@code Integer} → {@code int}), or {@code null}. */
     private static Class<?> unbox(Class<?> type) {
         if (type.isPrimitive()) {
             return type;

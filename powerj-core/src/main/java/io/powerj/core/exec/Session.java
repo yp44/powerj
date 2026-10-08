@@ -13,8 +13,8 @@ import java.util.OptionalInt;
 import java.util.TreeMap;
 
 /**
- * État d'une session de shell : répertoire courant, environnement, variables, dernière commande native.
- * Utilisée depuis le fil d'exécution des commandes ; les étapes d'un pipeline la lisent en parallèle.
+ * State of a shell session: current directory, environment, variables, last native command.
+ * Used from the command execution thread; the stages of a pipeline read it in parallel.
  */
 public final class Session {
 
@@ -27,19 +27,19 @@ public final class Session {
     private boolean lastSucceeded = true;
     private Integer exitRequest;
     private final JavaClasses java = new JavaClasses();
-    /** Exceptions Java récentes, la plus récente en premier ({@code $errors}, FR-53). */
+    /** Recent Java exceptions, most recent first ({@code $errors}, FR-53). */
     private final Deque<Throwable> errors = new ArrayDeque<>();
     private static final int MAX_ERRORS = 20;
 
     /**
-     * @param home             dossier utilisateur ({@code ~})
-     * @param currentDirectory répertoire courant initial
-     * @param environment      environnement initial (copié)
+     * @param home             user home directory ({@code ~})
+     * @param currentDirectory initial current directory
+     * @param environment      initial environment (copied)
      */
     public Session(Path home, Path currentDirectory, Map<String, String> environment) {
         this.home = home.toAbsolutePath().normalize();
         this.currentDirectory = currentDirectory.toAbsolutePath().normalize();
-        // Les noms de variables d'environnement ne tiennent pas compte de la casse sous Windows.
+        // Environment variable names are case-insensitive on Windows.
         this.environment = Platform.isWindows() ? new TreeMap<>(String.CASE_INSENSITIVE_ORDER) : new TreeMap<>();
         this.environment.putAll(environment);
     }
@@ -56,7 +56,7 @@ public final class Session {
         return Optional.ofNullable(previousDirectory);
     }
 
-    /** Change de répertoire courant ; le dossier doit exister. */
+    /** Changes the current directory; the directory must exist. */
     public void changeDirectory(Path target) {
         Path resolved = currentDirectory.resolve(target).toAbsolutePath().normalize();
         if (!Files.exists(resolved)) {
@@ -69,7 +69,7 @@ public final class Session {
         currentDirectory = resolved;
     }
 
-    /** Environnement de la session, appliqué aux commandes natives (modifiable). */
+    /** Environment of the session, applied to native commands (modifiable). */
     public Map<String, String> environment() {
         return environment;
     }
@@ -94,14 +94,14 @@ public final class Session {
         variables.put(name, value);
     }
 
-    /** Noms des variables définies et automatiques, triés (complétion). */
+    /** Names of the defined and automatic variables, sorted (completion). */
     public java.util.SortedSet<String> variableNames() {
         var names = new java.util.TreeSet<>(variables.keySet());
         names.addAll(List.of("?", "exit", "last", "pwd", "home", "errors"));
         return names;
     }
 
-    /** Valeur d'une variable, automatique ({@code $exit}, {@code $last}, {@code $?}…) ou définie. */
+    /** Value of a variable, automatic ({@code $exit}, {@code $last}, {@code $?}…) or defined. */
     public Object variable(String name) {
         return switch (name) {
             case "?" -> lastSucceeded;
@@ -119,12 +119,12 @@ public final class Session {
         };
     }
 
-    /** Classes Java accessibles et imports de la session (FR-47). */
+    /** Accessible Java classes and imports of the session (FR-47). */
     public JavaClasses java() {
         return java;
     }
 
-    /** Conserve l'exception d'origine d'une erreur pour {@code $errors} (FR-53). */
+    /** Keeps the original exception of an error for {@code $errors} (FR-53). */
     public synchronized void recordError(Throwable error) {
         errors.addFirst(error);
         while (errors.size() > MAX_ERRORS) {
@@ -136,12 +136,12 @@ public final class Session {
         return List.copyOf(errors);
     }
 
-    /** {@code $debug} : afficher la pile Java des erreurs (FR-43). */
+    /** {@code $debug}: show the Java stack trace of errors (FR-43). */
     public boolean debug() {
         return Boolean.TRUE.equals(variables.get("debug"));
     }
 
-    /** Demande la fermeture du shell avec ce code ({@code exit}). */
+    /** Requests that the shell close with this code ({@code exit}). */
     public void requestExit(int code) {
         exitRequest = code;
     }

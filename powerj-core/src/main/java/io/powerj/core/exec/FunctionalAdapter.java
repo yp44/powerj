@@ -8,10 +8,10 @@ import java.lang.reflect.Proxy;
 import io.powerj.api.ScriptBlock;
 
 /**
- * Bloc {@code { … }} passé à un paramètre de type interface fonctionnelle ({@code Predicate},
- * {@code Function}, {@code Comparator}…) : converti en implémentation de l'interface (spécification FR-51).
- * Les paramètres de la lambda reçoivent les arguments ; un bloc sans paramètre déclaré reçoit son unique
- * argument dans {@code $_} ; une référence de méthode est appelée avec les arguments (FR-33b).
+ * Block {@code { … }} passed to a parameter of a functional interface type ({@code Predicate},
+ * {@code Function}, {@code Comparator}…): converted into an implementation of the interface (specification FR-51).
+ * The lambda's parameters receive the arguments; a block without a declared parameter receives its single
+ * argument in {@code $_}; a method reference is called with the arguments (FR-33b).
  */
 final class FunctionalAdapter {
 
@@ -57,7 +57,7 @@ final class FunctionalAdapter {
         };
     }
 
-    /** Valeur du bloc convertie vers le type de retour de la méthode (FR-50). */
+    /** Value of the block converted to the return type of the method (FR-50). */
     private static Object result(Method sam, Object value) {
         Class<?> type = sam.getReturnType();
         if (type == void.class) {
@@ -93,7 +93,7 @@ final class FunctionalAdapter {
         return found;
     }
 
-    /** Méthodes publiques d'{@code Object} redéclarées par une interface ({@code Comparator.equals}). */
+    /** Public methods of {@code Object} redeclared by an interface ({@code Comparator.equals}). */
     private static boolean isObjectMethod(Method m) {
         try {
             Object.class.getMethod(m.getName(), m.getParameterTypes());

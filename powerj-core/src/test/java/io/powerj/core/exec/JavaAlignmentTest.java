@@ -14,7 +14,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** Alignement sur Java (étape 5b, FR-33b) : lambdas, références de méthode, booléens stricts, blocs de texte. */
+/** Alignment with Java (step 5b, FR-33b): lambdas, method references, strict booleans, text blocks. */
 class JavaAlignmentTest {
 
     @TempDir
@@ -50,7 +50,7 @@ class JavaAlignmentTest {
         assertThat(run("items | filter { i -> i.size > 15 && i.name.startsWith(\"item\") } | count")).isEqualTo("2\n");
         run("$min = 20");
         assertThat(run("items | filter { i -> i.size >= $min } | count")).isEqualTo("2\n");
-        // $_ reste disponible dans un bloc sans paramètre déclaré.
+        // $_ remains available in a block without a declared parameter.
         assertThat(run("items | filter { $_.size == 10 } | count")).isEqualTo("1\n");
     }
 

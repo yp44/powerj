@@ -9,9 +9,9 @@ import java.util.OptionalInt;
 import java.util.function.Supplier;
 
 /**
- * Encodage du texte échangé avec une commande native (spécification FR-40b) :
- * {@code POWERJ_NATIVE_ENCODING_<NOM>}, sinon {@code POWERJ_NATIVE_ENCODING}, sinon automatique
- * (page de code de la console Windows, UTF-8 ailleurs).
+ * Encoding of the text exchanged with a native command (specification FR-40b):
+ * {@code POWERJ_NATIVE_ENCODING_<NOM>}, otherwise {@code POWERJ_NATIVE_ENCODING}, otherwise automatic
+ * (code page of the Windows console, UTF-8 elsewhere).
  */
 public final class NativeEncoding {
 
@@ -45,7 +45,7 @@ public final class NativeEncoding {
         }
     }
 
-    /** Nom de l'exécutable en majuscules, sans extension : {@code git.exe} → {@code GIT}. */
+    /** Name of the executable in upper case, without extension: {@code git.exe} → {@code GIT}. */
     static String programKey(Path executable) {
         String name = executable.getFileName().toString();
         int dot = name.lastIndexOf('.');
@@ -71,7 +71,7 @@ public final class NativeEncoding {
             try {
                 return Charset.forName(name);
             } catch (IllegalArgumentException _) {
-                // nom suivant
+                // next name
             }
         }
         return Charset.forName(System.getProperty("native.encoding", "UTF-8"));

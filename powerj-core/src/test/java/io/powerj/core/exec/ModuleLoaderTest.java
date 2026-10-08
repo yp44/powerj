@@ -28,14 +28,14 @@ import org.junit.jupiter.api.io.TempDir;
 import io.powerj.api.CmdletProvider;
 
 /**
- * Modules tiers (§4.4) : des jars compilés pendant le test, chargés dans leur propre {@link ModuleLayer}.
- * Les tests tournent sur le classpath : les jars sont des modules automatiques (le module {@code greet}
- * d'exemple, explicite, est vérifié par le test de fumée de la CI).
+ * Third-party modules (§4.4): jars compiled during the test, loaded into their own {@link ModuleLayer}.
+ * The tests run on the classpath: the jars are automatic modules (the explicit example module
+ * {@code greet} is checked by the CI smoke test).
  */
 class ModuleLoaderTest {
 
-    // Sous Windows, un jar chargé reste ouvert par sa couche jusqu'à l'arrêt de la JVM : le dossier ne peut
-    // pas être supprimé à la fin du test.
+    // On Windows, a loaded jar stays open by its layer until the JVM stops: the directory cannot
+    // be deleted at the end of the test.
     @TempDir(cleanup = CleanupMode.NEVER)
     Path tmp;
 
@@ -98,7 +98,7 @@ class ModuleLoaderTest {
         run("mod-load other.jar");
         assertThat(errors).singleElement().asString()
                 .contains("« items »", "org.test.other", "accessible par other:items");
-        assertThat(run("items -n 1")).contains("item1"); // le premier garde le nom court
+        assertThat(run("items -n 1")).contains("item1"); // the first one keeps the short name
         assertThat(run("other:items -n Q")).contains("Bonjour Q");
         assertThat(run("mod-list")).contains("[other:items]");
     }
@@ -136,7 +136,7 @@ class ModuleLoaderTest {
         assertThat(errors).singleElement().asString().contains("org.test.hello.Greeting");
     }
 
-    /** Module {@code module} fournissant un cmdlet {@code name} : {@code name -n X -c 2}. */
+    /** Module {@code module} providing a cmdlet {@code name}: {@code name -n X -c 2}. */
     private void hello(Path jar, String module, String name) throws IOException {
         String pkg = module;
         Map<String, String> sources = Map.of(

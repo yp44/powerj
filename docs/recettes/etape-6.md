@@ -1,44 +1,44 @@
-# Recette — Étape 6 : autocomplétion Tab et coloration
+# Acceptance test — Step 6: Tab completion and highlighting
 
-**Objectif :** vérifier que Tab complète les commandes, options, chemins, variables, propriétés et l'API Java, et que la saisie est colorée selon la nature des mots.
+**Goal:** verify that Tab completes commands, options, paths, variables, properties and the Java API, and that the input is highlighted according to the kind of each word.
 
-## Récupérer les livrables
+## Getting the deliverables
 
-Comme aux étapes précédentes : onglet **Actions**, dernière exécution du workflow **CI**, artefact `powerj-windows-x64-installer` ou `powerj-windows-x64-portable`.
+As in the previous steps: **Actions** tab, latest run of the **CI** workflow, artifact `powerj-windows-x64-installer` or `powerj-windows-x64-portable`.
 
-## Comment fonctionne Tab
+## How Tab works
 
-- **Premier Tab** : complète le préfixe commun à toutes les propositions ; s'il n'y en a qu'une, la complète entièrement.
-- **Second Tab** : affiche le menu des propositions avec leur description ; Tab / Maj+Tab (ou les flèches) pour s'y déplacer, Entrée pour choisir.
-- Le menu indique la nature : `ls [pj]` (cmdlet), `cd [interne]`, `notepad [natif]` ; la signature pour Java : `of(Object...) : List`.
+- **First Tab**: completes the prefix common to all suggestions; if there is only one, completes it fully.
+- **Second Tab**: shows the menu of suggestions with their descriptions; Tab / Shift+Tab (or the arrow keys) to move through it, Enter to choose.
+- The menu shows the kind: `ls [pj]` (cmdlet), `cd [interne]`, `notepad [natif]`; the signature for Java: `of(Object...) : List`.
 
-## Scénario
+## Scenario
 
-| # | Action | Résultat attendu |
+| # | Action | Expected result |
 |---|---|---|
-| 1 | `l` puis Tab Tab | Menu : `ls [pj]` et les programmes du `PATH` commençant par `l`. |
-| 2 | `ls --` puis Tab Tab ; puis `ls -r --` puis Tab Tab | Options de `ls` avec leur description (`--recurse, -r  Parcourt les sous-dossiers`…) ; la seconde fois, `--recurse` n'est plus proposé. |
-| 3 | `cd C:\Pro` puis Tab | Complète en `"C:\\Program Files\\` (entre guillemets, à cause de l'espace) ; un nouveau Tab propose le contenu du dossier. |
-| 4 | `ls C:\Win` puis Tab, puis `Sys` Tab | `C:\Windows\`, puis `C:\Windows\System32\`. |
-| 5 | `ls \| where { $_.` puis Tab Tab | `name size modified path dir ext` (propriétés de `FileEntry`, sortie de `ls`) et les méthodes. |
-| 6 | `ls \| where { f -> f.na` puis Tab, puis `.sta` Tab | `f.name`, puis `startsWith(` : la lambda connaît le type de `f`. |
-| 7 | `$f = ls` puis `$f[0].` Tab Tab | Propriétés du premier fichier. Puis `$f*.na` Tab → `$f*.name`. |
-| 8 | `$` puis Tab Tab | Variables définies (`$f`…) et automatiques (`$exit`, `$last`, `$pwd`…), avec leur type. |
-| 9 | `^no` puis Tab | `notepad` (seulement les programmes natifs après `^`). |
+| 1 | `l` then Tab Tab | Menu: `ls [pj]` and the programs on the `PATH` starting with `l`. |
+| 2 | `ls --` then Tab Tab; then `ls -r --` then Tab Tab | Options of `ls` with their descriptions (`--recurse, -r  Parcourt les sous-dossiers`…); the second time, `--recurse` is no longer suggested. |
+| 3 | `cd C:\Pro` then Tab | Completes to `"C:\\Program Files\\` (in quotes, because of the space); another Tab suggests the folder's contents. |
+| 4 | `ls C:\Win` then Tab, then `Sys` Tab | `C:\Windows\`, then `C:\Windows\System32\`. |
+| 5 | `ls \| where { $_.` then Tab Tab | `name size modified path dir ext` (properties of `FileEntry`, output of `ls`) and the methods. |
+| 6 | `ls \| where { f -> f.na` then Tab, then `.sta` Tab | `f.name`, then `startsWith(`: the lambda knows the type of `f`. |
+| 7 | `$f = ls` then `$f[0].` Tab Tab | Properties of the first file. Then `$f*.na` Tab → `$f*.name`. |
+| 8 | `$` then Tab Tab | Defined variables (`$f`…) and automatic ones (`$exit`, `$last`, `$pwd`…), with their type. |
+| 9 | `^no` then Tab | `notepad` (only native programs after `^`). |
 | 10 | `java.util.Li` Tab Tab | `List`, `LinkedList`, `LinkedHashMap`… |
-| 11 | `List.` Tab Tab | Méthodes statiques avec leur signature : `of(Object...) : List`, `copyOf(Collection) : List`… |
-| 12 | `$l = List.of(1, 2)` puis `$l.` Tab Tab, puis `$l.stream().fi` Tab | `size() : int`, `get(int) : Object`, `stream() : Stream`… ; puis `filter(`. |
+| 11 | `List.` Tab Tab | Static methods with their signature: `of(Object...) : List`, `copyOf(Collection) : List`… |
+| 12 | `$l = List.of(1, 2)` then `$l.` Tab Tab, then `$l.stream().fi` Tab | `size() : int`, `get(int) : Object`, `stream() : Stream`…; then `filter(`. |
 | 13 | `new java.io.F` Tab Tab | `File`, `FileReader`, `FileWriter`… |
-| 14 | `import java.sec` Tab, puis `Mess` Tab | `java.security.`, puis `java.security.MessageDigest`. |
+| 14 | `import java.sec` Tab, then `Mess` Tab | `java.security.`, then `java.security.MessageDigest`. |
 | 15 | `ls \| map String::len` Tab | `String::length`. |
-| 16 | `Ma` Tab Tab | `Math`, `Map`, `MatchResult`… (classes importées par défaut). |
-| 17 | Couleurs : taper lentement `ls -r \| nope "x" $y ; git status` | `ls` vert, `-r` gris, `nope` rouge (commande inconnue), `"x"` jaune, `$y` magenta, `git` cyan (programme natif). |
-| 18 | Taper `Math.max(1, 2)` | Aucune couleur rouge : c'est une expression Java, pas une commande inconnue. |
-| 19 | Taper `cd ..` puis Entrée | `cd` en vert (commande interne). |
+| 16 | `Ma` Tab Tab | `Math`, `Map`, `MatchResult`… (classes imported by default). |
+| 17 | Colors: slowly type `ls -r \| nope "x" $y ; git status` | `ls` green, `-r` gray, `nope` red (unknown command), `"x"` yellow, `$y` magenta, `git` cyan (native program). |
+| 18 | Type `Math.max(1, 2)` | No red: it is a Java expression, not an unknown command. |
+| 19 | Type `cd ..` then Enter | `cd` in green (built-in command). |
 
-## Limites connues de l'étape 6
+## Known limitations of step 6
 
-- Pas de complétion à l'intérieur d'une chaîne `"…"` (sauf un chemin entre guillemets en argument), ni dans un `$( … )` placé dans une chaîne.
-- Pas encore d'annotation `@Completion` pour qu'un cmdlet fournisse ses propres propositions (FR-23) : les options de type enum et chemin sont complétées automatiquement.
-- Le type des paramètres d'une lambda passée à une méthode Java (`$l.stream().filter(s -> s.`) n'est pas déduit : pas de proposition après `s.`.
-- Le tout premier Tab peut prendre quelques dizaines de millisecondes (lecture de l'index des classes Java) ; ensuite moins d'une milliseconde.
+- No completion inside a `"…"` string (except a quoted path as an argument), nor in a `$( … )` placed inside a string.
+- No `@Completion` annotation yet for a cmdlet to provide its own suggestions (FR-23): enum and path options are completed automatically.
+- The type of the parameters of a lambda passed to a Java method (`$l.stream().filter(s -> s.`) is not inferred: no suggestions after `s.`.
+- The very first Tab can take a few tens of milliseconds (reading the Java class index); afterwards less than a millisecond.

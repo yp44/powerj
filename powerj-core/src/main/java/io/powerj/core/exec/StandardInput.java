@@ -9,18 +9,18 @@ import java.lang.foreign.ValueLayout;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/** Nature de l'entrée standard du process, lue par l'API FFM ({@code isatty}, {@code GetConsoleMode}). */
+/** Nature of the process's standard input, read through the FFM API ({@code isatty}, {@code GetConsoleMode}). */
 public final class StandardInput {
 
     private static final Logger LOG = Logger.getLogger(StandardInput.class.getName());
 
-    /** {@code STD_INPUT_HANDLE} de l'API Windows. */
+    /** {@code STD_INPUT_HANDLE} of the Windows API. */
     private static final int STD_INPUT_HANDLE = -10;
 
     private StandardInput() {
     }
 
-    /** {@code true} si l'entrée standard est un terminal (clavier), {@code false} si c'est un fichier ou un pipe. */
+    /** {@code true} if standard input is a terminal (keyboard), {@code false} if it is a file or a pipe. */
     public static boolean isTerminal() {
         try {
             return Platform.isWindows() ? windowsConsole() : posixTty();

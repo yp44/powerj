@@ -2,7 +2,7 @@ package io.powerj.core.exec;
 
 import java.util.Objects;
 
-/** Erreur bloquante prévue, levée par le shell ou un cmdlet ; son message est destiné à l'utilisateur. */
+/** Expected blocking error, thrown by the shell or a cmdlet; its message is intended for the user. */
 public class PjException extends RuntimeException {
 
     private final PjError error;

@@ -14,25 +14,25 @@ import io.powerj.core.lang.Ast.Operator;
 import io.powerj.core.lang.StringPart;
 
 /**
- * Évalue les expressions : arguments, valeurs en tête de ligne, contenu des blocs {@code { … }}, appels
- * Java (spécification §3.13). L'objet courant {@code $_} est lié par {@link #CURRENT} pendant l'évaluation
- * d'un bloc ; les paramètres d'une lambda ({@code f -> …}) par {@link #LOCALS} (FR-33b).
+ * Evaluates expressions: arguments, values at the start of a line, contents of {@code { … }} blocks, Java
+ * calls (specification §3.13). The current object {@code $_} is bound by {@link #CURRENT} during the evaluation
+ * of a block; the parameters of a lambda ({@code f -> …}) by {@link #LOCALS} (FR-33b).
  */
 final class Evaluator {
 
-    /** Objet courant {@code $_} d'un bloc. */
+    /** Current object {@code $_} of a block. */
     static final ScopedValue<Object> CURRENT = ScopedValue.newInstance();
 
-    /** Paramètres de la lambda en cours d'évaluation, par nom. */
+    /** Parameters of the lambda being evaluated, by name. */
     static final ScopedValue<Map<String, Object>> LOCALS = ScopedValue.newInstance();
 
-    /** Valeur {@code null} dans {@link #LOCALS}. */
+    /** {@code null} value in {@link #LOCALS}. */
     static final Object NULL = new Object();
 
-    /** Méthodes de {@code System} qui casseraient l'affichage du terminal (FR-58). */
+    /** Methods of {@code System} that would break the terminal display (FR-58). */
     private static final Set<String> REFUSED_SYSTEM_METHODS = Set.of("setOut", "setErr", "setIn");
 
-    /** Classe désignée dans une expression ({@code Math}, {@code java.util.List}). */
+    /** Class referenced in an expression ({@code Math}, {@code java.util.List}). */
     record ClassRef(Class<?> type) {
         @Override
         public String toString() {
@@ -40,10 +40,10 @@ final class Evaluator {
         }
     }
 
-    /** Début de nom qualifié qui n'est pas (encore) une classe : {@code java}, {@code java.util}. */
+    /** Start of a qualified name that is not (yet) a class: {@code java}, {@code java.util}. */
     record PackageRef(String name) { }
 
-    /** Exécute le pipeline d'une sous-expression {@code ( … )} et renvoie ses valeurs. */
+    /** Runs the pipeline of a subexpression {@code ( … )} and returns its values. */
     @FunctionalInterface
     interface PipelineRunner {
         List<Object> capture(Ast.Pipeline pipeline) throws InterruptedException;
@@ -57,7 +57,7 @@ final class Evaluator {
         this.runner = runner;
     }
 
-    /** Valeur de l'expression ; un nom qui ne désigne ni une valeur ni une classe est une erreur. */
+    /** Value of the expression; a name that denotes neither a value nor a class is an error. */
     Object evaluate(Expression expression) throws InterruptedException {
         Object value = eval(expression);
         if (value instanceof PackageRef(var name)) {
@@ -111,7 +111,7 @@ final class Evaluator {
         };
     }
 
-    /** Paramètres des lambdas en cours, capturés par un bloc ou une lambda créé ici. */
+    /** Parameters of the current lambdas, captured by a block or a lambda created here. */
     private static Map<String, Object> captured() {
         return LOCALS.isBound() ? LOCALS.get() : Map.of();
     }
@@ -124,19 +124,19 @@ final class Evaluator {
         return values;
     }
 
-    // --- Noms Java ---
+    // --- Java names ---
 
     private Object name(String name) {
         if (LOCALS.isBound() && LOCALS.get().containsKey(name)) {
             Object value = LOCALS.get().get(name);
-            return value == NULL ? null : value; // paramètre de lambda : prioritaire sur les classes
+            return value == NULL ? null : value; // lambda parameter: takes precedence over classes
         }
         JavaClasses java = session.java();
         java.checkAmbiguity(name);
         return java.simpleClass(name).<Object>map(ClassRef::new).orElseGet(() -> new PackageRef(name));
     }
 
-    /** {@code x.nom} : champ statique, classe imbriquée, suite d'un nom qualifié, ou propriété (FR-28). */
+    /** {@code x.name}: static field, nested class, continuation of a qualified name, or property (FR-28). */
     private Object get(Object target, String name) {
         return switch (target) {
             case ClassRef(var type) -> JavaClasses.staticField(type, name).map(field -> {
@@ -177,7 +177,7 @@ final class Evaluator {
         };
     }
 
-    /** {@code Classe::méthode}, {@code $objet::méthode}, {@code FileEntry::name} (FR-33b). */
+    /** {@code Class::method}, {@code $object::method}, {@code FileEntry::name} (FR-33b). */
     private static Object methodReference(Object target, String method) {
         return switch (target) {
             case ClassRef(var type) -> new MethodReference.OfClass(type, method);
@@ -188,7 +188,7 @@ final class Evaluator {
         };
     }
 
-    /** {@code System.exit(n)} équivaut à la commande {@code exit n} (FR-58). */
+    /** {@code System.exit(n)} is equivalent to the command {@code exit n} (FR-58). */
     private Object exit(List<Object> args) {
         if (args.size() != 1 || !(args.getFirst() instanceof Integer code)) {
             throw new PjException("exit : un code entier est attendu, ex. System.exit(0)");
@@ -202,7 +202,7 @@ final class Evaluator {
                 + " (une variable s'écrit $" + name + ")");
     }
 
-    /** {@code [type] valeur} : conversion explicite (FR-50). */
+    /** {@code [type] value}: explicit conversion (FR-50). */
     private static Object cast(Class<?> type, Object value) {
         if (value == null) {
             if (type.isPrimitive()) {
@@ -233,7 +233,7 @@ final class Evaluator {
                 + type.getSimpleName());
     }
 
-    // --- Variables et chaînes ---
+    // --- Variables and strings ---
 
     private Object variable(String name) {
         if (name.equals("_")) {
@@ -262,7 +262,7 @@ final class Evaluator {
         return text.toString();
     }
 
-    /** {@code x[i]} : index entier sur liste, tableau ou chaîne ; clé sur une {@code Map}. */
+    /** {@code x[i]}: integer index on a list, array or string; key on a {@code Map}. */
     private static Object at(Object target, Object index) {
         if (target instanceof Map<?, ?> map) {
             return map.get(index);
@@ -274,8 +274,8 @@ final class Evaluator {
     }
 
     /**
-     * Éléments visés par {@code *.} : ceux d'une collection, d'un tableau, d'un flux ; une valeur seule compte
-     * pour un élément, {@code null} pour aucun.
+     * Elements targeted by {@code *.}: those of a collection, an array, a stream; a single value counts
+     * as one element, {@code null} as none.
      */
     static List<Object> elements(Object value) {
         List<Object> elements = new ArrayList<>();
@@ -299,7 +299,7 @@ final class Evaluator {
         return elements;
     }
 
-    /** Valeur d'une capture (FR-31) : aucune → null, une → elle-même, plusieurs → liste. */
+    /** Value of a capture (FR-31): none → null, one → itself, several → list. */
     static Object single(List<Object> values) {
         return switch (values.size()) {
             case 0 -> null;

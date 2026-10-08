@@ -13,9 +13,9 @@ import java.util.TreeSet;
 import java.util.regex.Pattern;
 
 /**
- * Noms des programmes trouvés dans le {@code PATH} de la session, pour la complétion (FR-21). Sous Windows,
- * les extensions de {@code PATHEXT} sont retirées ({@code notepad}, pas {@code notepad.exe}). Le résultat
- * est mis en cache tant que {@code PATH} et {@code PATHEXT} ne changent pas, et au plus {@value #TTL_MILLIS} ms.
+ * Names of the programs found in the session's {@code PATH}, for completion (FR-21). On Windows,
+ * the {@code PATHEXT} extensions are removed ({@code notepad}, not {@code notepad.exe}). The result
+ * is cached as long as {@code PATH} and {@code PATHEXT} do not change, and for at most {@value #TTL_MILLIS} ms.
  */
 public final class NativeCommands {
 
@@ -34,7 +34,7 @@ public final class NativeCommands {
         this.windows = windows;
     }
 
-    /** Noms triés des programmes du {@code PATH}. */
+    /** Sorted names of the programs in the {@code PATH}. */
     public synchronized Set<String> names(Map<String, String> environment) {
         String path = environment.getOrDefault("PATH", "");
         String pathext = environment.getOrDefault("PATHEXT", ".COM;.EXE;.BAT;.CMD");
@@ -77,7 +77,7 @@ public final class NativeCommands {
                     }
                 }
             } catch (IOException | SecurityException _) {
-                // dossier illisible : ignoré
+                // unreadable directory: ignored
             }
         }
         return java.util.Collections.unmodifiableSortedSet((TreeSet<String>) names);

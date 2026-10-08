@@ -14,7 +14,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** Cmdlets, sous-expressions, help et which, avec un cmdlet de test. */
+/** Cmdlets, subexpressions, help and which, with a test cmdlet. */
 class CmdletInterpreterTest {
 
     @TempDir
@@ -63,7 +63,7 @@ class CmdletInterpreterTest {
         assertThat(run("(items -n 2)*.name")).isEqualTo("item1\nitem2\n");
         assertThat(run("(items)[-1].size")).isEqualTo("30\n");
         assertThat(run("(pwd)")).isEqualTo(tmp + "\n");
-        assertThat(run("\"nom : $last\"")).isNotEmpty(); // pas d'erreur de syntaxe
+        assertThat(run("\"nom : $last\"")).isNotEmpty(); // no syntax error
     }
 
     @Test
@@ -126,17 +126,17 @@ class CmdletInterpreterTest {
         assertThat(run("$i*.name*.toUpperCase()")).isEqualTo("ITEM1\nITEM2\nITEM3\n");
         assertThat(run("$i*.name.size()")).isEqualTo("3\n");
         assertThat(run("$i*.name.get(1).length()")).isEqualTo("5\n");
-        // Une valeur seule compte pour un élément, null pour aucun.
+        // A single value counts as one element, null as none.
         assertThat(run("(items -n 1)*.name")).isEqualTo("item1\n");
         run("$n = null");
         assertThat(run("$n*.name.size()")).isEqualTo("0\n");
-        // Sans *., la propriété s'applique à la liste elle-même : erreur explicite.
+        // Without *., the property applies to the list itself: explicit error.
         run("$i.size");
         assertThat(errors).singleElement().asString()
                 .contains("List n'a pas de propriété 'size'", "pour chaque élément : *.size", "méthode : size()");
         run("$i.name");
         assertThat(errors).singleElement().asString().contains("pour chaque élément : *.name");
-        // *. n'est pas une multiplication.
+        // *. is not a multiplication.
         assertThat(run("$x = 2 * 3; $x")).isEqualTo("6\n");
     }
 }

@@ -21,16 +21,16 @@ import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletProvider;
 
 /**
- * Chargement des modules tiers (spécification §4.4) : chaque jar de {@code ~/.powerj/modules}, ou chaque
- * sous-dossier (un module et ses dépendances), est chargé dans son propre {@link ModuleLayer}, ce qui isole
- * les dépendances des modules entre elles. Les cmdlets sont découverts par {@link ServiceLoader}.
+ * Loading of third-party modules (specification §4.4): each jar in {@code ~/.powerj/modules}, or each
+ * subdirectory (a module and its dependencies), is loaded into its own {@link ModuleLayer}, which isolates
+ * the modules' dependencies from one another. Cmdlets are discovered by {@link ServiceLoader}.
  * <p>
- * Les packages des modules sont ouverts à PowerJ seulement (lecture des records, options, affichage) : ils
- * ne deviennent pas utilisables en expression Java (§3.13).
+ * The modules' packages are opened to PowerJ only (reading records, options, display): they
+ * do not become usable in Java expressions (§3.13).
  */
 public final class ModuleLoader {
 
-    /** Résultat d'un chargement : noms des cmdlets ajoutés, avertissements. */
+    /** Result of a load: names of the cmdlets added, warnings. */
     public record Result(List<String> cmdlets, List<String> warnings) {
 
         static Result failure(String warning) {
@@ -42,14 +42,14 @@ public final class ModuleLoader {
     private final Set<String> reserved;
 
     /**
-     * @param reserved noms des commandes internes : un cmdlet homonyme ne serait jamais appelé
+     * @param reserved names of the built-in commands: a cmdlet with the same name would never be called
      */
     public ModuleLoader(CmdletRegistry registry, Set<String> reserved) {
         this.registry = registry;
         this.reserved = reserved;
     }
 
-    /** Charge chaque jar et chaque sous-dossier de {@code dir} ; un dossier absent ne charge rien. */
+    /** Loads each jar and each subdirectory of {@code dir}; a missing directory loads nothing. */
     public List<Result> loadAll(Path dir) {
         if (!Files.isDirectory(dir)) {
             return List.of();
@@ -67,7 +67,7 @@ public final class ModuleLoader {
         return entries.stream().map(this::load).toList();
     }
 
-    /** Charge un jar, ou un dossier contenant un module et ses dépendances ({@code mod-load}). */
+    /** Loads a jar, or a directory containing a module and its dependencies ({@code mod-load}). */
     public Result load(Path source) {
         Path path = source.toAbsolutePath().normalize();
         if (!Files.exists(path)) {
@@ -103,8 +103,8 @@ public final class ModuleLoader {
                 return Result.failure(path.getFileName() + " : module " + root + " déjà chargé");
             }
         }
-        // Modules du runtime et de PowerJ d'abord : un jar qui embarque sa propre copie de powerj-api
-        // utilise celle du shell.
+        // Runtime and PowerJ modules first: a jar that bundles its own copy of powerj-api
+        // uses the shell's one.
         Configuration configuration = Configuration.resolve(ModuleFinder.of(), List.of(parent.configuration()),
                 finder, roots);
         var controller = ModuleLayer.defineModulesWithOneLoader(configuration, List.of(parent),
@@ -124,7 +124,7 @@ public final class ModuleLoader {
         for (CmdletProvider provider : ServiceLoader.load(layer, CmdletProvider.class)) {
             Module module = provider.getClass().getModule();
             if (module.getLayer() != layer) {
-                continue; // fournisseur d'un module parent (cmdlets intégrés)
+                continue; // provider from a parent module (built-in cmdlets)
             }
             found = true;
             List<Cmdlet<?, ?, ?>> provided = new ArrayList<>();
@@ -151,7 +151,7 @@ public final class ModuleLoader {
         return new Result(List.copyOf(cmdlets), List.copyOf(warnings));
     }
 
-    /** Couche contenant {@code powerj-api} ; la couche de démarrage pendant les tests (classpath). */
+    /** Layer containing {@code powerj-api}; the boot layer during tests (classpath). */
     private static ModuleLayer parentLayer() {
         ModuleLayer layer = CmdletProvider.class.getModule().getLayer();
         return layer != null ? layer : ModuleLayer.boot();

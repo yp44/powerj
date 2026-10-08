@@ -44,7 +44,7 @@ class EnvTest {
 
     @Test
     void appendAndPrependUseThePathSeparator() {
-        // « env --append PATH /tools » : PATH est la valeur de --append, /tools arrive en position 0
+        // "env --append PATH /tools": PATH is the value of --append, /tools lands in position 0
         env("/tools", null, null, "PATH", null, null);
         assertThat(context.environment.get("PATH")).isEqualTo("/bin" + File.pathSeparator + "/tools");
         env("/first", null, null, null, "PATH", null);

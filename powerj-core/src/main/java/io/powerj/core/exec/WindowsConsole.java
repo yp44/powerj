@@ -11,8 +11,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Page de code de la console Windows, lue par l'API FFM ({@code GetConsoleOutputCP}, à défaut
- * {@code GetOEMCP}), sans JNI.
+ * Code page of the Windows console, read through the FFM API ({@code GetConsoleOutputCP}, or failing that
+ * {@code GetOEMCP}), without JNI.
  */
 final class WindowsConsole {
 
@@ -21,7 +21,7 @@ final class WindowsConsole {
     private WindowsConsole() {
     }
 
-    /** Page de code de sortie de la console, ou page OEM si le process n'a pas de console. */
+    /** Output code page of the console, or OEM code page if the process has no console. */
     static OptionalInt outputCodePage() {
         if (!Platform.isWindows()) {
             return OptionalInt.empty();

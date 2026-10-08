@@ -8,13 +8,13 @@ import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
 
-/** {@code env} : variables d'environnement de la session (spécification FR-36b). */
+/** {@code env}: session environment variables (specification FR-36b). */
 @CmdletInfo(name = "env", category = "Système", summary = "Affiche ou modifie les variables d'environnement de la session",
         examples = {"env", "env PATH", "env --set MAVEN_OPTS=-Xmx2g", "env --append PATH C:\\tools", "env --unset MAVEN_OPTS",
                 "(env PATH).value"})
 public final class Env implements Cmdlet<Env.Params, Void, EnvVar> {
 
-    /** Paramètres de {@code env}. */
+    /** Parameters of {@code env}. */
     public record Params(
             @Option(position = 0, description = "Nom d'une variable à afficher")
             String name,
@@ -49,7 +49,7 @@ public final class Env implements Cmdlet<Env.Params, Void, EnvVar> {
             }
         } else if (p.append() != null || p.prepend() != null) {
             String name = p.append() != null ? p.append() : p.prepend();
-            // « env --append PATH C:\tools » : PATH est lu comme valeur de --append, C:\tools en position 0.
+            // "env --append PATH C:\tools": PATH is read as the value of --append, C:\tools at position 0.
             String addition = p.value() != null ? p.value() : p.name();
             if (addition == null) {
                 throw new IllegalArgumentException("valeur attendue : env --append NOM valeur");
@@ -71,7 +71,7 @@ public final class Env implements Cmdlet<Env.Params, Void, EnvVar> {
         }
     }
 
-    /** Nom tel qu'enregistré ({@code Path} sous Windows quand on demande {@code PATH}). */
+    /** Name as stored ({@code Path} on Windows when {@code PATH} is requested). */
     private static String canonicalName(Map<String, String> env, String name) {
         return env.keySet().stream().filter(k -> k.equalsIgnoreCase(name)).findFirst().orElse(name);
     }

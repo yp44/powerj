@@ -19,13 +19,13 @@ import io.powerj.api.Option;
 import io.powerj.core.lang.Units;
 
 /**
- * Construit le record de paramètres d'un cmdlet à partir des arguments saisis, en style Unix
- * (spécification FR-18 à FR-20) : {@code -r}, {@code -ra}, {@code --recurse}, {@code --rec} (abrégé non
- * ambigu), {@code --filter *.java}, {@code --filter=*.java}, positionnels, {@code --} fin des options.
+ * Builds a cmdlet's parameter record from the arguments entered, Unix style
+ * (specification FR-18 to FR-20): {@code -r}, {@code -ra}, {@code --recurse}, {@code --rec} (unambiguous
+ * abbreviation), {@code --filter *.java}, {@code --filter=*.java}, positionals, {@code --} end of options.
  */
 public final class OptionBinder {
 
-    /** Description d'une option, issue d'un composant du record. */
+    /** Description of an option, derived from a record component. */
     public record OptionSpec(RecordComponent component, char shortName, String longName, boolean mandatory,
                              int position, String description) {
 
@@ -41,7 +41,7 @@ public final class OptionBinder {
             return position >= 0;
         }
 
-        /** Forme affichée : {@code -r, --recurse}. */
+        /** Displayed form: {@code -r, --recurse}. */
         public String display() {
             return (shortName != '\0' ? "-" + shortName + ", " : "    ") + "--" + longName;
         }
@@ -50,7 +50,7 @@ public final class OptionBinder {
     private OptionBinder() {
     }
 
-    /** Options déclarées par un record de paramètres, dans l'ordre des composants. */
+    /** Options declared by a parameter record, in component order. */
     public static List<OptionSpec> specs(Class<? extends Record> type) {
         List<OptionSpec> specs = new ArrayList<>();
         for (RecordComponent c : type.getRecordComponents()) {
@@ -67,8 +67,8 @@ public final class OptionBinder {
     }
 
     /**
-     * @param command nom de la commande, pour les messages
-     * @param args    arguments évalués : mots ({@code String}) ou valeurs d'expressions
+     * @param command name of the command, for messages
+     * @param args    evaluated arguments: words ({@code String}) or expression values
      */
     public static <P extends Record> P bind(String command, Class<P> type, List<Object> args) {
         List<OptionSpec> specs = specs(type);
@@ -108,7 +108,7 @@ public final class OptionBinder {
                     }
                     given[index] = true;
                 } else {
-                    // Options courtes, éventuellement groupées : -ra, -f *.java, -fvaleur
+                    // Short options, possibly grouped: -ra, -f *.java, -fvaleur
                     String letters = word.substring(1);
                     for (int k = 0; k < letters.length(); k++) {
                         OptionSpec spec = byShortName(command, specs, letters.charAt(k));
@@ -136,7 +136,7 @@ public final class OptionBinder {
                 OptionSpec spec = positionals.get(nextPositional);
                 int index = specs.indexOf(spec);
                 if (given[index] && !spec.isList()) {
-                    // l'option a déjà reçu sa valeur par son nom : on passe au positionnel suivant
+                    // the option already received its value by name: move on to the next positional
                     nextPositional++;
                     i--;
                     continue;
@@ -161,7 +161,7 @@ public final class OptionBinder {
         return construct(command, type, specs, values);
     }
 
-    /** {@code -x}, {@code --xx}, {@code --} ; mais pas un nombre négatif ni {@code -} seul. */
+    /** {@code -x}, {@code --xx}, {@code --}; but not a negative number nor {@code -} alone. */
     private static boolean isOption(String word) {
         return word.length() > 1 && word.charAt(0) == '-' && !word.matches("-\\d+(\\.\\d+)?");
     }
@@ -195,7 +195,7 @@ public final class OptionBinder {
         throw new PjException(command + " : option inconnue -" + letter);
     }
 
-    /** Nom le plus proche (distance d'édition ≤ 2). */
+    /** Closest name (edit distance ≤ 2). */
     static Optional<String> closest(String name, List<String> candidates) {
         String best = null;
         int bestDistance = 3;
@@ -246,7 +246,7 @@ public final class OptionBinder {
         return value;
     }
 
-    /** Convertit une valeur vers le type du composant (FR-20). */
+    /** Converts a value to the component's type (FR-20). */
     private static Object convert(String command, OptionSpec spec, Object value) {
         Class<?> type = spec.component().getType();
         if (type == List.class) {
@@ -274,7 +274,7 @@ public final class OptionBinder {
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static Object convertScalar(String command, OptionSpec spec, Class<?> type, Object value) {
         if (value == null || type.isInstance(value)) {
-            return value; // dont Object : valeur transmise telle quelle (bloc { }, objet)
+            return value; // including Object: value passed as is ({ } block, object)
         }
         String text = Values.text(value);
         try {
@@ -293,7 +293,7 @@ public final class OptionBinder {
                 return Integer.valueOf(text);
             }
             if (type == long.class || type == Long.class) {
-                // taille avec unité : 10kb, 1.5mb (FR-19)
+                // size with unit: 10kb, 1.5mb (FR-19)
                 return Units.parse(text).filter(Long.class::isInstance).orElseGet(() -> Long.valueOf(text));
             }
             if (type == double.class || type == Double.class) {

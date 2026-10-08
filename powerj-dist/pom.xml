@@ -22,9 +22,9 @@
         <dist.modules>${project.build.directory}/modules</dist.modules>
         <dist.jpackage>${project.build.directory}/jpackage</dist.jpackage>
         <dist.main>io.powerj.shell/io.powerj.shell.Main</dist.main>
-        <!-- Nom de l'exécutable jpackage ; surchargé sous Windows (profil windows). -->
+        <!-- jpackage executable name; overridden on Windows (windows profile). -->
         <dist.jpackage.exe>${java.home}/bin/jpackage</dist.jpackage.exe>
-        <!-- Options propres à la plateforme pour l'image applicative. -->
+        <!-- Platform-specific options for the application image. -->
         <dist.platform.args></dist.platform.args>
         <dist.platform>linux-x64</dist.platform>
     </properties>
@@ -63,7 +63,7 @@
             </properties>
         </profile>
 
-        <!-- Image applicative autonome : dossier powerj/ (lanceur + runtime Java) et archive zip. -->
+        <!-- Self-contained application image: powerj/ folder (launcher + Java runtime) and zip archive. -->
         <profile>
             <id>dist</id>
             <build>
@@ -73,7 +73,7 @@
                         <artifactId>build-helper-maven-plugin</artifactId>
                         <version>3.6.1</version>
                         <executions>
-                            <!-- jpackage exige une version numérique (0.1.0, sans -SNAPSHOT). -->
+                            <!-- jpackage requires a numeric version (0.1.0, without -SNAPSHOT). -->
                             <execution>
                                 <id>parse-version</id>
                                 <goals>
@@ -125,11 +125,11 @@
                                             <arg value="${dist.modules}"/>
                                             <arg value="--module"/>
                                             <arg value="${dist.main}"/>
-                                            <!-- Toute la bibliothèque Java SE est appelable depuis le shell (spec FR-52). -->
+                                            <!-- The whole Java SE library can be called from the shell (spec FR-52). -->
                                             <arg value="--add-modules"/>
-                                            <!-- jdk.unsupported : interception de Ctrl+C par JLine (sun.misc.Signal). -->
+                                            <!-- jdk.unsupported: Ctrl+C interception by JLine (sun.misc.Signal). -->
                                             <arg value="java.se,jdk.unsupported"/>
-                                            <!-- JLine accède à la console native (FFM / bibliothèque native). -->
+                                            <!-- JLine accesses the native console (FFM / native library). -->
                                             <arg value="--java-options"/>
                                             <arg value="--enable-native-access=org.jline.terminal.ffm,org.jline.nativ,io.powerj.core"/>
                                             <arg value="--jlink-options"/>
@@ -150,7 +150,7 @@
             </build>
         </profile>
 
-        <!-- Installeur Windows (.exe) construit à partir de l'image applicative ; nécessite WiX. -->
+        <!-- Windows installer (.exe) built from the application image; requires WiX. -->
         <profile>
             <id>installer</id>
             <build>

@@ -11,14 +11,14 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Classes Java accessibles depuis le shell (spécification FR-46, FR-47, FR-52) : classes et interfaces
- * publiques des packages exportés par les modules {@code java.*} du runtime, par leur nom complet ou, grâce
- * aux imports, par leur nom simple. Les classes des modules tiers (cmdlets, JLine, PowerJ) ne sont pas
- * exposées.
+ * Java classes accessible from the shell (specification FR-46, FR-47, FR-52): public classes and interfaces
+ * of the packages exported by the runtime's {@code java.*} modules, by their fully qualified name or, thanks
+ * to imports, by their simple name. Classes of third-party modules (cmdlets, JLine, PowerJ) are not
+ * exposed.
  */
 public final class JavaClasses {
 
-    /** Packages importés par défaut (FR-47) : aucun nom de classe en double entre eux. */
+    /** Packages imported by default (FR-47): no duplicate class name among them. */
     public static final List<String> DEFAULT_IMPORTS = List.of(
             "java.lang", "java.math", "java.text",
             "java.util", "java.util.function", "java.util.stream", "java.util.regex", "java.util.concurrent",
@@ -29,7 +29,7 @@ public final class JavaClasses {
     private static final Set<String> PRIMITIVES = Set.of("boolean", "byte", "char", "short", "int", "long",
             "float", "double", "void");
 
-    /** Résultat de recherche d'un nom simple. */
+    /** Result of looking up a simple name. */
     private sealed interface Lookup {
         record Found(Class<?> type) implements Lookup { }
 
@@ -39,12 +39,12 @@ public final class JavaClasses {
     }
 
     private final Set<String> packages = new LinkedHashSet<>(DEFAULT_IMPORTS);
-    /** Imports de classes : nom simple → nom complet. */
+    /** Class imports: simple name → fully qualified name. */
     private final Map<String, String> classImports = new ConcurrentHashMap<>();
     private final Map<String, Lookup> simpleNames = new ConcurrentHashMap<>();
     private final Map<String, Optional<Class<?>>> qualifiedNames = new ConcurrentHashMap<>();
 
-    /** Imports actifs, dans l'ordre : packages ({@code java.util.*}) puis classes. */
+    /** Active imports, in order: packages ({@code java.util.*}) then classes. */
     public synchronized List<String> imports() {
         List<String> all = new ArrayList<>();
         packages.forEach(p -> all.add(p + ".*"));
@@ -53,9 +53,9 @@ public final class JavaClasses {
     }
 
     /**
-     * {@code import java.security.*} ou {@code import javax.crypto.Cipher}.
+     * {@code import java.security.*} or {@code import javax.crypto.Cipher}.
      *
-     * @throws PjException si le package ou la classe n'existe pas dans la bibliothèque Java
+     * @throws PjException if the package or class does not exist in the Java library
      */
     public synchronized void addImport(String target) {
         if (target.endsWith(".*")) {
@@ -72,7 +72,7 @@ public final class JavaClasses {
         simpleNames.clear();
     }
 
-    /** Classe désignée par un nom simple ({@code List}) ou complet ({@code java.util.List}, {@code HttpResponse.BodyHandlers}). */
+    /** Class designated by a simple ({@code List}) or fully qualified name ({@code java.util.List}, {@code HttpResponse.BodyHandlers}). */
     public Optional<Class<?>> find(String name) {
         if (PRIMITIVES.contains(name)) {
             return Optional.of(primitive(name));
@@ -97,7 +97,7 @@ public final class JavaClasses {
         return type;
     }
 
-    /** Comme {@link #find}, avec un message d'erreur explicite (ambiguïté entre imports, classe inconnue). */
+    /** Like {@link #find}, with an explicit error message (ambiguity between imports, unknown class). */
     public Class<?> require(String name) {
         if (!name.contains(".") && simple(name) instanceof Lookup.Ambiguous(var candidates)) {
             throw new PjException("nom ambigu : " + name + " (" + String.join(", ", candidates)
@@ -106,12 +106,12 @@ public final class JavaClasses {
         return find(name).orElseThrow(() -> new PjException("classe introuvable : " + name));
     }
 
-    /** Classe désignée par un nom simple grâce aux imports, si elle existe et n'est pas ambiguë. */
+    /** Class designated by a simple name through the imports, if it exists and is not ambiguous. */
     Optional<Class<?>> simpleClass(String name) {
         return simple(name) instanceof Lookup.Found(var type) ? Optional.of(type) : Optional.empty();
     }
 
-    /** Lève l'erreur d'ambiguïté si {@code name} correspond à plusieurs imports. */
+    /** Throws the ambiguity error if {@code name} matches several imports. */
     void checkAmbiguity(String name) {
         if (simple(name) instanceof Lookup.Ambiguous(var candidates)) {
             throw new PjException("nom ambigu : " + name + " (" + String.join(", ", candidates)
@@ -119,7 +119,7 @@ public final class JavaClasses {
         }
     }
 
-    /** Classe publique imbriquée {@code outer.name} ({@code HttpResponse.BodyHandlers}). */
+    /** Public nested class {@code outer.name} ({@code HttpResponse.BodyHandlers}). */
     static Optional<Class<?>> nested(Class<?> outer, String name) {
         for (Class<?> inner : outer.getClasses()) {
             if (inner.getSimpleName().equals(name) && accessible(inner)) {
@@ -130,8 +130,8 @@ public final class JavaClasses {
     }
 
     /**
-     * Nom qualifié désignant une classe ou un champ statique ({@code java.lang.Math.PI},
-     * {@code DayOfWeek.MONDAY}) : en tête de ligne, c'est une expression Java et non une commande (FR-46).
+     * Qualified name designating a class or a static field ({@code java.lang.Math.PI},
+     * {@code DayOfWeek.MONDAY}): at the start of a line, it is a Java expression and not a command (FR-46).
      */
     public boolean isStaticReference(String name) {
         if (find(name).isPresent()) {
@@ -145,7 +145,7 @@ public final class JavaClasses {
         return owner.isPresent() && staticField(owner.get(), name.substring(dot + 1)).isPresent();
     }
 
-    /** Champ statique public d'une classe accessible. */
+    /** Public static field of an accessible class. */
     static Optional<Field> staticField(Class<?> type, String name) {
         try {
             Field field = type.getField(name);
@@ -156,7 +156,7 @@ public final class JavaClasses {
         }
     }
 
-    /** Classe publique d'un package exporté d'un module {@code java.*} (FR-52). */
+    /** Public class of a package exported by a {@code java.*} module (FR-52). */
     static boolean accessible(Class<?> type) {
         if (type.isArray()) {
             return accessible(type.componentType());
@@ -200,7 +200,7 @@ public final class JavaClasses {
     private Optional<Class<?>> qualified(String name) {
         return qualifiedNames.computeIfAbsent(name, n -> {
             if (!Character.isUpperCase(n.charAt(n.lastIndexOf('.') + 1))) {
-                return Optional.empty(); // un package, pas une classe : évite des recherches inutiles
+                return Optional.empty(); // a package, not a class: avoids useless lookups
             }
             try {
                 Class<?> type = Class.forName(n, false, ClassLoader.getPlatformClassLoader());

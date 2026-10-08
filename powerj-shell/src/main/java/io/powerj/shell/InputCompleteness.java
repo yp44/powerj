@@ -4,20 +4,20 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 
 /**
- * Détermine si une saisie est complète ou si le shell doit attendre une ligne de continuation
- * (spécification FR-02) : chaîne non fermée, accolade/parenthèse/crochet ouvert, ou ligne finissant
- * par {@code |}, {@code &&} ou {@code ||}. L'antislash en fin de ligne ne déclenche pas de
- * continuation, pour que {@code cd C:\} reste valide.
+ * Determines whether input is complete or whether the shell must wait for a continuation line
+ * (specification FR-02): unclosed string, open brace/parenthesis/bracket, or line ending
+ * with {@code |}, {@code &&} or {@code ||}. A backslash at the end of the line does not trigger
+ * continuation, so that {@code cd C:\} remains valid.
  */
 final class InputCompleteness {
 
-    /** Résultat de l'analyse. */
+    /** Result of the analysis. */
     sealed interface Result {
         record Complete() implements Result { }
 
         /**
-         * @param missing      ce qui manque, pour le message ({@code "}"}, {@code "\""}, une commande…)
-         * @param openBrackets nombre d'accolades, parenthèses et crochets encore ouverts
+         * @param missing      what is missing, for the message ({@code "}"}, {@code "\""}, a command…)
+         * @param openBrackets number of braces, parentheses and brackets still open
          */
         record Incomplete(String missing, int openBrackets) implements Result { }
     }
@@ -32,7 +32,7 @@ final class InputCompleteness {
             char c = input.charAt(i);
             if (inString) {
                 if (c == '\\') {
-                    i++; // caractère échappé, y compris \"
+                    i++; // escaped character, including \"
                 } else if (c == '"') {
                     inString = false;
                 }

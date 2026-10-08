@@ -42,7 +42,7 @@ class ReplTest {
         return new Session(tmp, cwd, System.getenv());
     }
 
-    /** Lance une session complète en tapant {@code keys} ; renvoie le code retour du shell. */
+    /** Runs a full session by typing {@code keys}; returns the shell's exit code. */
     private int session(String keys) throws Exception {
         if (home == null) {
             home = new PowerJHome(tmp.resolve("home")).createDirectories();
@@ -95,7 +95,7 @@ class ReplTest {
             var code = new CompletableFuture<Integer>();
             Thread.ofVirtual().start(() -> code.complete(repl.run(BUILD)));
 
-            // Ctrl+C n'est envoyé qu'une fois la ligne effectivement en cours de saisie.
+            // Ctrl+C is sent only once the line is actually being typed.
             terminal.type("abandonnée");
             awaitUntil(() -> reader.isReading() && reader.getBuffer().toString().equals("abandonnée"));
             terminal.type(CTRL_C);
@@ -174,7 +174,7 @@ class ReplTest {
     void bangBangRunsThePreviousCommandAgain() throws Exception {
         session("alpha" + ENTER + "beta" + ENTER + "!!" + ENTER);
 
-        assertThat(history).containsExactly("alpha", "beta");  // doublon consécutif ignoré
+        assertThat(history).containsExactly("alpha", "beta");  // consecutive duplicate ignored
         assertThat(screen.split("commande inconnue : beta", -1)).hasSize(3);
     }
 
@@ -206,7 +206,7 @@ class ReplTest {
         java.nio.file.Files.writeString(tmp.resolve("dev").resolve("rapport.txt"), "x");
         session("ls --recu\t" + ENTER + "ls | where { $_.na\t.startsWith(\"r\") }" + ENTER
                 + "ls rap\t" + ENTER);
-        // La ligne exécutée est la ligne complétée.
+        // The executed line is the completed line.
         assertThat(history).contains("ls --recurse", "ls | where { $_.name.startsWith(\"r\") }", "ls rapport.txt");
         assertThat(screen).contains("rapport.txt");
     }

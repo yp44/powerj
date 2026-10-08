@@ -8,19 +8,19 @@ import java.util.List;
 import io.powerj.api.ScriptBlock;
 
 /**
- * Référence de méthode (FR-33b), résolue à chaque appel selon les arguments reçus, comme en Java :
+ * Method reference (FR-33b), resolved on each call according to the arguments received, as in Java:
  * <ul>
- *   <li>{@code Classe::new} : constructeur ;</li>
- *   <li>{@code Classe::méthode} : méthode statique si elle accepte ce nombre d'arguments, sinon méthode
- *       d'instance appelée sur le premier argument ({@code String::length}) ;</li>
- *   <li>{@code $objet::méthode} : méthode d'instance de cet objet ;</li>
- *   <li>{@code Type::méthode} où {@code Type} n'est pas une classe du JDK ({@code FileEntry::name}) :
- *       méthode d'instance du premier argument, qui doit être de ce type.</li>
+ *   <li>{@code Class::new}: constructor;</li>
+ *   <li>{@code Class::method}: static method if it accepts this number of arguments, otherwise an instance
+ *       method called on the first argument ({@code String::length});</li>
+ *   <li>{@code $object::method}: instance method of this object;</li>
+ *   <li>{@code Type::method} where {@code Type} is not a JDK class ({@code FileEntry::name}):
+ *       instance method of the first argument, which must be of this type.</li>
  * </ul>
  */
 sealed interface MethodReference extends ScriptBlock {
 
-    /** Appelle la méthode avec les arguments reçus. */
+    /** Calls the method with the arguments received. */
     Object apply(Object[] args);
 
     @Override
@@ -33,7 +33,7 @@ sealed interface MethodReference extends ScriptBlock {
         return toString();
     }
 
-    /** {@code $objet::méthode}. */
+    /** {@code $object::method}. */
     record Bound(Object target, String method) implements MethodReference {
         @Override
         public Object apply(Object[] args) {
@@ -46,7 +46,7 @@ sealed interface MethodReference extends ScriptBlock {
         }
     }
 
-    /** {@code Classe::méthode} ou {@code Classe::new}, la classe étant connue. */
+    /** {@code Class::method} or {@code Class::new}, the class being known. */
     record OfClass(Class<?> type, String method) implements MethodReference {
         @Override
         public Object apply(Object[] args) {
@@ -79,7 +79,7 @@ sealed interface MethodReference extends ScriptBlock {
         }
     }
 
-    /** {@code Type::méthode}, le type n'étant connu que par son nom (sortie d'un cmdlet). */
+    /** {@code Type::method}, the type being known only by its name (output of a cmdlet). */
     record ByTypeName(String typeName, String method) implements MethodReference {
         @Override
         public Object apply(Object[] args) {

@@ -16,11 +16,11 @@ import io.powerj.core.exec.ShellIo;
 import io.powerj.core.exec.Supervisor;
 
 /**
- * Mode non interactif (spécification FR-04d) : {@code powerj -c "ligne"} ou {@code powerj fichier.pj}. Pas de
- * prompt ni d'historique ; une erreur bloquante arrête l'exécution.
+ * Non-interactive mode (specification FR-04d): {@code powerj -c "line"} or {@code powerj file.pj}. No
+ * prompt or history; a blocking error stops execution.
  * <p>
- * Code retour : celui de {@code exit n} s'il est appelé ; sinon 0 si la dernière ligne a réussi, le code de
- * la dernière commande native si c'est elle qui a échoué, 1 pour une erreur bloquante PowerJ.
+ * Exit code: that of {@code exit n} if it is called; otherwise 0 if the last line succeeded, the code of
+ * the last native command if it is the one that failed, 1 for a blocking PowerJ error.
  */
 final class ScriptMode {
 
@@ -30,24 +30,24 @@ final class ScriptMode {
     private final Supervisor supervisor = new Supervisor();
 
     /**
-     * @param input lignes de l'entrée standard quand ce n'est pas un terminal : elles alimentent la première
-     *              étape qui lit des objets ({@code dir /b | powerj -c "where { … }"})
+     * @param input lines of standard input when it is not a terminal: they feed the first
+     *              stage that reads objects ({@code dir /b | powerj -c "where { … }"})
      */
     ScriptMode(Session session, CmdletRegistry registry, PrintWriter out, Consumer<String> errors, int width,
                Optional<Iterator<String>> input) {
         this.session = session;
         this.errors = errors;
-        // Les commandes natives écrivent directement sur la sortie du process, même redirigée.
+        // Native commands write directly to the process output, even when redirected.
         this.interpreter = new Interpreter(session, new ShellIo(out, errors, true, () -> width), Map.of(), registry);
         input.ifPresent(interpreter::useStandardInput);
     }
 
-    /** Charge les modules tiers (§4.4) ; les avertissements vont sur la sortie d'erreur. */
+    /** Loads third-party modules (§4.4); warnings go to the error output. */
     void loadModules(java.nio.file.Path dir) {
         interpreter.loadModules(dir).forEach(errors);
     }
 
-    /** Exécute les lignes dans l'ordre ; les lignes vides et les commentaires {@code #} sont ignorés. */
+    /** Executes the lines in order; blank lines and {@code #} comments are ignored. */
     int run(List<String> lines) {
         int code = 0;
         for (String line : lines) {

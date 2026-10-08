@@ -16,13 +16,13 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Membres publics accessibles d'un type : composants de record, getters, champs, méthodes. Seuls les
- * types publics des packages exportés sont considérés ; une classe interne du JDK (celle de
- * {@code Path.of(…)} par exemple) est vue à travers ses interfaces publiques.
+ * Accessible public members of a type: record components, getters, fields, methods. Only the
+ * public types of exported packages are considered; an internal JDK class (the one returned by
+ * {@code Path.of(…)}, for example) is seen through its public interfaces.
  */
 public final class Members {
 
-    /** Membre affiché par {@code help members} (spécification FR-29). */
+    /** Member displayed by {@code help members} (specification FR-29). */
     public record Member(String name, String kind, String type) { }
 
     private static final ClassValue<List<Class<?>>> ACCESSIBLE_TYPES = new ClassValue<>() {
@@ -35,7 +35,7 @@ public final class Members {
     private Members() {
     }
 
-    /** Type lui-même, superclasses et interfaces, en ne gardant que les types publics et exportés. */
+    /** The type itself, its superclasses and interfaces, keeping only public and exported types. */
     static List<Class<?>> accessibleTypes(Class<?> type) {
         return ACCESSIBLE_TYPES.get(type);
     }
@@ -58,12 +58,12 @@ public final class Members {
     }
 
     static boolean isAccessible(Class<?> type) {
-        // Exporté à PowerJ : les packages des modules tiers lui sont ouverts au chargement (ModuleLoader).
+        // Exported to PowerJ: third-party module packages are opened to it at load time (ModuleLoader).
         return Modifier.isPublic(type.getModifiers())
                 && type.getModule().isExported(type.getPackageName(), Members.class.getModule());
     }
 
-    /** Getter accessible {@code getNom()} / {@code isNom()} pour la propriété {@code name}. */
+    /** Accessible getter {@code getNom()} / {@code isNom()} for the property {@code name}. */
     static Optional<Method> getter(Class<?> type, String name) {
         for (Class<?> t : accessibleTypes(type)) {
             for (Method m : t.getMethods()) {
@@ -83,7 +83,7 @@ public final class Members {
                     && (method.getReturnType() == boolean.class || method.getReturnType() == Boolean.class));
     }
 
-    /** Champ public d'instance, si le type est accessible. */
+    /** Public instance field, if the type is accessible. */
     static Optional<Field> field(Class<?> type, String name) {
         for (Class<?> t : accessibleTypes(type)) {
             for (Field f : t.getFields()) {
@@ -95,12 +95,12 @@ public final class Members {
         return Optional.empty();
     }
 
-    /** Membres d'une valeur : propriétés (composants, getters, champs) puis méthodes. */
+    /** Members of a value: properties (components, getters, fields) then methods. */
     public static List<Member> of(Object value) {
         return ofType(value.getClass());
     }
 
-    /** Membres d'instance d'un type : propriétés (composants, getters, champs) puis méthodes. */
+    /** Instance members of a type: properties (components, getters, fields) then methods. */
     public static List<Member> ofType(Class<?> type) {
         Map<String, Member> properties = new LinkedHashMap<>();
         if (type.isRecord()) {

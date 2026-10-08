@@ -15,7 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** Exécute de vraies commandes natives ({@code sh}, {@code printf}…) : tests limités à Linux/macOS. */
+/** Runs real native commands ({@code sh}, {@code printf}…): tests limited to Linux/macOS. */
 class InterpreterTest {
 
     @TempDir
@@ -69,7 +69,7 @@ class InterpreterTest {
     void exitCodeAndLastRun() throws Exception {
         run("sh -c \"exit 3\"");
         assertThat(run("$exit")).isEqualTo("3" + System.lineSeparator());
-        assertThat(run("$?")).isEqualTo("true" + System.lineSeparator()); // $exit lui-même a réussi
+        assertThat(run("$?")).isEqualTo("true" + System.lineSeparator()); // $exit itself succeeded
         run("sh -c \"exit 3\"");
         assertThat(session.lastSucceeded()).isFalse();
         assertThat(run("$last.exitCode")).isEqualTo("3" + System.lineSeparator());
@@ -82,7 +82,7 @@ class InterpreterTest {
         assertThat(run("sh -c \"exit 0\" && \"oui\" || \"non\"")).isEqualTo("oui" + System.lineSeparator());
         assertThat(run("sh -c \"exit 1\" && \"oui\" || \"non\"")).isEqualTo("non" + System.lineSeparator());
         assertThat(run("sh -c \"exit 1\" ; \"toujours\"")).isEqualTo("toujours" + System.lineSeparator());
-        // true / false sont des littéraux (comme en Java), leur valeur décide de l'enchaînement
+        // true / false are literals (as in Java); their value decides the chaining
         assertThat(run("false || \"non\"")).isEqualTo("false" + System.lineSeparator() + "non" + System.lineSeparator());
         assertThat(run("commandeinexistante || \"secours\"")).isEqualTo("secours" + System.lineSeparator());
         assertThat(errors).containsExactly("commande inconnue : commandeinexistante");

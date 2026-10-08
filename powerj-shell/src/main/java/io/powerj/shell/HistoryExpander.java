@@ -9,9 +9,9 @@ import org.jline.reader.Expander;
 import org.jline.reader.History;
 
 /**
- * Expansion d'historique en début de ligne seulement (spécification FR-11) : {@code !!}, {@code !n}
- * et {@code !texte}, suivis éventuellement du reste de la ligne. Un {@code !} ailleurs dans la ligne
- * reste une négation ({@code where { !$_.dir }}).
+ * History expansion at the start of the line only (specification FR-11): {@code !!}, {@code !n}
+ * and {@code !text}, optionally followed by the rest of the line. A {@code !} elsewhere in the line
+ * remains a negation ({@code where { !$_.dir }}).
  */
 final class HistoryExpander implements Expander {
 
@@ -29,7 +29,7 @@ final class HistoryExpander implements Expander {
             case String n when n.chars().allMatch(Character::isDigit) -> byNumber(history, n);
             case String prefix -> lastStartingWith(history, prefix);
         };
-        // JLine ignore l'exception et laisse la ligne telle quelle : le REPL signalera l'échec.
+        // JLine ignores the exception and leaves the line as is: the REPL will report the failure.
         return command.map(c -> c + m.group(2))
                 .orElseThrow(() -> new IllegalArgumentException("!" + event + " : introuvable"));
     }
@@ -39,7 +39,7 @@ final class HistoryExpander implements Expander {
         return word;
     }
 
-    /** Entrée numéro {@code n} telle qu'affichée par {@code history} (numérotation à partir de 1). */
+    /** Entry number {@code n} as displayed by {@code history} (numbering starts at 1). */
     private static Optional<String> byNumber(History history, String n) {
         try {
             int index = Integer.parseInt(n) - 1;

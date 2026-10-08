@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 import io.powerj.core.exec.Highlights.Kind;
 import io.powerj.core.exec.Highlights.Span;
 
-/** Coloration de la saisie (FR-08). */
+/** Input highlighting (FR-08). */
 class HighlightsTest {
 
     private static List<Span> of(String line) {
@@ -64,7 +64,7 @@ class HighlightsTest {
         assertThat(colored("map { (a, b) -> (a) + (b.x) }", Kind.UNKNOWN)).isEmpty();
         assertThat(colored("$l.stream().map(x -> (x.a)).toList()", Kind.UNKNOWN)).isEmpty();
         assertThat(colored("$l.stream().reduce(0, (a, b) -> (a) + (b))", Kind.UNKNOWN)).isEmpty();
-        // hors de la lambda, f n'est plus un paramètre
+        // outside the lambda, f is no longer a parameter
         assertThat(colored("ls | map { f -> f.name } ; (f.size)", Kind.UNKNOWN)).isEqualTo("f.size");
     }
 }

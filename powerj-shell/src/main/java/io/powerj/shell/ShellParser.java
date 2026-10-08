@@ -12,8 +12,8 @@ import io.powerj.core.exec.Completions;
 import io.powerj.core.lang.Lexer;
 
 /**
- * Analyseur fourni à JLine : signale les saisies incomplètes (prompt de continuation {@code >>}), découpe
- * la ligne en mots, et pour la complétion (Tab) délimite le texte à compléter grâce à {@link Completions}.
+ * Parser supplied to JLine: reports incomplete input (continuation prompt {@code >>}), splits
+ * the line into words, and for completion (Tab) delimits the text to complete using {@link Completions}.
  */
 final class ShellParser implements Parser {
 
@@ -28,9 +28,9 @@ final class ShellParser implements Parser {
     }
 
     /**
-     * Ligne analysée pour la complétion : le mot à compléter et les propositions calculées.
+     * Line parsed for completion: the word to complete and the computed suggestions.
      *
-     * @param start position du début du texte remplacé (guillemet ouvrant compris pour un chemin quoté)
+     * @param start start position of the replaced text (including the opening quote for a quoted path)
      */
     record CompletionLine(String line, int cursor, int start, Completions.Result result) implements CompletingParsedLine {
 
@@ -54,7 +54,7 @@ final class ShellParser implements Parser {
             return List.of(result.word());
         }
 
-        /** Un chemin contenant un espace est inséré entre guillemets, avec les échappements Java (FR-32b). */
+        /** A path containing a space is inserted between quotes, with Java escapes (FR-32b). */
         @Override
         public CharSequence escape(CharSequence candidate, boolean complete) {
             String text = candidate.toString();
@@ -83,7 +83,7 @@ final class ShellParser implements Parser {
         }
     }
 
-    /** Ligne découpée en mots séparés par des blancs (sans guillemets ni échappement pour l'instant). */
+    /** Line split into whitespace-separated words (no quotes or escaping for now). */
     record Words(String word, int wordCursor, int wordIndex, List<String> words, String line, int cursor)
             implements CompletingParsedLine {
 
@@ -118,7 +118,7 @@ final class ShellParser implements Parser {
 
     @Override
     public boolean isEscapeChar(char ch) {
-        return false; // l'antislash n'échappe rien hors des chaînes (FR-32b)
+        return false; // the backslash escapes nothing outside strings (FR-32b)
     }
 
     static Words split(String line, int cursor) {
@@ -145,7 +145,7 @@ final class ShellParser implements Parser {
             words.add(line.substring(start, i));
         }
         if (wordIndex < 0) {
-            // Curseur sur un blanc : mot vide à cette position (utile à la future complétion).
+            // Cursor on whitespace: empty word at this position (useful for future completion).
             wordIndex = wordsBeforeCursor;
             words.add(wordIndex, "");
         }

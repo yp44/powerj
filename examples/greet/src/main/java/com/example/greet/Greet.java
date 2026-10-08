@@ -6,7 +6,7 @@ import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 
-/** {@code greet --name Yves -c 3} : salue quelqu'un, {@code count} fois. */
+/** {@code greet --name Yves -c 3}: greets someone, {@code count} times. */
 @CmdletInfo(name = "greet", category = "Exemples", summary = "Salue quelqu'un",
         examples = "greet --name Yves -c 3")
 public final class Greet implements Cmdlet<GreetParams, Void, Greeting> {
