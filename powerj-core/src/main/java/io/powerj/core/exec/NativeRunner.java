@@ -91,6 +91,22 @@ public final class NativeRunner {
                 : stderr.map(FileTarget::redirect).orElse(inheritErr
                         ? ProcessBuilder.Redirect.INHERIT : ProcessBuilder.Redirect.PIPE));
 
+        // The program reads the console itself: the line editor must not read it at the same time.
+        boolean console = io.interactive() && builder.redirectInput() == ProcessBuilder.Redirect.INHERIT;
+        if (console) {
+            io.console().pause();
+        }
+        try {
+            return start(builder, executable, args, io, capture, detached, charset);
+        } finally {
+            if (console) {
+                io.console().resume();
+            }
+        }
+    }
+
+    private Result start(ProcessBuilder builder, Path executable, List<String> args, ShellIo io, boolean capture,
+                         boolean detached, Charset charset) throws InterruptedException {
         long start = System.nanoTime();
         Process process;
         try {
@@ -176,6 +192,22 @@ public final class NativeRunner {
             builders.add(builder);
         }
 
+        boolean console = io.interactive() && builders.getFirst().redirectInput() == ProcessBuilder.Redirect.INHERIT;
+        if (console) {
+            io.console().pause();
+        }
+        try {
+            return startGroup(builders, commands, session, io, input, output, sink, errors);
+        } finally {
+            if (console) {
+                io.console().resume();
+            }
+        }
+    }
+
+    private List<NativeRun> startGroup(List<ProcessBuilder> builders, List<Command> commands, Session session,
+                                       ShellIo io, Source input, Pipe output, Consumer<Object> sink,
+                                       Consumer<String> errors) throws InterruptedException {
         long start = System.nanoTime();
         List<Process> processes;
         try {

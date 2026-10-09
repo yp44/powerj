@@ -503,6 +503,9 @@ public record NativeRun(
 accessible via `$last`; `$exit` is `$last.exitCode`; `$?` is `true` if the code is 0. A non-zero code is **not** a blocking error.
 - CA: `^cmd /c "exit 3"` then `$exit` displays `3`; `$last.duration` displays the duration.
 
+**FR-39b — Interactive console programs.** A native command whose standard input is the console (vim, nano, ssh, python, `git commit` opening an editor…) reads the keyboard **alone**: while it runs, the line editor stops reading the console (JLine `Terminal.pause`/`resume`), then reads it again at the next prompt. Without this, under Windows the line editor's reading thread would take some of the keys typed for the program and turn Ctrl+C into a cancellation of the program.
+- CA (Windows): in `vim notes.txt`, every key typed once is received; Ctrl+C inside vim does not quit vim; `ping -t localhost` then Ctrl+C stops ping and returns to the prompt without quitting PowerJ; the prompt accepts input normally afterwards.
+
 **FR-39 — Graphical applications.** A Windows executable of the GUI subsystem (detected by reading the PE header) is launched **detached**: the shell returns control immediately, `$last.pid` is set, `$exit` is `null`.
 - CA: `notepad` opens Notepad and the prompt comes back right away.
 
