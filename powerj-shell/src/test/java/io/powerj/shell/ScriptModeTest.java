@@ -8,12 +8,14 @@ import java.io.StringWriter;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.Locale;
 import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import io.powerj.api.Language;
 import io.powerj.core.exec.CmdletRegistry;
 import io.powerj.core.exec.Platform;
 import io.powerj.core.exec.Session;
@@ -53,14 +55,25 @@ class ScriptModeTest {
     @Test
     void blockingErrorStopsTheScriptWithOne() {
         assertThat(run(Optional.empty(), "commandeinconnue", "\"jamais\"")).isEqualTo(1);
-        assertThat(errors).containsExactly("commande inconnue : commandeinconnue");
+        assertThat(errors).containsExactly("unknown command: commandeinconnue");
         assertThat(output()).isEmpty();
+    }
+
+    @Test
+    void errorsInFrench() {
+        Language.set(Locale.FRENCH);
+        try {
+            assertThat(run(Optional.empty(), "commandeinconnue")).isEqualTo(1);
+            assertThat(errors).containsExactly("commande inconnue : commandeinconnue");
+        } finally {
+            Language.set(Locale.ENGLISH);
+        }
     }
 
     @Test
     void syntaxErrorGivesOne() {
         assertThat(run(Optional.empty(), "ls |")).isEqualTo(1);
-        assertThat(errors).singleElement().asString().contains("commande attendue");
+        assertThat(errors).singleElement().asString().contains("command expected");
     }
 
     @Test

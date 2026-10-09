@@ -80,8 +80,7 @@ public final class Lexer {
             return new Token.Separator(Connector.IF_FAILURE);
         }
         if (startsWith("->")) {
-            throw new SyntaxException("« -> » hors d'un bloc : en argument d'une commande, une lambda s'écrit"
-                    + " entre accolades, ex. where { f -> f.size > 1mb }");
+            throw new SyntaxException(Messages.get("syntax.arrowOutsideBlock"));
         }
         if (startsWith("2>&1")) {
             pos += 4;
@@ -110,10 +109,10 @@ public final class Lexer {
                 pos++;
                 return new Token.Pipe();
             }
-            case '&' -> throw new SyntaxException("« & » isolé n'est pas supporté (utiliser && ou ;)");
-            case ')' -> throw new SyntaxException("« ) » inattendu (position " + (pos + 1) + ")");
-            case '}' -> throw new SyntaxException("« } » sans « { » correspondante (position " + (pos + 1) + ")");
-            case '=' -> throw new SyntaxException("« = » inattendu (position " + (pos + 1) + ") ; affectation : $nom = valeur");
+            case '&' -> throw new SyntaxException(Messages.get("syntax.loneAmpersand"));
+            case ')' -> throw new SyntaxException(Messages.get("syntax.unexpectedAt", ")", pos + 1));
+            case '}' -> throw new SyntaxException(Messages.get("syntax.unmatchedBrace", pos + 1));
+            case '=' -> throw new SyntaxException(Messages.get("syntax.unexpectedEquals", pos + 1));
             default -> { }
         }
         if (statement) {
@@ -258,7 +257,7 @@ public final class Lexer {
             pos++;
         }
         if (atEnd() || peek() != ']' || pos == start || input.substring(start, pos).equals("-")) {
-            throw new SyntaxException("index invalide à la position " + (open + 1) + " (attendu : [nombre])");
+            throw new SyntaxException(Messages.get("syntax.invalidIndex", open + 1));
         }
         int value = Integer.parseInt(input.substring(start, pos));
         pos++; // ]
@@ -307,7 +306,7 @@ public final class Lexer {
         var text = new StringBuilder();
         while (true) {
             if (atEnd()) {
-                throw new SyntaxException("chaîne non fermée (ouverte à la position " + (open + 1) + ")");
+                throw new SyntaxException(Messages.get("syntax.unclosedString", open + 1));
             }
             char c = input.charAt(pos++);
             switch (c) {
@@ -355,15 +354,14 @@ public final class Lexer {
             at++;
         }
         if (at >= input.length() || input.charAt(at) != '\n') {
-            throw new SyntaxException("un bloc de texte s'ouvre par \"\"\" suivi d'un retour à la ligne (position "
-                    + (open + 1) + ")");
+            throw new SyntaxException(Messages.get("syntax.textBlockOpening", open + 1));
         }
         int contentStart = at + 1;
         int close = contentStart;
         while (true) {
             close = input.indexOf("\"\"\"", close);
             if (close < 0) {
-                throw new SyntaxException("bloc de texte non fermé (ouvert à la position " + (open + 1) + ")");
+                throw new SyntaxException(Messages.get("syntax.unclosedTextBlock", open + 1));
             }
             if (!escaped(close)) {
                 break;
@@ -400,7 +398,7 @@ public final class Lexer {
 
     private String escape() {
         if (atEnd()) {
-            throw new SyntaxException("antislash en fin de chaîne");
+            throw new SyntaxException(Messages.get("syntax.trailingBackslash"));
         }
         char c = input.charAt(pos++);
         return switch (c) {
@@ -414,20 +412,20 @@ public final class Lexer {
             case 'f' -> "\f";
             case '0' -> "\0";
             case 'u' -> unicodeEscape();
-            default -> throw new SyntaxException("échappement inconnu \\" + c + " (pour un antislash, écrire \\\\)");
+            default -> throw new SyntaxException(Messages.get("syntax.unknownEscape.string", c));
         };
     }
 
     private String unicodeEscape() {
         if (pos + 4 > input.length()) {
-            throw new SyntaxException("échappement \\u incomplet");
+            throw new SyntaxException(Messages.get("syntax.incompleteUnicodeEscape"));
         }
         String hex = input.substring(pos, pos + 4);
         try {
             pos += 4;
             return String.valueOf((char) Integer.parseInt(hex, 16));
         } catch (NumberFormatException _) {
-            throw new SyntaxException("échappement \\u" + hex + " invalide");
+            throw new SyntaxException(Messages.get("syntax.invalidUnicodeEscape", hex));
         }
     }
 

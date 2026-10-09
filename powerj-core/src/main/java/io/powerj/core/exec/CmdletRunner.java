@@ -41,7 +41,7 @@ final class CmdletRunner {
             throw e;
         } catch (IllegalArgumentException e) {
             // Convention: a cmdlet reports incorrect usage with IllegalArgumentException.
-            throw new PjException(PjError.of(registered.name() + " : " + e.getMessage(), e));
+            throw new PjException(PjError.of(Messages.get("command.error", registered.name(), e.getMessage()), e));
         }
         return !context.hadErrors;
     }
@@ -57,8 +57,8 @@ final class CmdletRunner {
             Object value;
             while ((value = input.next()) != Source.END) {
                 if (value != null && !expected.isInstance(value)) {
-                    context.error("objet ignoré : " + value.getClass().getSimpleName() + " reçu, "
-                            + expected.getSimpleName() + " attendu");
+                    context.error(Messages.get("cmdlet.inputIgnored", value.getClass().getSimpleName(),
+                            expected.getSimpleName()));
                     continue;
                 }
                 cmdlet.process((P) params, (I) value, typedContext);
@@ -77,7 +77,7 @@ final class CmdletRunner {
                     args.remove(i);
                 } else {
                     if (i + 1 >= args.size()) {
-                        throw new PjException(command + " : valeur attendue après --on-error (stop, continue, silent)");
+                        throw new PjException(Messages.get("onError.valueExpected", command));
                     }
                     value = Values.text(args.get(i + 1));
                     args.remove(i + 1);
@@ -87,7 +87,7 @@ final class CmdletRunner {
                     case "stop" -> OnError.STOP;
                     case "continue" -> OnError.CONTINUE;
                     case "silent" -> OnError.SILENT;
-                    default -> throw new PjException(command + " : --on-error accepte stop, continue ou silent");
+                    default -> throw new PjException(Messages.get("onError.invalid", command));
                 };
                 i--;
             }
@@ -128,8 +128,8 @@ final class CmdletRunner {
         public void error(String message) {
             hadErrors = true;
             switch (onError) {
-                case STOP -> throw new PjException(command + " : " + message);
-                case CONTINUE -> errors.accept(command + " : " + message);
+                case STOP -> throw new PjException(Messages.get("command.error", command, message));
+                case CONTINUE -> errors.accept(Messages.get("command.error", command, message));
                 case SILENT -> { }
             }
         }

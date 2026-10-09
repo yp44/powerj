@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 
 import io.powerj.api.Bytes;
 import io.powerj.api.Display;
+import io.powerj.api.Language;
 
 class OutputFormatterTest {
 
@@ -40,8 +41,8 @@ class OutputFormatterTest {
                         name             size
                         ----             ----
                         a.txt            12 B
-                        long-name.txt  %s
-                        """.formatted(String.format(Locale.getDefault(Locale.Category.FORMAT), "%.1f KB", 2.0)));
+                        long-name.txt  2.0 KB
+                        """);
     }
 
     @Test
@@ -57,7 +58,7 @@ class OutputFormatterTest {
     @Test
     void scalarsCollectionsAndMaps() {
         assertThat(render(80, "texte", 42, List.of("a", "b"), null)).isEqualTo("texte\n42\na\nb\n");
-        assertThat(render(80, Map.of("k", "v"))).contains("clé  valeur", "k    v");
+        assertThat(render(80, Map.of("k", "v"))).contains("key  value", "k    v");
     }
 
     @Test
@@ -71,8 +72,19 @@ class OutputFormatterTest {
     void readableValues() {
         assertThat(OutputFormatter.humanBytes(512)).isEqualTo("512 B");
         assertThat(OutputFormatter.humanBytes(5L * 1024 * 1024 * 1024))
-                .isEqualTo(String.format(Locale.getDefault(Locale.Category.FORMAT), "%.1f GB", 5.0));
+                .isEqualTo("5.0 GB");
         assertThat(OutputFormatter.cell(Instant.parse("2026-10-05T18:12:00Z"), false)).matches("2026-10-0[56] \\d\\d:12");
+    }
+
+    @Test
+    void frenchUsesItsDecimalSeparatorAndHeaders() {
+        Language.set(Locale.FRENCH);
+        try {
+            assertThat(OutputFormatter.humanBytes(5L * 1024 * 1024 * 1024)).isEqualTo("5,0 GB");
+            assertThat(render(80, Map.of("k", "v"))).contains("clé  valeur", "---  ------", "k    v");
+        } finally {
+            Language.set(Locale.ENGLISH);
+        }
     }
 
     @Test

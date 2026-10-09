@@ -60,10 +60,10 @@ public final class Session {
     public void changeDirectory(Path target) {
         Path resolved = currentDirectory.resolve(target).toAbsolutePath().normalize();
         if (!Files.exists(resolved)) {
-            throw new PjException("cd : dossier introuvable : " + target);
+            throw new PjException(Messages.get("cd.notFound", target));
         }
         if (!Files.isDirectory(resolved)) {
-            throw new PjException("cd : ce n'est pas un dossier : " + target);
+            throw new PjException(Messages.get("cd.notDirectory", target));
         }
         previousDirectory = currentDirectory;
         currentDirectory = resolved;
@@ -112,7 +112,7 @@ public final class Session {
             case "errors" -> recentErrors();
             default -> {
                 if (!variables.containsKey(name)) {
-                    throw new PjException("variable inconnue : $" + name);
+                    throw new PjException(Messages.get("variable.unknown", name));
                 }
                 yield variables.get(name);
             }

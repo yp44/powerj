@@ -36,7 +36,7 @@ final class DiagnosticLog {
             root.addHandler(file);
         } catch (IOException | SecurityException e) {
             // No log possible: the shell remains usable.
-            System.err.println("PowerJ : journal indisponible dans " + logsDir + " (" + e.getMessage() + ")");
+            System.err.println(Messages.get("log.unavailable", logsDir, e.getMessage()));
         }
         if (debug) {
             var console = new ConsoleHandler();

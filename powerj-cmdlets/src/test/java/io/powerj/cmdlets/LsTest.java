@@ -81,7 +81,7 @@ class LsTest {
         context.emitted.clear();
         assertThat(names(params(List.of("src"), false, false, null, false, true))).containsExactly("notes.TXT");
         assertThatThrownBy(() -> new Ls().begin(params(List.of(), false, false, null, true, true), context))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("--dirs and --files are incompatible");
     }
 
     @Test
@@ -95,6 +95,6 @@ class LsTest {
     @Test
     void missingPathIsANonBlockingError() {
         assertThat(names(params(List.of("absent", "b.txt"), false, false, null, false, false))).containsExactly("b.txt");
-        assertThat(context.errors).containsExactly("introuvable : absent");
+        assertThat(context.errors).containsExactly("not found: absent");
     }
 }

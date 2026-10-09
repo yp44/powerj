@@ -34,7 +34,7 @@ class SupervisorTest {
         var outcome = supervisor.run("rec", () -> List.of(recurse(0)));
 
         assertThat(outcome).isInstanceOfSatisfying(Outcome.Failure.class,
-                f -> assertThat(f.error().message()).isEqualTo("récursion trop profonde"));
+                f -> assertThat(f.error().message()).isEqualTo("recursion too deep"));
     }
 
     @Test
@@ -44,7 +44,7 @@ class SupervisorTest {
         });
 
         assertThat(outcome).isInstanceOfSatisfying(Outcome.Failure.class,
-                f -> assertThat(f.error().message()).startsWith("mémoire insuffisante"));
+                f -> assertThat(f.error().message()).startsWith("out of memory"));
         assertThat(supervisor.run("next", List::of)).isEqualTo(new Outcome.Success(List.of()));
     }
 
@@ -55,7 +55,7 @@ class SupervisorTest {
         });
 
         assertThat(outcome).isInstanceOfSatisfying(Outcome.Failure.class, f -> {
-            assertThat(f.error().message()).contains("erreur interne", "boom");
+            assertThat(f.error().message()).contains("internal error", "boom");
             assertThat(f.error().cause()).containsInstanceOf(IllegalStateException.class);
         });
     }

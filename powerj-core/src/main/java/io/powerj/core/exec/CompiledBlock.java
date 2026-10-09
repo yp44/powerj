@@ -32,14 +32,14 @@ record CompiledBlock(String source, List<String> parameters, Expression body, Ev
     Object apply(Object[] args) {
         if (parameters == null) {
             if (args.length > 1) {
-                throw new PjException("ce bloc reçoit " + args.length + " arguments : déclarer ses paramètres comme en"
-                        + " Java, ex. { (a, b) -> a.compareTo(b) }");
+                throw new PjException(Messages.get("block.tooManyArguments", args.length));
             }
             return evaluate(args.length == 0 ? null : args[0], captured);
         }
         if (parameters.size() != args.length) {
-            throw new PjException("la lambda { " + source + " } déclare " + parameters.size() + " paramètre(s), "
-                    + args.length + " reçu(s)");
+            String key = "block.arity." + (parameters.size() == 1 ? "one" : "other") + "."
+                    + (args.length == 1 ? "one" : "other");
+            throw new PjException(Messages.get(key, source, parameters.size(), args.length));
         }
         Map<String, Object> locals = new HashMap<>(captured);
         for (int i = 0; i < args.length; i++) {

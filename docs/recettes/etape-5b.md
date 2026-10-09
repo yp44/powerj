@@ -2,6 +2,8 @@
 
 **Goal:** verify that blocks are written as in Java — named lambdas, lambdas without braces in Java calls, method references —, that `$_` remains available for short filters, that conditions are strictly boolean, and the new `map` cmdlet.
 
+> Messages are shown in the system language; set `language=en` in config.properties (or `POWERJ_LANG=en`) to get the English texts quoted here.
+
 > Step 5b ships with step 5, in the same exe: both acceptance tests are run on the same version.
 
 ## Getting the deliverables
@@ -41,10 +43,10 @@ Reminders:
 | 6 | `$l = List.of("apple", "banana", "kiwi")` then `$l.stream().filter(s -> s.length() > 4).map(String::toUpperCase).toList()` | `APPLE` then `BANANA`. |
 | 7 | `$m = new ArrayList($l); $m.sort((a, b) -> a.length() - b.length()); $m` | `kiwi`, `apple`, `banana`. |
 | 8 | `$l.stream().map(Path::of).toList()` then `Stream.of("a", "b").map(StringBuilder::new).toList()` | Static method and constructor references. |
-| 9 | `ls \| where { f -> f.name }` | For each object, non-blocking error `le bloc doit renvoyer un booléen`; the shell continues. |
+| 9 | `ls \| where { f -> f.name }` | For each object, non-blocking error `where: the block must return a boolean, got String … (object skipped: …)`; the shell continues. |
 | 10 | `$m.sort({ $a.length() - $b.length() })` | Clear error saying to write `(a, b) -> …`. |
 | 11 | `$min = 1kb; ls \| where { f -> f.size > $min }` | Shell variable used in a lambda. |
 | 12 | `ls \| where f -> f.dir` | Syntax error explaining that braces are mandatory as a cmdlet argument. |
 | 13 | `$f = ls -r` then `$f.size()`, `$f*.size`, `$f*.name*.toUpperCase()`, `$f*.name.size()` | Number of files; size of each file; uppercase names; number of names. `.` applies to the list, `*.` to each element. |
-| 14 | `$f.size` | Error: `… n'a pas de propriété 'size' (pour chaque élément : *.size ; méthode : size())`. |
+| 14 | `$f.size` | Error: `… has no property 'size' (for each element: *.size; method: size())`. |
 | 15 | Type `$t = """` then two lines of text then `"""`, then `$t.lines().count()` | `2`: multi-line text block. |

@@ -64,13 +64,12 @@ final class FunctionalAdapter {
             return null;
         }
         if (type == boolean.class && !(value instanceof Boolean)) {
-            throw new PjException("le bloc doit renvoyer un booléen (" + sam.getDeclaringClass().getSimpleName()
-                    + "." + sam.getName() + "), reçu " + Operators.describe(value));
+            throw new PjException(Messages.get("block.booleanExpected", sam.getDeclaringClass().getSimpleName(),
+                    sam.getName(), Operators.describe(value)));
         }
         if (JavaInvoker.cost(type, value) == JavaInvoker.NO_MATCH) {
-            throw new PjException("le bloc renvoie " + Operators.describe(value) + ", "
-                    + type.getSimpleName() + " attendu (" + sam.getDeclaringClass().getSimpleName() + "."
-                    + sam.getName() + ")");
+            throw new PjException(Messages.get("block.wrongReturn", Operators.describe(value), type.getSimpleName(),
+                    sam.getDeclaringClass().getSimpleName(), sam.getName()));
         }
         return JavaInvoker.convert(type, value);
     }

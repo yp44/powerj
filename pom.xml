@@ -97,6 +97,12 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
                     <version>3.5.3</version>
+                    <configuration>
+                        <!-- Messages in English whatever the machine or POWERJ_LANG (FR-61). -->
+                        <systemPropertyVariables>
+                            <powerj.language>en</powerj.language>
+                        </systemPropertyVariables>
+                    </configuration>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>

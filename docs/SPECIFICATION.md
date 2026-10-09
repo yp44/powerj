@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Document version** | 0.8 (`collect` cmdlet) |
+| **Document version** | 0.9 (internationalization en/fr) |
 | **Status** | Pending approval |
 | **Target platform** | Windows 10/11 x64 (`powerj.exe`), Linux/macOS as a bonus |
 | **Technical foundation** | Java 27, Maven 3.9, JLine 3 |
@@ -39,8 +39,8 @@ PJ C:\dev\powerj> ls -r --filter *.java | where { $_.size > 10kb && $_.modified 
 
 name               size      modified              dir
 ----               ----      --------              ---
-Parser.java        14,2 KB   2026-10-05 18:12      false
-Evaluator.java     11,8 KB   2026-10-06 09:40      false
+Parser.java        14.2 KB   2026-10-05 18:12      false
+Evaluator.java     11.8 KB   2026-10-06 09:40      false
 
 PJ C:\dev\powerj> git status --porcelain | where { $_.startsWith(" M ") }
  M src/core/Parser.java
@@ -182,12 +182,12 @@ There is **no** long form (`pj-ls`, `Get-ChildItem`…).
 2. user-defined alias;
 3. **cmdlet** (built-in or provided by a module);
 4. **native command** found in the `PATH` (with `PATHEXT` on Windows);
-5. otherwise: error `commande inconnue : xxx` (unknown command) with suggestions (edit distance).
+5. otherwise: error `unknown command: xxx` with suggestions (edit distance).
 
 **FR-14 — `^` prefix.** `^nom` skips steps 1 to 3 and always launches the native command: `^ls`, `^find "foo" a.txt`, `^sort data.txt`.
 - CA: on Windows, `^find "x" a.txt` runs `C:\Windows\System32\find.exe`.
 
-**FR-15 — `which`.** `which nom` indicates what will be executed: `ls → cmdlet (powerj-cmdlets)`, `git → natif C:\Program Files\Git\cmd\git.exe`.
+**FR-15 — `which`.** `which nom` indicates what will be executed: `ls → cmdlet (io.powerj.cmdlets)`, `git → native C:\Program Files\Git\cmd\git.exe`, `cd → built-in command`.
 
 **FR-16 — Configurable preference.** The `native.prefer` key in `config.properties` lists the names for which the native command takes precedence over the cmdlet (e.g. `native.prefer=find,sort`).
 
@@ -210,11 +210,11 @@ Option names are case-insensitive; a long option can be abbreviated as long as i
 
 **FR-19 — Unit literals.** Sizes `512b 2kb 500mb 1gb` (multiples of 1024) and durations `30s 5m 2h 7d` are language literals, usable both as options and in expressions.
 
-**FR-20 — Conversion and validation.** Values are converted to the declared type of the parameter (`Path`, `int`, `long`, `Duration`, `Instant`, enum, `boolean`…). Missing mandatory option, unconvertible value or unknown option → explicit error before execution, with a suggestion (`option inconnue --recurce, vouliez-vous dire --recurse ?`).
+**FR-20 — Conversion and validation.** Values are converted to the declared type of the parameter (`Path`, `int`, `long`, `Duration`, `Instant`, enum, `boolean`…). Missing mandatory option, unconvertible value or unknown option → explicit error before execution, with a suggestion (`ls: unknown option --recurce, did you mean --recurse?`).
 
 ### 3.6 Completion (Tab)
 
-**FR-21 — Command completion.** In command position, Tab offers: built-in keywords, aliases, cmdlets, then executables from the `PATH` (cache refreshed in the background). The menu indicates the kind: `ls [pj]`, `less [natif]`. After `^`, only native executables are offered.
+**FR-21 — Command completion.** In command position, Tab offers: built-in keywords, aliases, cmdlets, then executables from the `PATH` (cache refreshed in the background). The menu indicates the kind: `ls [pj]`, `cd [internal]`, `less [native]` (in French: `[interne]`, `[natif]`). After `^`, only native executables are offered.
 - CA: `l<Tab>` offers `ls [pj]` then the native commands starting with `l`.
 
 **FR-22 — Option completion.** After `-` or `--`, Tab offers the options of the current command with their description, **excluding those already typed**. Options are read from the cmdlet metadata: a third-party cmdlet is therefore completed without any extra code.
@@ -254,9 +254,9 @@ The menu displays the signature (`of(E...) : List<E>`). Imported classes (§FR-4
 - Access can be chained: `$x.path.parent`, `$f.toPath().fileName`.
 - **`.` always applies to the object itself**, as in Java: on a list, `$f.size()` is the number of elements and `$f.empty` calls `isEmpty()`.
 - **`*.` (the "spread" operator, as in Groovy) applies to each element** and returns the list of results: `$f*.name` (names of all files), `$f*.size`, `$f*.name*.toUpperCase()`, `$f*.name.size()` (number of names). A single value counts as one element, `null` as none: `(ls -r)*.name` always gives a list, even with a single file.
-- `$f.name` on a list is an explicit error: `List n'a pas de propriété 'name' (pour chaque élément : *.name)`. In a pipeline, the equivalent of `*.` is `map`: `ls | map FileEntry::name`.
+- `$f.name` on a list is an explicit error: `List has no property 'name' (for each element: *.name)`. In a pipeline, the equivalent of `*.` is `map`: `ls | map FileEntry::name`.
 - Indexing: `$f[0]`, `$f[-1]` on `List`, array or `String`; `$m['clé']` on `Map`.
-- Nonexistent property → error `FileEntry n'a pas de propriété 'siz' (propriétés : name, size, …)`; if a method with that name exists, the message says so: `String n'a pas de propriété 'length' (méthode : length())`.
+- Nonexistent property → error `FileEntry has no property 'siz' (properties: name, size, …)`; if a method with that name exists, the message says so: `String has no property 'length' (method: length())`.
 
 **FR-29 — Introspection.** `help members` on a value (`$f | help members` or `help members FileEntry`) lists the components: name, type, description (Javadoc / `@Doc` annotation).
 
@@ -283,7 +283,7 @@ banana
 
 Unrolling is lazy for `Stream` and `Iterator` (no materialization in memory).
 
-Sizes and durations in readable format (`14,2 KB`, `2 h 05 min`), dates in local time.
+Sizes and durations in readable format (`14.2 KB`, `2 h 05 min`; the decimal separator follows the language, `14,2 KB` in French, FR-61), dates in local time.
 
 ### 3.8 Expression language
 
@@ -349,7 +349,7 @@ Short rule: **`$_` for one-line filters typed at the keyboard, a named lambda as
 
 - A lambda parameter shadows, in the body of the block, a class with the same name (rare case: name parameters in lowercase).
 - `$a`, `$b` and `$args` (step 5) are **removed**: write a two-parameter lambda instead.
-- **Strict booleans**: wherever a condition is expected (`where`, `filter`, `&&`, `||`, `!`, ternary), the value must be a `boolean`, like a Java `Predicate`. `where { f -> f.name }` is a non-terminating error (`le bloc doit renvoyer un booléen`); write `where { f -> !f.name.isEmpty() }`. `null` is not a boolean.
+- **Strict booleans**: wherever a condition is expected (`where`, `filter`, `&&`, `||`, `!`, ternary), the value must be a `boolean`, like a Java `Predicate`. `where { f -> f.name }` is a non-terminating error (`the block must return a boolean, got String …`); write `where { f -> !f.name.isEmpty() }`. `null` is not a boolean.
 - Conversions keep the `[type] valeur` notation: the Java form `(type) valeur` would be ambiguous with `(commande)`.
 - **Text blocks**: `"""…"""` as in Java (common indentation removed), with interpolation `$x` and `$( … )`.
 
@@ -393,7 +393,7 @@ CA:
 - `ls -r --filter *.txt` recursively lists the `.txt` files;
 - `(ls)*.name` displays only the names;
 - `$f = ls; $f[0].size` displays the size of the first element;
-- `^ls` runs the native `ls` if it exists (Git Bash, WSL…), otherwise error `commande native introuvable` (native command not found).
+- `^ls` runs the native `ls` if it exists (Git Bash, WSL…), otherwise error `native command not found: ls`.
 
 #### FR-36 — `where`: filter objects
 
@@ -518,13 +518,13 @@ A program-specific value can be given by **`POWERJ_NATIVE_ENCODING_<NOM>`**, whe
 - **Non-blocking**: reported on the error stream, the pipeline continues (inaccessible file during `ls -r`).
 - **Blocking**: stops the whole pipeline (syntax error, unknown command, invalid option, unexpected exception).
 
-Errors are kept in `$errors` (last 50). Format: `ls : accès refusé : C:\System Volume Information`.
+Errors are kept in `$errors` (last 50). Format: `ls: access denied: C:\System Volume Information` (in French `ls : accès refusé : …`, FR-61).
 
 **FR-42 — Common `--on-error` option.** Every cmdlet accepts `--on-error stop|continue|silent` (default `continue`) to change how non-blocking errors are handled.
 
 **FR-43 — Debug mode.** `powerj.exe --debug` (or `$debug = true`) displays the full Java stack trace of unexpected errors; otherwise a short message is displayed.
 
-**FR-44 — Language.** Messages in French or English depending on the system locale, can be forced via `config.properties` (`lang=fr`).
+**FR-44 — Language.** Messages in English or French: see FR-61 (§3.15).
 
 ### 3.12 Help
 
@@ -647,7 +647,7 @@ The REPL loop boils down to `switch (supervisor.run(line))` over these four case
 | Problem | Handling |
 |---|---|
 | Java exception (cmdlet, Java call) | Short blocking error (FR-53), object in `$errors`. |
-| `StackOverflowError` (infinite recursion) | Error « récursion trop profonde » (recursion too deep); the interpreter also limits its own evaluation depth. |
+| `StackOverflowError` (infinite recursion) | Error `recursion too deep`; the interpreter also limits its own evaluation depth. |
 | `OutOfMemoryError` | A **memory reserve** allocated at startup is released so the shell can continue; the command's objects are released; a message advises filtering earlier in the pipeline. The reserve is reallocated afterwards. |
 | `LinkageError`, `ExceptionInInitializerError` | Blocking error with the name of the offending class. |
 | PowerJ internal error (bug) | Short message + full stack trace written to `~/.powerj/logs/powerj.log`. |
@@ -655,7 +655,7 @@ The REPL loop boils down to `switch (supervisor.run(line))` over these four case
 **FR-57 — Cancellation with Ctrl+C, in three levels.** All stages of a line run in the same structured concurrency scope (§5.3), which makes it possible to cancel everything at once.
 1. **Cooperative (immediate)**: a cancellation token (passed via `ScopedValue`) is checked by the interpreter at each evaluated node and at each `{ }` block call, by the pipeline between two objects, and by cmdlets (`ctx.cancelled()`). This covers shell loops and Java calls that call back into a block (`Stream.iterate(0, { $_ + 1 }).forEach(...)`).
 2. **Interruption**: the command's threads are interrupted (`Thread.interrupt`), which unblocks I/O, `sleep`, `HttpClient`, and queues. **Native processes** and all their descendants (`ProcessHandle.descendants()`) are stopped, then forcibly killed if they do not stop.
-3. **Abandonment**: if the command still has not stopped — typically JDK code that does not check for interruption, such as a catastrophic regular expression or a giant sort — a **second Ctrl+C** abandons it: the shell returns control with the warning `commande abandonnée, elle continue en arrière-plan` (command abandoned, it keeps running in the background), its output is ignored, and it is stopped when the shell closes. (Java does not allow forcibly killing a thread; abandonment is the only safe way out.)
+3. **Abandonment**: if the command still has not stopped — typically JDK code that does not check for interruption, such as a catastrophic regular expression or a giant sort — a **second Ctrl+C** abandons it: the shell returns control with the warning `command abandoned, it keeps running in the background: <line>`, its output is ignored, and it is stopped when the shell closes. (Java does not allow forcibly killing a thread; abandonment is the only safe way out.)
 
 **FR-58 — Java calls that are dangerous for the shell.** Some JDK methods would act on the shell itself rather than on the command. They are **intercepted during call resolution** (§5.4), without any additional security mechanism:
 
@@ -668,7 +668,50 @@ Java code that writes to `System.out` / `System.err` (`System.out.println("x")`)
 
 **FR-59 — Terminal and history always restored.** History is written after each command (FR-09), so an abrupt stop loses nothing. On exit, including on a fatal JVM error or when the window is closed, a shutdown hook restores the terminal to its initial state (raw mode disabled, colors reset).
 
-**FR-60 — Diagnostic log.** Internal errors and warnings are logged to `~/.powerj/logs/powerj.log` (rotation, 5 files maximum). `--debug` also displays these details on screen.
+**FR-60 — Diagnostic log.** Internal errors and warnings are logged to `~/.powerj/logs/powerj.log` (rotation, 5 files maximum), in English whatever the language of the messages (FR-61). `--debug` also displays these details on screen.
+
+### 3.15 Language (internationalization)
+
+**FR-61 — Language.** PowerJ displays its messages (errors, warnings, help, completion descriptions, `which`, `mod-list`, number formatting) in **English** or **French**. Supported languages: `en` and `fr`; any other value, or any other system language, gives English.
+
+The language is resolved once at startup, in this order (the first non-blank value wins):
+
+| Priority | Source | Example |
+|---|---|---|
+| 1 | System property `powerj.language` | `-Dpowerj.language=fr` (tests, embedding; the Maven tests force `en`) |
+| 2 | Environment variable `POWERJ_LANG` | `set POWERJ_LANG=en` (Windows), `POWERJ_LANG=fr powerj` (Linux/macOS) |
+| 3 | Key `language` of `config.properties` (§8) | `language=en` in `~/.powerj/config.properties` (or `$POWERJ_HOME/config.properties`) |
+| 4 | Display language of the system (`Locale.Category.DISPLAY`) | French system → `fr`; anything else → `en` |
+
+A value is matched on its prefix: `fr`, `fr_FR`, `FR` give French; `en`, `de`… give English. The API class `io.powerj.api.Language` performs this resolution (`Language.current()`).
+
+**Message files.** Texts are not in the code but in `ResourceBundle` files, one pair per package, in UTF-8, with positional placeholders `{0}`, `{1}`… (no `MessageFormat` escaping: apostrophes are written as is):
+
+| Package | Files | Contents |
+|---|---|---|
+| `io/powerj/api` | `messages_en.properties`, `messages_fr.properties` | Messages of the public API (non-boolean block) |
+| `io/powerj/core/lang` | idem | Syntax errors (`syntax: …`) |
+| `io/powerj/core/exec` | idem | Execution errors, built-in commands, options, help, completion, Java interop |
+| `io/powerj/cmdlets` | idem | Built-in cmdlets (summaries, options, categories, errors) |
+| `io/powerj/shell` | idem | REPL, history, startup, configuration |
+| `com/example/greet` | idem | Example module (§4.3) |
+
+Third-party modules translate their cmdlets with `CmdletProvider.messages(Locale)` (§4.2).
+
+Language-dependent formatting: the error prefix (`ls: not found: x` / `ls : introuvable : x`, French typography puts a space before `:`), the decimal separator of sizes (`14.2 KB` / `14,2 KB`), built-in categories in `help` (`Files`, `System`, `Filters` / `Fichiers`, `Système`, `Filtres`).
+
+**What is not translated:**
+- the **input syntax**: keywords and built-in command names (`where`, `exit`, `true`, `null`, `now`, `new`, `import`, `help members`…), cmdlet and option names (`--recurse`), units (`10kb`, `7d`);
+- **option values** (`--on-error stop|continue|silent`, enum constants, `true`/`false`);
+- Java names (classes, methods, properties such as `name`, `size`), the messages of Java exceptions (produced by the JDK in its own language) and the outputs of native programs;
+- the **diagnostic log** `~/.powerj/logs/powerj.log` (FR-60), always in English so that it can be shared in a bug report.
+
+CA:
+- with `POWERJ_LANG=en`, `foo` displays `unknown command: foo`; with `POWERJ_LANG=fr`, `commande inconnue : foo`;
+- `language=fr` in `config.properties` without `POWERJ_LANG`: French; `POWERJ_LANG=en` set as well: English (the variable takes precedence);
+- without any setting, a French Windows displays French, an English one English;
+- `help ls` shows `Options:` and `(required)` in English, `Options :` and `(obligatoire)` in French;
+- `greet -n Yves` (example module) displays `Hello Yves!` in English, `Bonjour Yves !` in French.
 
 ---
 
@@ -707,7 +750,7 @@ public interface CmdletContext<O> {
 @Retention(RUNTIME) @Target(TYPE)
 public @interface CmdletInfo {
     String name();
-    String category() default "Divers";
+    String category() default "Misc";
     String summary();
     String[] examples() default {};
 }
@@ -724,10 +767,23 @@ public @interface Option {
 @Retention(RUNTIME) @Target(RECORD_COMPONENT)
 public @interface Completion { Class<? extends Completer> value(); }
 
-public interface CmdletProvider { List<Cmdlet<?, ?, ?>> cmdlets(); }
+public interface CmdletProvider {
+    List<Cmdlet<?, ?, ?>> cmdlets();
+    default ResourceBundle messages(Locale locale) { return null; }   // translations (FR-61)
+}
 ```
 
 > The reference is the code of the `powerj-api` module (Javadoc); the `@Completion` annotation is not available yet.
+
+**Translation of the cmdlet texts (FR-61).** The texts of `@CmdletInfo` (`summary`, `category`) and `@Option` (`description`) are written **in English**: they are the fallback. A module translates them by overriding `CmdletProvider.messages(Locale)`, which returns its own `ResourceBundle` for the requested language (`Language.current()`, i.e. `Locale.ENGLISH` or `Locale.FRENCH`), loaded from the module itself (`ResourceBundle.getBundle("my.pkg.messages", locale)`):
+
+| Key | Replaces | Example |
+|---|---|---|
+| `<cmdlet>.summary` | `@CmdletInfo.summary` | `greet.summary=Salue quelqu'un` |
+| `<cmdlet>.option.<longName>` | `@Option.description` | `greet.option.name=Nom à saluer` |
+| `category.<Category>` | display of `@CmdletInfo.category` in `help` | `category.Examples=Exemples` |
+
+A missing key, or a `null` bundle (default implementation: module not translated), falls back to the annotation text. The `examples` are never translated (they are input syntax). For its own messages (output, errors), a module uses its bundle with `Language.text(bundle, key, args…)`, which replaces `{0}`, `{1}`…; a missing key gives the key itself.
 
 ### 4.3 Complete example: `greet` module
 
@@ -741,41 +797,69 @@ module com.example.greet {
 // Greeting.java — output record
 public record Greeting(String name, String message, Instant at) { }
 
-// GreetParams.java — parameter record
+// GreetParams.java — parameter record (English texts: fallback of the translations)
 public record GreetParams(
-        @Option(shortName = 'n', mandatory = true, description = "Nom à saluer") String name,
-        @Option(shortName = 'c', description = "Nombre de répétitions") int count) {
+        @Option(shortName = 'n', mandatory = true, description = "Name to greet") String name,
+        @Option(shortName = 'c', description = "Number of repetitions") int count) {
     public GreetParams {
         if (count <= 0) count = 1;
     }
 }
 
 // Greet.java
-@CmdletInfo(name = "greet", category = "Exemples", summary = "Salue quelqu'un",
+@CmdletInfo(name = "greet", category = "Examples", summary = "Greets someone",
             examples = "greet --name Yves -c 3")
 public final class Greet implements Cmdlet<GreetParams, Void, Greeting> {
     @Override
     public void begin(GreetParams p, CmdletContext<Greeting> ctx) {
         for (int i = 0; i < p.count(); i++) {
-            ctx.emit(new Greeting(p.name(), "Bonjour " + p.name() + " !", Instant.now()));
+            ctx.emit(new Greeting(p.name(), Messages.get("greet.message", p.name()), Instant.now()));
         }
+    }
+}
+
+// Messages.java — texts of the module in the current language
+final class Messages {
+    static String get(String key, Object... args) {
+        return Language.text(ResourceBundle.getBundle("com.example.greet.messages", Language.current()), key, args);
     }
 }
 
 // GreetProvider.java
 public final class GreetProvider implements CmdletProvider {
     public List<Cmdlet<?, ?, ?>> cmdlets() { return List.of(new Greet()); }
+
+    @Override
+    public ResourceBundle messages(Locale locale) {
+        return ResourceBundle.getBundle("com.example.greet.messages", locale);
+    }
 }
 ```
 
-Usage:
+```properties
+# com/example/greet/messages_en.properties
+category.Examples=Examples
+greet.summary=Greets someone
+greet.option.name=Name to greet
+greet.option.count=Number of repetitions
+greet.message=Hello {0}!
+
+# com/example/greet/messages_fr.properties
+category.Examples=Exemples
+greet.summary=Salue quelqu'un
+greet.option.name=Nom à saluer
+greet.option.count=Nombre de répétitions
+greet.message=Bonjour {0} !
+```
+
+Usage (in English; in French the message is `Bonjour Yves !`):
 
 ```text
 PJ C:\> greet --name Yves -c 2 | where { $_.message.contains("Yves") }
-name   message          at
-----   -------          --
-Yves   Bonjour Yves !   2026-10-07 10:12:03
-Yves   Bonjour Yves !   2026-10-07 10:12:03
+name   message       at
+----   -------       --
+Yves   Hello Yves!   2026-10-07 10:12:03
+Yves   Hello Yves!   2026-10-07 10:12:03
 ```
 
 ### 4.4 Installation and loading
@@ -784,7 +868,7 @@ Yves   Bonjour Yves !   2026-10-07 10:12:03
 - The jar can be an explicit module (`module-info.java` with `provides io.powerj.api.CmdletProvider with …`) or a classic jar declaring the service in `META-INF/services/io.powerj.api.CmdletProvider` (automatic module). It does not need to export its packages: PowerJ has them opened at load time to read the records and options.
 - The runtime and PowerJ modules take precedence: a jar that bundles its own copy of `powerj-api` uses the shell's copy.
 - `mod-load <path>` hot-loads a module (jar or folder) and displays the added cmdlets; `mod-list` lists the loaded modules (name, version, cmdlets, source), including the built-in cmdlets.
-- A module's classes are **not** usable in Java expressions (§3.13): `new com.example.greet.Greeting(…)` answers « classe introuvable » (class not found). Only its cmdlets are exposed; the objects they produce are used normally (`$g.message`, `where`, `map`). This is the intended way to use an external library from PowerJ.
+- A module's classes are **not** usable in Java expressions (§3.13): `new com.example.greet.Greeting(…)` answers `class not found: com.example.greet.Greeting`. Only its cmdlets are exposed; the objects they produce are used normally (`$g.message`, `where`, `map`). This is the intended way to use an external library from PowerJ.
 - An invalid module (unreadable jar, missing dependency, no cmdlet, module already loaded, conflicting name, exception during loading) is reported with a warning; the other modules are loaded normally.
 
 ---
@@ -891,8 +975,8 @@ User folder `~/.powerj/` (created on first launch):
 |---|---|
 | `history` | Command history (FR-09). |
 | `modules/` | Third-party module jars (§4.4). |
-| `config.properties` | `history.size=10000`, `lang=fr`, `native.prefer=find,sort`, `colors.cmdlet=green`… |
-| `logs/` | Diagnostic log (FR-60). |
+| `config.properties` | `history.size=10000`, `language=en` (or `fr`, FR-61), `native.prefer=find,sort`, `colors.cmdlet=green`… |
+| `logs/` | Diagnostic log, in English (FR-60). |
 | `profile.pj` | Lines executed at startup (variable assignments, aliases: `alias ll = ls -a`). |
 
 Environment variables read by PowerJ:
@@ -902,6 +986,7 @@ Environment variables read by PowerJ:
 | `POWERJ_HOME` | Location of the configuration folder (default `~/.powerj`). |
 | `POWERJ_NATIVE_ENCODING` | Encoding of native commands (FR-40b). |
 | `POWERJ_NATIVE_ENCODING_<NOM>` | Encoding for a specific executable (FR-40b). |
+| `POWERJ_LANG` | Language of the messages, `en` or `fr` (FR-61); takes precedence over the `language` key of `config.properties`, and is overridden by the system property `-Dpowerj.language`. |
 
 ---
 
@@ -929,6 +1014,7 @@ Environment variables read by PowerJ:
 - **REPL integration**: "dumb" JLine terminal driven by script (simulated input, verified output), including history and Ctrl+R.
 - **Modules**: loading of `powerj-sample-module`, handling of name collisions, module classes not accessible in Java expressions.
 - **Default imports**: automated test verifying that no simple name is duplicated across the default-imported packages (protects against classes being added in a future JDK version).
+- **Languages**: the Maven tests force English (`-Dpowerj.language=en` in the Surefire configuration) so that they do not depend on the machine or on `POWERJ_LANG`; resolution of the language and French texts are tested explicitly (FR-61).
 - **Manual acceptance test**: one checklist per step (§11), executed by the PM on the exe produced by the CI.
 
 ---
@@ -955,7 +1041,7 @@ Each step:
 **Content:** JLine, FR-01 to FR-11 (prompt, multi-line, Ctrl+C, Ctrl+D, editing, ↑/↓, Ctrl+R, persistent history, `history`, `!!`, `!n`); supervisor and `Outcome` result (FR-56), terminal restoration (FR-59), log (FR-60).
 
 **Acceptance test:**
-1. Type `bonjour`, `test un`, `test deux` (a « commande inconnue » (unknown command) error is expected).
+1. Type `bonjour`, `test un`, `test deux` (an `unknown command: …` error is expected).
 2. ↑ three times: the lines come back in reverse order.
 3. Ctrl+R then `un`: `test un` is suggested.
 4. Quit, relaunch: ↑ brings the lines back.
@@ -1044,7 +1130,7 @@ Delivered with step 5 (same PR, same exe).
 4. `$l = List.of("apple", "banana", "kiwi")` then `$l.stream().filter(s -> s.length() > 4).map(String::toUpperCase).toList()`.
 5. `$m = new ArrayList($l); $m.sort((a, b) -> a.length() - b.length()); $m`.
 6. `$l.stream().map(Path::of).toList()` and `Stream.of("a", "b").map(StringBuilder::new).toList()`.
-7. `ls | where { f -> f.name }`: non-blocking error `le bloc doit renvoyer un booléen` (the block must return a boolean) for each object.
+7. `ls | where { f -> f.name }`: non-blocking error `the block must return a boolean, got …` for each object.
 8. `$m.sort({ $a.length() - $b.length() })`: clear error telling the user to write `(a, b) -> …`.
 9. `$min = 1kb; ls | where { f -> f.size > $min }` (shell variables in a lambda).
 10. Multi-line text block: `$t = """` … `"""` then `$t.lines().count()`.
@@ -1074,15 +1160,16 @@ Delivered with step 5 (same PR, same exe).
 4. `greet -n Yves | where { $_.message.contains("Yves") }`.
 5. `help greet` displays the generated help.
 6. `mod-list` lists the module.
-7. `new com.example.greet.Greeting(...)`: « classe introuvable » (class not found) error (module classes are not exposed).
+7. `new com.example.greet.Greeting(...)`: `class not found: com.example.greet.Greeting` error (module classes are not exposed).
 
 ### After these steps
 
 The backlog cmdlets (§12.3) are added **one per mini-iteration**, each with a short specification (options, output record, CA), an exe and an acceptance checklist.
 
-| Mini-iteration | Cmdlet | Specification | Acceptance test |
+| Mini-iteration | Cmdlet / feature | Specification | Acceptance test |
 |---|---|---|---|
 | 8 | `collect` | FR-36d | `docs/recettes/etape-8-collect.md` |
+| 9 | i18n (en/fr) | FR-61 | `docs/recettes/i18n.md` |
 
 Version 2 will introduce scripting (`if`, `foreach`, functions, `.pj` files).
 

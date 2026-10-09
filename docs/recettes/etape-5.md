@@ -2,6 +2,8 @@
 
 **Goal:** verify that the JRE's Java API can be called directly from the shell (static methods, fields, `new`, instance methods, blocks passed as lambdas), that Java errors are readable, and that Ctrl+C stays in control of Java calls.
 
+> Messages are shown in the system language; set `language=en` in config.properties (or `POWERJ_LANG=en`) to get the English texts quoted here.
+
 ## Getting the deliverables
 
 As in the previous steps: **Actions** tab, latest run of the **CI** workflow, artifact `powerj-windows-x64-installer` or `powerj-windows-x64-portable`.
@@ -14,23 +16,23 @@ As in the previous steps: **Actions** tab, latest run of the **CI** workflow, ar
 | 2 | `$l = java.util.List.of("apple", "banana")` then `$l.size()` | `2`: the list is kept as is in the variable. |
 | 3 | `Math.max(3, 7)` then `java.lang.Math.PI` then `DayOfWeek.MONDAY` | `7`, `3.141592653589793`, `MONDAY`. |
 | 4 | `LocalDate.now().plusDays(10).dayOfWeek` | The day of the week 10 days from now (`java.time` is imported by default). |
-| 5 | `MessageDigest.getInstance("SHA-256")`, then `import java.security.*` and again `MessageDigest.getInstance("SHA-256").algorithm`, then `import` | First `« MessageDigest » inconnu…`, then `SHA-256`; `import` alone lists the active imports. |
+| 5 | `MessageDigest.getInstance("SHA-256")`, then `import java.security.*` and again `MessageDigest.getInstance("SHA-256").algorithm`, then `import` | First `"MessageDigest" unknown…`, then `SHA-256`; `import` alone lists the active imports. |
 | 6 | `new java.io.File("C:\\Windows").listFiles() \| where { f -> f.directory && f.name.startsWith("S") }` | The folders of `C:\Windows` starting with `S` (`System32`…). |
 | 7 | `$l.stream().map(s -> s.toUpperCase()).toList()` | `APPLE` then `BANANA`: the lambda becomes a `Function`. |
 | 8 | `$m = new java.util.ArrayList($l); $m.sort((a, b) -> b.length() - a.length()); $m` | `banana` then `apple`: a two-parameter lambda becomes a `Comparator`. |
 | 9 | `String.format("%s-%05d", "id", 42)` | `id-00042` (varargs and conversions). |
-| 10 | `Integer.parseInt("x")` | Red error `java.lang.NumberFormatException : For input string: "x"`. Then `$errors[0].class.name`: `java.lang.NumberFormatException`. |
+| 10 | `Integer.parseInt("x")` | Red error `java.lang.NumberFormatException: For input string: "x"`. Then `$errors[0].class.name`: `java.lang.NumberFormatException`. |
 | 11 | `$debug = true` then `Integer.parseInt("x")`, then `$debug = false` | The same message, followed by the full Java stack trace. |
-| 12 | `java -version` | Still launches the native `java` if it is installed (otherwise `commande inconnue : java`). |
+| 12 | `java -version` | Still launches the native `java` if it is installed (otherwise `unknown command: java`). |
 | 13 | `help members $l` then `help java.util.List` then `help Math` | Methods and properties of the list; API of `List` (static methods, methods); fields of `Math` (`static PI : double`). |
 | 14 | `ls \| where { List.of("txt", "md").contains($_.ext) }` | The `.txt` and `.md` files in the folder. |
 | 15 | `Files.size(Path.of("C:\\Windows\\notepad.exe")) / 1kb` | Size of `notepad.exe` in KB. |
 | 16 | `"Il est $(LocalTime.now().hour) h, max = $(Math.max(4, 9))"` | The `$( … )` values are inserted into the string. |
-| 17 | `[long] 5`, then `[int] 3.9`, then `[java.util.ArrayList] $l` | `5`, `3`, then the error `conversion impossible : … n'est pas un ArrayList`. |
+| 17 | `[long] 5`, then `[int] 3.9`, then `[java.util.ArrayList] $l` | `5`, `3`, then the error `cannot convert: … is not a ArrayList`. |
 | 18 | `Stream.iterate(0, n -> n + 1).forEach(n -> n)` then Ctrl+C | Immediate stop (`^C`), the shell remains usable. |
-| 19 | `BigInteger.valueOf(3).pow(300000000).bitLength()` then Ctrl+C, then Ctrl+C again | The JDK computation ignores the first request; the second one returns control with `commande abandonnée, elle continue en arrière-plan : …`. |
+| 19 | `BigInteger.valueOf(3).pow(300000000).bitLength()` then Ctrl+C, then Ctrl+C again | The JDK computation ignores the first request; the second one returns control with `command abandoned, it keeps running in the background: …`. |
 | 20 | `System.out.println("bonjour " + Math.max(1, 2))` | `bonjour 2`, without corrupting the input line. |
-| 21 | `System.setOut(null)` | Refused: `System.setOut est refusé : il casserait l'affichage du shell`. |
+| 21 | `System.setOut(null)` | Refused: `System.setOut is refused: it would break the shell display`. |
 | 22 | `System.exit(6)` then, in `cmd.exe`, `echo %ERRORLEVEL%` | PowerJ exits cleanly (history saved); `6`. |
 
 ## Syntax points to know

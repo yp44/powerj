@@ -8,8 +8,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
+import io.powerj.api.Language;
+
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -32,6 +36,11 @@ class CmdletInterpreterTest {
                 CmdletRegistry.of(FakeCmdlets.all()));
     }
 
+    @AfterEach
+    void englishAgain() {
+        Language.set(Locale.ENGLISH);
+    }
+
     private String run(String line) throws Exception {
         out.getBuffer().setLength(0);
         errors.clear();
@@ -47,6 +56,22 @@ class CmdletInterpreterTest {
                 item1    10
                 item2    20
                 """);
+    }
+
+    @Test
+    void helpListsModuleCommands() throws Exception {
+        assertThat(run("help")).contains("mod-load", "mod-list", "Loads a third-party module");
+        assertThat(run("help mod-list")).isEqualTo("mod-list — Lists the loaded modules and their cmdlets\nUsage: mod-list\n");
+    }
+
+    @Test
+    void messagesInFrench() throws Exception {
+        Language.set(Locale.FRENCH);
+        run("items --cont 2");
+        assertThat(errors).containsExactly("items : option inconnue --cont, vouliez-vous dire --count ?");
+        assertThat(run("which cd")).isEqualTo("cd → commande interne\n");
+        assertThat(run("help items")).contains("Usage : items [options]", "Options :", "Sortie : Item (name, size)");
+        assertThat(run("help members (items)[0]")).contains("propriété", "méthode");
     }
 
     @Test
@@ -69,38 +94,38 @@ class CmdletInterpreterTest {
     @Test
     void unknownPropertyListsTheKnownOnes() throws Exception {
         run("(items)[0].siz");
-        assertThat(errors).containsExactly("Item n'a pas de propriété 'siz' (propriétés : name, size)");
+        assertThat(errors).containsExactly("Item has no property 'siz' (properties: name, size)");
     }
 
     @Test
     void optionErrorsAndHelp() throws Exception {
         run("items --cont 2");
-        assertThat(errors).containsExactly("items : option inconnue --cont, vouliez-vous dire --count ?");
-        assertThat(run("items --help")).contains("items — Produit des objets de test", "-n, --count", "Sortie : Item (name, size)");
-        assertThat(run("help items")).contains("Usage : items [options]");
-        assertThat(run("help")).contains("Commandes internes", "Test", "items", "Produit des objets de test");
+        assertThat(errors).containsExactly("items: unknown option --cont, did you mean --count?");
+        assertThat(run("items --help")).contains("items — Produces test objects", "-n, --count", "Output: Item (name, size)");
+        assertThat(run("help items")).contains("Usage: items [options]");
+        assertThat(run("help")).contains("Built-in commands", "Test", "items", "Produces test objects");
     }
 
     @Test
     void nonBlockingErrorsAndOnError() throws Exception {
         assertThat(run("items --fail")).contains("item3");
-        assertThat(errors).containsExactly("items : problème sur item1");
+        assertThat(errors).containsExactly("items: problem with item1");
         assertThat(session.lastSucceeded()).isFalse();
 
         run("items --fail --on-error silent");
         assertThat(errors).isEmpty();
 
         assertThat(run("items --fail --on-error stop")).doesNotContain("item3");
-        assertThat(errors).containsExactly("items : problème sur item1");
+        assertThat(errors).containsExactly("items: problem with item1");
     }
 
     @Test
     void whichAndHelpMembers() throws Exception {
-        assertThat(run("which items cd")).contains("items → cmdlet (", "cd → commande interne");
-        assertThat(run("help members (items)[0]")).contains("name", "propriété", "size", "méthode", "int")
+        assertThat(run("which items cd")).contains("items → cmdlet (", "cd → built-in command");
+        assertThat(run("help members (items)[0]")).contains("name", "property", "size", "method", "int")
                 .doesNotContain("hashCode", "equals");
         run("which ^absent");
-        assertThat(errors).containsExactly("which : programme introuvable : absent");
+        assertThat(errors).containsExactly("which: program not found: absent");
     }
 
     @Test
@@ -133,9 +158,9 @@ class CmdletInterpreterTest {
         // Without *., the property applies to the list itself: explicit error.
         run("$i.size");
         assertThat(errors).singleElement().asString()
-                .contains("List n'a pas de propriété 'size'", "pour chaque élément : *.size", "méthode : size()");
+                .contains("List has no property 'size'", "for each element: *.size", "method: size()");
         run("$i.name");
-        assertThat(errors).singleElement().asString().contains("pour chaque élément : *.name");
+        assertThat(errors).singleElement().asString().contains("for each element: *.name");
         // *. is not a multiplication.
         assertThat(run("$x = 2 * 3; $x")).isEqualTo("6\n");
     }

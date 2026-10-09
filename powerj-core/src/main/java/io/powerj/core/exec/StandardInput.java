@@ -25,7 +25,7 @@ public final class StandardInput {
         try {
             return Platform.isWindows() ? windowsConsole() : posixTty();
         } catch (Throwable t) {
-            LOG.log(Level.FINE, "Nature de l'entrée standard inconnue", t);
+            LOG.log(Level.FINE, "Unknown kind of standard input", t);
             return System.console() != null && System.console().isTerminal();
         }
     }

@@ -46,13 +46,13 @@ final class Pipe implements Source {
      */
     void put(Object value) {
         if (aborted) {
-            throw new CancellationException("pipeline fermé par l'étape suivante");
+            throw new CancellationException("pipeline closed by the next stage");
         }
         try {
             queue.put(value == null ? NULL : value);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new CancellationException("pipeline interrompu");
+            throw new CancellationException("pipeline interrupted");
         }
     }
 

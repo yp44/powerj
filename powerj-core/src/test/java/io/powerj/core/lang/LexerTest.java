@@ -43,24 +43,24 @@ class LexerTest {
 
     @Test
     void unknownEscapeIsAnError() {
-        assertThatThrownBy(() -> Lexer.tokenize("\"C:\\dev\"")).hasMessageContaining("échappement inconnu \\d");
-        assertThatThrownBy(() -> Lexer.tokenize("\"C:\\Users\"")).hasMessageContaining("échappement inconnu \\U");
+        assertThatThrownBy(() -> Lexer.tokenize("\"C:\\dev\"")).hasMessageContaining("unknown escape \\d");
+        assertThatThrownBy(() -> Lexer.tokenize("\"C:\\Users\"")).hasMessageContaining("unknown escape \\U");
     }
 
     @Test
     void unclosedStringIsAnError() {
-        assertThatThrownBy(() -> Lexer.tokenize("echo \"abc")).hasMessageContaining("chaîne non fermée");
+        assertThatThrownBy(() -> Lexer.tokenize("echo \"abc")).hasMessageContaining("unclosed string");
     }
 
     @Test
     void stringsInterpolateVariablesAndGroups() {
-        assertThat(Lexer.tokenize("\"code $exit, durée $last.duration $ seul \\$x\"")).containsExactly(e(
+        assertThat(Lexer.tokenize("\"code $exit, duration $last.duration $ alone \\$x\"")).containsExactly(e(
                 new Ast.StringExpression(List.of(
                         new StringPart.Text("code "),
                         new StringPart.Interpolation("exit", List.of()),
-                        new StringPart.Text(", durée "),
+                        new StringPart.Text(", duration "),
                         new StringPart.Interpolation("last", List.of(new Accessor.Property("duration"))),
-                        new StringPart.Text(" $ seul $x")))));
+                        new StringPart.Text(" $ alone $x")))));
         var parts = ((Ast.StringExpression) ((Token.Expr) Lexer.tokenize("\"n=$(1 + 2) $(ls).\"").getFirst())
                 .expression()).parts();
         assertThat(parts).hasSize(5);

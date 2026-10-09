@@ -16,7 +16,7 @@ import io.powerj.api.ScriptBlock;
  * </pre>
  * A {@code null} result emits nothing; a collection is unrolled by the pipeline.
  */
-@CmdletInfo(name = "map", category = "Filtres", summary = "Transforme chaque objet du pipeline par une lambda",
+@CmdletInfo(name = "map", category = "Filters", summary = "Transforms each pipeline object with a lambda",
         examples = {"ls -r | map { f -> f.name + \" : \" + f.name.length() }", "ls | map FileEntry::name",
                 "ls | map { $_.name.toUpperCase() }", "env | map EnvVar::name"})
 public final class MapCmdlet implements Cmdlet<MapCmdlet.Params, Object, Object> {
@@ -24,14 +24,14 @@ public final class MapCmdlet implements Cmdlet<MapCmdlet.Params, Object, Object>
     /** Parameters of {@code map}. */
     public record Params(
             @Option(position = 0, mandatory = true,
-                    description = "Transformation : lambda { f -> … }, bloc { $_… } ou référence de méthode Type::méthode")
+                    description = "Transformation: lambda { f -> … }, block { $_… } or method reference Type::method")
             Object function) {
     }
 
     @Override
     public void begin(Params p, CmdletContext<Object> context) {
         if (!(p.function() instanceof ScriptBlock)) {
-            throw new IllegalArgumentException("transformation attendue : map { f -> … } ou map Type::méthode");
+            throw new IllegalArgumentException(Messages.get("map.function.expected"));
         }
     }
 
@@ -43,7 +43,7 @@ public final class MapCmdlet implements Cmdlet<MapCmdlet.Params, Object, Object>
         } catch (CancellationException e) {
             throw e;
         } catch (RuntimeException e) {
-            context.error(e.getMessage() + " (objet ignoré : " + Where.abbreviate(input) + ")");
+            context.error(Messages.get("pipeline.object.skipped", e.getMessage(), Where.abbreviate(input)));
             return;
         }
         if (result != null) {

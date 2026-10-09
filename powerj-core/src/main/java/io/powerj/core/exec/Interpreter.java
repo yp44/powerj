@@ -88,7 +88,7 @@ public final class Interpreter {
     /** {@code mod-load <path.jar>}: loads a module at runtime. */
     private List<Object> modLoad(List<Object> args, Session session) {
         if (args.isEmpty()) {
-            throw new PjException("mod-load : chemin d'un module (.jar ou dossier) attendu");
+            throw new PjException(Messages.get("module.load.pathExpected"));
         }
         List<Object> loaded = new ArrayList<>();
         for (Object arg : args) {
@@ -99,7 +99,7 @@ public final class Interpreter {
             ModuleLoader.Result result = modules.load(path);
             result.warnings().forEach(io.errors());
             if (result.cmdlets().isEmpty() && !result.warnings().isEmpty()) {
-                throw new PjException("mod-load : " + path.getFileName() + " non chargé");
+                throw new PjException(Messages.get("module.load.notLoaded", path.getFileName()));
             }
             loaded.addAll(result.cmdlets());
         }
@@ -109,7 +109,7 @@ public final class Interpreter {
     /** {@code mod-list}: loaded modules and their cmdlets. */
     private List<Object> modList(List<Object> args, Session session) {
         if (!args.isEmpty()) {
-            throw new PjException("mod-list : aucun argument attendu");
+            throw new PjException(Messages.get("module.list.noArguments"));
         }
         return List.copyOf(registry.modules());
     }
@@ -185,7 +185,7 @@ public final class Interpreter {
             Optional<NativeRunner.FileTarget> outTarget = redirect(statement.pipeline(), Token.Stream.OUT);
             if (statement.assignTo().isPresent()) {
                 if (outTarget.isPresent()) {
-                    throw new PjException("une affectation ne peut pas rediriger sa sortie avec >");
+                    throw new PjException(Messages.get("redirect.assignment"));
                 }
                 List<Object> values = new ArrayList<>();
                 boolean succeeded = pipeline(statement.pipeline(), values::add, true, Optional.empty(), errTarget);
@@ -286,8 +286,8 @@ public final class Interpreter {
                 } catch (Throwable t) {
                     blockingErrors.set(true);
                     java.util.logging.Logger.getLogger(Interpreter.class.getName())
-                            .log(java.util.logging.Level.SEVERE, "Erreur interne dans une étape de pipeline", t);
-                    errors.accept("erreur interne : " + t + " (détails dans le journal)");
+                            .log(java.util.logging.Level.SEVERE, "Internal error in a pipeline stage", t);
+                    errors.accept(Messages.get("error.internal", t));
                     closeQuietly(output);
                 } finally {
                     if (input instanceof Pipe pipe) {
@@ -385,7 +385,7 @@ public final class Interpreter {
             Builtin builtin = builtins.get(command.name());
             if (builtin != null) {
                 if (index > 0) {
-                    throw new PjException("« " + command.name() + " » ne lit pas les objets du pipeline");
+                    throw new PjException(Messages.get("pipeline.noInput", command.name()));
                 }
                 return new ObjectStep((_, output, _) -> {
                     invokeBuiltin(command.name(), builtin, args).forEach(output);
@@ -402,7 +402,7 @@ public final class Interpreter {
                     });
                 }
                 if (index > 0 && !cmdlet.readsInput()) {
-                    throw new PjException("« " + command.name() + " » ne lit pas les objets du pipeline");
+                    throw new PjException(Messages.get("pipeline.noInput", command.name()));
                 }
                 return new ObjectStep((input, output, errors) -> runCmdlet(cmdlet, args,
                         cmdlet.readsInput() ? input : null, output,
@@ -417,17 +417,17 @@ public final class Interpreter {
     /** Command not found; {@code Math.NOPE}: the static field is missing rather than the command. */
     private PjException unknownCommand(Ast.Command command) {
         if (command.forceNative()) {
-            return new PjException("commande native introuvable : " + command.name());
+            return new PjException(Messages.get("command.nativeNotFound", command.name()));
         }
         int dot = command.name().lastIndexOf('.');
         if (dot > 0 && command.arguments().isEmpty()) {
             var owner = session.java().find(command.name().substring(0, dot));
             if (owner.isPresent()) {
-                return new PjException(owner.get().getSimpleName() + " n'a pas de champ statique "
-                        + command.name().substring(dot + 1));
+                return new PjException(Messages.get("java.noStaticField", owner.get().getSimpleName(),
+                        command.name().substring(dot + 1)));
             }
         }
-        return new PjException("commande inconnue : " + command.name());
+        return new PjException(Messages.get("command.unknown", command.name()));
     }
 
     private boolean runCmdlet(CmdletRegistry.Registered cmdlet, List<Object> args, Source input,
@@ -437,7 +437,7 @@ public final class Interpreter {
         } catch (PjException | InterruptedException | java.util.concurrent.CancellationException e) {
             throw e;
         } catch (Exception e) {
-            throw new PjException(PjError.of(cmdlet.name() + " : " + e, e));
+            throw new PjException(PjError.of(Messages.get("command.error", cmdlet.name(), e), e));
         }
     }
 
@@ -467,8 +467,7 @@ public final class Interpreter {
         try {
             Files.writeString(target.get().file(), "", StandardCharsets.UTF_8);
         } catch (IOException e) {
-            throw new PjException(PjError.of("écriture impossible dans " + target.get().file() + " : "
-                    + e.getMessage(), e));
+            throw new PjException(PjError.of(Messages.get("file.writeFailed", target.get().file(), e.getMessage()), e));
         }
         return Optional.of(new NativeRunner.FileTarget(target.get().file(), true));
     }
@@ -518,7 +517,7 @@ public final class Interpreter {
         } catch (PjException | InterruptedException e) {
             throw e;
         } catch (Exception e) {
-            throw new PjException(PjError.of(name + " : " + e.getMessage(), e));
+            throw new PjException(PjError.of(Messages.get("command.error", name, e.getMessage()), e));
         }
     }
 
@@ -535,7 +534,7 @@ public final class Interpreter {
 
     private List<Object> which(List<Object> names, Session session) {
         if (names.isEmpty()) {
-            throw new PjException("which : nom de commande attendu");
+            throw new PjException(Messages.get("which.nameExpected"));
         }
         List<Object> lines = new ArrayList<>();
         for (Object value : names) {
@@ -543,16 +542,16 @@ public final class Interpreter {
             if (name.startsWith("^") && name.length() > 1) {
                 String program = name.substring(1);
                 Path path = resolver.resolve(program, session)
-                        .orElseThrow(() -> new PjException("which : programme introuvable : " + program));
-                lines.add(name + " → natif " + path);
+                        .orElseThrow(() -> new PjException(Messages.get("which.programNotFound", program)));
+                lines.add(Messages.get("which.native", name, path));
             } else if (builtins.containsKey(name)) {
-                lines.add(name + " → commande interne");
+                lines.add(Messages.get("which.builtin", name));
             } else if (registry.find(name).isPresent()) {
-                lines.add(name + " → cmdlet (" + registry.find(name).get().module() + ")");
+                lines.add(Messages.get("which.cmdlet", name, registry.find(name).get().module()));
             } else {
                 Path path = resolver.resolve(name, session)
-                        .orElseThrow(() -> new PjException("which : introuvable : " + name));
-                lines.add(name + " → natif " + path);
+                        .orElseThrow(() -> new PjException(Messages.get("which.notFound", name)));
+                lines.add(Messages.get("which.native", name, path));
             }
         }
         return lines;
@@ -576,7 +575,7 @@ public final class Interpreter {
     /** Values of a parenthesized pipeline: {@code (ls).name}. */
     private List<Object> capture(Ast.Pipeline pipeline) throws InterruptedException {
         if (redirect(pipeline, Token.Stream.OUT).isPresent()) {
-            throw new PjException("« > » impossible dans une sous-expression ( )");
+            throw new PjException(Messages.get("redirect.subexpression"));
         }
         List<Object> values = new ArrayList<>();
         Optional<NativeRunner.FileTarget> errTarget = redirect(pipeline, Token.Stream.ERR);
@@ -637,7 +636,7 @@ public final class Interpreter {
             try {
                 Files.writeString(target.file(), message + System.lineSeparator(), StandardCharsets.UTF_8);
             } catch (IOException e) {
-                throw new PjException(PjError.of("écriture impossible dans " + target.file() + " : " + e.getMessage(), e));
+                throw new PjException(PjError.of(Messages.get("file.writeFailed", target.file(), e.getMessage()), e));
             }
         }
     }
@@ -647,7 +646,7 @@ public final class Interpreter {
             Files.writeString(file, line + System.lineSeparator(), StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE, StandardOpenOption.APPEND);
         } catch (IOException e) {
-            throw new PjException(PjError.of("écriture impossible dans " + file + " : " + e.getMessage(), e));
+            throw new PjException(PjError.of(Messages.get("file.writeFailed", file, e.getMessage()), e));
         }
     }
 
@@ -678,8 +677,8 @@ public final class Interpreter {
                                 : new StandardOpenOption[0];
                         file = new PrintWriter(Files.newBufferedWriter(target.get().file(), StandardCharsets.UTF_8, options));
                     } catch (IOException e) {
-                        throw new PjException(PjError.of("écriture impossible dans " + target.get().file()
-                                + " : " + e.getMessage(), e));
+                        throw new PjException(PjError.of(Messages.get("file.writeFailed", target.get().file(),
+                                e.getMessage()), e));
                     }
                     formatter = new OutputFormatter(file, FILE_WIDTH);
                 } else {
@@ -697,7 +696,7 @@ public final class Interpreter {
             if (file != null) {
                 file.close();
                 if (file.checkError()) {
-                    throw new PjException("écriture impossible dans " + target.orElseThrow().file());
+                    throw new PjException(Messages.get("file.writeFailed.noReason", target.orElseThrow().file()));
                 }
             }
         }

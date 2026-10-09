@@ -7,14 +7,14 @@ import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 
 /** {@code greet --name Yves -c 3}: greets someone, {@code count} times. */
-@CmdletInfo(name = "greet", category = "Exemples", summary = "Salue quelqu'un",
+@CmdletInfo(name = "greet", category = "Examples", summary = "Greets someone",
         examples = "greet --name Yves -c 3")
 public final class Greet implements Cmdlet<GreetParams, Void, Greeting> {
 
     @Override
     public void begin(GreetParams p, CmdletContext<Greeting> ctx) {
         for (int i = 0; i < p.count(); i++) {
-            ctx.emit(new Greeting(p.name(), "Bonjour " + p.name() + " !", Instant.now()));
+            ctx.emit(new Greeting(p.name(), Messages.get("greet.message", p.name()), Instant.now()));
         }
     }
 }

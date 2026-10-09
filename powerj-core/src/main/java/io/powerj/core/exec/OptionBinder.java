@@ -102,7 +102,7 @@ public final class OptionBinder {
                         values[index] = add(values[index], convert(command, spec, inline));
                     } else {
                         if (i + 1 >= args.size()) {
-                            throw new PjException(command + " : valeur attendue après --" + spec.longName());
+                            throw new PjException(Messages.get("option.valueExpected.long", command, spec.longName()));
                         }
                         values[index] = add(values[index], convert(command, spec, args.get(++i)));
                     }
@@ -124,14 +124,14 @@ public final class OptionBinder {
                         } else if (i + 1 < args.size()) {
                             values[index] = add(values[index], convert(command, spec, args.get(++i)));
                         } else {
-                            throw new PjException(command + " : valeur attendue après -" + spec.shortName());
+                            throw new PjException(Messages.get("option.valueExpected.short", command, spec.shortName()));
                         }
                         break;
                     }
                 }
             } else {
                 if (nextPositional >= positionals.size()) {
-                    throw new PjException(command + " : argument inattendu : " + Values.text(arg));
+                    throw new PjException(Messages.get("option.unexpectedArgument", command, Values.text(arg)));
                 }
                 OptionSpec spec = positionals.get(nextPositional);
                 int index = specs.indexOf(spec);
@@ -152,7 +152,7 @@ public final class OptionBinder {
         for (int i = 0; i < specs.size(); i++) {
             OptionSpec spec = specs.get(i);
             if (spec.mandatory() && !given[i]) {
-                throw new PjException(command + " : option obligatoire manquante : --" + spec.longName());
+                throw new PjException(Messages.get("option.missingMandatory", command, spec.longName()));
             }
             if (values[i] == null) {
                 values[i] = defaultValue(spec.component().getType());
@@ -178,12 +178,13 @@ public final class OptionBinder {
             return prefixed.getFirst();
         }
         if (prefixed.size() > 1 && !name.isEmpty()) {
-            throw new PjException(command + " : option ambiguë --" + name + " : "
-                    + String.join(", ", prefixed.stream().map(s -> "--" + s.longName()).toList()));
+            throw new PjException(Messages.get("option.ambiguous", command, name,
+                    String.join(", ", prefixed.stream().map(s -> "--" + s.longName()).toList())));
         }
-        String suggestion = closest(name, specs.stream().map(OptionSpec::longName).toList())
-                .map(s -> ", vouliez-vous dire --" + s + " ?").orElse("");
-        throw new PjException(command + " : option inconnue --" + name + suggestion);
+        Optional<String> suggestion = closest(name, specs.stream().map(OptionSpec::longName).toList());
+        throw new PjException(suggestion.isPresent()
+                ? Messages.get("option.unknown.long.suggestion", command, name, suggestion.get())
+                : Messages.get("option.unknown.long", command, name));
     }
 
     private static OptionSpec byShortName(String command, List<OptionSpec> specs, char letter) {
@@ -192,7 +193,7 @@ public final class OptionBinder {
                 return spec;
             }
         }
-        throw new PjException(command + " : option inconnue -" + letter);
+        throw new PjException(Messages.get("option.unknown.short", command, letter));
     }
 
     /** Closest name (edit distance ≤ 2). */
@@ -232,7 +233,7 @@ public final class OptionBinder {
         return switch (text.toLowerCase(Locale.ROOT)) {
             case "true", "oui", "yes", "1" -> true;
             case "false", "non", "no", "0" -> false;
-            default -> throw new PjException(command + " : --" + spec.longName() + " attend true ou false, pas '" + text + "'");
+            default -> throw new PjException(Messages.get("option.booleanExpected", command, spec.longName(), text));
         };
     }
 
@@ -283,8 +284,7 @@ public final class OptionBinder {
             }
             if (type == Duration.class) {
                 return Units.parse(text).filter(Duration.class::isInstance).orElseThrow(
-                        () -> new PjException(command + " : durée attendue pour --" + spec.longName()
-                                + " (ex. 30s, 5m, 2h, 7d), pas '" + text + "'"));
+                        () -> new PjException(Messages.get("option.durationExpected", command, spec.longName(), text)));
             }
             if (type == Path.class) {
                 return value instanceof Path p ? p : Path.of(text);
@@ -308,13 +308,13 @@ public final class OptionBinder {
                         return constant;
                     }
                 }
-                throw new PjException(command + " : --" + spec.longName() + " accepte "
-                        + Arrays.toString(type.getEnumConstants()).toLowerCase(Locale.ROOT) + ", pas '" + text + "'");
+                throw new PjException(Messages.get("option.enumExpected", command, spec.longName(),
+                        Arrays.toString(type.getEnumConstants()).toLowerCase(Locale.ROOT), text));
             }
         } catch (NumberFormatException | InvalidPathException e) {
-            throw new PjException(command + " : valeur invalide pour --" + spec.longName() + " : '" + text + "'");
+            throw new PjException(Messages.get("option.invalidValue", command, spec.longName(), text));
         }
-        throw new PjException(command + " : type d'option non géré : " + type.getSimpleName());
+        throw new PjException(Messages.get("option.unsupportedType", command, type.getSimpleName()));
     }
 
     private static Object defaultValue(Class<?> type) {
@@ -349,9 +349,9 @@ public final class OptionBinder {
             return constructor.newInstance(values);
         } catch (InvocationTargetException e) {
             Throwable cause = e.getCause();
-            throw new PjException(PjError.of(command + " : " + cause.getMessage(), cause));
+            throw new PjException(PjError.of(Messages.get("command.error", command, cause.getMessage()), cause));
         } catch (ReflectiveOperationException e) {
-            throw new PjException(PjError.of(command + " : paramètres inutilisables : " + e, e));
+            throw new PjException(PjError.of(Messages.get("option.unusableParameters", command, e), e));
         }
     }
 

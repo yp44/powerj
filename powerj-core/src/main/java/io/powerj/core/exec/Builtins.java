@@ -12,12 +12,12 @@ final class Builtins {
 
     static List<Object> cd(List<Object> args, Session session) {
         if (args.size() > 1) {
-            throw new PjException("cd : un seul argument attendu");
+            throw new PjException(Messages.get("cd.oneArgument"));
         }
         String target = args.isEmpty() ? "~" : Values.text(args.getFirst());
         Path path = switch (target) {
             case "-" -> session.previousDirectory()
-                    .orElseThrow(() -> new PjException("cd : pas de dossier précédent"));
+                    .orElseThrow(() -> new PjException(Messages.get("cd.noPrevious")));
             case "~" -> session.home();
             case String t when t.startsWith("~/") || t.startsWith("~\\") -> session.home().resolve(t.substring(2));
             case String t when Platform.isWindows() && t.matches("[A-Za-z]:") -> Path.of(t + "\\");
@@ -29,7 +29,7 @@ final class Builtins {
 
     static List<Object> pwd(List<Object> args, Session session) {
         if (!args.isEmpty()) {
-            throw new PjException("pwd : aucun argument attendu");
+            throw new PjException(Messages.get("pwd.noArguments"));
         }
         return List.of(session.currentDirectory());
     }
@@ -41,10 +41,10 @@ final class Builtins {
                 try {
                     yield Integer.parseInt(Values.text(args.getFirst()));
                 } catch (NumberFormatException _) {
-                    throw new PjException("exit : code retour invalide '" + Values.text(args.getFirst()) + "'");
+                    throw new PjException(Messages.get("exit.invalidCode", Values.text(args.getFirst())));
                 }
             }
-            default -> throw new PjException("exit : un seul argument attendu");
+            default -> throw new PjException(Messages.get("exit.oneArgument"));
         };
         session.requestExit(code);
         return List.of();
@@ -54,7 +54,7 @@ final class Builtins {
         try {
             return Path.of(path);
         } catch (InvalidPathException e) {
-            throw new PjException("cd : chemin invalide : " + path);
+            throw new PjException(Messages.get("cd.invalidPath", path));
         }
     }
 }

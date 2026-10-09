@@ -89,7 +89,7 @@ public final class Repl {
                 case Outcome.Failure(var error) -> printError(error.message());
                 case Outcome.Cancelled() -> printError("^C");
                 case Outcome.Abandoned(var commandLine) ->
-                        printError("commande abandonnée, elle continue en arrière-plan : " + commandLine);
+                        printError(Messages.get("command.abandoned", commandLine));
             }
             out.flush();
         }
@@ -104,7 +104,7 @@ public final class Repl {
         var trimmed = line.strip();
         // A successful history expansion never leaves a "!" at the start of the line (FR-11).
         if (trimmed.startsWith("!") && trimmed.length() > 1 && !Character.isWhitespace(trimmed.charAt(1))) {
-            throw new PjException("historique : aucune commande ne correspond à " + trimmed.split("\\s+")[0]);
+            throw new PjException(Messages.get("history.noMatch", trimmed.split("\\s+")[0]));
         }
         interpreter.execute(line);
         return List.of();
@@ -117,8 +117,7 @@ public final class Repl {
             return List.of();
         }
         if (!args.isEmpty()) {
-            throw new PjException("history : option inconnue '" + Values.text(args.getLast())
-                    + "' (option disponible : --clear)");
+            throw new PjException(Messages.get("history.unknownOption", Values.text(args.getLast())));
         }
         List<Object> lines = new ArrayList<>();
         for (var entry : reader.getHistory()) {

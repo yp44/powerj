@@ -21,7 +21,7 @@ import io.powerj.api.ScriptBlock;
  * where size > 1mb                      # short form, equivalent to where { $_.size > 1mb }
  * </pre>
  */
-@CmdletInfo(name = "where", category = "Filtres", summary = "Filtre les objets du pipeline selon une condition",
+@CmdletInfo(name = "where", category = "Filters", summary = "Filters pipeline objects by a condition",
         examples = {"ls -r | where { $_.size > 1mb }", "ls | where { $_.name.endsWith(\".java\") && !$_.dir }",
                 "ls | where { f -> f.size > 1mb && !f.dir }", "ls | where size > 10kb", "git status --porcelain | where { $_.startsWith(\" M \") }",
                 "env | where { $_.name.startsWith(\"JAVA\") }"})
@@ -30,7 +30,7 @@ public final class Where implements Cmdlet<Where.Params, Object, Object> {
     /** Parameters of {@code where}. */
     public record Params(
             @Option(position = 0, mandatory = true,
-                    description = "Condition booléenne : lambda { f -> … }, bloc { $_… }, ou forme courte : propriété opérateur valeur")
+                    description = "Boolean condition: lambda { f -> … }, block { $_… }, or short form: property operator value")
             List<Object> condition) {
     }
 
@@ -57,7 +57,7 @@ public final class Where implements Cmdlet<Where.Params, Object, Object> {
             throw e;
         } catch (RuntimeException e) {
             // FR-36: an evaluation error is non-blocking, the object is skipped.
-            context.error(e.getMessage() + " (objet ignoré : " + abbreviate(input) + ")");
+            context.error(Messages.get("pipeline.object.skipped", e.getMessage(), abbreviate(input)));
             return;
         }
         if (keep) {
@@ -78,12 +78,11 @@ public final class Where implements Cmdlet<Where.Params, Object, Object> {
         if (words.size() == 3 && words.get(0) instanceof String property && words.get(1) instanceof String operator
                 && OPERATORS.contains(operator)) {
             if (!PROPERTY.matcher(property).matches()) {
-                throw new IllegalArgumentException("nom de propriété invalide : " + property);
+                throw new IllegalArgumentException(Messages.get("where.property.invalid", property));
             }
             return context.compile("$_." + property + " " + operator + " " + value(words.get(2)));
         }
-        throw new IllegalArgumentException("condition attendue : where { expression } ou where propriété opérateur valeur"
-                + " (opérateurs : == != < <= > >=)");
+        throw new IllegalArgumentException(Messages.get("where.condition.expected"));
     }
 
     /** Short-form value as expression text: literal as is, otherwise a quoted string. */
@@ -94,8 +93,8 @@ public final class Where implements Cmdlet<Where.Params, Object, Object> {
             case Boolean b -> b.toString();
             case String s when LITERAL.matcher(s).matches() -> s;
             case String s -> quote(s);
-            default -> throw new IllegalArgumentException("valeur non prise en charge par la forme courte : "
-                    + value.getClass().getSimpleName() + " ; utiliser where { … }");
+            default -> throw new IllegalArgumentException(Messages.get("where.value.unsupported",
+                    value.getClass().getSimpleName()));
         };
     }
 

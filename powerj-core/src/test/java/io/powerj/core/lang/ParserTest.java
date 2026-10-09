@@ -30,7 +30,7 @@ class ParserTest {
     @Test
     void caretForcesNative() {
         assertThat(only("^find x").body()).isEqualTo(new Command("find", true, List.of(new WordArgument("x"))));
-        assertThatThrownBy(() -> Parser.parse("^")).hasMessageContaining("nom de commande attendu");
+        assertThatThrownBy(() -> Parser.parse("^")).hasMessageContaining("command name expected");
     }
 
     @Test
@@ -65,19 +65,19 @@ class ParserTest {
 
     @Test
     void syntaxErrors() {
-        assertThatThrownBy(() -> Parser.parse("&& a")).hasMessageContaining("sans commande avant");
-        assertThatThrownBy(() -> Parser.parse("a &&")).hasMessageContaining("commande attendue après");
-        assertThatThrownBy(() -> Parser.parse("a >")).hasMessageContaining("fichier attendu");
-        assertThatThrownBy(() -> Parser.parse("$x =")).hasMessageContaining("valeur attendue");
-        assertThatThrownBy(() -> Parser.parse("ls |")).hasMessageContaining("commande attendue après « | »");
-        assertThatThrownBy(() -> Parser.parse("| ls")).hasMessageContaining("commande attendue");
-        assertThatThrownBy(() -> Parser.parse("ls | $x")).hasMessageContaining("première étape");
-        assertThatThrownBy(() -> Parser.parse("ls | { e -> e.name }")).hasMessageContaining("écrire map { … }");
-        assertThatThrownBy(() -> Parser.parse("ls | { $_.name }")).hasMessageContaining("écrire map { … }");
-        assertThatThrownBy(() -> Parser.parse("ls > f | where x")).hasMessageContaining("le placer à la fin");
-        assertThatThrownBy(() -> Parser.parse("where }")).hasMessageContaining("« } » sans « { »");
-        assertThatThrownBy(() -> Parser.parse("where { $_.x ")).hasMessageContaining("bloc non fermé");
-        assertThatThrownBy(() -> Parser.parse("$x.y = 1")).hasMessageContaining("affectation : $nom = valeur");
+        assertThatThrownBy(() -> Parser.parse("&& a")).hasMessageContaining("without a command before it");
+        assertThatThrownBy(() -> Parser.parse("a &&")).hasMessageContaining("command expected after");
+        assertThatThrownBy(() -> Parser.parse("a >")).hasMessageContaining("file expected");
+        assertThatThrownBy(() -> Parser.parse("$x =")).hasMessageContaining("value expected");
+        assertThatThrownBy(() -> Parser.parse("ls |")).hasMessageContaining("command expected after \"|\"");
+        assertThatThrownBy(() -> Parser.parse("| ls")).hasMessageContaining("command expected");
+        assertThatThrownBy(() -> Parser.parse("ls | $x")).hasMessageContaining("first stage");
+        assertThatThrownBy(() -> Parser.parse("ls | { e -> e.name }")).hasMessageContaining("write map { … }");
+        assertThatThrownBy(() -> Parser.parse("ls | { $_.name }")).hasMessageContaining("write map { … }");
+        assertThatThrownBy(() -> Parser.parse("ls > f | where x")).hasMessageContaining("put it at the end");
+        assertThatThrownBy(() -> Parser.parse("where }")).hasMessageContaining("\"}\" without a matching \"{\"");
+        assertThatThrownBy(() -> Parser.parse("where { $_.x ")).hasMessageContaining("unclosed block");
+        assertThatThrownBy(() -> Parser.parse("$x.y = 1")).hasMessageContaining("assignment: $name = value");
     }
 
     @Test
@@ -88,9 +88,9 @@ class ParserTest {
                 new WordArgument("members"),
                 new Ast.ExpressionArgument(new Ast.At(new Ast.SubExpression(pipeline(new Command("ls", false,
                         List.of(new WordArgument("-r"))))), new Ast.Literal(0))))));
-        assertThatThrownBy(() -> Parser.parse("(ls")).hasMessageContaining("« ) » manquante");
-        assertThatThrownBy(() -> Parser.parse("()")).hasMessageContaining("parenthèses vides");
-        assertThatThrownBy(() -> Parser.parse("ls)")).hasMessageContaining("« ) » inattendu");
+        assertThatThrownBy(() -> Parser.parse("(ls")).hasMessageContaining("missing \")\"");
+        assertThatThrownBy(() -> Parser.parse("()")).hasMessageContaining("empty parentheses");
+        assertThatThrownBy(() -> Parser.parse("ls)")).hasMessageContaining("unexpected \")\"");
         // A value followed by a pipeline, in parentheses.
         var grouped = (ExpressionBody) only("($l | where { $_ }).size()").body();
         assertThat(((Ast.Invoke) grouped.expression()).target()).isInstanceOf(Ast.SubExpression.class);

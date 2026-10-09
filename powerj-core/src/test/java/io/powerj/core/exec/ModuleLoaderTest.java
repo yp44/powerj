@@ -67,12 +67,12 @@ class ModuleLoaderTest {
         assertThat(run("hello -n Yves -c 2")).isEqualTo("""
                 name  message
                 ----  -------
-                Yves  Bonjour Yves
-                Yves  Bonjour Yves
+                Yves  Hello Yves
+                Yves  Hello Yves
                 """);
         assertThat(run("$g = hello -n Yves -c 2 ; $g*.message ; $g[1].name") + errors)
-                .isEqualTo("Bonjour Yves\nBonjour Yves\nYves\n[]");
-        assertThat(run("help hello")).contains("hello — Salue", "-n, --name", "Module : org.test.hello");
+                .isEqualTo("Hello Yves\nHello Yves\nYves\n[]");
+        assertThat(run("help hello")).contains("hello — Greets", "-n, --name", "Module: org.test.hello");
         assertThat(run("mod-list")).contains("org.test.hello", "[hello]", "hello.jar");
     }
 
@@ -87,9 +87,9 @@ class ModuleLoaderTest {
         assertThat(interpreter.commandKind("hello")).isEqualTo(Interpreter.CommandKind.UNKNOWN);
         assertThat(run("mod-load hello.jar")).isEqualTo("hello\n");
         assertThat(interpreter.commandKind("hello")).isEqualTo(Interpreter.CommandKind.CMDLET);
-        assertThat(run("(hello -n A).message")).isEqualTo("Bonjour A\n");
+        assertThat(run("(hello -n A).message")).isEqualTo("Hello A\n");
         run("mod-load hello.jar");
-        assertThat(errors).containsExactly("hello.jar : module org.test.hello déjà chargé", "mod-load : hello.jar non chargé");
+        assertThat(errors).containsExactly("hello.jar: module org.test.hello already loaded", "mod-load: hello.jar not loaded");
     }
 
     @Test
@@ -97,9 +97,9 @@ class ModuleLoaderTest {
         hello(tmp.resolve("other.jar"), "org.test.other", "items");
         run("mod-load other.jar");
         assertThat(errors).singleElement().asString()
-                .contains("« items »", "org.test.other", "accessible par other:items");
+                .contains("\"items\"", "org.test.other", "available as other:items");
         assertThat(run("items -n 1")).contains("item1"); // the first one keeps the short name
-        assertThat(run("other:items -n Q")).contains("Bonjour Q");
+        assertThat(run("other:items -n Q")).contains("Hello Q");
         assertThat(run("mod-list")).contains("[other:items]");
     }
 
@@ -107,7 +107,7 @@ class ModuleLoaderTest {
     void builtinNamesAreReserved() throws Exception {
         hello(tmp.resolve("bad.jar"), "org.test.bad", "cd");
         run("mod-load bad.jar");
-        assertThat(errors).first().asString().contains("« cd »", "nom réservé");
+        assertThat(errors).first().asString().contains("\"cd\"", "name reserved");
     }
 
     @Test
@@ -117,15 +117,15 @@ class ModuleLoaderTest {
         Path empty = tmp.resolve("empty.jar");
         jar(empty, "org.test.empty", Map.of());
         run("mod-load notes.txt");
-        assertThat(errors).first().asString().contains("un module est un fichier .jar");
+        assertThat(errors).first().asString().contains("a module is a .jar file");
         run("mod-load broken.jar");
-        assertThat(errors).first().asString().contains("broken.jar : module invalide");
+        assertThat(errors).first().asString().contains("broken.jar: invalid module");
         run("mod-load empty.jar");
-        assertThat(errors).first().asString().contains("aucun cmdlet");
+        assertThat(errors).first().asString().contains("no cmdlet");
         run("mod-load absent.jar");
-        assertThat(errors).first().asString().contains("module introuvable");
+        assertThat(errors).first().asString().contains("module not found");
         run("mod-list x");
-        assertThat(errors).first().asString().contains("aucun argument");
+        assertThat(errors).first().asString().contains("no arguments");
     }
 
     @Test
@@ -144,17 +144,17 @@ class ModuleLoaderTest {
                 "Params.java", """
                         package %s;
                         import io.powerj.api.Option;
-                        public record Params(@Option(shortName = 'n', mandatory = true, description = "Nom") String name,
+                        public record Params(@Option(shortName = 'n', mandatory = true, description = "Name") String name,
                                              @Option(shortName = 'c') int count) { }
                         """.formatted(pkg),
                 "Hello.java", """
                         package %s;
                         import io.powerj.api.*;
-                        @CmdletInfo(name = "%s", summary = "Salue")
+                        @CmdletInfo(name = "%s", summary = "Greets")
                         public final class Hello implements Cmdlet<Params, Void, Greeting> {
                             @Override public void begin(Params p, CmdletContext<Greeting> ctx) {
                                 for (int i = 0; i < Math.max(1, p.count()); i++) {
-                                    ctx.emit(new Greeting(p.name(), "Bonjour " + p.name()));
+                                    ctx.emit(new Greeting(p.name(), "Hello " + p.name()));
                                 }
                             }
                         }

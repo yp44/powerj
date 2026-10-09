@@ -2,6 +2,8 @@
 
 **Goal:** verify that the CI produces an installable, launchable `powerj.exe` with a minimal REPL.
 
+> Messages are shown in the system language; set `language=en` in config.properties (or `POWERJ_LANG=en`) to get the English texts quoted here.
+
 ## Getting the deliverables
 
 1. Open the **Actions** tab of the GitHub repository, then the latest run of the **CI** workflow on the branch under test.
@@ -15,9 +17,9 @@
 |---|---|---|
 | 1 | Run the installer, accept the proposed choices (installation for the current user). | Installation completes without administrator rights. |
 | 2 | Open **PowerJ** from the Start menu (*PowerJ* folder) or the desktop shortcut. | A console opens with the banner `PowerJ 0.1.0-SNAPSHOT (Java 27)` followed by the prompt `PJ C:\…> `. |
-| 3 | Type `bonjour` then Enter. | Message `commande inconnue : bonjour`, then a new prompt. |
+| 3 | Type `bonjour` then Enter. | Message `unknown command: bonjour`, then a new prompt. |
 | 4 | Press Enter on an empty line. | A new prompt, with no message. |
-| 5 | Type `exit trois`. | Message `exit : code retour invalide 'trois'`. |
+| 5 | Type `exit trois`. | Message `exit: invalid exit code 'trois'`. |
 | 6 | Type `exit`. | The window closes. |
 | 7 | Portable version: unzip the archive, open `cmd.exe` in the `powerj` folder, type `powerj.exe`. | Banner and prompt showing the current folder of `cmd.exe`. |
 | 8 | In PowerJ, type `exit 3`, then in `cmd.exe` type `echo %ERRORLEVEL%`. | Displays `3`. |

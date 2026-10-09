@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
+import io.powerj.api.Language;
 import io.powerj.core.BuildInfo;
 import io.powerj.core.exec.CmdletRegistry;
 import io.powerj.core.exec.Session;
@@ -71,7 +73,7 @@ class ReplTest {
     @Test
     void unknownCommandIsReportedAndTheShellContinues() throws Exception {
         assertThat(session("bonjour" + ENTER + "exit 2" + ENTER)).isEqualTo(2);
-        assertThat(screen).contains("commande inconnue : bonjour");
+        assertThat(screen).contains("unknown command: bonjour");
     }
 
     @Test
@@ -111,7 +113,7 @@ class ReplTest {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
         while (!condition.getAsBoolean()) {
             if (System.nanoTime() > deadline) {
-                throw new AssertionError("condition jamais atteinte");
+                throw new AssertionError("condition never reached");
             }
             Thread.sleep(10);
         }
@@ -146,7 +148,7 @@ class ReplTest {
         session(UP + UP + ENTER);
 
         assertThat(history).containsExactly("essai un", "essai deux", "essai un");
-        assertThat(screen).contains("commande inconnue : essai");
+        assertThat(screen).contains("unknown command: essai");
     }
 
     @Test
@@ -175,7 +177,7 @@ class ReplTest {
         session("alpha" + ENTER + "beta" + ENTER + "!!" + ENTER);
 
         assertThat(history).containsExactly("alpha", "beta");  // consecutive duplicate ignored
-        assertThat(screen.split("commande inconnue : beta", -1)).hasSize(3);
+        assertThat(screen.split("unknown command: beta", -1)).hasSize(3);
     }
 
     @Test
@@ -189,14 +191,34 @@ class ReplTest {
     void unknownHistoryEventIsReported() throws Exception {
         session("alpha" + ENTER + "!zzz" + ENTER);
 
-        assertThat(screen).contains("historique : aucune commande ne correspond à !zzz");
+        assertThat(screen).contains("history: no command matches !zzz");
+    }
+
+    @Test
+    void historyMessagesInFrench() throws Exception {
+        Language.set(Locale.FRENCH);
+        try {
+            session("alpha" + ENTER + "!zzz" + ENTER + "history -x" + ENTER);
+        } finally {
+            Language.set(Locale.ENGLISH);
+        }
+
+        assertThat(screen).contains("historique : aucune commande ne correspond à !zzz",
+                "history : option inconnue '-x' (option disponible : --clear)");
+    }
+
+    @Test
+    void historyUnknownOptionIsReported() throws Exception {
+        session("history -x" + ENTER);
+
+        assertThat(screen).contains("history: unknown option '-x' (available option: --clear)");
     }
 
     @Test
     void incompleteLineContinuesOnTheNextOne() throws Exception {
         session("liste |" + ENTER + "where { $_.dir" + ENTER + "}" + ENTER);
 
-        assertThat(screen).contains(">> ", "commande inconnue : liste");
+        assertThat(screen).contains(">> ", "unknown command: liste");
         assertThat(history).containsExactly("liste |\nwhere { $_.dir\n}");
     }
 

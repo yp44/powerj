@@ -62,7 +62,7 @@ public final class ModuleLoader {
                 }
             }
         } catch (IOException e) {
-            return List.of(Result.failure("modules : lecture impossible de " + dir + " (" + e.getMessage() + ")"));
+            return List.of(Result.failure(Messages.get("module.dirUnreadable", dir, e.getMessage())));
         }
         return entries.stream().map(this::load).toList();
     }
@@ -71,17 +71,17 @@ public final class ModuleLoader {
     public Result load(Path source) {
         Path path = source.toAbsolutePath().normalize();
         if (!Files.exists(path)) {
-            return Result.failure("module introuvable : " + path);
+            return Result.failure(Messages.get("module.notFound", path));
         }
         if (!Files.isDirectory(path) && !isJar(path)) {
-            return Result.failure(path.getFileName() + " : un module est un fichier .jar (ou un dossier de jars)");
+            return Result.failure(Messages.get("module.notJar", path.getFileName()));
         }
         try {
             return define(path);
         } catch (FindException | ResolutionException | LayerInstantiationException e) {
-            return Result.failure(path.getFileName() + " : module invalide (" + e.getMessage() + ")");
+            return Result.failure(Messages.get("module.invalid", path.getFileName(), e.getMessage()));
         } catch (ServiceConfigurationError | RuntimeException | LinkageError e) {
-            return Result.failure(path.getFileName() + " : erreur au chargement (" + e + ")");
+            return Result.failure(Messages.get("module.loadError", path.getFileName(), e));
         }
     }
 
@@ -96,11 +96,11 @@ public final class ModuleLoader {
             }
         }
         if (roots.isEmpty()) {
-            return Result.failure(path.getFileName() + " : aucun module nouveau (déjà fourni par PowerJ, ou dossier vide)");
+            return Result.failure(Messages.get("module.nothingNew", path.getFileName()));
         }
         for (String root : roots) {
             if (registry.hasModule(root)) {
-                return Result.failure(path.getFileName() + " : module " + root + " déjà chargé");
+                return Result.failure(Messages.get("module.alreadyLoaded", path.getFileName(), root));
             }
         }
         // Runtime and PowerJ modules first: a jar that bundles its own copy of powerj-api
@@ -131,13 +131,12 @@ public final class ModuleLoader {
             for (Cmdlet<?, ?, ?> cmdlet : provider.cmdlets()) {
                 var info = cmdlet.getClass().getAnnotation(io.powerj.api.CmdletInfo.class);
                 if (info != null && reserved.contains(info.name())) {
-                    warnings.add("cmdlet « " + info.name() + " » du module " + module.getName()
-                            + " ignoré : nom réservé à une commande interne");
+                    warnings.add(Messages.get("module.reservedName", info.name(), module.getName()));
                 } else {
                     provided.add(cmdlet);
                 }
             }
-            warnings.addAll(registry.addModule(module, Optional.of(path), provided));
+            warnings.addAll(registry.addModule(module, Optional.of(path), provider, provided));
         }
         for (var loaded : registry.modules()) {
             if (layer.findModule(loaded.name()).filter(m -> m.getLayer() == layer).isPresent()) {
@@ -145,8 +144,7 @@ public final class ModuleLoader {
             }
         }
         if (!found) {
-            warnings.add(path.getFileName() + " : aucun cmdlet (le module doit déclarer « provides "
-                    + CmdletProvider.class.getName() + " with … »)");
+            warnings.add(Messages.get("module.noCmdlet", path.getFileName(), CmdletProvider.class.getName()));
         }
         return new Result(List.copyOf(cmdlets), List.copyOf(warnings));
     }

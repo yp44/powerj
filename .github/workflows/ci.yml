@@ -89,9 +89,27 @@ jobs:
           $pj -c 'mod-list' >> greet.txt
           $pj -c 'new com.example.greet.Greeting("a", "b", null)' >> greet.txt 2>&1 || true
           cat greet.txt
-          test "$(grep -c 'Bonjour Yves !' greet.txt)" -eq 2
+          test "$(grep -c 'Hello Yves!' greet.txt)" -eq 2
           grep -q 'com.example.greet .*\[greet\]' greet.txt
-          grep -q 'classe introuvable : com.example.greet.Greeting' greet.txt
+          grep -q 'class not found: com.example.greet.Greeting' greet.txt
+
+      - name: Test de fumée des langues (en / fr)
+        run: |
+          pj=$PWD/powerj-dist/target/jpackage/powerj/bin/powerj
+          export POWERJ_HOME=$RUNNER_TEMP/pjhome
+          POWERJ_LANG=en $pj -c 'nope' > lang.txt 2>&1 || true
+          POWERJ_LANG=fr $pj -c 'nope' >> lang.txt 2>&1 || true
+          POWERJ_LANG=fr $pj -c 'help ls' >> lang.txt 2>&1
+          POWERJ_LANG=fr $pj -c 'greet -n Yves' >> lang.txt 2>&1
+          printf 'language=fr\n' > $POWERJ_HOME/config.properties
+          $pj -c '1 +' >> lang.txt 2>&1 || true
+          rm $POWERJ_HOME/config.properties
+          cat lang.txt
+          grep -q 'unknown command: nope' lang.txt
+          grep -q 'commande inconnue : nope' lang.txt
+          grep -q 'ls — Liste les fichiers et dossiers' lang.txt
+          grep -q 'Bonjour Yves !' lang.txt
+          grep -q 'syntaxe : expression incomplète' lang.txt
 
       - name: Module d'exemple greet.jar
         uses: actions/upload-artifact@v5
@@ -186,7 +204,15 @@ jobs:
           Copy-Item examples\greet\target\greet.jar "$env:POWERJ_HOME\modules\"
           $lignes = & $pj -c 'greet -n Yves -c 2 | map { g -> g.message }'
           $lignes
-          if (($lignes -join ',') -ne 'Bonjour Yves !,Bonjour Yves !') { throw "greet incorrect : $lignes" }
+          if (($lignes -join ',') -ne 'Hello Yves!,Hello Yves!') { throw "greet incorrect : $lignes" }
+          $env:POWERJ_LANG = 'fr'
+          $fr = & $pj -c 'greet -n Yves'
+          $fr
+          if (-not ($fr -match 'Bonjour Yves !')) { throw "greet en français incorrect : $fr" }
+          $fr = & $pj -c 'nope' 2>&1 | Out-String
+          $fr
+          if (-not ($fr -match 'commande inconnue : nope')) { throw "message français absent : $fr" }
+          Remove-Item Env:POWERJ_LANG
           $modules = & $pj -c 'mod-list'
           $modules
           if (-not ($modules -match 'com.example.greet')) { throw "mod-list ne liste pas com.example.greet" }

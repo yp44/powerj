@@ -68,8 +68,8 @@ class CompletionsTest {
 
     @Test
     void commandsWithTheirNature() {
-        assertThat(displays("l")).contains("ls [pj]", "lsblk-like [natif]");
-        assertThat(displays("wh")).contains("where [pj]", "which [interne]");
+        assertThat(displays("l")).contains("ls [pj]", "lsblk-like [native]");
+        assertThat(displays("wh")).contains("where [pj]", "which [internal]");
         assertThat(values("^l")).containsExactly("lsblk-like");
         assertThat(values("ls | wh")).contains("where");
         assertThat(values("$x = l")).contains("ls");

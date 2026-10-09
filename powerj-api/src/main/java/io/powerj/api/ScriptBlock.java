@@ -24,7 +24,7 @@ public interface ScriptBlock {
         if (value instanceof Boolean b) {
             return b;
         }
-        throw new IllegalStateException("le bloc doit renvoyer un booléen, reçu "
-                + (value == null ? "null" : value.getClass().getSimpleName() + " " + value));
+        throw new IllegalStateException(Messages.get("block.notBoolean",
+                value == null ? "null" : value.getClass().getSimpleName() + " " + value));
     }
 }

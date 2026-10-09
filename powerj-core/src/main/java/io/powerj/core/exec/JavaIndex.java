@@ -50,7 +50,7 @@ public final class JavaIndex {
             try {
                 packagesToLoad.forEach(this::classes);
             } catch (RuntimeException e) {
-                LOG.log(Level.FINE, "Index Java incomplet", e);
+                LOG.log(Level.FINE, "Incomplete Java index", e);
             }
         });
     }
@@ -91,7 +91,7 @@ public final class JavaIndex {
                     .filter(n -> isPublic(pkg + "." + n))
                     .forEach(names::add);
         } catch (IOException e) {
-            LOG.log(Level.FINE, "Lecture du module " + moduleName + " impossible", e);
+            LOG.log(Level.FINE, "Cannot read module " + moduleName, e);
         }
         return List.copyOf(names);
     }

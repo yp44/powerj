@@ -61,12 +61,12 @@ public final class JavaClasses {
         if (target.endsWith(".*")) {
             String pkg = target.substring(0, target.length() - 2);
             if (!isExportedPackage(pkg)) {
-                throw new PjException("import : package introuvable dans la bibliothèque Java : " + pkg);
+                throw new PjException(Messages.get("import.packageNotFound", pkg));
             }
             packages.add(pkg);
         } else {
             Class<?> type = qualified(target).orElseThrow(() ->
-                    new PjException("import : classe introuvable dans la bibliothèque Java : " + target));
+                    new PjException(Messages.get("import.classNotFound", target)));
             classImports.put(type.getSimpleName(), target);
         }
         simpleNames.clear();
@@ -100,10 +100,9 @@ public final class JavaClasses {
     /** Like {@link #find}, with an explicit error message (ambiguity between imports, unknown class). */
     public Class<?> require(String name) {
         if (!name.contains(".") && simple(name) instanceof Lookup.Ambiguous(var candidates)) {
-            throw new PjException("nom ambigu : " + name + " (" + String.join(", ", candidates)
-                    + ") ; préciser le nom complet");
+            throw new PjException(Messages.get("java.ambiguousName", name, String.join(", ", candidates)));
         }
-        return find(name).orElseThrow(() -> new PjException("classe introuvable : " + name));
+        return find(name).orElseThrow(() -> new PjException(Messages.get("java.classNotFound", name)));
     }
 
     /** Class designated by a simple name through the imports, if it exists and is not ambiguous. */
@@ -114,8 +113,7 @@ public final class JavaClasses {
     /** Throws the ambiguity error if {@code name} matches several imports. */
     void checkAmbiguity(String name) {
         if (simple(name) instanceof Lookup.Ambiguous(var candidates)) {
-            throw new PjException("nom ambigu : " + name + " (" + String.join(", ", candidates)
-                    + ") ; préciser le nom complet");
+            throw new PjException(Messages.get("java.ambiguousName", name, String.join(", ", candidates)));
         }
     }
 

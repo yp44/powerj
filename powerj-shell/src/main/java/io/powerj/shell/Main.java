@@ -15,6 +15,7 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -24,6 +25,7 @@ import org.jline.terminal.TerminalBuilder;
 import org.jline.utils.WriterOutputStream;
 
 import io.powerj.core.BuildInfo;
+import io.powerj.api.Language;
 import io.powerj.core.exec.CmdletRegistry;
 import io.powerj.core.exec.NativeEncoding;
 import io.powerj.core.exec.Session;
@@ -47,12 +49,18 @@ public final class Main {
         try {
             home.createDirectories();
         } catch (IOException e) {
-            System.err.println("PowerJ : impossible de créer " + home.dir() + " (" + e.getMessage() + ")");
+            // Language not resolved yet: system locale (or -Dpowerj.language).
+            System.err.println(Messages.get("home.createFailed", home.dir(), e.getMessage()));
         }
         DiagnosticLog.install(home.logsDir(), debug);
+        ShellConfig config = ShellConfig.load(home.configFile());
+        // Language of the messages (FR-61): -Dpowerj.language, POWERJ_LANG, config.properties, then the system.
+        Language.set(Language.resolve(System.getProperty(Language.PROPERTY),
+                System.getenv(Language.ENVIRONMENT_VARIABLE), config.language(),
+                Locale.getDefault(Locale.Category.DISPLAY)));
         List<String> rest = Arrays.stream(args).filter(a -> !a.equals("--debug")).toList();
         if (rest.isEmpty()) {
-            System.exit(run(home, ShellConfig.load(home.configFile())));
+            System.exit(run(home, config));
         }
         System.exit(runScript(rest));
     }
@@ -62,7 +70,7 @@ public final class Main {
         List<String> lines;
         if (args.getFirst().equals("-c")) {
             if (args.size() != 2) {
-                System.err.println("usage : powerj -c \"<ligne>\"  |  powerj <fichier.pj>  |  powerj");
+                System.err.println(Messages.get("usage"));
                 return 2;
             }
             lines = List.of(args.get(1));
@@ -71,11 +79,11 @@ public final class Main {
             try {
                 lines = Files.readAllLines(file, StandardCharsets.UTF_8);
             } catch (IOException e) {
-                System.err.println("PowerJ : lecture impossible de " + file + " (" + e.getMessage() + ")");
+                System.err.println(Messages.get("script.readFailed", file, e.getMessage()));
                 return 2;
             }
         } else {
-            System.err.println("usage : powerj -c \"<ligne>\"  |  powerj <fichier.pj>  |  powerj");
+            System.err.println(Messages.get("usage"));
             return 2;
         }
         boolean console = isInteractiveConsole();
@@ -129,8 +137,8 @@ public final class Main {
             }
             terminal = builder.build();
         } catch (IOException e) {
-            LOG.log(Level.SEVERE, "Terminal indisponible", e);
-            System.err.println("PowerJ : terminal indisponible (" + e.getMessage() + ")");
+            LOG.log(Level.SEVERE, "Terminal unavailable", e);
+            System.err.println(Messages.get("terminal.unavailable", e.getMessage()));
             return 1;
         }
         // The terminal is restored (raw mode disabled) even on an abrupt shutdown (FR-59).
@@ -148,7 +156,7 @@ public final class Main {
             try {
                 reader.getHistory().save();
             } catch (IOException e) {
-                LOG.log(Level.WARNING, "Sauvegarde de l'historique impossible", e);
+                LOG.log(Level.WARNING, "Cannot save the history", e);
             }
             return code;
         } finally {
@@ -170,7 +178,7 @@ public final class Main {
         try {
             terminal.close();
         } catch (IOException e) {
-            LOG.log(Level.FINE, "Fermeture du terminal", e);
+            LOG.log(Level.FINE, "Closing the terminal", e);
         }
     }
 }

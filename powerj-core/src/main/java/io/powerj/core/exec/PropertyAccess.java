@@ -35,7 +35,7 @@ public final class PropertyAccess {
 
     static Object property(Object target, String name) {
         if (target == null) {
-            throw new PjException("propriété '" + name + "' sur une valeur nulle");
+            throw new PjException(Messages.get("property.onNull", name));
         }
         if (target instanceof Map<?, ?> map) {
             return map.get(name);
@@ -46,20 +46,21 @@ public final class PropertyAccess {
         }
         List<String> hints = new ArrayList<>();
         if (target instanceof Collection<?> || target.getClass().isArray()) {
-            hints.add("pour chaque élément : *." + name);
+            hints.add(Messages.get("property.hint.each", name));
         }
         if (JavaInvoker.hasNoArgMethod(target.getClass(), name)) {
-            hints.add("méthode : " + name + "()");
+            hints.add(Messages.get("property.hint.method", name));
         }
         if (hints.isEmpty()) {
-            List<String> known = Members.of(target).stream().filter(m -> !m.kind().equals("méthode"))
+            List<String> known = Members.of(target).stream().filter(m -> m.kind() != Members.Kind.METHOD)
                     .map(Members.Member::name).limit(12).toList();
             if (!known.isEmpty()) {
-                hints.add("propriétés : " + String.join(", ", known));
+                hints.add(Messages.get("property.hint.properties", String.join(", ", known)));
             }
         }
-        throw new PjException(typeName(target) + " n'a pas de propriété '" + name + "'"
-                + (hints.isEmpty() ? "" : " (" + String.join(" ; ", hints) + ")"));
+        throw new PjException(hints.isEmpty() ? Messages.get("property.missing", typeName(target), name)
+                : Messages.get("property.missing.hints", typeName(target), name,
+                        String.join(Messages.get("property.hint.separator"), hints)));
     }
 
     /** Readable name: {@code List} rather than an internal JDK class ({@code UnmodifiableRandomAccessList}). */
@@ -98,27 +99,27 @@ public final class PropertyAccess {
             }
         } catch (InvocationTargetException e) {
             Throwable cause = e.getCause();
-            throw new PjException(PjError.of("lecture de la propriété '" + name + "' : " + cause, cause));
+            throw new PjException(PjError.of(Messages.get("property.readFailed", name, cause), cause));
         } catch (ReflectiveOperationException e) {
-            throw new PjException(PjError.of("lecture de la propriété '" + name + "' impossible : " + e, e));
+            throw new PjException(PjError.of(Messages.get("property.readImpossible", name, e), e));
         }
         return Lookup.MISSING;
     }
 
     static Object index(Object target, int index) {
         return switch (target) {
-            case null -> throw new PjException("index [" + index + "] sur une valeur nulle");
+            case null -> throw new PjException(Messages.get("index.onNull", index));
             case List<?> list -> list.get(position(index, list.size()));
             case CharSequence text -> String.valueOf(text.charAt(position(index, text.length())));
             case Object array when array.getClass().isArray() -> Array.get(array, position(index, Array.getLength(array)));
-            default -> throw new PjException(target.getClass().getSimpleName() + " ne s'indexe pas");
+            default -> throw new PjException(Messages.get("index.notIndexable", target.getClass().getSimpleName()));
         };
     }
 
     private static int position(int index, int size) {
         int position = index < 0 ? size + index : index;
         if (position < 0 || position >= size) {
-            throw new PjException("index [" + index + "] hors limites (taille " + size + ")");
+            throw new PjException(Messages.get("index.outOfBounds", index, size));
         }
         return position;
     }

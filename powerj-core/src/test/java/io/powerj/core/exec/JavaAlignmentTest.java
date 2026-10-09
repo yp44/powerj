@@ -94,26 +94,26 @@ class JavaAlignmentTest {
     @Test
     void conditionsMustBeBooleans() throws Exception {
         assertThat(run("items | filter { i -> i.name } | count")).isEqualTo("0\n");
-        assertThat(errors).hasSize(3).allSatisfy(e -> assertThat(e).contains("le bloc doit renvoyer un booléen", "String"));
+        assertThat(errors).hasSize(3).allSatisfy(e -> assertThat(e).contains("the block must return a boolean", "String"));
         run("$x = (1 && true)");
-        assertThat(errors).singleElement().asString().contains("« && » attend un booléen");
+        assertThat(errors).singleElement().asString().contains("\"&&\" expects a boolean");
     }
 
     @Test
     void parameterCountsAreChecked() throws Exception {
         run("$m = new ArrayList(List.of(\"b\", \"a\"))");
         run("$m.sort({ $a.compareTo($b) })");
-        assertThat(errors).singleElement().asString().contains("ce bloc reçoit 2 arguments", "(a, b) ->");
+        assertThat(errors).singleElement().asString().contains("this block receives 2 arguments", "(a, b) ->");
         run("$m.sort({ x -> x })");
-        assertThat(errors).singleElement().asString().contains("déclare 1 paramètre(s), 2 reçu(s)");
+        assertThat(errors).singleElement().asString().contains("declares 1 parameter, 2 received");
     }
 
     @Test
     void lambdaSyntaxErrors() {
         assertThatThrownBy(() -> interpreter.execute("items | filter i -> i.size"))
-                .hasMessageContaining("une lambda s'écrit entre accolades");
-        assertThatThrownBy(() -> interpreter.execute("items | filter { i -> }")).hasMessageContaining("corps de lambda attendu");
-        assertThatThrownBy(() -> interpreter.execute("items | filter { (a, a) -> 1 }")).hasMessageContaining("en double");
+                .hasMessageContaining("a lambda is written in braces");
+        assertThatThrownBy(() -> interpreter.execute("items | filter { i -> }")).hasMessageContaining("lambda body expected");
+        assertThatThrownBy(() -> interpreter.execute("items | filter { (a, a) -> 1 }")).hasMessageContaining("duplicate lambda parameter");
     }
 
     @Test
@@ -125,6 +125,6 @@ class JavaAlignmentTest {
     void textBlocks() throws Exception {
         assertThat(value("\"\"\"\n    Bonjour \"monde\"\n      n=$(1 + 1)\n    \"\"\"")).isEqualTo("Bonjour \"monde\"\n  n=2\n");
         assertThat(value("\"\"\"\n    a\n    b\"\"\".lines().count()")).isEqualTo(2L);
-        assertThatThrownBy(() -> interpreter.execute("\"\"\"abc\"\"\"")).hasMessageContaining("retour à la ligne");
+        assertThatThrownBy(() -> interpreter.execute("\"\"\"abc\"\"\"")).hasMessageContaining("line break");
     }
 }

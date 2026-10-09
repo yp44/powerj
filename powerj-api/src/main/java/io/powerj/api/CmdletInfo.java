@@ -16,7 +16,7 @@ public @interface CmdletInfo {
     String name();
 
     /** Category in {@code help}. */
-    String category() default "Divers";
+    String category() default "Misc";
 
     /** One-line summary. */
     String summary();

@@ -1,6 +1,7 @@
 package io.powerj.core.lang;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -92,7 +93,7 @@ public final class ExpressionParser {
     public static Expression parse(String source, Predicate<String> staticNames) {
         var parser = new ExpressionParser(source, 0, Mode.BLOCK, staticNames);
         if (parser.atEnd()) {
-            throw new SyntaxException("bloc vide { }");
+            throw new SyntaxException(Messages.get("syntax.emptyBlock"));
         }
         Expression expression = parser.expression();
         if (!parser.atEnd()) {
@@ -113,7 +114,7 @@ public final class ExpressionParser {
             List<String> parameters = parameters(header);
             String body = source.substring(header.end());
             if (body.isBlank()) {
-                throw new SyntaxException("corps de lambda attendu après « -> »");
+                throw new SyntaxException(Messages.get("syntax.lambdaBodyExpected"));
             }
             return new Ast.Lambda(source.strip(), parameters, parse(body, withParameters(staticNames, parameters)));
         }
@@ -182,7 +183,7 @@ public final class ExpressionParser {
         for (String name : header.group(2).split(",")) {
             String trimmed = name.strip();
             if (names.contains(trimmed)) {
-                throw new SyntaxException("paramètre de lambda en double : " + trimmed);
+                throw new SyntaxException(Messages.get("syntax.duplicateLambdaParameter", trimmed));
             }
             names.add(trimmed);
         }
@@ -308,7 +309,7 @@ public final class ExpressionParser {
             if (isSymbol(token, ".")) {
                 next();
                 if (atEnd() || !(peek() instanceof Ident(var name, var at, _)) || restricted() && at != pos) {
-                    throw new SyntaxException("nom attendu après « . »" + where());
+                    throw located("syntax.nameExpectedAfterDot");
                 }
                 next();
                 if (!atEnd() && isSymbol(peek(), "(") && peek().at() == pos) {
@@ -321,7 +322,7 @@ public final class ExpressionParser {
                 next(); // *
                 next(); // .
                 if (atEnd() || !(peek() instanceof Ident(var name, var at, _)) || at != pos) {
-                    throw new SyntaxException("nom attendu après « *. »" + where());
+                    throw located("syntax.nameExpectedAfterSpread");
                 }
                 next();
                 if (!atEnd() && isSymbol(peek(), "(") && peek().at() == pos) {
@@ -333,7 +334,7 @@ public final class ExpressionParser {
             } else if (isSymbol(token, "::")) {
                 next();
                 if (atEnd() || !(peek() instanceof Ident(var name, var at, _)) || restricted() && at != pos) {
-                    throw new SyntaxException("nom de méthode attendu après « :: »" + where());
+                    throw located("syntax.methodNameExpected");
                 }
                 next();
                 current = new Ast.MethodRef(current, name);
@@ -403,7 +404,7 @@ public final class ExpressionParser {
 
     private Expression primary() {
         if (atEnd()) {
-            throw new SyntaxException("expression incomplète" + context());
+            throw inContext("syntax.incompleteExpression");
         }
         Tok token = next();
         return switch (token) {
@@ -425,24 +426,25 @@ public final class ExpressionParser {
 
     /** {@code new qualified.Name(arguments)}. */
     private Expression instantiation() {
-        String type = qualifiedName("new");
+        String type = qualifiedName();
         if (atEnd() || !isSymbol(peek(), "(")) {
-            throw new SyntaxException("« ( » attendu après new " + type);
+            throw new SyntaxException(Messages.get("syntax.openParenExpectedAfterNew", type));
         }
         next();
         return new Ast.New(type, callArguments());
     }
 
-    private String qualifiedName(String after) {
+    /** Class name after {@code new}. */
+    private String qualifiedName() {
         if (atEnd() || !(peek() instanceof Ident(var first, _, _))) {
-            throw new SyntaxException("nom de classe attendu après " + after + where());
+            throw located("syntax.classNameExpected");
         }
         next();
         var name = new StringBuilder(first);
         while (!atEnd() && isSymbol(peek(), ".") && peek().at() == pos) {
             next();
             if (atEnd() || !(peek() instanceof Ident(var part, _, _))) {
-                throw new SyntaxException("nom attendu après « . »" + where());
+                throw located("syntax.nameExpectedAfterDot");
             }
             next();
             name.append('.').append(part);
@@ -458,11 +460,11 @@ public final class ExpressionParser {
         int open = paren.at();
         int close = matching(input, open);
         if (close < 0) {
-            throw new SyntaxException("« ) » manquante (ouverte à la position " + (open + 1) + ")");
+            throw new SyntaxException(Messages.get("syntax.missingCloseParen", open + 1));
         }
         int contentStart = skipBlanks(input, open + 1);
         if (contentStart == close) {
-            throw new SyntaxException("parenthèses vides");
+            throw new SyntaxException(Messages.get("syntax.emptyParentheses"));
         }
         if (Lexer.expressionAt(input, contentStart, staticNames)) {
             depth++;
@@ -516,7 +518,7 @@ public final class ExpressionParser {
     private Expression block(Tok brace) {
         int close = matching(input, brace.at());
         if (close < 0) {
-            throw new SyntaxException("bloc non fermé (« { » à la position " + (brace.at() + 1) + ")");
+            throw new SyntaxException(Messages.get("syntax.unclosedBlock", brace.at() + 1));
         }
         String source = input.substring(brace.at() + 1, close);
         reset(close + 1);
@@ -543,8 +545,7 @@ public final class ExpressionParser {
 
     private void expect(String symbol) {
         if (atEnd() || !isSymbol(peek(), symbol)) {
-            throw atEnd() ? new SyntaxException("« " + symbol + " » manquant" + context())
-                    : new SyntaxException("« " + symbol + " » attendu" + where());
+            throw atEnd() ? inContext("syntax.missing", symbol) : located("syntax.expected", symbol);
         }
         next();
     }
@@ -562,19 +563,33 @@ public final class ExpressionParser {
 
     private SyntaxException unexpected(Tok token) {
         if (isSymbol(token, "=")) {
-            return new SyntaxException("« = » dans une expression : pour comparer, utiliser == (position "
-                    + (token.at() + 1) + ")");
+            return new SyntaxException(Messages.get("syntax.equalsInExpression", token.at() + 1));
         }
         String text = input.substring(token.at(), token.end());
-        return new SyntaxException("« " + text + " » inattendu (position " + (token.at() + 1) + ")");
+        return new SyntaxException(Messages.get("syntax.unexpectedAt", text, token.at() + 1));
     }
 
-    private String where() {
-        return atEnd() ? " en fin d'expression" : " à la position " + (peek().at() + 1);
+    /**
+     * Error {@code key + ".end"} at the end of the expression, otherwise {@code key + ".at"} with the
+     * position of the next token as last argument.
+     */
+    private SyntaxException located(String key, Object... args) {
+        if (atEnd()) {
+            return new SyntaxException(Messages.get(key + ".end", args));
+        }
+        Object[] withPosition = Arrays.copyOf(args, args.length + 1);
+        withPosition[args.length] = peek().at() + 1;
+        return new SyntaxException(Messages.get(key + ".at", withPosition));
     }
 
-    private String context() {
-        return mode == Mode.BLOCK ? " dans { " + input.strip() + " }" : "";
+    /** Error {@code key}, or {@code key + ".block"} with the block source as last argument in a block. */
+    private SyntaxException inContext(String key, Object... args) {
+        if (mode != Mode.BLOCK) {
+            return new SyntaxException(Messages.get(key, args));
+        }
+        Object[] withSource = Arrays.copyOf(args, args.length + 1);
+        withSource[args.length] = input.strip();
+        return new SyntaxException(Messages.get(key + ".block", withSource));
     }
 
     private void reset(int position) {
@@ -656,7 +671,7 @@ public final class ExpressionParser {
             end++;
         }
         if (end == start) {
-            throw new SyntaxException("nom de variable attendu après $ (position " + (dollar + 1) + ")");
+            throw new SyntaxException(Messages.get("syntax.variableNameExpected", dollar + 1));
         }
         return new Variable(input.substring(start, end), dollar, end);
     }
@@ -691,22 +706,22 @@ public final class ExpressionParser {
                 return new Value(Long.valueOf(digits), start, end);
             }
         } catch (NumberFormatException _) {
-            throw new SyntaxException("nombre trop grand : " + digits);
+            throw new SyntaxException(Messages.get("syntax.numberTooLarge", digits));
         }
-        Object value = Units.parse(digits + suffix).orElseThrow(() -> new SyntaxException("nombre invalide : "
-                + digits + suffix + " (unités : b kb mb gb tb, ms s m h d)"));
+        Object value = Units.parse(digits + suffix).orElseThrow(() -> new SyntaxException(
+                Messages.get("syntax.invalidNumber", digits + suffix)));
         return new Value(value, start, end);
     }
 
     private Lexer.Scanned<Character> character(int open) {
         int at = open + 1;
         if (at >= input.length()) {
-            throw new SyntaxException("caractère non fermé (position " + (open + 1) + ")");
+            throw new SyntaxException(Messages.get("syntax.unclosedCharacter", open + 1));
         }
         char value = input.charAt(at++);
         if (value == '\\') {
             if (at >= input.length()) {
-                throw new SyntaxException("caractère non fermé (position " + (open + 1) + ")");
+                throw new SyntaxException(Messages.get("syntax.unclosedCharacter", open + 1));
             }
             char e = input.charAt(at++);
             value = switch (e) {
@@ -721,24 +736,23 @@ public final class ExpressionParser {
                 case '0' -> '\0';
                 case 'u' -> {
                     if (at + 4 > input.length()) {
-                        throw new SyntaxException("échappement \\u incomplet");
+                        throw new SyntaxException(Messages.get("syntax.incompleteUnicodeEscape"));
                     }
                     try {
                         char u = (char) Integer.parseInt(input.substring(at, at + 4), 16);
                         at += 4;
                         yield u;
                     } catch (NumberFormatException _) {
-                        throw new SyntaxException("échappement \\u" + input.substring(at, at + 4) + " invalide");
+                        throw new SyntaxException(Messages.get("syntax.invalidUnicodeEscape", input.substring(at, at + 4)));
                     }
                 }
-                default -> throw new SyntaxException("échappement inconnu \\" + e);
+                default -> throw new SyntaxException(Messages.get("syntax.unknownEscape", e));
             };
         } else if (value == '\'') {
-            throw new SyntaxException("caractère vide '' (position " + (open + 1) + ")");
+            throw new SyntaxException(Messages.get("syntax.emptyCharacter", open + 1));
         }
         if (at >= input.length() || input.charAt(at) != '\'') {
-            throw new SyntaxException("un caractère s'écrit entre apostrophes : 'a' ; pour une chaîne, utiliser \"…\""
-                    + " (position " + (open + 1) + ")");
+            throw new SyntaxException(Messages.get("syntax.characterQuotes", open + 1));
         }
         return new Lexer.Scanned<>(value, at + 1);
     }
