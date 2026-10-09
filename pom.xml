@@ -98,7 +98,7 @@
                     <artifactId>maven-surefire-plugin</artifactId>
                     <version>3.5.3</version>
                     <configuration>
-                        <!-- Messages in English whatever the machine or POWERJ_LANG (FR-60). -->
+                        <!-- Messages in English whatever the machine or POWERJ_LANG (FR-61). -->
                         <systemPropertyVariables>
                             <powerj.language>en</powerj.language>
                         </systemPropertyVariables>

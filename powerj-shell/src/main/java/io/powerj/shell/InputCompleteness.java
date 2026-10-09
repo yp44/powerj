@@ -22,6 +22,12 @@ final class InputCompleteness {
         record Incomplete(String missing, int openBrackets) implements Result { }
     }
 
+    /**
+     * {@link Result.Incomplete#missing()} for a line ending with an operator; internal value, never displayed
+     * (the continuation prompt does not use JLine's {@code %M}).
+     */
+    static final String MISSING_COMMAND = "command";
+
     private InputCompleteness() {
     }
 
@@ -59,7 +65,7 @@ final class InputCompleteness {
         }
         var trimmed = input.stripTrailing();
         if (trimmed.endsWith("|") || trimmed.endsWith("&&")) {
-            return new Result.Incomplete("commande", 0);
+            return new Result.Incomplete(MISSING_COMMAND, 0);
         }
         return new Result.Complete();
     }

@@ -2,6 +2,8 @@
 
 **Goal:** verify the `|` pipeline (cmdlets and native commands mixed), `{ }` blocks with Java syntax, the `where` cmdlet, the `2>&1` redirection, Ctrl+C on a pipeline and non-interactive mode (`powerj -c`, `.pj` file).
 
+> Messages are shown in the system language; set `language=en` in config.properties (or `POWERJ_LANG=en`) to get the English texts quoted here.
+
 ## Getting the deliverables
 
 As in the previous steps: **Actions** tab, latest run of the **CI** workflow, artifact `powerj-windows-x64-installer` or `powerj-windows-x64-portable`.
@@ -22,15 +24,15 @@ As in the previous steps: **Actions** tab, latest run of the **CI** workflow, ar
 | 10 | `^cmd /c "echo dehors& echo erreur 1>&2" 2>&1 \| where { $_.contains("erreur") }` | `erreur`: with `2>&1`, the error stream joins the output and goes through the pipeline. |
 | 11 | `^cmd /c "echo b& echo a" \| ^sort` | `a` then `b`: native → native, bytes passed directly. |
 | 12 | `$gros = ls -r \| where size > 1mb` then `$gros*.name` then `(ls \| where { $_.dir })*.name` | The result of a pipeline can be assigned and used inside parentheses. |
-| 13 | `ls \| where { $_.size > now }` | For each object, a non-blocking error in red (`where : « > » impossible entre Long … et Instant …`), then the prompt; adding `--on-error silent` hides them, `--on-error stop` stops at the first one. |
-| 14 | `ls \| where { $_.size = 3 }` | `syntaxe : « = » dans un bloc : pour comparer, utiliser ==`: nothing is executed. |
-| 15 | `ls \| ls` | `« ls » ne lit pas les objets du pipeline`. |
+| 13 | `ls \| where { $_.size > now }` | For each object, a non-blocking error in red (`where: ">" is not possible between Long … and Instant … (object skipped: …)`), then the prompt; adding `--on-error silent` hides them, `--on-error stop` stops at the first one. |
+| 14 | `ls \| where { $_.size = 3 }` | `syntax: "=" in an expression: to compare, use == (position …)`: nothing is executed. |
+| 15 | `ls \| ls` | `"ls" does not read pipeline objects`. |
 | 16 | `ls \| where { $_.modified > now - 7d }` | Files modified less than 7 days ago (`now`, durations `7d`, `2h`, `30m`…). |
 | 17 | From `cmd.exe`, in the folder of `powerj.exe`: `powerj -c "ls C:\Windows \| where { $_.size > 1mb }"` | The table, then back to `cmd.exe`. |
 | 18 | `powerj -c "^cmd /c exit 3"` then `echo %ERRORLEVEL%` | `3`. |
 | 19 | `dir /b C:\Windows \| powerj -c "where { $_.endsWith(\".exe\") }"` | The `.exe` files of `C:\Windows`: the lines from standard input feed `where`. |
 | 20 | Create `test.pj` containing the two lines `ls C:\Windows \| where dir == true` and `exit 5`, then `powerj test.pj` and `echo %ERRORLEVEL%` | The folders of `C:\Windows`, then `5`. |
-| 21 | `powerj -c "commandeinconnue"` then `echo %ERRORLEVEL%` | `commande inconnue : commandeinconnue`, then `1`. |
+| 21 | `powerj -c "commandeinconnue"` then `echo %ERRORLEVEL%` | `unknown command: commandeinconnue`, then `1`. |
 
 Linux / macOS variant (archive `powerj-linux-x64`): replace `ipconfig` with `ip addr`, `^cmd /c …` with `sh -c "…"`, `dir /b` with `ls -1`, and launch `bin/powerj`.
 

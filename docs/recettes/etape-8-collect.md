@@ -2,6 +2,8 @@
 
 **Goal:** verify that `collect` gathers the objects of a pipeline into **a single list**, always a list (even with a single element or empty), and that the next stage receives this entire list.
 
+> Messages are shown in the system language; set `language=en` in config.properties (or `POWERJ_LANG=en`) to get the English texts quoted here.
+
 ## Getting the deliverables
 
 As in the previous steps: **Actions** tab, latest run of the **CI** workflow, artifact `powerj-windows-x64-installer` or `powerj-windows-x64-portable`.
@@ -32,8 +34,8 @@ Without `collect`, `( … )` and `$l = …` give the object **alone** when there
 | 7 | `ls C:\Windows --dirs \| collect` | Displayed like `ls C:\Windows --dirs` (a list is displayed through its elements). |
 | 8 | `ls \| collect \| where { l -> l.size() > 3 } \| map { l -> "plus de 3 : " + l.size() }` | One line if the current directory has more than 3 entries, nothing otherwise. |
 | 9 | `ls \| collect \| map { l -> l.` then Tab Tab | Methods of `List`: `size()`, `stream()`, `get(`… |
-| 10 | `help collect` | Help: summary, `Sortie : Collected`, examples. |
-| 11 | `ls \| collect -x` | Error `collect : option inconnue -x`. |
+| 10 | `help collect` | Help: summary `Gathers the pipeline objects into a single list`, `Output: Collected`, `Examples:`. |
+| 11 | `ls \| collect -x` | Error `collect: unknown option -x`. |
 
 ## Known limitations
 

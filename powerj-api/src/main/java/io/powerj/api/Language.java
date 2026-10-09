@@ -5,7 +5,7 @@ import java.util.MissingResourceException;
 import java.util.ResourceBundle;
 
 /**
- * Language of the messages displayed by PowerJ and its cmdlets: English or French (specification FR-60).
+ * Language of the messages displayed by PowerJ and its cmdlets: English or French (specification FR-61).
  * <p>
  * Resolution order: system property {@value #PROPERTY}, environment variable {@code POWERJ_LANG}, key
  * {@code language} of {@code config.properties}, then the language of the system. Any language other than

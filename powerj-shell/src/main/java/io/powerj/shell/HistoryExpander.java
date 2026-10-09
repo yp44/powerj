@@ -31,7 +31,7 @@ final class HistoryExpander implements Expander {
         };
         // JLine ignores the exception and leaves the line as is: the REPL will report the failure.
         return command.map(c -> c + m.group(2))
-                .orElseThrow(() -> new IllegalArgumentException("!" + event + " : introuvable"));
+                .orElseThrow(() -> new IllegalArgumentException("!" + event + ": event not found"));
     }
 
     @Override

@@ -107,7 +107,7 @@ final class ShellParser implements Parser {
     public ParsedLine parse(String line, int cursor, ParseContext context) {
         if (context == ParseContext.ACCEPT_LINE
                 && InputCompleteness.check(line) instanceof InputCompleteness.Result.Incomplete(var missing, var open)) {
-            throw new EOFError(-1, cursor, "saisie incomplète", missing, open, null);
+            throw new EOFError(-1, cursor, "incomplete input" /* internal: never displayed */, missing, open, null);
         }
         if (context == ParseContext.COMPLETE && completions != null) {
             Completions.Result result = completions.complete(line, cursor);

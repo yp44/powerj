@@ -14,7 +14,7 @@ import java.util.logging.Logger;
  * Settings read from {@code config.properties} (specification §8).
  *
  * @param historySize maximum number of history entries kept
- * @param language    {@code language} key ({@code en} or {@code fr}, FR-60), or {@code null} if absent
+ * @param language    {@code language} key ({@code en} or {@code fr}, FR-61), or {@code null} if absent
  */
 public record ShellConfig(int historySize, String language) {
 
@@ -26,7 +26,7 @@ public record ShellConfig(int historySize, String language) {
 
     public ShellConfig {
         if (historySize <= 0) {
-            throw new IllegalArgumentException("history.size doit être positif : " + historySize);
+            throw new IllegalArgumentException(Messages.get("config.historySize.notPositive", historySize));
         }
     }
 
@@ -42,7 +42,7 @@ public record ShellConfig(int historySize, String language) {
         } catch (NoSuchFileException _) {
             return defaults();
         } catch (IOException e) {
-            LOG.log(Level.WARNING, "Lecture de " + file + " impossible, réglages par défaut utilisés", e);
+            LOG.log(Level.WARNING, "Cannot read " + file + ", using default settings", e);
             return defaults();
         }
         return new ShellConfig(positiveInt(props, HISTORY_SIZE_KEY, DEFAULT_HISTORY_SIZE), props.getProperty(LANGUAGE_KEY));
@@ -61,7 +61,7 @@ public record ShellConfig(int historySize, String language) {
         } catch (NumberFormatException _) {
             // invalid value: reported below
         }
-        LOG.warning(() -> "Valeur invalide pour " + key + " : '" + text + "', " + defaultValue + " utilisé");
+        LOG.warning(() -> "Invalid value for " + key + ": '" + text + "', using " + defaultValue);
         return defaultValue;
     }
 }

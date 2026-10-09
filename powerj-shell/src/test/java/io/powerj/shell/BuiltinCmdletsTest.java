@@ -77,8 +77,8 @@ class BuiltinCmdletsTest {
     @Test
     void lsOptionErrorsAndHelp() throws Exception {
         run("ls --recurce");
-        assertThat(errors).containsExactly("ls : option inconnue --recurce, vouliez-vous dire --recurse ?");
-        assertThat(run("ls --help")).contains("ls — Liste les fichiers et dossiers", "-r, --recurse", "Sortie : FileEntry");
+        assertThat(errors).containsExactly("ls: unknown option --recurce, did you mean --recurse?");
+        assertThat(run("ls --help")).contains("ls — Lists files and directories", "-r, --recurse", "Output: FileEntry");
         assertThat(run("which ls")).startsWith("ls → cmdlet ("); // module name: see the packaged binary
     }
 
@@ -90,12 +90,12 @@ class BuiltinCmdletsTest {
         run("env --unset POWERJ_AUTRE");
         assertThat(session.environment()).doesNotContainKey("POWERJ_AUTRE");
         run("env ABSENTE_XYZ");
-        assertThat(errors).containsExactly("env : variable absente : ABSENTE_XYZ");
+        assertThat(errors).containsExactly("env: no such variable: ABSENTE_XYZ");
     }
 
     @Test
     void helpListsCategories() throws Exception {
-        assertThat(run("help")).contains("Fichiers", "ls", "Système", "env");
+        assertThat(run("help")).contains("Files", "ls", "System", "env");
     }
 
     @Test
@@ -104,7 +104,7 @@ class BuiltinCmdletsTest {
         assertThat(run("(ls | where { $_.dir })*.name")).isEqualTo("docs\n");
         assertThat(run("(ls -r | where { $_.size > 6 && $_.modified > now - 1d })*.name")).isEqualTo("notes.txt\n");
         assertThat(run("(ls -r | where { List.of(\"md\", \"png\").contains($_.ext) })*.name")).isEqualTo("spec.md\n");
-        assertThatThrownBy(() -> run("ls | where { $_.size = 1 }")).hasMessageContaining("utiliser ==");
+        assertThatThrownBy(() -> run("ls | where { $_.size = 1 }")).hasMessageContaining("use ==");
     }
 
     @Test
@@ -114,19 +114,19 @@ class BuiltinCmdletsTest {
         assertThat(run("(ls -r | where size >= 6)*.name")).isEqualTo("spec.md\nnotes.txt\n");
         assertThat(run("(ls -r | where name != \"docs\" | where dir == false)*.name")).isEqualTo("spec.md\nnotes.txt\n");
         run("ls | where size");
-        assertThat(errors).singleElement().asString().contains("where : condition attendue");
+        assertThat(errors).singleElement().asString().contains("where: condition expected");
         run("ls | where size ~ 3");
-        assertThat(errors).singleElement().asString().contains("where : condition attendue");
+        assertThat(errors).singleElement().asString().contains("where: condition expected");
     }
 
     @Test
     void whereErrorsAreNonBlocking() throws Exception {
         assertThat(run("ls | where { $_.size / 0 > 1 }")).isEmpty();
-        assertThat(errors).hasSize(2).allSatisfy(e -> assertThat(e).startsWith("where : calcul impossible"));
+        assertThat(errors).hasSize(2).allSatisfy(e -> assertThat(e).startsWith("where: calculation failed"));
         run("ls | where { $_.size / 0 > 1 } --on-error silent");
         assertThat(errors).isEmpty();
         run("ls | where { $_.size / 0 > 1 } --on-error stop");
-        assertThat(errors).singleElement().asString().startsWith("where : calcul impossible");
+        assertThat(errors).singleElement().asString().startsWith("where: calculation failed");
     }
 
     @Test
@@ -134,8 +134,8 @@ class BuiltinCmdletsTest {
         assertThat(run("(env | where { $_.name.startsWith(\"POWERJ_T\") }).value")).isEqualTo("1\n");
         run("$l = (ls)*.name");
         assertThat(run("$l | where { $_.contains(\"o\") }")).isEqualTo("docs\nnotes.txt\n");
-        assertThat(run("where --help")).contains("where — Filtre les objets", "ls | where size > 10kb");
-        assertThat(run("help")).contains("Filtres", "where");
+        assertThat(run("where --help")).contains("where — Filters pipeline objects", "ls | where size > 10kb");
+        assertThat(run("help")).contains("Filters", "where");
     }
 
     @Test
@@ -149,9 +149,9 @@ class BuiltinCmdletsTest {
         assertThat(run("ls | map { f -> f.name.split(\"\\\\.\") }")).isEqualTo("docs\nnotes\ntxt\n");
         assertThat(run("ls | map { f -> null }")).isEmpty();
         run("ls | map 42");
-        assertThat(errors).singleElement().asString().contains("map : transformation attendue");
+        assertThat(errors).singleElement().asString().contains("map: transformation expected");
         run("ls | where { f -> f.name }");
-        assertThat(errors).hasSize(2).allSatisfy(e -> assertThat(e).contains("le bloc doit renvoyer un booléen"));
+        assertThat(errors).hasSize(2).allSatisfy(e -> assertThat(e).contains("the block must return a boolean"));
         assertThat(run("help")).contains("map");
     }
 
@@ -175,8 +175,8 @@ class BuiltinCmdletsTest {
         assertThat(run("$l.stream() | map { f -> f.name } | where { n -> n.endsWith(\".txt\") }")).isEqualTo("notes.txt\n");
         // Displayed at the end of a pipeline as its elements.
         assertThat(run("ls | collect")).contains("docs", "notes.txt");
-        assertThat(run("collect --help")).contains("collect — Rassemble les objets du pipeline en une seule liste");
+        assertThat(run("collect --help")).contains("collect — Gathers the pipeline objects into a single list");
         run("ls | collect -x");
-        assertThat(errors).containsExactly("collect : option inconnue -x");
+        assertThat(errors).containsExactly("collect: unknown option -x");
     }
 }

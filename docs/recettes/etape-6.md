@@ -2,6 +2,8 @@
 
 **Goal:** verify that Tab completes commands, options, paths, variables, properties and the Java API, and that the input is highlighted according to the kind of each word.
 
+> Messages are shown in the system language; set `language=en` in config.properties (or `POWERJ_LANG=en`) to get the English texts quoted here.
+
 ## Getting the deliverables
 
 As in the previous steps: **Actions** tab, latest run of the **CI** workflow, artifact `powerj-windows-x64-installer` or `powerj-windows-x64-portable`.
@@ -10,14 +12,14 @@ As in the previous steps: **Actions** tab, latest run of the **CI** workflow, ar
 
 - **First Tab**: completes the prefix common to all suggestions; if there is only one, completes it fully.
 - **Second Tab**: shows the menu of suggestions with their descriptions; Tab / Shift+Tab (or the arrow keys) to move through it, Enter to choose.
-- The menu shows the kind: `ls [pj]` (cmdlet), `cd [interne]`, `notepad [natif]`; the signature for Java: `of(Object...) : List`.
+- The menu shows the kind: `ls [pj]` (cmdlet), `cd [internal]`, `notepad [native]`; the signature for Java: `of(Object...) : List`.
 
 ## Scenario
 
 | # | Action | Expected result |
 |---|---|---|
 | 1 | `l` then Tab Tab | Menu: `ls [pj]` and the programs on the `PATH` starting with `l`. |
-| 2 | `ls --` then Tab Tab; then `ls -r --` then Tab Tab | Options of `ls` with their descriptions (`--recurse, -r  Parcourt les sous-dossiers`…); the second time, `--recurse` is no longer suggested. |
+| 2 | `ls --` then Tab Tab; then `ls -r --` then Tab Tab | Options of `ls` with their descriptions (`--recurse, -r  Walks subdirectories`…); the second time, `--recurse` is no longer suggested. |
 | 3 | `cd C:\Pro` then Tab | Completes to `"C:\\Program Files\\` (in quotes, because of the space); another Tab suggests the folder's contents. |
 | 4 | `ls C:\Win` then Tab, then `Sys` Tab | `C:\Windows\`, then `C:\Windows\System32\`. |
 | 5 | `ls \| where { $_.` then Tab Tab | `name size modified path dir ext` (properties of `FileEntry`, output of `ls`) and the methods. |

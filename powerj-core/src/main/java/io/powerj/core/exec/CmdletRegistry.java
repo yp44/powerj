@@ -35,7 +35,7 @@ public final class CmdletRegistry {
             return info.name();
         }
 
-        /** Summary in the current language ({@code <name>.summary} of the provider's messages, FR-60). */
+        /** Summary in the current language ({@code <name>.summary} of the provider's messages, FR-61). */
         public String summary() {
             return translated(name() + ".summary", info.summary());
         }

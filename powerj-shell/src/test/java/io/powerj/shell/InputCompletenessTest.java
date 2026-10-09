@@ -20,9 +20,9 @@ class InputCompletenessTest {
 
     @Test
     void trailingPipeOrLogicalOperatorNeedsAContinuation() {
-        assertThat(InputCompleteness.check("ls |")).isEqualTo(new Result.Incomplete("commande", 0));
-        assertThat(InputCompleteness.check("ls ||  ")).isEqualTo(new Result.Incomplete("commande", 0));
-        assertThat(InputCompleteness.check("mvn package &&")).isEqualTo(new Result.Incomplete("commande", 0));
+        assertThat(InputCompleteness.check("ls |")).isEqualTo(new Result.Incomplete(InputCompleteness.MISSING_COMMAND, 0));
+        assertThat(InputCompleteness.check("ls ||  ")).isEqualTo(new Result.Incomplete(InputCompleteness.MISSING_COMMAND, 0));
+        assertThat(InputCompleteness.check("mvn package &&")).isEqualTo(new Result.Incomplete(InputCompleteness.MISSING_COMMAND, 0));
     }
 
     @Test
