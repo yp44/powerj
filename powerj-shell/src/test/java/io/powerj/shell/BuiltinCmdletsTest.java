@@ -60,7 +60,9 @@ class BuiltinCmdletsTest {
     @Test
     void lsDisplaysATable() throws Exception {
         String table = run("ls");
-        assertThat(table.lines().toList().getFirst()).matches("name\\s+size\\s+modified\\s+dir\\s+path");
+        assertThat(table.lines().toList().getFirst()).matches("name\\s+size\\s+modified\\s+dir");
+        assertThat(table).doesNotContain(tmp.toString()); // path is not displayed, but stays a property:
+        assertThat(run("(ls)*.path")).contains(tmp.resolve("notes.txt").toString());
         assertThat(table).contains("docs", "notes.txt", "7 B", "true", "false");
     }
 

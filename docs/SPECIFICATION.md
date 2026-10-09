@@ -392,7 +392,7 @@ public record FileEntry(
         String ext) { }    // extension without the dot, "" if none
 ```
 
-Columns displayed by default: `name size modified dir path` (`path`: absolute path, truncated if the window is narrow). Folders are listed before files, in alphabetical order. The walk is **lazy** (streaming): `ls -r C:\ | where …` displays the first results immediately and Ctrl+C interrupts it. An inaccessible folder produces a non-blocking error and the walk continues.
+Columns displayed by default: `name size modified dir`. The absolute path is the `path` property, not displayed but usable: `(ls)*.path`, `ls | map { f -> f.path }`. Folders are listed before files, in alphabetical order. The walk is **lazy** (streaming): `ls -r C:\ | where …` displays the first results immediately and Ctrl+C interrupts it. An inaccessible folder produces a non-blocking error and the walk continues.
 
 CA:
 - `ls` displays the contents of the current directory as a table;
@@ -1077,7 +1077,7 @@ Each step:
 **Content:** `powerj-api` (FR: §4.2), cmdlet registry, `env` cmdlet (FR-36b) and encoding setting via variable (FR-40b), cmdlet > native priority, `^`, Unix option binding (FR-18 to FR-20), access to object properties (FR-27 to FR-29: records, getters, fields), type-based display (FR-30), unrolling (FR-30b), `ls` cmdlet (FR-35), `help` (FR-45).
 
 **Acceptance test:**
-1. `ls` displays a `name size modified dir path` table.
+1. `ls` displays a `name size modified dir` table.
 2. `ls -r --filter *.txt` recursively lists the `.txt` files.
 3. `(ls)*.name` displays the names only.
 4. `$f = ls` then `$f[0].size` and `$f[0].path.parent`.

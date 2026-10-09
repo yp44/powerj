@@ -12,7 +12,7 @@ As in the previous steps: **Actions** tab, latest run of the **CI** workflow, ar
 
 | # | Action | Expected result |
 |---|---|---|
-| 1 | `cd ~` then `ls` | Table `name size modified dir path` (absolute path in the last column): folders first, then files, in alphabetical order; human-readable sizes (`14.2 KB`; `14,2 KB` in French), local dates. |
+| 1 | `cd ~` then `ls` | Table `name size modified dir` (the absolute path is the `path` property, not displayed: `(ls)*.path`): folders first, then files, in alphabetical order; human-readable sizes (`14.2 KB`; `14,2 KB` in French), local dates. |
 | 2 | `ls -a` | Hidden files appear as well. |
 | 3 | `ls -r --filter *.txt` (in a folder containing `.txt` files) | All `.txt` files in subfolders; the pattern ignores case (`*.TXT` too). |
 | 4 | `ls -d`, then `ls --files`, then `ls C:\Windows *.ini` | Folders only; files only; contents of `C:\Windows` followed by the `.ini` files of the current directory. |

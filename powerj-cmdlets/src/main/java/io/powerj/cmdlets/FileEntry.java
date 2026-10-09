@@ -13,11 +13,11 @@ import io.powerj.api.Display;
  * @param name     name with extension
  * @param size     size in bytes (0 for a directory)
  * @param modified last modification date
- * @param path     absolute path
+ * @param path     absolute path (not displayed by default: {@code (ls)*.path}, {@code f.path})
  * @param dir      {@code true} for a directory
  * @param ext      extension without the dot, {@code ""} if none
  */
-@Display(columns = {"name", "size", "modified", "dir", "path"})
+@Display(columns = {"name", "size", "modified", "dir"})
 public record FileEntry(String name, @Bytes long size, Instant modified, Path path, boolean dir, String ext) {
 
     public FileEntry {
