@@ -93,9 +93,7 @@ public final class Interpreter {
         List<Object> loaded = new ArrayList<>();
         for (Object arg : args) {
             String text = Values.text(arg);
-            Path path = text.equals("~") ? session.home()
-                    : text.startsWith("~/") || text.startsWith("~\\") ? session.home().resolve(text.substring(2))
-                    : session.currentDirectory().resolve(text);
+            Path path = session.currentDirectory().resolve(text); // ~ already expanded (FR-62)
             ModuleLoader.Result result = modules.load(path);
             result.warnings().forEach(io.errors());
             if (result.cmdlets().isEmpty() && !result.warnings().isEmpty()) {
@@ -567,7 +565,7 @@ public final class Interpreter {
 
     private Object argumentValue(Argument argument) throws InterruptedException {
         return switch (argument) {
-            case Ast.WordArgument(var text) -> text;
+            case Ast.WordArgument(var text) -> session.expandTilde(text); // ~, ~/x (FR-62); not in quotes
             case Ast.ExpressionArgument(var expression) -> evaluator.evaluate(expression);
         };
     }

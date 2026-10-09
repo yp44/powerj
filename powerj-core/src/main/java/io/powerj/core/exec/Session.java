@@ -4,6 +4,7 @@ import java.nio.file.Files;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -17,6 +18,9 @@ import java.util.TreeMap;
  * Used from the command execution thread; the stages of a pipeline read it in parallel.
  */
 public final class Session {
+
+    /** Environment variables designating the home directory, in order of priority. */
+    private static final List<String> HOME_VARIABLES = List.of("HOME", "USERPROFILE");
 
     private final Path home;
     private final Map<String, String> environment;
@@ -32,7 +36,8 @@ public final class Session {
     private static final int MAX_ERRORS = 20;
 
     /**
-     * @param home             user home directory ({@code ~})
+     * @param home             user home directory, used for {@code ~} when the environment has neither
+     *                         {@code HOME} nor {@code USERPROFILE}
      * @param currentDirectory initial current directory
      * @param environment      initial environment (copied)
      */
@@ -44,8 +49,37 @@ public final class Session {
         this.environment.putAll(environment);
     }
 
+    /**
+     * Home directory, designated by {@code ~} (FR-62): the {@code HOME} variable of the session environment
+     * (so {@code env --set HOME=…} applies at once), else {@code USERPROFILE} (Windows), else the user
+     * directory given at startup.
+     */
     public Path home() {
+        for (String name : HOME_VARIABLES) {
+            String value = environment.get(name);
+            if (value != null && !value.isBlank()) {
+                try {
+                    return Path.of(value.strip()).toAbsolutePath().normalize();
+                } catch (InvalidPathException _) {
+                    // invalid value: try the next source
+                }
+            }
+        }
         return home;
+    }
+
+    /**
+     * Tilde expansion of an unquoted word (FR-62): {@code ~} becomes the home directory, {@code ~/x} and
+     * {@code ~\x} a path under it; any other word is returned unchanged ({@code ~user} included).
+     */
+    public String expandTilde(String word) {
+        if (word.equals("~")) {
+            return home().toString();
+        }
+        if (word.startsWith("~/") || word.startsWith("~\\")) {
+            return home().resolve(word.substring(2)).toString();
+        }
+        return word;
     }
 
     public Path currentDirectory() {

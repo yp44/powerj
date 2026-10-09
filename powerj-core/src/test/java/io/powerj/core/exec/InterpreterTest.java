@@ -30,7 +30,9 @@ class InterpreterTest {
     void setUp() throws Exception {
         assumeFalse(Platform.isWindows(), "commandes Unix");
         Files.createDirectories(tmp.resolve("home"));
-        session = new Session(tmp.resolve("home"), tmp, System.getenv());
+        Map<String, String> environment = new java.util.HashMap<>(System.getenv());
+        environment.put("HOME", tmp.resolve("home").toString()); // ~ follows HOME (FR-62)
+        session = new Session(tmp.resolve("home"), tmp, environment);
         interpreter = new Interpreter(session, new ShellIo(new PrintWriter(out, true), errors::add, false), Map.of(),
                 CmdletRegistry.of(List.of()));
     }
@@ -191,5 +193,37 @@ class InterpreterTest {
         assertThat(worker.isAlive()).isFalse();
         assertThat(ProcessHandle.current().children().anyMatch(p -> p.info().command().orElse("").endsWith("sleep")))
                 .isFalse();
+    }
+
+    @Test
+    void tildeIsTheHomeVariableInUnquotedArguments() throws Exception {
+        Path home = tmp.resolve("home");
+        String nl = System.lineSeparator();
+        // Native command arguments: ~ and ~/x are expanded, quoted or embedded ~ are not.
+        assertThat(run("printf \"%s\\n\" ~ ~/notes.txt \"~\" a~b ~user")).isEqualTo(
+                home + nl + home.resolve("notes.txt") + nl + "~" + nl + "a~b" + nl + "~user" + nl);
+        // Redirections.
+        run("printf \"x\\n\" > ~/out.txt");
+        assertThat(Files.readString(home.resolve("out.txt"))).isEqualTo("x\n");
+        // Built-in commands.
+        Files.createDirectories(home.resolve("projets"));
+        run("cd ~/projets");
+        assertThat(session.currentDirectory()).isEqualTo(home.resolve("projets"));
+        // ~ follows the HOME variable of the session, changed at runtime (env --set HOME=…).
+        Path other = Files.createDirectories(tmp.resolve("other"));
+        session.environment().put("HOME", other.toString());
+        run("cd ~");
+        assertThat(session.currentDirectory()).isEqualTo(other);
+        assertThat(errors).isEmpty();
+    }
+
+    @Test
+    void homeFallsBackToUserProfileThenToTheStartupDirectory() {
+        Path start = tmp.resolve("start");
+        var withProfile = new Session(start, tmp, Map.of("USERPROFILE", tmp.resolve("profile").toString()));
+        assertThat(withProfile.home()).isEqualTo(tmp.resolve("profile"));
+        assertThat(new Session(start, tmp, Map.of("HOME", " ")).home()).isEqualTo(start);
+        assertThat(new Session(start, tmp, Map.of()).expandTilde("~/a")).isEqualTo(start.resolve("a").toString());
+        assertThat(new Session(start, tmp, Map.of()).expandTilde("~x")).isEqualTo("~x");
     }
 }
