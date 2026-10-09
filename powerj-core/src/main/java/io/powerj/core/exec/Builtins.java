@@ -14,12 +14,14 @@ final class Builtins {
         if (args.size() > 1) {
             throw new PjException(Messages.get("cd.oneArgument"));
         }
-        String target = args.isEmpty() ? "~" : Values.text(args.getFirst());
+        if (args.isEmpty()) {
+            session.changeDirectory(session.home()); // like cd ~ (the ~ of an argument is already expanded, FR-62)
+            return List.of();
+        }
+        String target = Values.text(args.getFirst());
         Path path = switch (target) {
             case "-" -> session.previousDirectory()
                     .orElseThrow(() -> new PjException(Messages.get("cd.noPrevious")));
-            case "~" -> session.home();
-            case String t when t.startsWith("~/") || t.startsWith("~\\") -> session.home().resolve(t.substring(2));
             case String t when Platform.isWindows() && t.matches("[A-Za-z]:") -> Path.of(t + "\\");
             case String t -> parse(t);
         };

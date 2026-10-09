@@ -111,6 +111,18 @@ jobs:
           grep -q 'Bonjour Yves !' lang.txt
           grep -q 'syntaxe : expression incomplète' lang.txt
 
+      - name: Test de fumée du tilde (~ = HOME)
+        run: |
+          pj=$PWD/powerj-dist/target/jpackage/powerj/bin/powerj
+          export HOME=$RUNNER_TEMP/tildehome
+          mkdir -p $HOME/docs
+          touch $HOME/docs/note.txt
+          $pj -c 'cd ~ ; pwd ; (ls ~/docs)*.name ; "x" > ~/out.txt' > tilde.txt
+          cat tilde.txt
+          grep -qx "$HOME" tilde.txt
+          grep -qx 'note.txt' tilde.txt
+          test -f $HOME/out.txt
+
       - name: Module d'exemple greet.jar
         uses: actions/upload-artifact@v5
         with:

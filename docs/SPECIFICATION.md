@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Document version** | 0.9 (internationalization en/fr) |
+| **Document version** | 0.10 (`~` = `HOME` directory in every argument) |
 | **Status** | Pending approval |
 | **Target platform** | Windows 10/11 x64 (`powerj.exe`), Linux/macOS as a bonus |
 | **Technical foundation** | Java 27, Maven 3.9, JLine 3 |
@@ -119,13 +119,19 @@ Each requirement has an identifier `FR-xx` and one or more verifiable **acceptan
 
 | Command | Effect |
 |---|---|
-| `cd <chemin>` | Changes the current directory (absolute path, relative path, `..`, `~` = user home directory, drive `D:`). |
+| `cd <chemin>` | Changes the current directory (absolute path, relative path, `..`, `~` = home directory (FR-62), drive `D:`). |
 | `cd` | Returns to the user home directory. |
 | `cd -` | Returns to the previous directory. |
 | `pwd` | Displays the current directory (`Path` object). |
 
 The current directory belongs to the shell: it is the base for relative paths of cmdlets, of Java calls going through PowerJ, and of launched native commands (the process working directory). `$pwd` contains the current `Path`.
 - CA: `cd ~`, `cd ..`, `cd -`, `cd D:`, `cd "C:\\Program Files"`; the prompt follows; `git status` runs in the right directory.
+
+**FR-62 — Tilde `~`.** `~` designates the home directory given by the **`HOME`** variable of the session environment; if `HOME` is not set (usual on Windows), `USERPROFILE`, then the user directory of the JVM (`user.home`). `HOME` is read at each use: `env --set HOME=D:\moi` applies at once.
+- Expanded like in bash, in every **unquoted word** argument of any command (cmdlet, built-in command, native program) and in redirection targets: `~` alone, `~/…` and `~\…` (`ls ~/docs`, `notepad ~\notes.txt`, `"x" > ~/out.txt`, `mod-load ~/greet.jar`).
+- Not expanded: inside quotes (`"~"`), in the middle of a word (`a~b`), `~user`, in Java expressions.
+- Path completion (Tab) follows the same directory: `ls ~/Do<Tab>`.
+- CA: with `HOME=/home/yves`, `echo ~/x "~"` prints `/home/yves/x ~`; after `env --set HOME=/tmp`, `cd ~` goes to `/tmp`; on Windows without `HOME`, `cd ~` goes to `%USERPROFILE%`.
 
 **FR-04c — Command chaining.** At the line level, several commands are chained like Java statements:
 
@@ -1170,6 +1176,7 @@ The backlog cmdlets (§12.3) are added **one per mini-iteration**, each with a s
 |---|---|---|---|
 | 8 | `collect` | FR-36d | `docs/recettes/etape-8-collect.md` |
 | 9 | i18n (en/fr) | FR-61 | `docs/recettes/i18n.md` |
+| 10 | `~` = `HOME` | FR-62 | `docs/recettes/tilde.md` |
 
 Version 2 will introduce scripting (`if`, `foreach`, functions, `.pj` files).
 
