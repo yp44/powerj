@@ -17,6 +17,7 @@ import org.jline.utils.AttributedStyle;
 import io.powerj.core.BuildInfo;
 import io.powerj.core.exec.CmdletRegistry;
 import io.powerj.core.exec.Completions;
+import io.powerj.core.exec.ConsoleInput;
 import io.powerj.core.exec.Interpreter;
 import io.powerj.core.exec.Outcome;
 import io.powerj.core.exec.PjException;
@@ -46,7 +47,7 @@ public final class Repl {
         this.terminal = reader.getTerminal();
         this.out = terminal.writer();
         boolean interactive = !terminal.getType().startsWith("dumb");
-        var io = new ShellIo(out, this::printError, interactive, () -> terminal.getWidth());
+        var io = new ShellIo(out, this::printError, interactive, () -> terminal.getWidth(), consoleInput(terminal));
         this.interpreter = new Interpreter(session, io, Map.of("history", this::history), registry);
         // Completion (Tab) and input highlighting (FR-08, FR-21 to FR-26).
         var completions = new Completions(interpreter);
@@ -77,6 +78,9 @@ public final class Repl {
         out.flush();
         while (session.exitRequest().isEmpty()) {
             String line;
+            if (terminal.paused()) {
+                terminal.resume(); // a command abandoned with a second Ctrl+C may still hold the console
+            }
             try {
                 line = reader.readLine(prompt());
             } catch (UserInterruptException _) {
@@ -94,6 +98,31 @@ public final class Repl {
             out.flush();
         }
         return session.exitRequest().getAsInt();
+    }
+
+    /**
+     * Suspends JLine's reading of the console while a native program reads it (vim…): under Windows its
+     * pump thread reads the console permanently and would steal keys, and turn Ctrl+C into a cancellation.
+     */
+    private static ConsoleInput consoleInput(Terminal terminal) {
+        if (!terminal.canPauseResume()) {
+            return ConsoleInput.NONE;
+        }
+        return new ConsoleInput() {
+            @Override
+            public void pause() {
+                try {
+                    terminal.pause(true);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+
+            @Override
+            public void resume() {
+                terminal.resume();
+            }
+        };
     }
 
     String prompt() {
