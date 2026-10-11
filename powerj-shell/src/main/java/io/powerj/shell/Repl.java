@@ -1,6 +1,8 @@
 package io.powerj.shell;
 
+import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +41,10 @@ public final class Repl {
     private final Terminal terminal;
     private final PrintWriter out;
     private List<String> moduleWarnings = List.of();
+    private Path profile;
+    private boolean runProfile;
+    /** Prefix of the error lines ({@code profile.pj:3: }) while the profile runs, otherwise {@code null}. */
+    private volatile String errorPrefix;
 
     public Repl(LineReader reader, Supervisor supervisor, Session session, CmdletRegistry registry) {
         this.reader = Objects.requireNonNull(reader, "reader");
@@ -68,6 +74,15 @@ public final class Repl {
     }
 
     /**
+     * Startup profile (FR-63): {@code $profile} designates {@code file}, which is run before the first prompt
+     * if {@code run} ({@code false} with {@code --no-profile}).
+     */
+    public void useProfile(Path file, boolean run) {
+        this.profile = file;
+        this.runProfile = run;
+    }
+
+    /**
      * Runs the loop until {@code exit} or Ctrl+D on an empty line.
      *
      * @return the shell's exit code
@@ -76,6 +91,7 @@ public final class Repl {
         out.println(buildInfo.banner());
         moduleWarnings.forEach(this::printError);
         out.flush();
+        runProfile();
         while (session.exitRequest().isEmpty()) {
             String line;
             if (terminal.paused()) {
@@ -98,6 +114,53 @@ public final class Repl {
             out.flush();
         }
         return session.exitRequest().getAsInt();
+    }
+
+    /**
+     * Runs the profile's commands like typed lines; their errors are prefixed with the file and the line, and
+     * do not stop the following commands. Ctrl+C stops the whole profile.
+     */
+    private void runProfile() {
+        if (profile == null) {
+            return;
+        }
+        session.setVariable("profile", profile);
+        if (!runProfile) {
+            return;
+        }
+        List<Profile.Command> commands;
+        try {
+            commands = Profile.read(profile);
+        } catch (IOException e) {
+            printError(Messages.get("profile.readFailed", profile, e.getMessage()));
+            return;
+        }
+        String name = profile.getFileName().toString();
+        try {
+            for (var command : commands) {
+                errorPrefix = name + ":" + command.line() + ": ";
+                var outcome = supervisor.run(command.text(), () -> execute(command.text()));
+                switch (outcome) {
+                    case Outcome.Success _ -> { }
+                    case Outcome.Failure(var error) -> printError(error.message());
+                    case Outcome.Cancelled() -> {
+                        printError(Messages.get("profile.cancelled"));
+                        return;
+                    }
+                    case Outcome.Abandoned(var commandLine) -> {
+                        printError(Messages.get("command.abandoned", commandLine));
+                        return;
+                    }
+                }
+                out.flush();
+                if (session.exitRequest().isPresent()) {
+                    return;
+                }
+            }
+        } finally {
+            errorPrefix = null;
+            out.flush();
+        }
     }
 
     /**
@@ -156,6 +219,10 @@ public final class Repl {
 
     /** Line of the PowerJ error stream, in red on a terminal that supports colors. */
     private void printError(String message) {
+        String prefix = errorPrefix;
+        if (prefix != null) {
+            message = prefix + message;
+        }
         synchronized (out) {
             out.println(new AttributedString(message, AttributedStyle.DEFAULT.foreground(AttributedStyle.RED))
                     .toAnsi(terminal));

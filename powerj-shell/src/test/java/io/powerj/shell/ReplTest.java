@@ -36,6 +36,7 @@ class ReplTest {
     Path tmp;
 
     private PowerJHome home;
+    private boolean runProfile = true;
     private String screen;
     private List<String> history;
 
@@ -52,6 +53,7 @@ class ReplTest {
         try (var terminal = new TestTerminal(keys)) {
             var reader = ShellReader.create(terminal.terminal(), home, ShellConfig.defaults());
             var repl = new Repl(reader, new Supervisor(), session(), CmdletRegistry.discover());
+            repl.useProfile(home.profileFile(), runProfile);
             terminal.startTyping();
             int code = repl.run(BUILD);
             reader.getHistory().save();
@@ -231,5 +233,52 @@ class ReplTest {
         // The executed line is the completed line.
         assertThat(history).contains("ls --recurse", "ls | where { $_.name.startsWith(\"r\") }", "ls rapport.txt");
         assertThat(screen).contains("rapport.txt");
+    }
+
+    private void profile(String content) throws Exception {
+        home = new PowerJHome(tmp.resolve("home")).createDirectories();
+        Files.writeString(home.profileFile(), content);
+    }
+
+    @Test
+    void profileDefinitionsAreAvailableAtThePrompt() throws Exception {
+        profile("\uFEFF# my profile\n\n$x = 40 + 2\nimport java.time.*\n$list = List.of(\n    \"alpha\",\n    \"omega\")\n");
+        session("$x" + ENTER + "$list.get(1)" + ENTER + "Year.of(2024).isLeap()" + ENTER);
+
+        assertThat(screen).contains("42", "omega", "true");
+        assertThat(history).containsExactly("$x", "$list.get(1)", "Year.of(2024).isLeap()");
+    }
+
+    @Test
+    void profileErrorsShowTheLineAndTheFollowingLinesRun() throws Exception {
+        profile("$a = 1\nbonjour\n$b = 2\n");
+        session("$a + $b" + ENTER);
+
+        assertThat(screen).contains("profile.pj:2: unknown command: bonjour", "3");
+        assertThat(screen.indexOf("profile.pj:2:")).isLessThan(screen.indexOf("PJ "));
+    }
+
+    @Test
+    void profileVariableDesignatesTheFile() throws Exception {
+        session("$profile" + ENTER);
+
+        assertThat(screen).contains(home.profileFile().toString());
+    }
+
+    @Test
+    void noProfileSkipsTheFile() throws Exception {
+        profile("$x = 42\n");
+        runProfile = false;
+        session("$x" + ENTER + "$profile" + ENTER);
+
+        assertThat(screen).doesNotContain("42").contains(home.profileFile().toString());
+    }
+
+    @Test
+    void exitInTheProfileQuits() throws Exception {
+        profile("exit 3\n$never = 1\n");
+
+        assertThat(session("")).isEqualTo(3);
+        assertThat(screen).doesNotContain("PJ ");
     }
 }

@@ -34,7 +34,8 @@ import io.powerj.core.exec.Supervisor;
 
 /**
  * Entry point of {@code powerj.exe}: interactive shell without arguments; {@code -c "line"} or a
- * {@code .pj} file for non-interactive mode; {@code --debug} for error details.
+ * {@code .pj} file for non-interactive mode; {@code --debug} for error details; {@code --no-profile} to
+ * start without {@code profile.pj} (FR-63).
  */
 public final class Main {
 
@@ -45,6 +46,7 @@ public final class Main {
 
     public static void main(String[] args) {
         boolean debug = Arrays.asList(args).contains("--debug");
+        boolean noProfile = Arrays.asList(args).contains("--no-profile");
         var home = PowerJHome.resolve(System.getenv(), Path.of(System.getProperty("user.home")));
         try {
             home.createDirectories();
@@ -58,9 +60,10 @@ public final class Main {
         Language.set(Language.resolve(System.getProperty(Language.PROPERTY),
                 System.getenv(Language.ENVIRONMENT_VARIABLE), config.language(),
                 Locale.getDefault(Locale.Category.DISPLAY)));
-        List<String> rest = Arrays.stream(args).filter(a -> !a.equals("--debug")).toList();
+        List<String> rest = Arrays.stream(args).filter(a -> !a.equals("--debug") && !a.equals("--no-profile"))
+                .toList();
         if (rest.isEmpty()) {
-            System.exit(run(home, config));
+            System.exit(run(home, config, !noProfile));
         }
         System.exit(runScript(rest));
     }
@@ -126,7 +129,7 @@ public final class Main {
         }
     }
 
-    private static int run(PowerJHome home, ShellConfig config) {
+    private static int run(PowerJHome home, ShellConfig config, boolean runProfile) {
         Terminal terminal;
         try {
             var builder = TerminalBuilder.builder().system(true).name("PowerJ");
@@ -152,6 +155,7 @@ public final class Main {
                     System.getenv());
             var repl = new Repl(reader, new Supervisor(), session, CmdletRegistry.discover());
             repl.loadModules(home.modulesDir());
+            repl.useProfile(home.profileFile(), runProfile);
             int code = repl.run(BuildInfo.current());
             try {
                 reader.getHistory().save();

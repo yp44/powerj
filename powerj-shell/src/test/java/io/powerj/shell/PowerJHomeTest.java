@@ -36,4 +36,11 @@ class PowerJHomeTest {
 
         assertThat(Files.isDirectory(home.logsDir())).isTrue();
     }
+
+    @Test
+    void profileIsInTheDirectory() {
+        var home = new PowerJHome(tmp.resolve("h"));
+
+        assertThat(home.profileFile()).isEqualTo(tmp.resolve("h").resolve("profile.pj"));
+    }
 }

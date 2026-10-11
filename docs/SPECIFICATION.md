@@ -133,6 +133,13 @@ The current directory belongs to the shell: it is the base for relative paths of
 - Path completion (Tab) follows the same directory: `ls ~/Do<Tab>`.
 - CA: with `HOME=/home/yves`, `echo ~/x "~"` prints `/home/yves/x ~`; after `env --set HOME=/tmp`, `cd ~` goes to `/tmp`; on Windows without `HOME`, `cd ~` goes to `%USERPROFILE%`.
 
+**FR-63 — Startup profile `profile.pj`.** When the **interactive** shell starts, PowerJ runs the file `profile.pj` of the configuration folder (`~/.powerj/profile.pj`, or `$POWERJ_HOME/profile.pj`; §8), after the banner and the module warnings, before the first prompt. Its commands run in the session of the prompt: variables, `import`, `env --set`, `cd` remain in effect.
+- The file is read in UTF-8 (a leading BOM, written by Notepad, is ignored). Blank lines and `#` comments are ignored. A command spans several lines with the same rule as the interactive continuation (FR-02: open brace, parenthesis or quote, line ending with `|` or `&&`).
+- Each command runs like a typed line (Supervisor, FR-56) but is not added to the history. An error is displayed prefixed with the file and the line of the command (`profile.pj:4: unknown command: bonjour`) and does not stop the following commands: a faulty profile never prevents the shell from starting. Ctrl+C cancels the current command and skips the rest of the profile. `exit` in the profile quits PowerJ.
+- Missing file: nothing is displayed and no file is created. `powerj --no-profile` starts without running it. The non-interactive mode (`-c`, `.pj` file, FR-04d) never runs it.
+- `$profile` contains the path of the file, even with `--no-profile` (`notepad $profile`, `vim $profile`).
+- CA: with a profile containing `$x = 42`, `import java.time.*` and an unknown command on line 4, the shell displays `profile.pj:4: unknown command: …` then the prompt; `$x` gives `42` and `Year.of(2024).isLeap()` gives `true`; `powerj --no-profile` then `$x` gives `unknown variable: $x`; `powerj -c "$x"` too.
+
 **FR-04c — Command chaining.** At the line level, several commands are chained like Java statements:
 
 | Syntax | Effect |
@@ -986,7 +993,7 @@ User folder `~/.powerj/` (created on first launch):
 | `modules/` | Third-party module jars (§4.4). |
 | `config.properties` | `history.size=10000`, `language=en` (or `fr`, FR-61), `native.prefer=find,sort`, `colors.cmdlet=green`… |
 | `logs/` | Diagnostic log, in English (FR-60). |
-| `profile.pj` | Lines executed at startup (variable assignments, aliases: `alias ll = ls -a`). |
+| `profile.pj` | Commands run when the interactive shell starts (FR-63): variable assignments (`$proj = Path.of("D:/dev")`), `import java.time.*`, `env --set MAVEN_OPTS=-Xmx2g`. `$profile` contains its path. |
 
 Environment variables read by PowerJ:
 
@@ -1180,6 +1187,7 @@ The backlog cmdlets (§12.3) are added **one per mini-iteration**, each with a s
 | 8 | `collect` | FR-36d | `docs/recettes/etape-8-collect.md` |
 | 9 | i18n (en/fr) | FR-61 | `docs/recettes/i18n.md` |
 | 10 | `~` = `HOME` | FR-62 | `docs/recettes/tilde.md` |
+| 11 | `profile.pj` | FR-63 | `docs/recettes/profile.md` |
 
 Version 2 will introduce scripting (`if`, `foreach`, functions, `.pj` files).
 
