@@ -40,6 +40,11 @@ public record PowerJHome(Path dir) {
         return dir.resolve("modules");
     }
 
+    /** Commands run when the interactive shell starts (FR-63). */
+    public Path profileFile() {
+        return dir.resolve("profile.pj");
+    }
+
     public Path logsDir() {
         return dir.resolve("logs");
     }
