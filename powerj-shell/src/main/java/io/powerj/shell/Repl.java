@@ -111,11 +111,10 @@ public final class Repl {
         return new ConsoleInput() {
             @Override
             public void pause() {
-                try {
-                    terminal.pause(true);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
+                // Never pause(true): it interrupts the pump thread, and an interrupt landing while the pump
+                // hands over an input event makes JLine close the whole terminal. pause() only asks the
+                // pump to stop at its next poll (at most 100 ms, during the program's start-up).
+                terminal.pause();
             }
 
             @Override
