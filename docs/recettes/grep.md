@@ -53,6 +53,7 @@ Then `cd C:\tmp\g`.
 | 19 | `grep -i "error\|exception" C:\Windows\Logs -r -p 32 --on-error silent` then **Ctrl+C** | Results appear as soon as they are found; Ctrl+C stops the search immediately and gives the prompt back. |
 | 20 | Same command without `-p 32`, then with it, prefixed by `(…\| collect).size()` | Same number of results; with `-p 32`, noticeably faster on a cold large folder. |
 | 21 | `ls -r` and `ls -r --filter *.java` | Same display as before the mini-iteration (folders first, alphabetical order). |
+| 21b | `(ls -r C:\Windows\System32 --on-error silent \| collect).size()` then the same with `-p 16` | Same number of entries; with `-p 16`, the order of the entries is free and the walk faster on a cold folder. `ls -p 0` gives `ls: --parallel expects a number of threads of at least 1, got 0`. |
 | 22 | `help grep` | Help with the options `-r`, `-p, --parallel`, `--max-depth`, `-i`, `-v`, `-a`, `--encoding`, `--property`, and the examples. |
 | 23 | `grep TODO a.txt > out.txt` then `type out.txt` | The table, **without** color codes. |
 

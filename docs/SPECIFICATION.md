@@ -375,7 +375,7 @@ Only **four cmdlets** are in the scope of the first steps: `ls`, `where`, `map` 
 #### FR-35 — `ls`: list files
 
 ```text
-ls [chemin...] [-a|--all] [-r|--recurse] [-f|--filter <motif>] [-d|--dirs] [--files]
+ls [chemin...] [-a|--all] [-r|--recurse] [-f|--filter <motif>] [-d|--dirs] [--files] [-p|--parallel <n>]
 ```
 
 | Option | Type | Description |
@@ -386,6 +386,7 @@ ls [chemin...] [-a|--all] [-r|--recurse] [-f|--filter <motif>] [-d|--dirs] [--fi
 | `-f`, `--filter` | pattern | Keeps only the names matching the pattern (`*.java`). |
 | `-d`, `--dirs` | boolean | Folders only. |
 | `--files` | boolean | Files only. |
+| `-p`, `--parallel` | `int` ≥ 1 | Walks the tree with up to `n` directories and entries read at the same time, in **virtual threads** (`powerj-fs`, FR-64). The order of the entries is then free; `1` (default): sequential, folders first in alphabetical order. |
 
 Output: stream of
 
@@ -399,11 +400,12 @@ public record FileEntry(
         String ext) { }    // extension without the dot, "" if none
 ```
 
-Columns displayed by default: `name size modified dir`. The absolute path is the `path` property, not displayed but usable: `(ls)*.path`, `ls | map { f -> f.path }`. Folders are listed before files, in alphabetical order. The walk is **lazy** (streaming): `ls -r C:\ | where …` displays the first results immediately and Ctrl+C interrupts it. An inaccessible folder produces a non-blocking error and the walk continues.
+Columns displayed by default: `name size modified dir`. The absolute path is the `path` property, not displayed but usable: `(ls)*.path`, `ls | map { f -> f.path }`. Folders are listed before files, in alphabetical order (except with `--parallel`). The walk is **lazy** (streaming): `ls -r C:\ | where …` displays the first results immediately and Ctrl+C interrupts it. An inaccessible folder produces a non-blocking error and the walk continues.
 
 CA:
 - `ls` displays the contents of the current directory as a table;
 - `ls -r --filter *.txt` recursively lists the `.txt` files;
+- `ls -r -p 16` lists the same entries as `ls -r`, in any order;
 - `(ls)*.name` displays only the names;
 - `$f = ls; $f[0].size` displays the size of the first element;
 - `^ls` runs the native `ls` if it exists (Git Bash, WSL…), otherwise error `native command not found: ls`.

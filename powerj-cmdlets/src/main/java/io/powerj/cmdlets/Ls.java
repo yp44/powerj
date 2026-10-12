@@ -22,7 +22,7 @@ import io.powerj.fs.WalkError;
 
 /** {@code ls}: lists files as {@link FileEntry} objects (specification FR-35). */
 @CmdletInfo(name = "ls", category = "Files", summary = "Lists files and directories",
-        examples = {"ls", "ls -r --filter *.java", "ls C:\\Windows -d", "(ls).name", "$f = ls; $f[0].size"})
+        examples = {"ls", "ls -r --filter *.java", "ls -r -p 16 C:\\dev", "ls C:\\Windows -d", "(ls).name", "$f = ls; $f[0].size"})
 public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
 
     /** Parameters of {@code ls}. */
@@ -38,7 +38,10 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
             @Option(shortName = 'd', description = "Directories only")
             boolean dirs,
             @Option(description = "Files only")
-            boolean files) {
+            boolean files,
+            @Option(shortName = 'p', description = "Walks the tree with n directories and entries read at the same time, "
+                    + "in virtual threads (order free)")
+            Integer parallel) {
     }
 
     private static final Comparator<Path> DIRECTORIES_FIRST = Comparator
@@ -49,6 +52,9 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
     public void begin(Params params, CmdletContext<FileEntry> context) {
         if (params.dirs() && params.files()) {
             throw new IllegalArgumentException(Messages.get("ls.dirs.files.incompatible"));
+        }
+        if (params.parallel() != null && params.parallel() < 1) {
+            throw new IllegalArgumentException(Messages.get("ls.parallel.invalid", params.parallel()));
         }
         Optional<PathMatcher> filter = Optional.ofNullable(params.filter()).map(Globs::matcher);
         List<String> paths = params.paths().isEmpty() ? List.of(".") : params.paths();
@@ -84,7 +90,7 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
         PathMatcher pattern = Globs.matcher(argument.substring(separator + 1));
         Path base = context.currentDirectory().resolve(dir).normalize();
         List<FileEntry> matches = new ArrayList<>();
-        walker(params, 1).walk(base,
+        walker(params, 1, 1).walk(base,
                 (path, attributes) -> pattern.matches(path.getFileName()) ? entry(path, attributes) : null,
                 matches::add, error -> report(error, context));
         for (FileEntry match : matches) {
@@ -102,15 +108,18 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
 
     /** Lazy walk (FR-35): each entry is emitted as soon as it is read; symbolic links are not followed. */
     private void listDirectory(Path dir, Params params, Optional<PathMatcher> filter, CmdletContext<FileEntry> context) {
-        walker(params, params.recurse() ? Integer.MAX_VALUE : 1).walk(dir, Ls::entry, entry -> {
+        int parallelism = params.parallel() == null ? 1 : params.parallel();
+        walker(params, params.recurse() ? Integer.MAX_VALUE : 1, parallelism).walk(dir, Ls::entry, entry -> {
             if (keep(entry, params, filter)) {
                 context.emit(entry);
             }
         }, error -> report(error, context));
     }
 
-    private static FileWalker walker(Params params, int maxDepth) {
-        return FileWalker.builder().maxDepth(maxDepth).includeHidden(params.all()).order(DIRECTORIES_FIRST).build();
+    /** With {@code parallelism > 1}, the order of the entries is free (FR-35). */
+    private static FileWalker walker(Params params, int maxDepth, int parallelism) {
+        return FileWalker.builder().maxDepth(maxDepth).includeHidden(params.all()).order(DIRECTORIES_FIRST)
+                .parallelism(parallelism).build();
     }
 
     private static void report(WalkError error, CmdletContext<FileEntry> context) {
