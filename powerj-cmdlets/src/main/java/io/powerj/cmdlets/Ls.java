@@ -1,13 +1,8 @@
 package io.powerj.cmdlets;
 
-import java.io.IOException;
-import java.nio.file.AccessDeniedException;
-import java.nio.file.DirectoryStream;
-import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.LinkOption;
-import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -21,6 +16,9 @@ import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
+import io.powerj.fs.FileWalker;
+import io.powerj.fs.Globs;
+import io.powerj.fs.WalkError;
 
 /** {@code ls}: lists files as {@link FileEntry} objects (specification FR-35). */
 @CmdletInfo(name = "ls", category = "Files", summary = "Lists files and directories",
@@ -52,7 +50,7 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
         if (params.dirs() && params.files()) {
             throw new IllegalArgumentException(Messages.get("ls.dirs.files.incompatible"));
         }
-        Optional<PathMatcher> filter = Optional.ofNullable(params.filter()).map(Ls::glob);
+        Optional<PathMatcher> filter = Optional.ofNullable(params.filter()).map(Globs::matcher);
         List<String> paths = params.paths().isEmpty() ? List.of(".") : params.paths();
         for (String path : paths) {
             list(path, params, filter, context);
@@ -67,7 +65,7 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
             listWildcard(argument, params, filter, context);
             return;
         }
-        if (argument.contains("*") || argument.contains("?")) {
+        if (Globs.isPattern(argument)) {
             listWildcard(argument, params, filter, context);
         } else if (Files.isDirectory(path)) {
             listDirectory(path, params, filter, context);
@@ -83,50 +81,44 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
                               CmdletContext<FileEntry> context) {
         int separator = Math.max(argument.lastIndexOf('/'), argument.lastIndexOf('\\'));
         String dir = separator < 0 ? "." : argument.substring(0, separator + 1);
-        PathMatcher pattern = glob(argument.substring(separator + 1));
+        PathMatcher pattern = Globs.matcher(argument.substring(separator + 1));
         Path base = context.currentDirectory().resolve(dir).normalize();
-        boolean found = false;
-        for (Path child : children(base, params, context)) {
-            if (pattern.matches(child.getFileName())) {
-                found = true;
-                entry(child).filter(e -> keep(e, params, filter)).ifPresent(context::emit);
-                if (params.recurse() && Files.isDirectory(child, LinkOption.NOFOLLOW_LINKS)) {
-                    listDirectory(child, params, filter, context);
-                }
+        List<FileEntry> matches = new ArrayList<>();
+        walker(params, 1).walk(base,
+                (path, attributes) -> pattern.matches(path.getFileName()) ? entry(path, attributes) : null,
+                matches::add, error -> report(error, context));
+        for (FileEntry match : matches) {
+            if (keep(match, params, filter)) {
+                context.emit(match);
+            }
+            if (params.recurse() && Files.isDirectory(match.path(), LinkOption.NOFOLLOW_LINKS)) {
+                listDirectory(match.path(), params, filter, context);
             }
         }
-        if (!found) {
+        if (matches.isEmpty()) {
             context.error(Messages.get("ls.no.match", argument));
         }
     }
 
+    /** Lazy walk (FR-35): each entry is emitted as soon as it is read; symbolic links are not followed. */
     private void listDirectory(Path dir, Params params, Optional<PathMatcher> filter, CmdletContext<FileEntry> context) {
-        for (Path child : children(dir, params, context)) {
-            entry(child).filter(e -> keep(e, params, filter)).ifPresent(context::emit);
-            // Symbolic links are not followed: avoids infinite loops.
-            if (params.recurse() && Files.isDirectory(child, LinkOption.NOFOLLOW_LINKS)) {
-                listDirectory(child, params, filter, context);
+        walker(params, params.recurse() ? Integer.MAX_VALUE : 1).walk(dir, Ls::entry, entry -> {
+            if (keep(entry, params, filter)) {
+                context.emit(entry);
             }
-        }
+        }, error -> report(error, context));
     }
 
-    private static List<Path> children(Path dir, Params params, CmdletContext<FileEntry> context) {
-        List<Path> children = new ArrayList<>();
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
-            for (Path child : stream) {
-                if (params.all() || !hidden(child)) {
-                    children.add(child);
-                }
-            }
-        } catch (AccessDeniedException _) {
-            context.error(Messages.get("ls.access.denied", dir));
-        } catch (NoSuchFileException _) {
-            context.error(Messages.get("ls.not.found", dir));
-        } catch (IOException e) {
-            context.error(Messages.get("ls.read.failed", dir, e.getMessage()));
-        }
-        children.sort(DIRECTORIES_FIRST);
-        return children;
+    private static FileWalker walker(Params params, int maxDepth) {
+        return FileWalker.builder().maxDepth(maxDepth).includeHidden(params.all()).order(DIRECTORIES_FIRST).build();
+    }
+
+    private static void report(WalkError error, CmdletContext<FileEntry> context) {
+        context.error(switch (error.kind()) {
+            case ACCESS_DENIED -> Messages.get("ls.access.denied", error.path());
+            case NOT_FOUND -> Messages.get("ls.not.found", error.path());
+            case IO -> Messages.get("ls.read.failed", error.path(), error.message());
+        });
     }
 
     private static boolean keep(FileEntry entry, Params params, Optional<PathMatcher> filter) {
@@ -138,28 +130,16 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
 
     private static Optional<FileEntry> entry(Path path) {
         try {
-            var attributes = Files.readAttributes(path, BasicFileAttributes.class);
-            String name = path.getFileName() == null ? path.toString() : path.getFileName().toString();
-            boolean dir = attributes.isDirectory();
-            return Optional.of(new FileEntry(name, dir ? 0 : attributes.size(),
-                    attributes.lastModifiedTime().toInstant(), path.toAbsolutePath(), dir,
-                    FileEntry.extensionOf(name, dir)));
-        } catch (IOException _) {
+            return Optional.of(entry(path, Files.readAttributes(path, BasicFileAttributes.class)));
+        } catch (java.io.IOException _) {
             return Optional.empty(); // file vanished between listing and reading
         }
     }
 
-    private static boolean hidden(Path path) {
-        try {
-            return Files.isHidden(path);
-        } catch (IOException _) {
-            return false;
-        }
-    }
-
-    private static PathMatcher glob(String pattern) {
-        // Case-insensitive on Windows as elsewhere: *.TXT matches a.txt.
-        PathMatcher matcher = FileSystems.getDefault().getPathMatcher("glob:" + pattern.toLowerCase(Locale.ROOT));
-        return p -> matcher.matches(Path.of(p.toString().toLowerCase(Locale.ROOT)));
+    private static FileEntry entry(Path path, BasicFileAttributes attributes) {
+        String name = path.getFileName() == null ? path.toString() : path.getFileName().toString();
+        boolean dir = attributes.isDirectory();
+        return new FileEntry(name, dir ? 0 : attributes.size(), attributes.lastModifiedTime().toInstant(),
+                path.toAbsolutePath(), dir, FileEntry.extensionOf(name, dir));
     }
 }

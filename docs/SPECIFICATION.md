@@ -370,7 +370,7 @@ Short rule: **`$_` for one-line filters typed at the keyboard, a named lambda as
 
 ### 3.9 Cmdlets in the current scope
 
-Only **four cmdlets** are in the scope of this document: `ls`, `where`, `map` and `env`. The first two alone cover the core mechanisms: producing record objects, attribute access, the pipeline, expressions, and mixing with native commands.
+Only **four cmdlets** are in the scope of the first steps: `ls`, `where`, `map` and `env`; the mini-iterations add `collect` (FR-36d) and `grep` (FR-64). The first two alone cover the core mechanisms: producing record objects, attribute access, the pipeline, expressions, and mixing with native commands.
 
 #### FR-35 — `ls`: list files
 
@@ -407,6 +407,60 @@ CA:
 - `(ls)*.name` displays only the names;
 - `$f = ls; $f[0].size` displays the size of the first element;
 - `^ls` runs the native `ls` if it exists (Git Bash, WSL…), otherwise error `native command not found: ls`.
+
+#### FR-64 — `grep`: search a regular expression
+
+```text
+grep <motif> [chemin...] [-r|--recurse] [-p|--parallel <n>] [--max-depth <n>] [-i|--ignore-case]
+     [-v|--invert] [-a|--all] [--encoding <charset>] [--property <nom>]
+```
+
+| Option | Type | Description |
+|---|---|---|
+| `motif` (positional, mandatory) | `String` | Regular expression, **`java.util.regex.Pattern`** syntax (`\w`, `(?<nom>…)`, `(?i)`…). Unquoted, the argument is taken as is (`grep class\s+\w+`, FR-32b); in quotes, backslashes are doubled as in Java source (`grep "class (\\w+)"`). |
+| `chemin` (positional, multiple) | `String` | File(s) or folder(s) to search; wildcards on the last element (`*.log`, `src/*.java`). Default: the current directory, unless `grep` receives objects from the pipeline. A folder without `-r` is searched one level deep (its files). |
+| `-r`, `--recurse` | boolean | Walks subfolders. Symbolic links to folders are not followed. |
+| `-p`, `--parallel` | `int` ≥ 1 | Walks the tree and reads up to `n` files at the same time, in **virtual threads**. The order of the files is then free; the lines of a file stay grouped and in order. `1` (default): sequential, files in alphabetical order. |
+| `--max-depth` | `int` ≥ 1 | Maximum depth (`1`: only the files of the folder); implies `-r`. |
+| `-i`, `--ignore-case` | boolean | Ignores case (Unicode). |
+| `-v`, `--invert` | boolean | Keeps the lines (or the objects) that do **not** match. |
+| `-a`, `--all` | boolean | Includes hidden files and folders. |
+| `--encoding` | charset | Charset of the files; default **UTF-8**, without fallback: a file that is not valid in this charset produces the non-blocking error `cannot read <file>: not readable as UTF-8 text (choose the charset with --encoding)`. |
+| `--property` | name | Searches this property of the pipeline objects (`ls \| grep --property name ^a`). |
+
+Output for files: stream of
+
+```java
+@Display(columns = {"path", "line", "text"})
+public record GrepMatch(
+        Path path,                  // absolute path of the file
+        int line,                   // line number, from 1
+        @Highlight("matches") String text,   // line without its end-of-line characters
+        List<Span> matches,         // position of each match in text (empty with -v)
+        List<String> groups,        // groups of the first match: groups[0] = whole match, groups[1]…
+        Map<String, String> named)  // named groups (?<nom>…) of the first match: m.named.nom
+{ }
+```
+
+The table displays `path line text`; on a terminal that accepts colors, the matches are shown in **bold red** in `text` (`@Highlight`, §4.2; no color in a redirected file, in non-interactive mode or with the `NO_COLOR` variable). Binary files (a NUL byte in their first 8 KB, except with a UTF-16/UTF-32 `--encoding`) are skipped silently. An unreadable file or folder, or a missing path, produces a non-blocking error and the search goes on; an invalid regular expression is a blocking error with its position.
+
+**Pipeline input.** After a `|`, `grep` processes each object received:
+- a file (`FileEntry`, `Path`, `java.io.File`) without `--property`: its **content** is searched, output `GrepMatch` (`ls -r --filter *.java | grep TODO`); a folder is walked only with `-r` (otherwise skipped: `ls -r` already emits its files);
+- any other object is **filtered** like `where`: it is emitted unchanged if its text (`toString`, or the value of `--property`) matches (`git log --oneline | grep -i fix`).
+
+With objects in input and no `chemin`, the current directory is not searched. The `chemin` given are searched in any case. In non-interactive mode, a redirected standard input is such an input (FR-04d): `powerj -c "grep TODO . -r"` names the folder explicitly.
+
+**Walk library.** The walk lives in the module **`powerj-fs`** (`io.powerj.fs.FileWalker`), reusable by any cmdlet (`ls -r` uses it; a third-party module can `requires io.powerj.fs`): depth, hidden files, order, parallelism in virtual threads with a bounded number of files open at once, cancellation by Ctrl+C, non-blocking errors. The visitor runs in the worker threads; results and errors are handed over to the cmdlet's thread, which alone calls `emit` / `error`.
+
+CA:
+- `grep TODO src -r` displays `path line text` with absolute paths, TODO in red;
+- `grep TODO src -r -p 16` gives the same lines (in any file order);
+- `grep "<version>(?<v>[^<]+)" pom.xml | map { m -> m.named.v }` displays the version;
+- `grep -i fixme --max-depth 2`, `grep -v "^#" config.txt`;
+- `ls -r --filter *.java | grep TODO` and `git log --oneline | grep -i fix`;
+- `ls | grep --property name "^a"` keeps the `FileEntry` whose name starts with `a`;
+- `grep "(" x.txt`: `grep: invalid regular expression (: Unclosed group (position 1)`;
+- a Latin-1 file: non-blocking error suggesting `--encoding`, then `grep café latin.txt --encoding ISO-8859-1` finds the line.
 
 #### FR-36 — `where`: filter objects
 
@@ -759,6 +813,7 @@ public interface CmdletContext<O> {
     Path currentDirectory();
     Map<String, String> environment();  // session environment (FR-36b)
     Optional<Object> variable(String name);
+    default boolean hasInput() { return false; }  // after a |, even if no object arrives (FR-64)
     boolean cancelled();                // Ctrl+C requested
     ScriptBlock compile(String expression);
 }
@@ -779,6 +834,11 @@ public @interface Option {
     int position() default -1;          // >= 0: positional parameter
     String description() default "";
 }
+
+@Retention(RUNTIME) @Target(RECORD_COMPONENT)
+public @interface Highlight { String value(); }  // parts of a text component shown in color: name of a
+                                                 // List<Span> component of the same record (FR-64)
+public record Span(int start, int end) { }       // [start, end) range of a text
 
 @Retention(RUNTIME) @Target(RECORD_COMPONENT)
 public @interface Completion { Class<? extends Completer> value(); }
@@ -896,10 +956,11 @@ Yves   Hello Yves!   2026-10-07 10:12:03
 ```text
 powerj/                         (parent POM, packaging pom)
 ├── powerj-api/                 Public API for cmdlets (no dependencies)
+├── powerj-fs/                  File tree walk, sequential or parallel in virtual threads (FR-64)
 ├── powerj-core/                Lexer, parser, AST, resolution, evaluator, pipeline,
 │                               object access, Java interop, formatting,
 │                               native execution
-├── powerj-cmdlets/             Built-in cmdlets (ls, where)
+├── powerj-cmdlets/             Built-in cmdlets (ls, grep, where, map, collect, env)
 ├── powerj-shell/               JLine REPL, completion, highlighting, main
 ├── powerj-sample-module/       Sample third-party module (greet)
 └── powerj-dist/                jlink + jpackage → powerj.exe
@@ -1024,7 +1085,7 @@ Environment variables read by PowerJ:
 
 - **Unit**: lexer, parser, resolution, option binding, expression evaluator, property access (records, getters, fields, `Map`), formatting, unrolling.
 - **Java interop**: static/instance/constructor calls, overloads and varargs, conversions, blocks → functional interfaces, non-exported classes called through a public interface, exceptions, lexical rule (`java -version` vs `java.lang.Math.max(1,2)`).
-- **Cmdlets**: `ls` on a temporary directory tree (`@TempDir`), `where` on constructed streams.
+- **Cmdlets**: `ls` and `grep` on a temporary directory tree (`@TempDir`), `where` on constructed streams; `FileWalker` sequential and parallel (same results, consumers in the calling thread, cancellation).
 - **Native commands**: cross-platform tests with `cmd /c echo` (Windows) / `echo` (Linux), exit code, stderr, native → native.
 - **Completion**: expected candidates for partial lines.
 - **REPL integration**: "dumb" JLine terminal driven by script (simulated input, verified output), including history and Ctrl+R.
@@ -1188,6 +1249,7 @@ The backlog cmdlets (§12.3) are added **one per mini-iteration**, each with a s
 | 9 | i18n (en/fr) | FR-61 | `docs/recettes/i18n.md` |
 | 10 | `~` = `HOME` | FR-62 | `docs/recettes/tilde.md` |
 | 11 | `profile.pj` | FR-63 | `docs/recettes/profile.md` |
+| 12 | `grep` and `powerj-fs` | FR-64 | `docs/recettes/grep.md` |
 
 Version 2 will introduce scripting (`if`, `foreach`, functions, `.pj` files).
 

@@ -34,7 +34,7 @@ final class CmdletRunner {
         List<Object> remaining = new ArrayList<>(args);
         OnError onError = extractOnError(registered.name(), remaining);
         Record params = OptionBinder.bind(registered.name(), registered.parameters(), remaining);
-        var context = new Context(registered.name(), session, errors, sink, onError, compiler);
+        var context = new Context(registered.name(), session, errors, sink, onError, compiler, input != null);
         try {
             invoke(registered, params, context, input);
         } catch (PjException | CancellationException | InterruptedException e) {
@@ -104,16 +104,18 @@ final class CmdletRunner {
         private final Consumer<Object> sink;
         private final OnError onError;
         private final Function<String, ScriptBlock> compiler;
+        private final boolean hasInput;
         private boolean hadErrors;
 
         Context(String command, Session session, Consumer<String> errors, Consumer<Object> sink, OnError onError,
-                Function<String, ScriptBlock> compiler) {
+                Function<String, ScriptBlock> compiler, boolean hasInput) {
             this.command = command;
             this.session = session;
             this.errors = errors;
             this.sink = sink;
             this.onError = onError;
             this.compiler = compiler;
+            this.hasInput = hasInput;
         }
 
         @Override
@@ -151,6 +153,11 @@ final class CmdletRunner {
             } catch (PjException _) {
                 return Optional.empty();
             }
+        }
+
+        @Override
+        public boolean hasInput() {
+            return hasInput;
         }
 
         @Override

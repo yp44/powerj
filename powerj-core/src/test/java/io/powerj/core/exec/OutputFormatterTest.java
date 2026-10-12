@@ -13,7 +13,9 @@ import org.junit.jupiter.api.Test;
 
 import io.powerj.api.Bytes;
 import io.powerj.api.Display;
+import io.powerj.api.Highlight;
 import io.powerj.api.Language;
+import io.powerj.api.Span;
 
 class OutputFormatterTest {
 
@@ -23,6 +25,19 @@ class OutputFormatterTest {
     record Chosen(String name, int count, String hidden) { }
 
     record Wide(int a, int b, int c, int d, int e, int f) { }
+
+    @Display(columns = {"line", "text"})
+    record Found(int line, @Highlight("spans") String text, List<Span> spans) { }
+
+    private static String renderColors(int width, Object... values) {
+        var out = new StringWriter();
+        try (var formatter = new OutputFormatter(new PrintWriter(out), width, true)) {
+            for (Object v : values) {
+                formatter.accept(v);
+            }
+        }
+        return out.toString().replace(System.lineSeparator(), "\n");
+    }
 
     private static String render(int width, Object... values) {
         var out = new StringWriter();
@@ -43,6 +58,32 @@ class OutputFormatterTest {
                         a.txt            12 B
                         long-name.txt  2.0 KB
                         """);
+    }
+
+    @Test
+    void highlightedPartsAreInBoldRedWhenColorsAreAccepted() {
+        var found = new Found(7, "a TODO and a todo", List.of(new Span(2, 6), new Span(13, 17)));
+        assertThat(renderColors(80, found)).isEqualTo("""
+                line  text
+                ----  ----
+                   7  a \u001b[1;31mTODO\u001b[0m and a \u001b[1;31mtodo\u001b[0m
+                """);
+        assertThat(render(80, found)).doesNotContain("\u001b").contains("   7  a TODO and a todo");
+    }
+
+    @Test
+    void highlightingStopsAtTheTruncation() {
+        String text = "x".repeat(30) + "MATCH";
+        var found = new Found(1, text, List.of(new Span(10, 35))); // text column shrunk to 14: 13 characters + "…"
+        String rendered = renderColors(20, found);
+        assertThat(rendered).contains("xxxxxxxxxx\u001b[1;31mxxx\u001b[0m…").doesNotContain("MATCH");
+    }
+
+    @Test
+    void highlightIgnoresSpansOutsideTheText() {
+        assertThat(OutputFormatter.highlight("abc", List.of(new Span(1, 2), new Span(5, 9)), 3))
+                .isEqualTo("a\u001b[1;31mb\u001b[0mc");
+        assertThat(OutputFormatter.highlight("abc", null, 3)).isEqualTo("abc");
     }
 
     @Test

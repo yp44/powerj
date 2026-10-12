@@ -78,6 +78,9 @@ jobs:
           printf 'x.txt\ny.log\nz.txt\n' | $pj -c 'where { $_.endsWith(".txt") }' > stdin.txt
           cat stdin.txt
           test "$(cat stdin.txt)" = "$(printf 'x.txt\nz.txt')"
+          $pj -c 'grep -i "^ROOT:" /etc/passwd -p 2 | map { m -> "grep : " + m.line }' < /dev/null > grep.txt
+          cat grep.txt
+          test "$(cat grep.txt)" = "grep : 1"
 
       - name: Test de fumée des modules tiers
         run: |

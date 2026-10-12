@@ -29,6 +29,14 @@ public interface CmdletContext<O> {
     /** Value of a session variable. */
     Optional<Object> variable(String name);
 
+    /**
+     * {@code true} if the cmdlet receives objects from the pipeline ({@code … | cmdlet}), even if none
+     * arrives; {@code false} at the head of a pipeline. Known as soon as {@code begin}.
+     */
+    default boolean hasInput() {
+        return false;
+    }
+
     /** {@code true} if the user requested cancellation (Ctrl+C). */
     boolean cancelled();
 

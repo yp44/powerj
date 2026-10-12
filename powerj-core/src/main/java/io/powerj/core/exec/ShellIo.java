@@ -14,15 +14,23 @@ import java.util.function.IntSupplier;
  * @param interactive {@code true} if a real terminal is attached: native commands at the end of the line
  *                    then inherit the console directly (colors, interactive programs)
  * @param console     keyboard input of the console, suspended while a native program reads it
+ * @param colors      {@code true} if the output accepts ANSI colors (highlighting of the matches of
+ *                    {@code grep}, FR-64)
  */
 public record ShellIo(PrintWriter out, Consumer<String> errors, boolean interactive, IntSupplier width,
-                      ConsoleInput console) {
+                      ConsoleInput console, boolean colors) {
 
     public ShellIo {
         Objects.requireNonNull(out, "out");
         Objects.requireNonNull(errors, "errors");
         Objects.requireNonNull(width, "width");
         Objects.requireNonNull(console, "console");
+    }
+
+    /** Outputs without colors. */
+    public ShellIo(PrintWriter out, Consumer<String> errors, boolean interactive, IntSupplier width,
+                   ConsoleInput console) {
+        this(out, errors, interactive, width, console, false);
     }
 
     /** Outputs without a console input to suspend. */

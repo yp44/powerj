@@ -680,7 +680,7 @@ public final class Interpreter {
                     }
                     formatter = new OutputFormatter(file, FILE_WIDTH);
                 } else {
-                    formatter = new OutputFormatter(io.out(), io.width().getAsInt());
+                    formatter = new OutputFormatter(io.out(), io.width().getAsInt(), io.colors());
                 }
             }
             return formatter;
