@@ -49,12 +49,14 @@ import io.powerj.fs.WalkError;
  * ls -r --filter *.java | grep TODO      # files received from the pipeline: their content is searched
  * git log | grep -i fix                  # other objects: filtered like where
  * ls | grep --property name "^a"
+ * grep MAGIC data.bin --binary --encoding ISO-8859-1
  * </pre>
  */
 @CmdletInfo(name = "grep", category = "Files", summary = "Searches a regular expression in files or pipeline objects",
         examples = {"grep TODO src -r", "grep -i \"error|warn\" *.log", "grep \"class (\\\\w+)\" -r -p 16 | map { m -> m.groups[1] }", "grep class\\s+\\w+ src -r",
                 "grep \"version=\\\"(?<v>[^\\\"]+)\\\"\" pom.xml | map { m -> m.named.v }",
-                "ls -r --filter *.java | grep TODO", "git log --oneline | grep -i fix", "ls | grep --property name \"^a\""})
+                "ls -r --filter *.java | grep TODO", "git log --oneline | grep -i fix", "ls | grep --property name \"^a\"",
+                "grep MAGIC data.bin --binary --encoding ISO-8859-1"})
 public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
 
     /** Parameters of {@code grep}. */
@@ -80,7 +82,9 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
             @Option(description = "Charset of the files (default: UTF-8)")
             String encoding,
             @Option(description = "Property of the pipeline objects to search (e.g. name)")
-            String property) {
+            String property,
+            @Option(description = "Also searches binary files (no check of the NUL byte)")
+            boolean binary) {
     }
 
     /** Bytes read to recognize a binary file (one containing a NUL byte), skipped. */
@@ -170,7 +174,7 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
         private final Pattern pattern;
         private final boolean invert;
         private final Charset charset;
-        /** UTF-16 and UTF-32 texts contain NUL bytes: no binary detection for them. */
+        /** Off with --binary, and for UTF-16 and UTF-32 texts, which contain NUL bytes. */
         private final boolean detectBinary;
         private final ScriptBlock property;
         private final FileWalker walker;
@@ -191,7 +195,8 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
             }
             invert = params.invert();
             charset = charset(params.encoding());
-            detectBinary = !charset.name().startsWith("UTF-16") && !charset.name().startsWith("UTF-32");
+            detectBinary = !params.binary()
+                    && !charset.name().startsWith("UTF-16") && !charset.name().startsWith("UTF-32");
             property = params.property() == null ? null : property(params.property(), context);
             int maxDepth = params.maxDepth() != null ? params.maxDepth()
                     : params.recurse() ? Integer.MAX_VALUE : 1;

@@ -41,11 +41,11 @@ class GrepTest {
     }
 
     private static Grep.Params params(String pattern, String... paths) {
-        return new Grep.Params(pattern, List.of(paths), false, null, null, false, false, false, null, null);
+        return new Grep.Params(pattern, List.of(paths), false, null, null, false, false, false, null, null, false);
     }
 
     private static Grep.Params recursive(String pattern, Integer parallel) {
-        return new Grep.Params(pattern, List.of(), true, parallel, null, false, false, false, null, null);
+        return new Grep.Params(pattern, List.of(), true, parallel, null, false, false, false, null, null, false);
     }
 
     private List<GrepMatch> run(Grep.Params params) {
@@ -104,11 +104,11 @@ class GrepTest {
 
     @Test
     void ignoreCaseAndInvert() {
-        var ignoreCase = new Grep.Params("todo", List.of("a.txt"), false, null, null, true, false, false, null, null);
+        var ignoreCase = new Grep.Params("todo", List.of("a.txt"), false, null, null, true, false, false, null, null, false);
         assertThat(found(ignoreCase)).containsExactly("a.txt:2", "a.txt:3");
         assertThat(run(ignoreCase).getLast().matches()).containsExactly(new Span(5, 9), new Span(10, 14));
         context.emitted.clear();
-        var invert = new Grep.Params("TODO", List.of("a.txt"), false, null, null, false, true, false, null, null);
+        var invert = new Grep.Params("TODO", List.of("a.txt"), false, null, null, false, true, false, null, null, false);
         List<GrepMatch> matches = run(invert);
         assertThat(matches).singleElement().satisfies(m -> {
             assertThat(m.line()).isEqualTo(1);
@@ -118,7 +118,7 @@ class GrepTest {
 
     @Test
     void maxDepthImpliesRecursion() {
-        var depth2 = new Grep.Params("(?i)todo", List.of(), false, null, 2, false, false, false, null, null);
+        var depth2 = new Grep.Params("(?i)todo", List.of(), false, null, 2, false, false, false, null, null, false);
         assertThat(found(depth2)).containsExactlyInAnyOrder("a.txt:2", "a.txt:3", "src/B.java:2");
     }
 
@@ -134,8 +134,16 @@ class GrepTest {
     void binaryAndHiddenFilesAreSkippedUnlessAll() {
         assertThat(found(params("TODO"))).doesNotContain("image.bin:1", ".secret:1");
         context.emitted.clear();
-        var all = new Grep.Params("TODO", List.of(), false, null, null, false, false, true, null, null);
+        var all = new Grep.Params("TODO", List.of(), false, null, null, false, false, true, null, null, false);
         assertThat(found(all)).contains(".secret:1").doesNotContain("image.bin:1");
+    }
+
+    @Test
+    void binaryOptionDisablesTheBinaryCheck() {
+        var binary = new Grep.Params("TODO", List.of("image.bin"), false, null, null, false, false, false,
+                "ISO-8859-1", null, true);
+        assertThat(found(binary)).containsExactly("image.bin:1");
+        assertThat(context.errors).isEmpty();
     }
 
     @Test
@@ -159,7 +167,7 @@ class GrepTest {
         assertThat(context.errors).singleElement().asString().contains("UTF-8").contains("--encoding");
         context.errors.clear();
         var latin = new Grep.Params("café", List.of("latin.txt"), false, null, null, false, false, false,
-                "ISO-8859-1", null);
+                "ISO-8859-1", null, false);
         assertThat(run(latin)).singleElement().extracting(GrepMatch::text).isEqualTo("café TODO");
         assertThat(context.errors).isEmpty();
     }
@@ -169,7 +177,7 @@ class GrepTest {
         assertThatThrownBy(() -> run(params("(unclosed"))).isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("invalid regular expression (unclosed");
         assertThatThrownBy(() -> run(new Grep.Params("x", List.of(), false, null, null, false, false, false,
-                "nope-charset", null))).hasMessage("unknown charset: nope-charset");
+                "nope-charset", null, false))).hasMessage("unknown charset: nope-charset");
         assertThatThrownBy(() -> run(recursive("x", 0))).hasMessageContaining("--parallel");
     }
 
@@ -177,7 +185,7 @@ class GrepTest {
     void filtersStringsOfThePipeline() {
         context.hasInput = true;
         var grep = new Grep();
-        var params = new Grep.Params("fix", List.of(), false, null, null, true, false, false, null, null);
+        var params = new Grep.Params("fix", List.of(), false, null, null, true, false, false, null, null, false);
         grep.begin(params, context);
         for (String line : List.of("a1 Fix crash", "b2 add feature", "c3 fix typo")) {
             grep.process(params, line, context);
@@ -217,7 +225,7 @@ class GrepTest {
             };
         };
         var grep = new Grep();
-        var params = new Grep.Params("^a", List.of(), false, null, null, false, false, false, null, "name");
+        var params = new Grep.Params("^a", List.of(), false, null, null, false, false, false, null, "name", false);
         grep.begin(params, context);
         var a = new FileEntry("a.txt", 0, Instant.EPOCH, tmp.resolve("a.txt"), false, "txt");
         var b = new FileEntry("b.txt", 0, Instant.EPOCH, tmp.resolve("b.txt"), false, "txt");

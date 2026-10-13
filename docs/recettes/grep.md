@@ -45,6 +45,7 @@ Then `cd C:\tmp\g`.
 | 11 | `grep -i todo src\*.JAVA` | `src\B.java` line 2 (wildcards, case-insensitive). |
 | 12 | `grep TODO latin.txt` | Error `grep: cannot read C:\tmp\g\latin.txt: not readable as UTF-8 text (choose the charset with --encoding)`. |
 | 13 | `grep café latin.txt --encoding windows-1252` | The line `café TODO`. |
+| 13b | `grep TODO image.bin` (a binary file, e.g. any `.png` renamed) then `grep TODO image.bin --binary --encoding ISO-8859-1` | Nothing the first time (binary file skipped); the second time, the lines containing `TODO` are found. |
 | 14 | `grep "(" a.txt` | Error `grep: invalid regular expression (: Unclosed group (position 1)`. |
 | 15 | `grep x absent.txt` | Error `grep: not found: C:\tmp\g\absent.txt`. |
 | 16 | `ls -r --filter *.java \| grep TODO` | `GrepMatch` of `src\B.java`: the files received from the pipeline are searched. |

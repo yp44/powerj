@@ -414,7 +414,7 @@ CA:
 
 ```text
 grep <motif> [chemin...] [-r|--recurse] [-p|--parallel <n>] [--max-depth <n>] [-i|--ignore-case]
-     [-v|--invert] [-a|--all] [--encoding <charset>] [--property <nom>]
+     [-v|--invert] [-a|--all] [--encoding <charset>] [--property <nom>] [--binary]
 ```
 
 | Option | Type | Description |
@@ -429,6 +429,7 @@ grep <motif> [chemin...] [-r|--recurse] [-p|--parallel <n>] [--max-depth <n>] [-
 | `-a`, `--all` | boolean | Includes hidden files and folders. |
 | `--encoding` | charset | Charset of the files; default **UTF-8**, without fallback: a file that is not valid in this charset produces the non-blocking error `cannot read <file>: not readable as UTF-8 text (choose the charset with --encoding)`. |
 | `--property` | name | Searches this property of the pipeline objects (`ls \| grep --property name ^a`). |
+| `--binary` | boolean | Also searches binary files: disables the NUL-byte check below. Combine with `--encoding ISO-8859-1` to read any bytes without a decoding error. |
 
 Output for files: stream of
 
@@ -444,7 +445,7 @@ public record GrepMatch(
 { }
 ```
 
-The table displays `path line text`; on a terminal that accepts colors, the matches are shown in **bold red** in `text` (`@Highlight`, §4.2; no color in a redirected file, in non-interactive mode or with the `NO_COLOR` variable). Binary files (a NUL byte in their first 8 KB, except with a UTF-16/UTF-32 `--encoding`) are skipped silently. An unreadable file or folder, or a missing path, produces a non-blocking error and the search goes on; an invalid regular expression is a blocking error with its position.
+The table displays `path line text`; on a terminal that accepts colors, the matches are shown in **bold red** in `text` (`@Highlight`, §4.2; no color in a redirected file, in non-interactive mode or with the `NO_COLOR` variable). Binary files (a NUL byte in their first 8 KB, except with a UTF-16/UTF-32 `--encoding` or with `--binary`) are skipped silently. An unreadable file or folder, or a missing path, produces a non-blocking error and the search goes on; an invalid regular expression is a blocking error with its position.
 
 **Pipeline input.** After a `|`, `grep` processes each object received:
 - a file (`FileEntry`, `Path`, `java.io.File`) without `--property`: its **content** is searched, output `GrepMatch` (`ls -r --filter *.java | grep TODO`); a folder is walked only with `-r` (otherwise skipped: `ls -r` already emits its files);
