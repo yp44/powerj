@@ -124,8 +124,9 @@ public final class Lexer {
         if (head ? expressionAt(input, pos, staticNames) : argumentExpressionAt()) {
             var scanned = ExpressionParser.scan(input, pos,
                     head ? ExpressionParser.Mode.STATEMENT : ExpressionParser.Mode.ARGUMENT, staticNames);
+            String source = input.substring(pos, scanned.end()).strip();
             pos = scanned.end();
-            return new Token.Expr(scanned.value());
+            return new Token.Expr(scanned.value(), source);
         }
         return word();
     }

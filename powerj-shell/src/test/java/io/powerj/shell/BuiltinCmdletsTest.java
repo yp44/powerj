@@ -158,6 +158,17 @@ class BuiltinCmdletsTest {
     }
 
     @Test
+    void expressionWithPipelineObjectIsAStage() throws Exception {
+        // ls | $_.name: evaluated for each object, like map { $_.name } (FR-36e).
+        assertThat(run("ls | $_.name")).isEqualTo("docs\nnotes.txt\n");
+        assertThat(run("ls -r | where { $_.name.endsWith(\".md\") } | collect | $_.size()")).isEqualTo("1\n");
+        assertThat(run("ls --files | \"$($_.name)!\"")).isEqualTo("notes.txt!\n");
+        assertThat(run("ls | $_.name.length() | collect | $_.stream().mapToInt(n -> n).sum()")).isEqualTo("13\n");
+        run("ls --files | $_.nope()");
+        assertThat(errors).singleElement().asString().contains("FileEntry has no method nope()");
+    }
+
+    @Test
     void collectAlwaysProducesOneList() throws Exception {
         // Always a list: a single result or none is not "unwrapped".
         assertThat(run("(ls -r | where { f -> f.name == \"spec.md\" } | collect).size()")).isEqualTo("1\n");

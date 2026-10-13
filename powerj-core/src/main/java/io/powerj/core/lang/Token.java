@@ -9,8 +9,25 @@ public sealed interface Token {
     /**
      * Expression: string, variable, literal, block {@code { … }}, group {@code ( … )}, Java call
      * ({@code Math.max(3, 7)}, {@code new File("x")}), parsed by {@link ExpressionParser}.
+     *
+     * @param source text of the expression in the line, for display; not part of the token's identity
      */
-    record Expr(Ast.Expression expression) implements Token { }
+    record Expr(Ast.Expression expression, String source) implements Token {
+
+        public Expr(Ast.Expression expression) {
+            this(expression, null);
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof Expr(var e, var _) && expression.equals(e);
+        }
+
+        @Override
+        public int hashCode() {
+            return expression.hashCode();
+        }
+    }
 
     /** {@code $name =} at the start of a statement: assignment. */
     record AssignTo(String variable) implements Token { }
