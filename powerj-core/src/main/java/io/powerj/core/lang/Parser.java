@@ -97,13 +97,19 @@ public final class Parser {
                 throw new SyntaxException(stages.isEmpty() ? Messages.get("syntax.commandExpected")
                         : Messages.get("syntax.commandExpectedAfter", "|"));
             }
+            String source = peek() instanceof Token.Expr(var _, var text) ? text : null;
             Body body = body();
             if (!stages.isEmpty() && body instanceof Ast.ExpressionBody(var expression)) {
                 if (expression instanceof Ast.BlockExpression || expression instanceof Ast.Lambda
                         || expression instanceof Ast.MethodRef) {
                     throw new SyntaxException(Messages.get("syntax.blockAsStage"));
                 }
-                throw new SyntaxException(Messages.get("syntax.valueNotFirstStage"));
+                if (!PipelineObject.isUsedBy(expression)) {
+                    throw new SyntaxException(Messages.get("syntax.valueNotFirstStage"));
+                }
+                // ls | $_.name: evaluated for each object, like map { $_.name } (FR-36e).
+                body = new Ast.Command("map", false, List.of(new Ast.ExpressionArgument(
+                        new Ast.BlockExpression(source == null ? "$_" : source, expression))));
             }
             boolean errorsToOutput = false;
             while (!atEnd() && peek() instanceof Token.Redirection(var stream, var append)) {
@@ -131,7 +137,7 @@ public final class Parser {
     private Body body() {
         Token first = next();
         return switch (first) {
-            case Token.Expr(var expression) -> new Ast.ExpressionBody(expression);
+            case Token.Expr(var expression, var _) -> new Ast.ExpressionBody(expression);
             case Token.Word(var text) -> {
                 boolean forceNative = text.startsWith("^");
                 String name = forceNative ? text.substring(1) : text;
@@ -173,7 +179,7 @@ public final class Parser {
     private Argument argument(Token token) {
         return switch (token) {
             case Token.Word(var text) -> new Ast.WordArgument(text);
-            case Token.Expr(var expression) -> new Ast.ExpressionArgument(expression);
+            case Token.Expr(var expression, var _) -> new Ast.ExpressionArgument(expression);
             default -> throw unexpected(token);
         };
     }

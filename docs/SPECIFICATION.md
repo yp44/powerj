@@ -460,6 +460,18 @@ CA:
 - `ls | collect | map { l -> l.size() }` displays a single number;
 - Tab after `ls | collect | map { l -> l.` suggests the methods of `List`.
 
+#### FR-36e — Expression stage using `$_`
+
+After a `|`, an expression that uses the pipeline object **`$_`** is a stage evaluated **for each object**, exactly like `map { … }` (FR-36c): `ls | $_.name` is `ls | map { $_.name }`.
+
+- `ls -r | where { $_.size > 1mb } | collect | $_.size()` displays the number of files (one object, the list, FR-36d);
+- strings with interpolation work too: `ls | "$($_.name) : $($_.size)"`;
+- the result follows the rules of `map`: `null` emits nothing, a collection is unrolled (FR-30b), an error skips the object without stopping the pipeline (`map: FileEntry has no method nope() (object skipped: …)`);
+- the `$_` of a nested block or lambda does not count (`ls | List.of(1).stream().map({ $_ * 2 }).toList()` does not use the pipeline object);
+- an expression without `$_` after a `|` remains an error: `ls | $x` → `a value can only be the first stage of a pipeline: use $_ for each object (ls | $_.name) or map { … }`; a block alone (`ls | { $_.name }`) remains an error too (write `map { … }`).
+
+CA: `ls | $_.name` lists the names; `ls -r | where { $_.size > 1mb } | collect | $_.size()` displays one number; `ls | $x` gives the error above.
+
 #### FR-36b — `env`: environment variables
 
 ```text
@@ -1188,6 +1200,7 @@ The backlog cmdlets (§12.3) are added **one per mini-iteration**, each with a s
 | 9 | i18n (en/fr) | FR-61 | `docs/recettes/i18n.md` |
 | 10 | `~` = `HOME` | FR-62 | `docs/recettes/tilde.md` |
 | 11 | `profile.pj` | FR-63 | `docs/recettes/profile.md` |
+| 12 | Expression stage `ls \| $_.name` | FR-36e | `docs/recettes/pipeline-dollar.md` |
 
 Version 2 will introduce scripting (`if`, `foreach`, functions, `.pj` files).
 

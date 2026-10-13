@@ -64,6 +64,19 @@ class ParserTest {
     }
 
     @Test
+    void expressionUsingThePipelineObjectBecomesAMapStage() {
+        var stages = only("ls | $_.name | collect | $_.size()").pipeline().stages();
+        assertThat(stages.get(1).body()).isEqualTo(new Ast.Command("map", false, List.of(new Ast.ExpressionArgument(
+                new Ast.BlockExpression("$_.name",
+                        new Ast.Get(new Ast.VariableExpression("_", List.of()), "name"))))));
+        assertThat(stages.get(3).body()).isInstanceOf(Ast.Command.class);
+        assertThat(only("ls | \"$_ !\"").pipeline().stages().get(1).body()).isInstanceOf(Ast.Command.class);
+        // The $_ of a nested block is its own: the stage does not use the pipeline object.
+        assertThatThrownBy(() -> Parser.parse("ls | List.of(1).stream().map({ $_ * 2 }).toList()"))
+                .hasMessageContaining("first stage");
+    }
+
+    @Test
     void syntaxErrors() {
         assertThatThrownBy(() -> Parser.parse("&& a")).hasMessageContaining("without a command before it");
         assertThatThrownBy(() -> Parser.parse("a &&")).hasMessageContaining("command expected after");
