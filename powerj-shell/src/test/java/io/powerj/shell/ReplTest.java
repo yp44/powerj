@@ -242,10 +242,10 @@ class ReplTest {
 
     @Test
     void profileDefinitionsAreAvailableAtThePrompt() throws Exception {
-        profile("\uFEFF# my profile\n\n$x = 40 + 2\nimport java.time.*\n$list = List.of(\n    \"alpha\",\n    \"omega\")\n");
+        profile("\uFEFF# my profile\n\n$x = \"from-\" + \"profile\"\nimport java.time.*\n$list = List.of(\n    \"alpha\",\n    \"omega\")\n");
         session("$x" + ENTER + "$list.get(1)" + ENTER + "Year.of(2024).isLeap()" + ENTER);
 
-        assertThat(screen).contains("42", "omega", "true");
+        assertThat(screen).contains("from-profile", "omega", "true");
         assertThat(history).containsExactly("$x", "$list.get(1)", "Year.of(2024).isLeap()");
     }
 
@@ -267,11 +267,12 @@ class ReplTest {
 
     @Test
     void noProfileSkipsTheFile() throws Exception {
-        profile("$x = 42\n");
+        profile("$x = \"from-\" + \"profile\"\n");
         runProfile = false;
         session("$x" + ENTER + "$profile" + ENTER);
 
-        assertThat(screen).doesNotContain("42").contains(home.profileFile().toString());
+        // A value that cannot appear in the temporary paths shown by the prompt.
+        assertThat(screen).doesNotContain("from-profile").contains("unknown variable: $x", home.profileFile().toString());
     }
 
     @Test
