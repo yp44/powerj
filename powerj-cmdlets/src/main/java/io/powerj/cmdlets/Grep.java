@@ -83,7 +83,8 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
             String encoding,
             @Option(description = "Property of the pipeline objects to search (e.g. name)")
             String property,
-            @Option(description = "Also searches binary files (no check of the NUL byte)")
+            @Option(description = "No check for binary files (NUL byte in the first 8 KB): faster on folders of text "
+                    + "files; binary files are searched too")
             boolean binary) {
     }
 
@@ -255,12 +256,16 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
             Path absolute = file.toAbsolutePath();
             List<GrepMatch> matches = new ArrayList<>();
             try (InputStream in = Files.newInputStream(file)) {
-                byte[] head = in.readNBytes(BINARY_PROBE);
-                if (detectBinary && binary(head)) {
-                    return null;
+                InputStream content = in;
+                if (detectBinary) {
+                    byte[] head = in.readNBytes(BINARY_PROBE);
+                    if (binary(head)) {
+                        return null;
+                    }
+                    content = new SequenceInputStream(new ByteArrayInputStream(head), in);
                 }
-                var reader = new BufferedReader(new InputStreamReader(
-                        new SequenceInputStream(new ByteArrayInputStream(head), in), charset.newDecoder()));
+                // without the check (--binary), the file is read directly: no probe of its first bytes
+                var reader = new BufferedReader(new InputStreamReader(content, charset.newDecoder()));
                 String text;
                 int number = 0;
                 while ((text = reader.readLine()) != null) {
