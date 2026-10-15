@@ -106,6 +106,21 @@ class BuiltinCmdletsTest {
     }
 
     @Test
+    void catReadsFilesAndPipelineObjects() throws Exception {
+        Files.writeString(tmp.resolve("docs/a.txt"), "one\ntwo\n");
+        assertThat(run("cat notes.txt docs/a.txt")).isEqualTo("bonjour\none\ntwo\n");
+        assertThat(run("(cat notes.txt docs/a.txt -m numbered)*.line")).isEqualTo("1\n2\n3\n");
+        assertThat(run("(cat notes.txt docs/a.txt -m content).length")).isEqualTo("15\n");
+        assertThat(run("\"notes.txt\" | cat")).isEqualTo("bonjour\n");
+        assertThat(run("ls docs --filter *.txt | cat")).isEqualTo("one\ntwo\n");
+        assertThat(run("grep bonjour notes.txt | cat --property path")).isEqualTo("bonjour\n");
+        assertThat(run("cat --help")).contains("cat — ", "-m, --mode", "--encoding", "--property");
+        assertThat(errors).isEmpty();
+        run("cat absent.txt");
+        assertThat(errors).singleElement().asString().startsWith("cat: not found: ");
+    }
+
+    @Test
     void envReadsAndChangesTheSessionEnvironment() throws Exception {
         assertThat(run("(env POWERJ_TEST).value")).isEqualTo("1\n");
         run("env --set POWERJ_AUTRE=deux");

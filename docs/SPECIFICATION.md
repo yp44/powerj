@@ -370,7 +370,7 @@ Short rule: **`$_` for one-line filters typed at the keyboard, a named lambda as
 
 ### 3.9 Cmdlets in the current scope
 
-Only **four cmdlets** are in the scope of the first steps: `ls`, `where`, `map` and `env`; the mini-iterations add `collect` (FR-36d) and `grep` (FR-64). The first two alone cover the core mechanisms: producing record objects, attribute access, the pipeline, expressions, and mixing with native commands.
+Only **four cmdlets** are in the scope of the first steps: `ls`, `where`, `map` and `env`; the mini-iterations add `collect` (FR-36d), `grep` (FR-64) and `cat` (FR-65). The first two alone cover the core mechanisms: producing record objects, attribute access, the pipeline, expressions, and mixing with native commands.
 
 #### FR-35 — `ls`: list files
 
@@ -466,6 +466,62 @@ CA:
 - `ls | grep --property name "^a"` keeps the `FileEntry` whose name starts with `a`;
 - `grep "(" x.txt`: `grep: invalid regular expression (: Unclosed group (position 1)`;
 - a Latin-1 file: non-blocking error suggesting `--encoding`, then `grep café latin.txt --encoding ISO-8859-1` finds the line.
+
+#### FR-65 — `cat`: read files
+
+```text
+cat [chemin...] [-m|--mode lines|text|numbered|content] [--encoding <charset>] [--property <nom>]
+```
+
+| Option | Type | Description |
+|---|---|---|
+| `chemin` (positional, multiple) | `String` | File(s) to read, in the order given; wildcards on the last element (`*.log`, `src/*.java`), matches in alphabetical order. Default: the pipeline objects. |
+| `-m`, `--mode` | `lines` (default), `text`, `numbered`, `content` | Shape of the output, see below. Case-insensitive. |
+| `--encoding` | charset | Charset of the files; default **UTF-8**, without fallback: a file that is not valid in this charset produces the non-blocking error `cannot read <file>: not readable as UTF-8 text (choose the charset with --encoding)`. |
+| `--property` | name | Property of the pipeline objects that gives the file to read (`String`, `Path` or `File`): `grep TODO -r -s \| cat --property path`. |
+
+Output, according to `--mode`:
+
+| Mode | Output |
+|---|---|
+| `lines` | One `String` per line, without its end-of-line characters (`\n`, `\r\n`). |
+| `text` | **One** `String`: the content of all the files, one after the other, end-of-line characters included (like Unix `cat`). |
+| `numbered` | One `CatLine` per line. |
+| `content` | **One** `CatContent`: the content of all the files, one after the other. |
+
+```java
+@Display(columns = {"line", "length", "text"})
+public record CatLine(
+        Path path,      // absolute path of the file (not displayed by default)
+        int line,       // line number, from 1; it goes on from one file to the next
+        int length,     // number of characters of text
+        String text)    // line without its end-of-line characters
+{ }
+
+@Display(columns = {"length", "content"})
+public record CatContent(
+        int length,     // number of characters of content
+        String content) // content of the files, end-of-line characters included
+{ }
+```
+
+**Several files.** They are read one after the other. The line numbers go on: if the first file has 3 lines, the first line of the second file is line 4. With `text` and `content`, a single object holds the content of all the files (`CatContent` has no `path`: it can mix several files).
+
+**Pipeline input.** After a `|`, each object received is read **as if it had been given as a `chemin`**, after the `chemin` arguments (numbering and content go on):
+- a `String` is a path, relative to the current directory (no wildcards): `"a.txt" | cat`, `git ls-files | cat -m numbered`;
+- a `Path`, a `java.io.File`, or a `FileEntry` (`ls --filter *.txt | cat`) is read; a folder listed by `ls` is skipped;
+- any other object: `--property <nom>` names its property that gives the file (`String`, `Path` or `File`); without `--property`, or if the property is not a file, non-blocking error `not a file: …` and the object is skipped. With `--property`, the property is read on every object.
+
+With `text` and `content`, the single object is emitted at the end of the pipeline, if at least one file was read. A missing file, a folder given as `chemin`, an unreadable or undecodable file produce a non-blocking error and the reading goes on with the next file. `cat` without `chemin` and without pipeline input is a blocking error `file expected: cat <file>... or ... | cat`.
+
+CA:
+- `cat a.txt` displays the lines of `a.txt`;
+- `cat a.txt b.txt -m numbered` displays `line length text`; the first line of `b.txt` has the number following the last line of `a.txt`;
+- `cat a.txt b.txt -m text` gives one string; `(cat a.txt -m content).length` the number of characters of the file;
+- `ls --filter *.txt | cat -m numbered` and `"a.txt" | cat`;
+- `grep TODO -r -s | cat --property path -m numbered`;
+- `cat latin.txt`: non-blocking error suggesting `--encoding`, then `cat latin.txt --encoding ISO-8859-1` reads it;
+- `cat absent.txt a.txt`: error `cat: not found: …\absent.txt`, then the lines of `a.txt`.
 
 #### FR-36 — `where`: filter objects
 
@@ -1255,6 +1311,7 @@ The backlog cmdlets (§12.3) are added **one per mini-iteration**, each with a s
 | 10 | `~` = `HOME` | FR-62 | `docs/recettes/tilde.md` |
 | 11 | `profile.pj` | FR-63 | `docs/recettes/profile.md` |
 | 12 | `grep` and `powerj-fs` | FR-64 | `docs/recettes/grep.md` |
+| 13 | `cat` | FR-65 | `docs/recettes/cat.md` |
 
 Version 2 will introduce scripting (`if`, `foreach`, functions, `.pj` files).
 
@@ -1329,7 +1386,7 @@ PJ C:\dev> (ls)*.name.stream().map({ $_.toUpperCase() }).sorted().toList()
 
 | Cmdlet | Description | Planned output record |
 |---|---|---|
-| `cat` | Read a file line by line | `String` |
+| ~~`cat`~~ | Read files — **done** (FR-65) | `String`, `CatLine`, `CatContent` |
 | `find` | Advanced search (`--name --since --size --type`) | `FileEntry` |
 | `cp`, `mv`, `rm`, `mkdir`, `touch` | File operations | `FileEntry` |
 | `ps`, `kill` | Processes | `ProcessEntry` |
