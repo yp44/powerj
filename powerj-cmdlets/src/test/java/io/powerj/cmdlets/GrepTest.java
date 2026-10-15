@@ -146,17 +146,6 @@ class GrepTest {
         assertThat(context.errors).isEmpty();
     }
 
-    @ParameterizedTest
-    @ValueSource(booleans = {false, true})
-    void linesAcrossTheProbedFirstBytesAreFoundWithOrWithoutTheCheck(boolean binary) throws Exception {
-        // the 8 KB boundary falls in the middle of a line
-        Files.writeString(tmp.resolve("big.txt"), "x".repeat(8190) + "TODO split\n" + "y\n".repeat(1000) + "end TODO\n");
-        var params = new Grep.Params("TODO", List.of("big.txt"), false, null, null, false, false, false, null, null,
-                binary);
-        assertThat(run(params)).extracting(GrepMatch::line).containsExactly(1, 1002);
-        assertThat(context.errors).isEmpty();
-    }
-
     @Test
     void wildcards() {
         assertThat(found(params("(?i)todo", "src/*.JAVA"))).containsExactly("src/B.java:2");

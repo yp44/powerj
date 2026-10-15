@@ -429,7 +429,7 @@ grep <motif> [chemin...] [-r|--recurse] [-p|--parallel <n>] [--max-depth <n>] [-
 | `-a`, `--all` | boolean | Includes hidden files and folders. |
 | `--encoding` | charset | Charset of the files; default **UTF-8**, without fallback: a file that is not valid in this charset produces the non-blocking error `cannot read <file>: not readable as UTF-8 text (choose the charset with --encoding)`. |
 | `--property` | name | Searches this property of the pipeline objects (`ls \| grep --property name ^a`). |
-| `--binary` | boolean | Disables the binary-file check below: each file is read directly, without probing its first 8 KB, which is faster on folders known to hold only text files. Binary files are then searched too; combine with `--encoding ISO-8859-1` to read any bytes without a decoding error. |
+| `--binary` | boolean | Also searches binary files: disables the NUL-byte check below. Combine with `--encoding ISO-8859-1` to read any bytes without a decoding error. |
 
 Output for files: stream of
 
