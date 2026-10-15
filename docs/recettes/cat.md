@@ -29,6 +29,7 @@ Then `cd C:\tmp\c`.
 | 4 | `$l = cat a.txt b.txt -m numbered` then `$l[3].path` | The absolute path `C:\tmp\c\b.txt`. |
 | 5 | `cat a.txt b.txt -m text` | One string: `first`…`third`, then `un`, `deux`. `(cat a.txt b.txt -m text).length()` gives the number of characters of both files. |
 | 6 | `cat a.txt b.txt -m content` | One object `length  content`; `length` is the number of characters of both files together. |
+| 6b | `cat a.txt -m content \| map { $_.content }` then the same followed by `> copy.txt` | `first`, `second`, `third` on three lines; `copy.txt` holds the three lines (line breaks kept). |
 | 7 | `cat *.txt -m numbered` | `a.txt`, `b.txt` (then the error of row 10 for `latin.txt`), in alphabetical order, numbering continuous. |
 | 8 | `cat a.txt -m NUMBERED` | Same as `-m numbered` (case-insensitive). `cat a.txt -m bad` gives an error listing `lines, text, numbered, content`. |
 | 9 | `cat absent.txt b.txt` | Error `cat: not found: C:\tmp\c\absent.txt`, then `un`, `deux`. `cat src b.txt`: error `cat: is a directory: C:\tmp\c\src`, then `un`, `deux`. |

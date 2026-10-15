@@ -111,6 +111,12 @@ class BuiltinCmdletsTest {
         assertThat(run("cat notes.txt docs/a.txt")).isEqualTo("bonjour\none\ntwo\n");
         assertThat(run("(cat notes.txt docs/a.txt -m numbered)*.line")).isEqualTo("1\n2\n3\n");
         assertThat(run("(cat notes.txt docs/a.txt -m content).length")).isEqualTo("15\n");
+        // the line breaks of the content are kept, on screen and in a redirected file
+        assertThat(run("cat docs/a.txt notes.txt -m text")).isEqualTo("one\ntwo\nbonjour\n");
+        assertThat(run("cat docs/a.txt -m content | map { $_.content }")).isEqualTo("one\ntwo\n\n");
+        run("cat docs/a.txt -m content | map { $_.content } > copy.txt");
+        assertThat(Files.readString(tmp.resolve("copy.txt")).replace(System.lineSeparator(), "\n"))
+                .isEqualTo("one\ntwo\n\n");
         assertThat(run("\"notes.txt\" | cat")).isEqualTo("bonjour\n");
         assertThat(run("ls docs --filter *.txt | cat")).isEqualTo("one\ntwo\n");
         assertThat(run("grep bonjour notes.txt | cat --property path")).isEqualTo("bonjour\n");
