@@ -39,6 +39,7 @@ Then `cd C:\tmp\g`.
 | 5 | `grep -i todo --max-depth 2` | `a.txt` and `src\B.java`, not `src\deep\C.java`. |
 | 6 | `grep -v TODO a.txt` | Only line 1 `first line`. |
 | 7 | `grep -i todo -r -p 16` | Same lines as 4 (file order may differ; the lines of a file stay together and in order). |
+| 7b | `grep -i todo -r -s` then `grep -i todo -r -s -v` | One line per file (the first match): `a.txt` line 2, `src\B.java` line 2, `src\deep\C.java` line 1. With `-v`: only the files without `todo` (e.g. `pom.xml`), with line `0` and an empty text. |
 | 8 | `grep "<version>(?<v>[^<]+)" pom.xml \| map { m -> m.named.v }` | `1.2.3`. |
 | 9 | `grep "class (\\w+)" -r \| map { m -> m.groups[1] }` | `B` and `C` (`groups[0]` is the whole match `class B`). |
 | 10 | `$m = grep TODO a.txt` then `$m[0].line`, `$m[0].path`, `$m[0].matches` | `2`, the absolute path, a `start end` table with `0 4`. |

@@ -414,7 +414,7 @@ CA:
 
 ```text
 grep <motif> [chemin...] [-r|--recurse] [-p|--parallel <n>] [--max-depth <n>] [-i|--ignore-case]
-     [-v|--invert] [-a|--all] [--encoding <charset>] [--property <nom>] [--binary]
+     [-v|--invert] [-a|--all] [--encoding <charset>] [--property <nom>] [--binary] [-s|--single-match]
 ```
 
 | Option | Type | Description |
@@ -430,6 +430,7 @@ grep <motif> [chemin...] [-r|--recurse] [-p|--parallel <n>] [--max-depth <n>] [-
 | `--encoding` | charset | Charset of the files; default **UTF-8**, without fallback: a file that is not valid in this charset produces the non-blocking error `cannot read <file>: not readable as UTF-8 text (choose the charset with --encoding)`. |
 | `--property` | name | Searches this property of the pipeline objects (`ls \| grep --property name ^a`). |
 | `--binary` | boolean | Also searches binary files: disables the NUL-byte check below. Combine with `--encoding ISO-8859-1` to read any bytes without a decoding error. |
+| `-s`, `--single-match` | boolean | Only the **first** matching line of each file searched (`GrepMatch`), and the file is not read further: finds quickly the files that match at least once (`grep TODO -r -s \| map { m -> m.path }`). With `-v`: the files that **never** match, one `GrepMatch` each with `line` 0, empty `text` and empty `matches` (reading stops at the first match, which excludes the file). No effect on the pipeline objects filtered like `where`. |
 
 Output for files: stream of
 
@@ -460,6 +461,7 @@ CA:
 - `grep TODO src -r -p 16` gives the same lines (in any file order);
 - `grep "<version>(?<v>[^<]+)" pom.xml | map { m -> m.named.v }` displays the version;
 - `grep -i fixme --max-depth 2`, `grep -v "^#" config.txt`;
+- `grep TODO -r -s` gives one line per file containing `TODO`; `grep TODO -r -s -v` the files without `TODO` (line 0);
 - `ls -r --filter *.java | grep TODO` and `git log --oneline | grep -i fix`;
 - `ls | grep --property name "^a"` keeps the `FileEntry` whose name starts with `a`;
 - `grep "(" x.txt`: `grep: invalid regular expression (: Unclosed group (position 1)`;

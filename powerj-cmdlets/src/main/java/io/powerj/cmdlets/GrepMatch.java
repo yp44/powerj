@@ -13,7 +13,7 @@ import io.powerj.api.Span;
  * Line of a file matching the pattern of {@code grep} (specification FR-64).
  *
  * @param path    absolute path of the file
- * @param line    line number, from 1
+ * @param line    line number, from 1; 0 with {@code --single-match --invert}: the file never matches
  * @param text    text of the line, without its end-of-line characters; the matches are highlighted in color
  * @param matches position of each match in {@code text} (empty with {@code --invert})
  * @param groups  capturing groups of the first match: {@code groups[0]} is the whole match, {@code groups[1]}

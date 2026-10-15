@@ -98,6 +98,8 @@ class BuiltinCmdletsTest {
         assertThat(run("List.of(\"a fix\", \"b\", \"c FIX\") | grep -i fix")).isEqualTo("a fix\nc FIX\n");
         assertThat(run("(ls | grep --property name ^no).name")).isEqualTo("notes.txt\n");
         assertThat(run("grep --help")).contains("grep — ", "-p, --parallel", "--max-depth", "--encoding");
+        assertThat(run("(grep -s [oe] -r | collect).size()")).isEqualTo("3\n"); // notes.txt, spec.md, pom.xml
+        assertThat(run("(grep -s -v version -r)*.line")).isEqualTo("0\n0\n");
         assertThat(errors).isEmpty();
         run("grep \"(\"");
         assertThat(errors).singleElement().asString().startsWith("grep: invalid regular expression (");

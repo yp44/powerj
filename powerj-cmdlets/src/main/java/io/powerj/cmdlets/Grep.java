@@ -50,13 +50,16 @@ import io.powerj.fs.WalkError;
  * git log | grep -i fix                  # other objects: filtered like where
  * ls | grep --property name "^a"
  * grep MAGIC data.bin --binary --encoding ISO-8859-1
+ * grep TODO -r -s | map { m -> m.path }  # files with at least one match, each read up to it
+ * grep -s -v Copyright src -r            # files that never match (line 0)
  * </pre>
  */
 @CmdletInfo(name = "grep", category = "Files", summary = "Searches a regular expression in files or pipeline objects",
         examples = {"grep TODO src -r", "grep -i \"error|warn\" *.log", "grep \"class (\\\\w+)\" -r -p 16 | map { m -> m.groups[1] }", "grep class\\s+\\w+ src -r",
                 "grep \"version=\\\"(?<v>[^\\\"]+)\\\"\" pom.xml | map { m -> m.named.v }",
                 "ls -r --filter *.java | grep TODO", "git log --oneline | grep -i fix", "ls | grep --property name \"^a\"",
-                "grep MAGIC data.bin --binary --encoding ISO-8859-1"})
+                "grep MAGIC data.bin --binary --encoding ISO-8859-1", "grep TODO -r -s | map { m -> m.path }",
+                "grep -s -v Copyright src -r"})
 public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
 
     /** Parameters of {@code grep}. */
@@ -84,7 +87,10 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
             @Option(description = "Property of the pipeline objects to search (e.g. name)")
             String property,
             @Option(description = "Also searches binary files (no check of the NUL byte)")
-            boolean binary) {
+            boolean binary,
+            @Option(shortName = 's', description = "Only the first matching line of each file, which is not read "
+                    + "further; with -v, the files that never match (line 0)")
+            boolean singleMatch) {
     }
 
     /** Bytes read to recognize a binary file (one containing a NUL byte), skipped. */
@@ -177,6 +183,8 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
         /** Off with --binary, and for UTF-16 and UTF-32 texts, which contain NUL bytes. */
         private final boolean detectBinary;
         private final ScriptBlock property;
+        /** --single-match: stop reading a file at its first match. */
+        private final boolean singleMatch;
         private final FileWalker walker;
 
         Search(Params params, CmdletContext<?> context) {
@@ -198,6 +206,7 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
             detectBinary = !params.binary()
                     && !charset.name().startsWith("UTF-16") && !charset.name().startsWith("UTF-32");
             property = params.property() == null ? null : property(params.property(), context);
+            singleMatch = params.singleMatch();
             int maxDepth = params.maxDepth() != null ? params.maxDepth()
                     : params.recurse() ? Integer.MAX_VALUE : 1;
             walker = FileWalker.builder().maxDepth(maxDepth).includeHidden(params.all()).order(BY_NAME)
@@ -268,10 +277,22 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
                     if ((number & 0xFFF) == 0 && Thread.currentThread().isInterrupted()) {
                         throw new CancellationException();
                     }
+                    if (singleMatch && invert) {
+                        if (pattern.matcher(text).find()) {
+                            return null; // the file matches: excluded, not read further
+                        }
+                        continue;
+                    }
                     GrepMatch match = match(absolute, number, text);
                     if (match != null) {
+                        if (singleMatch) {
+                            return List.of(match); // first match: the rest of the file is not read
+                        }
                         matches.add(match);
                     }
+                }
+                if (singleMatch && invert) {
+                    return List.of(new GrepMatch(absolute, 0, "", List.of(), List.of(), Map.of()));
                 }
             } catch (CharacterCodingException _) {
                 // no fallback: the user chooses the charset with --encoding
