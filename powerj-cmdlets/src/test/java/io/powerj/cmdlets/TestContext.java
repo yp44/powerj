@@ -48,6 +48,14 @@ final class TestContext<O> implements CmdletContext<O> {
         return Optional.empty();
     }
 
+    /** Simulates a cmdlet placed after a {@code |}. */
+    boolean hasInput;
+
+    @Override
+    public boolean hasInput() {
+        return hasInput;
+    }
+
     @Override
     public boolean cancelled() {
         return false;

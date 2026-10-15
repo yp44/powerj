@@ -267,11 +267,12 @@ class ReplTest {
 
     @Test
     void noProfileSkipsTheFile() throws Exception {
-        profile("$x = 42\n");
+        // a value that cannot appear in the random name of the temporary directory
+        profile("$x = \"profile-ran\"\n");
         runProfile = false;
         session("$x" + ENTER + "$profile" + ENTER);
 
-        assertThat(screen).doesNotContain("42").contains(home.profileFile().toString());
+        assertThat(screen).doesNotContain("profile-ran").contains(home.profileFile().toString());
     }
 
     @Test

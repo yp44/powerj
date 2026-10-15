@@ -35,7 +35,7 @@ public final class Where implements Cmdlet<Where.Params, Object, Object> {
     }
 
     private static final Set<String> OPERATORS = Set.of("==", "!=", "<", "<=", ">", ">=");
-    private static final Pattern PROPERTY = Pattern.compile("[\\p{L}_][\\p{L}\\p{N}_]*(\\.[\\p{L}_][\\p{L}\\p{N}_]*)*");
+    static final Pattern PROPERTY = Pattern.compile("[\\p{L}_][\\p{L}\\p{N}_]*(\\.[\\p{L}_][\\p{L}\\p{N}_]*)*");
     private static final Pattern LITERAL = Pattern.compile(
             "-?\\d+(\\.\\d+)?(L|b|kb|mb|gb|tb|ms|s|m|h|d)?|true|false|null", Pattern.CASE_INSENSITIVE);
 

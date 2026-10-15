@@ -85,6 +85,27 @@ class BuiltinCmdletsTest {
     }
 
     @Test
+    void grepSearchesFilesAndFiltersThePipeline() throws Exception {
+        Files.writeString(tmp.resolve("docs/pom.xml"), "<a>\n  <version>1.2.3</version>\n</a>\n");
+        String table = run("grep version -r");
+        assertThat(table.lines().toList().getFirst()).matches("path\\s+line\\s+text");
+        assertThat(table).contains(tmp.resolve("docs/pom.xml").toString(), "2", "<version>1.2.3</version>");
+        assertThat(run("grep \"<version>(?<v>[^<]+)\" docs/pom.xml -p 4 | map { m -> m.named.v }"))
+                .isEqualTo("1.2.3\n");
+        assertThat(run("(grep -i BONJOUR notes.txt).groups[0]")).isEqualTo("bonjour\n");
+        // pipeline input: files are searched, other objects filtered; no search of the current directory
+        assertThat(run("ls -r --files | grep spec | map { m -> m.line }")).isEqualTo("1\n");
+        assertThat(run("List.of(\"a fix\", \"b\", \"c FIX\") | grep -i fix")).isEqualTo("a fix\nc FIX\n");
+        assertThat(run("(ls | grep --property name ^no).name")).isEqualTo("notes.txt\n");
+        assertThat(run("grep --help")).contains("grep — ", "-p, --parallel", "--max-depth", "--encoding");
+        assertThat(run("(grep -s [oe] -r | collect).size()")).isEqualTo("3\n"); // notes.txt, spec.md, pom.xml
+        assertThat(run("(grep -s -v version -r)*.line")).isEqualTo("0\n0\n");
+        assertThat(errors).isEmpty();
+        run("grep \"(\"");
+        assertThat(errors).singleElement().asString().startsWith("grep: invalid regular expression (");
+    }
+
+    @Test
     void envReadsAndChangesTheSessionEnvironment() throws Exception {
         assertThat(run("(env POWERJ_TEST).value")).isEqualTo("1\n");
         run("env --set POWERJ_AUTRE=deux");

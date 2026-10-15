@@ -15,6 +15,7 @@ import org.jline.reader.impl.LineReaderImpl;
 import org.jline.terminal.Terminal;
 import org.jline.utils.AttributedString;
 import org.jline.utils.AttributedStyle;
+import org.jline.utils.InfoCmp;
 
 import io.powerj.core.BuildInfo;
 import io.powerj.core.exec.CmdletRegistry;
@@ -53,7 +54,8 @@ public final class Repl {
         this.terminal = reader.getTerminal();
         this.out = terminal.writer();
         boolean interactive = !terminal.getType().startsWith("dumb");
-        var io = new ShellIo(out, this::printError, interactive, () -> terminal.getWidth(), consoleInput(terminal));
+        var io = new ShellIo(out, this::printError, interactive, () -> terminal.getWidth(), consoleInput(terminal),
+                interactive && colors(terminal));
         this.interpreter = new Interpreter(session, io, Map.of("history", this::history), registry);
         // Completion (Tab) and input highlighting (FR-08, FR-21 to FR-26).
         var completions = new Completions(interpreter);
@@ -66,6 +68,13 @@ public final class Repl {
         // Ctrl+C during execution cancels the command without exiting the shell (FR-03);
         // during input, JLine throws UserInterruptException.
         terminal.handle(Terminal.Signal.INT, _ -> supervisor.cancel());
+    }
+
+    /** {@code true} if the terminal displays ANSI colors (FR-64), unless {@code NO_COLOR} is set. */
+    private static boolean colors(Terminal terminal) {
+        Integer colors = terminal.getNumericCapability(InfoCmp.Capability.max_colors);
+        String noColor = System.getenv("NO_COLOR");
+        return colors != null && colors >= 8 && (noColor == null || noColor.isEmpty());
     }
 
     /** Loads third-party modules (§4.4); warnings are displayed below the banner. */

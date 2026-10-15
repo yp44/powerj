@@ -14,6 +14,7 @@
 
     <modules>
         <module>powerj-api</module>
+        <module>powerj-fs</module>
         <module>powerj-core</module>
         <module>powerj-cmdlets</module>
         <module>powerj-shell</module>
@@ -38,6 +39,11 @@
             <dependency>
                 <groupId>io.powerj</groupId>
                 <artifactId>powerj-api</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.powerj</groupId>
+                <artifactId>powerj-fs</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

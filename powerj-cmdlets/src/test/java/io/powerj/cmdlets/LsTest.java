@@ -40,7 +40,7 @@ class LsTest {
 
     private static Ls.Params params(List<String> paths, boolean all, boolean recurse, String filter,
                                     boolean dirs, boolean files) {
-        return new Ls.Params(paths, all, recurse, filter, dirs, files);
+        return new Ls.Params(paths, all, recurse, filter, dirs, files, null);
     }
 
     @Test
@@ -90,6 +90,18 @@ class LsTest {
                 .containsExactly("Main.java", "b.txt");
         context.emitted.clear();
         assertThat(names(params(List.of("*.java"), false, false, null, false, false))).containsExactly("A.java");
+    }
+
+    @Test
+    void parallelWalkGivesTheSameEntriesInAnyOrder() {
+        var parallel = new Ls.Params(List.of(), false, true, null, false, false, 4);
+        assertThat(names(parallel)).containsExactlyInAnyOrder("src", "main", "Main.java", "notes.TXT", "A.java", "b.txt");
+        context.emitted.clear();
+        var filtered = new Ls.Params(List.of(), false, true, "*.java", false, true, 4);
+        assertThat(names(filtered)).containsExactlyInAnyOrder("Main.java", "A.java");
+        assertThat(context.errors).isEmpty();
+        assertThatThrownBy(() -> new Ls().begin(new Ls.Params(List.of(), false, true, null, false, false, 0), context))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("--parallel");
     }
 
     @Test

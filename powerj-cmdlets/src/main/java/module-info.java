@@ -3,6 +3,7 @@
  */
 module io.powerj.cmdlets {
     requires io.powerj.api;
+    requires io.powerj.fs;
 
     exports io.powerj.cmdlets;
 

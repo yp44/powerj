@@ -16,7 +16,9 @@ import java.util.Map;
 
 import io.powerj.api.Bytes;
 import io.powerj.api.Display;
+import io.powerj.api.Highlight;
 import io.powerj.api.Language;
+import io.powerj.api.Span;
 
 /**
  * Display of values (specification FR-30):
@@ -26,6 +28,8 @@ import io.powerj.api.Language;
  *   <li>{@code Map}: key / value table; collections and arrays: one element per line;</li>
  *   <li>scalars: one readable line ({@link Bytes} sizes, local dates, durations).</li>
  * </ul>
+ * On a terminal that accepts colors, the parts of a {@link Highlight} component are shown in bold red
+ * (matches of {@code grep}, FR-64).
  * Tables are displayed as they stream: the column widths are computed from the first
  * {@value #WIDTH_SAMPLE} lines, and subsequent lines are truncated to these widths.
  */
@@ -37,21 +41,42 @@ public final class OutputFormatter implements AutoCloseable {
     private static final String GAP = "  ";
     private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
-    private record Column(String name, Method accessor, boolean bytes) { }
+    private static final String HIGHLIGHT_ON = "\u001b[1;31m";
+    private static final String HIGHLIGHT_OFF = "\u001b[0m";
+
+    /** @param highlight accessor of the {@code List<Span>} component of a {@link Highlight} column, or {@code null} */
+    private record Column(String name, Method accessor, boolean bytes, Method highlight) { }
+
+    /** Row of a table: the text of the cells and, for each one, the parts to highlight ({@code null}: none). */
+    private record Row(String[] cells, List<List<Span>> highlights) {
+        Row(String[] cells) {
+            this(cells, java.util.Collections.nCopies(cells.length, null));
+        }
+    }
 
     private final PrintWriter out;
     private final int width;
+    private final boolean colors;
 
     private Class<?> tableType;
     private List<Column> columns;
-    private final List<String[]> sample = new ArrayList<>();
+    private final List<Row> sample = new ArrayList<>();
     private int[] widths;
     private boolean[] rightAligned;
 
     /** @param width terminal width in characters (0 or less: 120) */
     public OutputFormatter(PrintWriter out, int width) {
+        this(out, width, false);
+    }
+
+    /**
+     * @param width  terminal width in characters (0 or less: 120)
+     * @param colors {@code true} if the output accepts ANSI colors
+     */
+    public OutputFormatter(PrintWriter out, int width, boolean colors) {
         this.out = out;
         this.width = width > 0 ? width : 120;
+        this.colors = colors;
     }
 
     public void accept(Object value) {
@@ -101,10 +126,15 @@ public final class OutputFormatter implements AutoCloseable {
             tableType = type;
             columns = tableColumns;
         }
-        String[] row = new String[columns.size()];
-        for (int i = 0; i < row.length; i++) {
-            row[i] = cell(read(columns.get(i).accessor(), record), columns.get(i).bytes());
+        String[] cells = new String[columns.size()];
+        List<List<Span>> highlights = new ArrayList<>(cells.length);
+        for (int i = 0; i < cells.length; i++) {
+            Column column = columns.get(i);
+            Object value = read(column.accessor(), record);
+            cells[i] = cell(value, column.bytes());
+            highlights.add(highlights(value, column.highlight(), record));
         }
+        Row row = new Row(cells, highlights);
         if (widths == null) {
             sample.add(row);
             if (sample.size() >= WIDTH_SAMPLE) {
@@ -137,9 +167,9 @@ public final class OutputFormatter implements AutoCloseable {
             rightAligned[i] = columns.get(i).bytes() || Number.class.isAssignableFrom(t)
                     || (t.isPrimitive() && t != boolean.class && t != char.class);
         }
-        for (String[] row : sample) {
+        for (Row row : sample) {
             for (int i = 0; i < n; i++) {
-                widths[i] = Math.max(widths[i], row[i].length());
+                widths[i] = Math.max(widths[i], row.cells()[i].length());
             }
         }
         fitToWidth();
@@ -149,8 +179,8 @@ public final class OutputFormatter implements AutoCloseable {
             header[i] = columns.get(i).name();
             rule[i] = "-".repeat(Math.min(header[i].length(), widths[i]));
         }
-        printRow(header);
-        printRow(rule);
+        printRow(new Row(header));
+        printRow(new Row(rule));
         sample.forEach(this::printRow);
         sample.clear();
     }
@@ -173,17 +203,22 @@ public final class OutputFormatter implements AutoCloseable {
         }
     }
 
-    private void printRow(String[] cells) {
+    private void printRow(Row row) {
+        String[] cells = row.cells();
         var line = new StringBuilder();
         for (int i = 0; i < cells.length; i++) {
             String text = truncate(cells[i], widths[i]);
+            String padding = " ".repeat(widths[i] - text.length());
+            // the ellipsis of a truncated cell is never highlighted
+            String shown = highlight(text, row.highlights().get(i),
+                    text.length() < cells[i].length() ? text.length() - 1 : text.length());
             boolean last = i == cells.length - 1;
             if (rightAligned[i]) {
-                line.append(" ".repeat(widths[i] - text.length())).append(text);
+                line.append(padding).append(shown);
             } else {
-                line.append(text);
+                line.append(shown);
                 if (!last) {
-                    line.append(" ".repeat(widths[i] - text.length()));
+                    line.append(padding);
                 }
             }
             if (!last) {
@@ -201,8 +236,10 @@ public final class OutputFormatter implements AutoCloseable {
         RecordComponent[] components = record.getClass().getRecordComponents();
         int nameWidth = Arrays.stream(components).mapToInt(c -> c.getName().length()).max().orElse(0);
         for (RecordComponent c : components) {
-            out.println(("%-" + nameWidth + "s : %s").formatted(c.getName(),
-                    cell(read(c.getAccessor(), record), c.isAnnotationPresent(Bytes.class))));
+            Object value = read(c.getAccessor(), record);
+            String text = cell(value, c.isAnnotationPresent(Bytes.class));
+            text = highlight(text, highlights(value, column(c).highlight(), record), text.length());
+            out.println(("%-" + nameWidth + "s : %s").formatted(c.getName(), text));
         }
         out.println();
     }
@@ -242,7 +279,42 @@ public final class OutputFormatter implements AutoCloseable {
     private static Column column(RecordComponent c) {
         Method accessor = c.getAccessor();
         accessor.trySetAccessible();
-        return new Column(c.getName(), accessor, c.isAnnotationPresent(Bytes.class));
+        Method highlight = null;
+        Highlight annotation = c.getAnnotation(Highlight.class);
+        if (annotation != null) {
+            highlight = Arrays.stream(c.getDeclaringRecord().getRecordComponents())
+                    .filter(other -> other.getName().equals(annotation.value()) && other.getType() == List.class)
+                    .map(RecordComponent::getAccessor).findFirst().orElse(null);
+        }
+        return new Column(c.getName(), accessor, c.isAnnotationPresent(Bytes.class), highlight);
+    }
+
+    /** Parts to highlight in the text of {@code value}, or {@code null} if none (or no colors). */
+    private List<Span> highlights(Object value, Method highlight, Record record) {
+        if (!colors || highlight == null || !(value instanceof CharSequence)
+                || !(read(highlight, record) instanceof List<?> spans) || spans.isEmpty()) {
+            return null;
+        }
+        return spans.stream().filter(Span.class::isInstance).map(Span.class::cast).toList();
+    }
+
+    /** Text with its parts in bold red, limited to the first {@code limit} characters. */
+    static String highlight(String text, List<Span> spans, int limit) {
+        if (spans == null || spans.isEmpty()) {
+            return text;
+        }
+        var result = new StringBuilder();
+        int position = 0;
+        for (Span span : spans.stream().sorted(java.util.Comparator.comparingInt(Span::start)).toList()) {
+            int start = Math.max(span.start(), position);
+            int end = Math.min(span.end(), limit);
+            if (start >= end) {
+                continue;
+            }
+            result.append(text, position, start).append(HIGHLIGHT_ON).append(text, start, end).append(HIGHLIGHT_OFF);
+            position = end;
+        }
+        return result.append(text, position, text.length()).toString();
     }
 
     private static Object read(Method accessor, Record record) {
