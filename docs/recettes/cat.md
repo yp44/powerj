@@ -51,3 +51,4 @@ Then `cd C:\tmp\c`.
 - With `--mode text` or `content`, the whole content is held in memory and emitted at the end: not suited to very large files.
 - With `--mode lines` or `numbered`, the lines are emitted as they are read: if a file turns out not to be decodable in the middle, its first lines have already been emitted before the error.
 - A string received from the pipeline is a path as is: wildcards (`*.txt`) are not expanded there.
+- In non-interactive mode (`powerj -c "cat"`) with a redirected standard input, that input feeds `cat` (FR-04d): each line read is taken as a file name (`ls *.txt | powerj -c cat` would read them); `cat` without a file then gives no `file expected` error.
