@@ -276,7 +276,7 @@ The menu displays the signature (`of(E...) : List<E>`). Imported classes (§FR-4
 **FR-30 — Default display.** At the end of a pipeline, each object is displayed according to its type:
 - **record**: as a table if ≤ 5 displayable components (aligned columns, width adapted to the terminal), otherwise as a `nom : valeur` list; a record can declare its columns via `@Display(columns = {"name", "size", "modified"})`;
 - **`Map`**: `clé / valeur` (key / value) table;
-- **scalars** (`String`, numbers, booleans, dates, `Path`, enums): readable form; the line breaks of a text are kept, also in a table cell or a redirected file (`cat a.txt -m text`, `cat a.txt -m content | map { $_.content } > copie.txt`);
+- **scalars** (`String`, numbers, booleans, dates, `Path`, enums): readable form; the line breaks of a text are kept, also in a table cell or a redirected file (`cat a.txt -m text`, `cat a.txt -m content | map { $_.content } > copie.txt`), and a text that already ends with a line break gets no other one (the copy is identical to the file);
 - **other objects**: `toString()`; `help members` lets you explore their properties.
 
 Successive objects of the same record type are grouped in the same table.

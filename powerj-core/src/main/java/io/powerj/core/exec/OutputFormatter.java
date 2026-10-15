@@ -97,6 +97,7 @@ public final class OutputFormatter implements AutoCloseable {
             }
             case Record record -> record(record);
             case Map<?, ?> map -> map(map);
+            case String text -> text(text);
             default -> line(cell(value, false));
         }
     }
@@ -111,6 +112,16 @@ public final class OutputFormatter implements AutoCloseable {
     private void line(String text) {
         endTable();
         out.println(text);
+    }
+
+    /** Text as is: no line break added when it already ends with one (content read by cat). */
+    private void text(String text) {
+        if (text.endsWith("\n")) {
+            endTable();
+            out.print(text);
+        } else {
+            line(text);
+        }
     }
 
     private void record(Record record) {
