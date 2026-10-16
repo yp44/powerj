@@ -7,19 +7,19 @@
 **An interactive, object-oriented shell written in Java 27.** Commands return **Java objects** instead of text, you filter them on their properties in a pipeline, native programs work as in any shell, and **the whole Java API of the JRE** is available right at the prompt.
 
 ```text
-PJ C:\dev\powerj> ls -r --filter *.java | where { $_.size > 10kb }
+PJ ~/dev/powerj> ls -r --filter *.java | where { $_.size > 10kb }
 
 name               size      modified              dir
 ----               ----      --------              ---
 Parser.java        14.2 KB   2026-10-05 18:12      false
 Evaluator.java     11.8 KB   2026-10-06 09:40      false
 
-PJ C:\dev\powerj> grep "TODO|FIXME" src -r -p 16 | map { m -> m.path.fileName + ":" + m.line }
-PJ C:\dev\powerj> git status --porcelain | where { $_.startsWith(" M ") }
+PJ ~/dev/powerj> grep "TODO|FIXME" src -r -p 16 | map { m -> m.path.fileName + ":" + m.line }
+PJ ~/dev/powerj> git status --porcelain | where { $_.startsWith(" M ") }
  M src/core/Parser.java
-PJ C:\dev\powerj> java.util.List.of("apple", "banana", "orange") | where { $_.contains("b") }
+PJ ~/dev/powerj> java.util.List.of("apple", "banana", "orange") | where { $_.contains("b") }
 banana
-PJ C:\dev\powerj> LocalDate.now().plusDays(10).dayOfWeek
+PJ ~/dev/powerj> LocalDate.now().plusDays(10).dayOfWeek
 FRIDAY
 ```
 
@@ -45,7 +45,7 @@ PowerJ is a command shell in the spirit of PowerShell, built for people who live
 - the expressions you write in `{ … }` blocks, in arguments or at the start of a line **are Java**: `$_.size > 10kb`, `f -> f.name.endsWith(".md")`, `String::toUpperCase`, `Math.max(3, 7)`, `new StringBuilder()`;
 - any other word is looked up on the `PATH` and run as a **native command** (`git`, `mvn`, `docker`…), whose output becomes a stream of `String` lines that cmdlets can filter.
 
-It targets **Windows 10/11** first (shipped as `powerj.exe` with an installer) and also runs on **Linux and macOS**.
+It runs on **Linux, macOS and Windows**: the build produces a self-contained launcher with its own Java runtime for each platform.
 
 ## Philosophy
 
@@ -54,7 +54,7 @@ It targets **Windows 10/11** first (shipped as `powerj.exe` with an installer) a
 - **Native commands are first-class.** `git`, `mvn` or `notepad` run exactly as in a classic shell; their stdout/stderr stay streams; cmdlets and native commands mix freely in a pipeline. `^ls` always runs the native program when a cmdlet has the same name.
 - **Java is the expression language.** No new DSL to learn: Java syntax, operators, lambdas and method references, plus direct access to every public class of the `java.*` modules.
 - **The shell never crashes.** Every line runs under a supervisor; Ctrl+C cancels the running command (a second Ctrl+C abandons a stuck computation) without leaving the shell; errors are short readable messages (`$debug = true` shows the Java stack trace).
-- **Streaming with backpressure.** Pipeline stages are connected by bounded queues: `ls -r C:\` piped into a slow consumer does not fill memory.
+- **Streaming with backpressure.** Pipeline stages are connected by bounded queues: `ls -r /` piped into a slow consumer does not fill memory.
 - **Extensible by dropping a jar.** A third-party module is a plain jar implementing a small API; it gets option parsing, completion, help and table display for free.
 - **An exemplary modern Java codebase.** Records, sealed interfaces, pattern matching, virtual threads, scoped values, the FFM API — used where they bring a concrete benefit ([§6 of the specification](docs/SPECIFICATION.md#6-use-of-modern-java-features)).
 
@@ -123,7 +123,7 @@ Messages, help, completion and errors in **English or French**; commands and opt
 
 The image is produced in `powerj-dist/target/jpackage/powerj/` (launcher `bin/powerj` on Linux/macOS, `powerj.exe` on Windows), with a zip archive in `powerj-dist/target/`. It embeds its own Java runtime containing all the `java.se` modules: nothing else needs to be installed on the target machine.
 
-On Windows, the `.exe` installer (adds PowerJ to the `PATH` and the Start menu) is built with `mvnw.cmd -Pdist,installer verify` and requires [WiX](https://wixtoolset.org/) (`dotnet tool install --global wix --version 5.0.2`). The GitHub Actions CI builds and smoke-tests the launcher on every push, and produces the Windows installer as a downloadable artifact.
+Optionally, on Windows, an `.exe` installer (adds PowerJ to the `PATH` and the Start menu) is built with `mvnw.cmd -Pdist,installer verify` and requires [WiX](https://wixtoolset.org/) (`dotnet tool install --global wix --version 5.0.2`). The GitHub Actions CI builds and smoke-tests the launcher on every push, and produces the Windows installer as a downloadable artifact.
 
 ### Run
 
@@ -133,7 +133,7 @@ On Windows, the `.exe` installer (adds PowerJ to the `PATH` and the Start menu) 
 | `powerj --no-profile` | Interactive shell without the startup profile |
 | `powerj -c "ls -r \| where size > 1mb"` | Runs one line, then exits |
 | `powerj script.pj` | Runs a file line by line, then exits |
-| `dir /b \| powerj -c "where { $_.endsWith(\".txt\") }"` | Standard input feeds the first stage as `String` lines |
+| `ls /etc \| powerj -c 'where { $_.endsWith(".conf") }'` | Standard input feeds the first stage as `String` lines |
 | `powerj --debug …` | Also prints the detailed diagnostic log to the console |
 
 In non-interactive mode the exit code is the argument of `exit` if called, otherwise 0 on success, the code of the last native command if it failed, or 1 for a PowerJ error.
@@ -159,7 +159,7 @@ PowerJ keeps its files in `~/.powerj/` (`%USERPROFILE%\.powerj\` on Windows, or 
 |---|---|
 | `history` | Command history (UTF-8), reloaded at startup |
 | `config.properties` | `history.size=10000`, `language=en` (or `fr`) |
-| `profile.pj` | Commands run when the interactive shell starts: `$proj = Path.of("D:/dev")`, `import java.time.*`, `env --set MAVEN_OPTS=-Xmx2g` — errors show their line and never prevent startup ([profile](docs/recettes/profile.md)) |
+| `profile.pj` | Commands run when the interactive shell starts: `$proj = Path.of("/home/me/dev")`, `import java.time.*`, `env --set MAVEN_OPTS=-Xmx2g` — errors show their line and never prevent startup ([profile](docs/recettes/profile.md)) |
 | `modules/` | Third-party module jars, loaded at startup |
 | `logs/` | Diagnostic log, always in English |
 
@@ -173,8 +173,8 @@ PowerJ keeps its files in `~/.powerj/` (`%USERPROFILE%\.powerj\` on Windows, or 
 **Language.** By default PowerJ follows the display language of the system (French → French, anything else → English). Precedence: system property `-Dpowerj.language`, then `POWERJ_LANG`, then the `language` key of `config.properties`, then the system ([i18n](docs/recettes/i18n.md)).
 
 ```text
-set POWERJ_LANG=en                      # Windows (cmd.exe), before launching powerj
 POWERJ_LANG=fr powerj                   # Linux / macOS
+set POWERJ_LANG=en                      # Windows (cmd.exe), before launching powerj
 ```
 
 ## How it works
