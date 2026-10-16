@@ -173,6 +173,39 @@ In this mode: no prompt, no history, no colors if the output is not a terminal, 
 
 **FR-08 — Syntax highlighting.** While typing: cmdlet (green), native command (cyan), unknown command (red), options (gray), strings (yellow), variables (magenta).
 
+**FR-66 — Preview mode.** Like the modes of vi, the line editor has two modes: **normal** (default) and **preview**. **Alt+V** ("View") switches from one to the other, keeping the line being typed; the mode stays from one command to the next until the next switch. In preview mode, the **prompt** shows it, `PJ? <directory>> ` instead of `PJ <directory>> ` (`PJ?` in cyan on a terminal with colors); the continuation prompt `>> ` does not change. Ctrl+Esc was ruled out: Windows keeps it for the Start menu and most terminals send it as a plain Esc. Under macOS, Alt+V needs the terminal's option "Use Option as Meta key".
+
+In preview mode, **each change of the line evaluates it in the background**, and its first results are shown **below the line**, without pressing Enter:
+
+```text
+PJ? C:\dev> ls -r --filter *.java | where { f -> f.size > 10kb } | map { f -> f.na█
+── String · 10+ ─────────────────────────────────────────────────────────────
+Parser.java
+Interpreter.java
+…
+```
+
+- **Banner:** type of the values (simple name of their common class, otherwise `Object`) and their number, `10+` when there are more; `no result`; the number of non-blocking errors (objects skipped) when there are some. Then at most 10 values in the usual display format (tables for records, FR-30), cut to the terminal width (12 lines at most).
+- **Evaluation:** starts 60 ms after the last key (typing fast does not start one evaluation per key), stops at the 10th value (the next ones are not computed: `ls -r /` answers at once), and after **400 ms**: the values already received are then shown, with `+`. A new key cancels the running evaluation (cancellation mechanism of §3.14). The evaluation that does not react to the cancellation (Java loop without callback, e.g. `LongStream.range(0, Long.MAX_VALUE).sum()`) keeps its thread busy: the preview no longer refreshes until it ends; Alt+V, then normal input, remain available.
+- **Stage under the cursor:** the preview shows the output of the stage where the cursor is (the line is cut before the next top-level `|`): moving the cursor into the 2nd stage shows what the 2nd stage produces, without splitting the pipeline. Cursor at the end: the whole line.
+- **What runs.** Only what changes nothing:
+  - the **cmdlets declared `@CmdletInfo(preview = true)`** (§4.2; default `false`). Built-in cmdlets: `ls`, `where`, `map`, `collect`, `env`, `grep`, `cat`. A cmdlet whose options can change something refines the decision with `Cmdlet.previewable(params)`: `env` is previewed, `env --set` (`--unset`, `--append`, `--prepend`) is not;
+  - **expressions**, and the **Java calls of the fixed preview set**, built into PowerJ and not configurable: methods of `Object` (`toString`, `equals`, `hashCode`, `getClass`, `compareTo`); all methods of `String`, `CharSequence`, wrappers (`Integer`, `Long`…), `Math`, `StrictMath`, `BigInteger`, `BigDecimal`, `Enum`, `Optional*`, `Comparator`, `Objects`, `Pattern`, `Matcher`, `Paths`, and of the packages `java.time.*`, `java.util.stream`, `java.util.function`; `Path` (except `register`); the **reading** methods of collections, maps and iterators (`size`, `get`, `contains`, `stream`, `forEach`, `keySet`, `List.of`…, not `add`, `put`, `sort`, `remove`…, nor `parallelStream`); `Arrays` and `Collections` except their mutators (`sort`, `fill`, `shuffle`…); `Files` in read-only mode (`exists`, `size`, `isDirectory`, `readString`, `readAllLines`, `lines`, `list`, `walk`…); `Class` for its names and type tests only (not reflection); the constructors of `String`, `BigInteger`, `BigDecimal` and of the empty collections (`new ArrayList(…)`, `new HashMap()`…). Only JDK classes are concerned: a method of a third-party module never runs in a preview; record accessors always do.
+- **What stops the preview:** a native command, a built-in command (`cd`, `help`, `mod-load`…), a cmdlet not declared `preview = true` or whose options change something, a Java call outside the set (including reflection, `System.exit`, a constructor outside the set), an assignment `$x = …`, a redirection, several commands (`;`, `&&`, `||`), a variable holding a stream or an iterator (it could be read only once). The preview then **stays on its last results**, under a gray banner that says why: `⏸ preview off: native command git`, `⏸ preview off: Java call outside the preview set: Files.delete`. Typing goes on normally.
+- The check is made **when the call is about to happen**, not by reading the line: it also covers the calls made in a lambda (`stream().forEach(f -> Files.delete(f))`), in a `$( … )`, in a pipeline stage running in its own thread, in a block converted to a Java function before the preview, and while the values are formatted (a stream inside a list is read under the same checks). Parallel streams (`parallel`, `parallelStream`, `Arrays.parallelSort`…) are outside the set: they would call the lambdas in other threads. The forbidden call is never made.
+- **Nothing changes during a preview:** nothing is displayed outside the preview area, non-blocking errors are only counted, `$?`, `$errors`, `$exit` and the variables are left as they are.
+- **Syntax error** while typing (`ls |`): the last results stay, under a gray banner `… <message>`. **Blocking error** (`"abc".nope()`, unknown command): the message in red replaces the results.
+- **Completion (Tab) in preview mode** offers only the cmdlets declared `preview = true` and the Java methods of the preview set; built-in commands and native programs are not offered.
+- **Enter** executes the line normally, whatever the state of the preview (a native command included); the preview is cleared before the output. Ctrl+C clears the line and the preview.
+- CA:
+  - Alt+V displays `PJ? C:\dev> `; Alt+V again displays `PJ C:\dev> `; the line typed is kept;
+  - in preview mode, `"abc".toUpperCase()` shows `── String · 1` then `ABC` below the line before Enter;
+  - `ls` shows the table of the files with `── FileEntry · n`; adding `| where { f -> f.size > 1kb }` reduces it while typing;
+  - in `java.util.List.of("alpha1", "beta2") | where { s -> s.endsWith("2") }`, cursor at the end: `String · 1` (`beta2`); Home (cursor in the 1st stage): `String · 2`;
+  - `ls | git status`, `cd ..`, `env --set X=1`, `$x = 1`, `"a" > out.txt`: banner `⏸ preview off: …`, and nothing happens (no file, no variable, same directory) until Enter;
+  - `ls | where { f -> Files.deleteIfExists(f.path) }`: `⏸ preview off: Java call outside the preview set: Files.deleteIfExists`, no file deleted;
+  - Tab after `c` in preview mode offers `cat` and `collect`, not `cd`; after `Files.` offers `exists(`, not `delete(`.
+
 ### 3.3 History
 
 **FR-09 — Persistence.** The history is saved in `~/.powerj/history` (UTF-8) after each command and reloaded on startup.
@@ -852,6 +885,7 @@ CA:
 
 - The Maven module **`powerj-api`** is the **only dependency** needed to write a cmdlet. It is published separately and semantically versioned.
 - A cmdlet is a class that implements `Cmdlet<P, I, O>`; the output type `O` is free (**a record is recommended** to benefit from table display and attribute completion).
+- A cmdlet that changes nothing (no file written, no environment changed, no network side effect) declares `@CmdletInfo(preview = true)`, so that it runs in preview mode (FR-66); `previewable(params)` excludes the options that change something.
 - Options are declared by a **parameter record** whose components are annotated with `@Option`.
 - Modules are discovered by `ServiceLoader` and loaded into an **isolated `ModuleLayer`** per jar.
 
@@ -866,6 +900,7 @@ public interface Cmdlet<P extends Record, I, O> {
     default void begin(P params, CmdletContext<O> ctx) throws Exception { }
     default void process(P params, I input, CmdletContext<O> ctx) throws Exception { }
     default void end(P params, CmdletContext<O> ctx) throws Exception { }
+    default boolean previewable(P params) { return true; }  // preview = true, but not with these options (FR-66)
 }
 
 public interface CmdletContext<O> {
@@ -885,6 +920,7 @@ public @interface CmdletInfo {
     String category() default "Misc";
     String summary();
     String[] examples() default {};
+    boolean preview() default false;   // may run in preview mode: changes nothing (FR-66)
 }
 
 @Retention(RUNTIME) @Target(RECORD_COMPONENT)
@@ -1312,6 +1348,7 @@ The backlog cmdlets (§12.3) are added **one per mini-iteration**, each with a s
 | 11 | `profile.pj` | FR-63 | `docs/recettes/profile.md` |
 | 12 | `grep` and `powerj-fs` | FR-64 | `docs/recettes/grep.md` |
 | 13 | `cat` | FR-65 | `docs/recettes/cat.md` |
+| 14 | Preview mode (Alt+V) | FR-66 | `docs/recettes/preview.md` |
 
 Version 2 will introduce scripting (`if`, `foreach`, functions, `.pj` files).
 

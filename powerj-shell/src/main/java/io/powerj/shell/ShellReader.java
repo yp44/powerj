@@ -1,12 +1,14 @@
 package io.powerj.shell;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Stream;
 
 import org.jline.keymap.KeyMap;
 import org.jline.reader.LineReader;
-import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.Reference;
+import org.jline.reader.impl.history.DefaultHistory;
 import org.jline.terminal.Terminal;
 import org.jline.utils.InfoCmp.Capability;
 
@@ -19,20 +21,20 @@ final class ShellReader {
     }
 
     static LineReader create(Terminal terminal, PowerJHome home, ShellConfig config) {
-        LineReader reader = LineReaderBuilder.builder()
-                .terminal(terminal)
-                .appName("PowerJ")
-                .parser(new ShellParser())
-                .expander(new HistoryExpander())
-                .variable(LineReader.HISTORY_FILE, home.historyFile())
-                .variable(LineReader.HISTORY_SIZE, config.historySize())
-                .variable(LineReader.HISTORY_FILE_SIZE, config.historySize())
-                .variable(LineReader.SECONDARY_PROMPT_PATTERN, CONTINUATION_PROMPT)
-                .option(LineReader.Option.HISTORY_INCREMENTAL, true)   // written after each command (FR-09)
-                .option(LineReader.Option.HISTORY_IGNORE_DUPS, true)   // consecutive duplicates (FR-10)
-                .option(LineReader.Option.HISTORY_IGNORE_SPACE, true)  // line starting with a space
-                .option(LineReader.Option.DISABLE_EVENT_EXPANSION, false)
-                .build();
+        Map<String, Object> variables = new HashMap<>();
+        variables.put(LineReader.HISTORY_FILE, home.historyFile());
+        variables.put(LineReader.HISTORY_SIZE, config.historySize());
+        variables.put(LineReader.HISTORY_FILE_SIZE, config.historySize());
+        variables.put(LineReader.SECONDARY_PROMPT_PATTERN, CONTINUATION_PROMPT);
+        // Built like LineReaderBuilder does, with the reader that displays the preview (FR-66).
+        var reader = new PreviewLineReader(terminal, "PowerJ", variables);
+        reader.setHistory(new DefaultHistory());
+        reader.setParser(new ShellParser());
+        reader.setExpander(new HistoryExpander());
+        reader.option(LineReader.Option.HISTORY_INCREMENTAL, true);   // written after each command (FR-09)
+        reader.option(LineReader.Option.HISTORY_IGNORE_DUPS, true);   // consecutive duplicates (FR-10)
+        reader.option(LineReader.Option.HISTORY_IGNORE_SPACE, true);  // line starting with a space
+        reader.option(LineReader.Option.DISABLE_EVENT_EXPANSION, false);
         bindPrefixHistorySearch(reader, terminal);
         return reader;
     }

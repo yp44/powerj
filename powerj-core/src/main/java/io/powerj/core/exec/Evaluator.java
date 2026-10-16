@@ -193,6 +193,7 @@ final class Evaluator {
         if (args.size() != 1 || !(args.getFirst() instanceof Integer code)) {
             throw new PjException(Messages.get("exit.integerExpected"));
         }
+        PreviewGuard.deny(Messages.get("preview.off.exit"));
         session.requestExit(code);
         return null;
     }
@@ -244,7 +245,12 @@ final class Evaluator {
             Object value = LOCALS.get().get(name);
             return value == NULL ? null : value;
         }
-        return session.variable(name);
+        Object value = session.variable(name);
+        if (value instanceof java.util.stream.BaseStream<?, ?> || value instanceof java.util.Iterator<?>) {
+            // A stream or an iterator can be read only once: the preview would use it up (FR-66).
+            PreviewGuard.deny(Messages.get("preview.off.readOnce", name));
+        }
+        return value;
     }
 
     private String interpolate(List<StringPart> parts) throws InterruptedException {

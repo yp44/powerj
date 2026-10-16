@@ -23,4 +23,12 @@ public @interface CmdletInfo {
 
     /** Examples displayed by {@code help <name>}. */
     String[] examples() default {};
+
+    /**
+     * {@code true} if the cmdlet may run in preview mode (FR-66): it changes nothing (no file, no environment, no
+     * network side effect) and only produces objects. Default {@code false}: a cmdlet that does not declare it is
+     * never run while the user types. A cmdlet whose options can change something refines the decision with
+     * {@link Cmdlet#previewable(Record)}.
+     */
+    boolean preview() default false;
 }

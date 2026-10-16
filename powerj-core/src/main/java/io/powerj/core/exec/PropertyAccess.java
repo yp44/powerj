@@ -91,6 +91,7 @@ public final class PropertyAccess {
             }
             var getter = Members.getter(type, name);
             if (getter.isPresent()) {
+                PreviewGuard.checkCall(getter.get()); // record components above are always read (FR-66)
                 return new Lookup(true, getter.get().invoke(target));
             }
             var field = Members.field(type, name);

@@ -67,6 +67,11 @@ public final class CmdletRegistry {
             return input != Void.class;
         }
 
+        /** {@code true} if the cmdlet declares that it may run in preview mode (FR-66). */
+        public boolean preview() {
+            return info.preview();
+        }
+
         /** Qualified name, always usable: {@code greet:greet} (FR-17). */
         public String qualifiedName() {
             return alias(module) + ":" + name();

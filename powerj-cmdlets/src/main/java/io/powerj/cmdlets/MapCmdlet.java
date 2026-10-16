@@ -16,7 +16,7 @@ import io.powerj.api.ScriptBlock;
  * </pre>
  * A {@code null} result emits nothing; a collection is unrolled by the pipeline.
  */
-@CmdletInfo(name = "map", category = "Filters", summary = "Transforms each pipeline object with a lambda",
+@CmdletInfo(name = "map", preview = true, category = "Filters", summary = "Transforms each pipeline object with a lambda",
         examples = {"ls -r | map { f -> f.name + \" : \" + f.name.length() }", "ls | map FileEntry::name",
                 "ls | map { $_.name.toUpperCase() }", "env | map EnvVar::name"})
 public final class MapCmdlet implements Cmdlet<MapCmdlet.Params, Object, Object> {
