@@ -15,6 +15,9 @@ Parser.java        14.2 KB   2026-10-05 18:12      false
 Evaluator.java     11.8 KB   2026-10-06 09:40      false
 
 PJ ~/dev/powerj> grep "TODO|FIXME" src -r -p 16 | map { m -> m.path.fileName + ":" + m.line }
+Parser.java:118
+Evaluator.java:57
+Evaluator.java:203
 PJ ~/dev/powerj> git status --porcelain | where { $_.startsWith(" M ") }
  M src/core/Parser.java
 PJ ~/dev/powerj> java.util.List.of("apple", "banana", "orange") | where { $_.contains("b") }
