@@ -225,4 +225,18 @@ class BuiltinCmdletsTest {
         run("ls | collect -x");
         assertThat(errors).containsExactly("collect: unknown option -x");
     }
+
+    @Test
+    void sortOrdersByKeys() throws Exception {
+        Files.writeString(tmp.resolve("big.txt"), "x".repeat(100));
+        assertThat(run("ls --files | sort size --desc | map { f -> f.name }")).isEqualTo("big.txt\nnotes.txt\n");
+        assertThat(run("ls | sort dir name | map { f -> f.name }")).isEqualTo("big.txt\nnotes.txt\ndocs\n");
+        assertThat(run("ls | sort { $_.name.length() } -d | map { f -> f.name }"))
+                .isEqualTo("notes.txt\nbig.txt\ndocs\n");
+        assertThat(run("List.of(\"b\", \"B\", \"a\") | sort -i")).isEqualTo("a\nb\nB\n");
+        assertThat(run("List.of(10L, 3, 2.5) | sort")).isEqualTo("2.5\n3\n10\n");
+        assertThat(errors).isEmpty();
+        run("ls | sort bad!");
+        assertThat(errors).containsExactly("sort: invalid property name: bad!");
+    }
 }
