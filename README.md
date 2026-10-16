@@ -21,6 +21,19 @@ PJ ~/dev/powerj> java.util.List.of("apple", "banana", "orange") | where { $_.con
 banana
 PJ ~/dev/powerj> LocalDate.now().plusDays(10).dayOfWeek
 FRIDAY
+PJ ~/dev/powerj> help members (cat -n pom.xml).get(0)
+
+name        kind      type
+----        ----      ----
+path        property  Path
+line        property  int
+length      property  int
+text        property  String
+length()    method    int
+line()      method    int
+path()      method    Path
+text()      method    String
+toString()  method    String
 ```
 
 ## Contents
