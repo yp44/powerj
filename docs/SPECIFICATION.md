@@ -630,6 +630,34 @@ CA:
 - `env --set MAVEN_OPTS=-Xmx2g` then `mvn` receives the variable;
 - `env --unset MAVEN_OPTS`.
 
+#### FR-67 — `sort`: sort objects
+
+```text
+sort [<clé>...] [-d|--desc] [-i|--ignore-case]
+```
+
+| Option | Short | Type | Description |
+|---|---|---|---|
+| `clé` (position 0, multiple) | — | property, property path or block | Sort keys by priority: ties on a key are broken by the next one. None: the objects themselves. |
+| `--desc` | `-d` | boolean | Descending order, for all keys. |
+| `--ignore-case` | `-i` | boolean | Compares `String` keys ignoring case. |
+
+A key is a property name (`sort size`, same as `sort { $_.size }`), a property path (`sort path.fileName`), a block (`sort { $_.name.length() }`, `sort { f -> f.modified }`) or a method reference (`sort FileEntry::size`). An invalid property name or a key of another kind is a blocking error.
+
+Output: the received objects, unchanged, in the new order. `sort` emits once its input has ended (it keeps all objects in memory). The sort is **stable**: objects with equal keys keep their order, also with `--desc`.
+
+Comparison of two key values: `null` last, in both directions; numbers by value whatever their class (`3` < `10L` < `10.5`); strings with `compareTo` (or ignoring case with `-i`); other `Comparable`s of the same class (dates, `Path`, enums, booleans) with `compareTo`. Values that cannot be compared (mixed types) are sorted by their text, with a single non-blocking error `cannot compare <type> with <type>: these values are sorted by their text`. An error while evaluating a key is non-blocking: the object is left out.
+
+`sort` is a filter without side effect (allowed in preview mode, FR-66). The native `sort` remains available with `^sort` or `native.prefer=sort` (FR-14, FR-16).
+
+CA:
+- `ls | sort size --desc` lists the largest files first;
+- `ls | sort dir name` lists files then folders, each in alphabetical order;
+- `ls -r | sort { $_.name.length() } -d`;
+- `(ls)*.name | sort -i` ignores case;
+- `git branch | sort` sorts the lines of a native command;
+- `ls | sort nom-invalide!` is a blocking error; `sort` on mixed strings and numbers reports one error and sorts them by text.
+
 ### 3.10 Native commands
 
 **FR-37 — Principle: streams stay streams.** A native command is **not** wrapped in an object: its standard output and its error output are handled as streams, the way a classic shell does.
