@@ -2,28 +2,20 @@ package io.powerj.cmdlets;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.SequenceInputStream;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
-import java.nio.charset.IllegalCharsetNameException;
-import java.nio.charset.StandardCharsets;
-import java.nio.charset.UnsupportedCharsetException;
 import java.nio.file.Files;
-import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
-import java.nio.file.PathMatcher;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CancellationException;
 import java.util.regex.Matcher;
@@ -37,7 +29,6 @@ import io.powerj.api.Option;
 import io.powerj.api.ScriptBlock;
 import io.powerj.api.Span;
 import io.powerj.fs.FileWalker;
-import io.powerj.fs.Globs;
 import io.powerj.fs.WalkError;
 
 /**
@@ -95,8 +86,6 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
 
     /** Bytes read to recognize a binary file (one containing a NUL byte), skipped. */
     private static final int BINARY_PROBE = 8192;
-    private static final Comparator<Path> BY_NAME = Comparator.comparing(
-            (Path p) -> p.getFileName().toString().toLowerCase(Locale.ROOT)).thenComparing(Path::toString);
 
     /** State of each running execution: the same cmdlet can be used in several pipelines at once. */
     private final Map<Params, Search> searches = Collections.synchronizedMap(new IdentityHashMap<>());
@@ -108,7 +97,8 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
         if (!params.paths().isEmpty()) {
             List<Path> roots = new ArrayList<>();
             for (String argument : params.paths()) {
-                roots.addAll(roots(argument, params, context));
+                roots.addAll(FileArguments.expand(argument, params.all(), context, error -> report(error, context),
+                        "grep.no.match"));
             }
             search.files(roots, context);
         } else if (!context.hasInput()) {
@@ -119,7 +109,7 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
     @Override
     public void process(Params params, Object input, CmdletContext<Object> context) {
         Search search = searches.computeIfAbsent(params, p -> new Search(p, context));
-        Path file = params.property() == null ? file(input, context) : null;
+        Path file = params.property() == null ? FileArguments.file(input, context) : null;
         if (file == null) {
             search.filter(input, context);
         } else if (params.recurse() || params.maxDepth() != null || !Files.isDirectory(file)) {
@@ -131,39 +121,6 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
     @Override
     public void end(Params params, CmdletContext<Object> context) {
         searches.remove(params);
-    }
-
-    /** File designated by a pipeline object ({@link FileEntry}, {@link Path}, {@link File}), or {@code null}. */
-    private static Path file(Object input, CmdletContext<?> context) {
-        return switch (input) {
-            case FileEntry entry -> entry.path();
-            case Path path -> context.currentDirectory().resolve(path);
-            case File file -> context.currentDirectory().resolve(file.toPath());
-            case null, default -> null;
-        };
-    }
-
-    /** Roots designated by an argument: a path, or the matches of a wildcard on its last element. */
-    private static List<Path> roots(String argument, Params params, CmdletContext<Object> context) {
-        if (!Globs.isPattern(argument)) {
-            try {
-                return List.of(context.currentDirectory().resolve(argument).normalize());
-            } catch (InvalidPathException _) {
-                // Windows: * and ? are invalid in a path, handled as a wildcard
-            }
-        }
-        int separator = Math.max(argument.lastIndexOf('/'), argument.lastIndexOf('\\'));
-        String dir = separator < 0 ? "." : argument.substring(0, separator + 1);
-        PathMatcher pattern = Globs.matcher(argument.substring(separator + 1));
-        List<Path> matches = new ArrayList<>();
-        FileWalker.builder().maxDepth(1).includeHidden(params.all()).order(BY_NAME).build()
-                .walk(context.currentDirectory().resolve(dir).normalize(),
-                        (path, _) -> pattern.matches(path.getFileName()) ? path : null, matches::add,
-                        error -> report(error, context));
-        if (matches.isEmpty()) {
-            context.error(Messages.get("grep.no.match", argument));
-        }
-        return matches;
     }
 
     private static void report(WalkError error, CmdletContext<?> context) {
@@ -202,26 +159,15 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
                         e.getDescription(), e.getIndex()));
             }
             invert = params.invert();
-            charset = charset(params.encoding());
+            charset = FileArguments.charset(params.encoding(), "grep.encoding.unknown");
             detectBinary = !params.binary()
                     && !charset.name().startsWith("UTF-16") && !charset.name().startsWith("UTF-32");
             property = params.property() == null ? null : property(params.property(), context);
             singleMatch = params.singleMatch();
             int maxDepth = params.maxDepth() != null ? params.maxDepth()
                     : params.recurse() ? Integer.MAX_VALUE : 1;
-            walker = FileWalker.builder().maxDepth(maxDepth).includeHidden(params.all()).order(BY_NAME)
+            walker = FileWalker.builder().maxDepth(maxDepth).includeHidden(params.all()).order(FileArguments.BY_NAME)
                     .parallelism(params.parallel() == null ? 1 : params.parallel()).build();
-        }
-
-        private static Charset charset(String encoding) {
-            if (encoding == null) {
-                return StandardCharsets.UTF_8;
-            }
-            try {
-                return Charset.forName(encoding);
-            } catch (IllegalCharsetNameException | UnsupportedCharsetException _) {
-                throw new IllegalArgumentException(Messages.get("grep.encoding.unknown", encoding));
-            }
         }
 
         private static ScriptBlock property(String name, CmdletContext<?> context) {

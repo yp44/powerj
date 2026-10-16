@@ -97,6 +97,14 @@ class OutputFormatterTest {
     }
 
     @Test
+    void lineBreaksAreKept() {
+        assertThat(render(80, "one\ntwo\nthree")).isEqualTo("one\ntwo\nthree\n");
+        // a text that ends with a line break gets no other one
+        assertThat(render(80, "one\ntwo\n", "three")).isEqualTo("one\ntwo\nthree\n");
+        assertThat(OutputFormatter.cell("a\r\nb\nc", false)).isEqualTo("a\r\nb\nc");
+    }
+
+    @Test
     void scalarsCollectionsAndMaps() {
         assertThat(render(80, "texte", 42, List.of("a", "b"), null)).isEqualTo("texte\n42\na\nb\n");
         assertThat(render(80, Map.of("k", "v"))).contains("key  value", "k    v");

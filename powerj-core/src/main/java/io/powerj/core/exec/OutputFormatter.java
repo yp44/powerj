@@ -97,6 +97,7 @@ public final class OutputFormatter implements AutoCloseable {
             }
             case Record record -> record(record);
             case Map<?, ?> map -> map(map);
+            case String text -> text(text);
             default -> line(cell(value, false));
         }
     }
@@ -111,6 +112,16 @@ public final class OutputFormatter implements AutoCloseable {
     private void line(String text) {
         endTable();
         out.println(text);
+    }
+
+    /** Text as is: no line break added when it already ends with one (content read by cat). */
+    private void text(String text) {
+        if (text.endsWith("\n")) {
+            endTable();
+            out.print(text);
+        } else {
+            line(text);
+        }
     }
 
     private void record(Record record) {
@@ -326,15 +337,15 @@ public final class OutputFormatter implements AutoCloseable {
         }
     }
 
-    /** Value on one line, in readable format. */
+    /** Value in readable format; its line breaks are kept (a text read by cat is shown as is). */
     static String cell(Object value, boolean bytes) {
         return switch (value) {
             case null -> "";
             case Number n when bytes -> humanBytes(n.longValue());
             case Instant instant -> DATE_TIME.format(instant.atZone(ZoneId.systemDefault()));
             case Duration d -> Values.text(d);
-            case String s -> s.replace('\n', ' ').replace('\r', ' ');
-            default -> Values.text(value).replace('\n', ' ');
+            case String s -> s;
+            default -> Values.text(value);
         };
     }
 
