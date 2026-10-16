@@ -139,4 +139,16 @@ class CompletionsTest {
             assertThat(completions.complete(line, line.length())).isNotNull();
         }
     }
+
+    @Test
+    void previewModeOffersOnlyWhatCanRunInAPreview() {
+        completions.previewMode(true);
+        assertThat(values("l")).contains("ls").doesNotContain("lsblk-like");
+        assertThat(values("c")).contains("cat", "collect").doesNotContain("cd");
+        assertThat(values("java.nio.file.Files.")).contains("exists(", "readString(").doesNotContain("delete(", "writeString(");
+        assertThat(values("\"abc\".")).contains("toUpperCase()");
+        completions.previewMode(false);
+        assertThat(values("l")).contains("ls", "lsblk-like");
+        assertThat(values("java.nio.file.Files.")).contains("delete(");
+    }
 }

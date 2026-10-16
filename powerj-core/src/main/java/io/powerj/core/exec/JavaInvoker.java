@@ -110,6 +110,7 @@ final class JavaInvoker {
             throw new PjException(Messages.get("java.noPublicConstructor", type.getSimpleName()));
         }
         var constructor = (Constructor<?>) select(candidates, args, "new " + type.getSimpleName());
+        PreviewGuard.checkCall(constructor);
         try {
             return constructor.newInstance(convertAll(constructor, args));
         } catch (InvocationTargetException e) {
@@ -130,6 +131,7 @@ final class JavaInvoker {
     }
 
     private static Object call(Method method, Object target, Object[] args) {
+        PreviewGuard.checkCall(method);
         try {
             return method.invoke(target, args);
         } catch (InvocationTargetException e) {

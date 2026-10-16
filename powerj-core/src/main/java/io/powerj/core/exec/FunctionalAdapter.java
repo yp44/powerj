@@ -31,10 +31,16 @@ final class FunctionalAdapter {
 
     static Object adapt(ScriptBlock block, Class<?> type) {
         Method sam = SINGLE_ABSTRACT_METHOD.get(type);
+        // A preview in progress follows the block into the threads where Java calls it (parallel stream…), FR-66.
+        PreviewGuard guard = PreviewGuard.current();
         InvocationHandler handler = (proxy, method, args) -> {
             if (method.getName().equals(sam.getName()) && method.getParameterCount() == sam.getParameterCount()
                     && !method.isDefault()) {
-                return result(sam, call(block, args == null ? new Object[0] : args));
+                Object[] actual = args == null ? new Object[0] : args;
+                if (guard != null && PreviewGuard.current() != guard) {
+                    return guard.call(() -> result(sam, call(block, actual)));
+                }
+                return result(sam, call(block, actual));
             }
             if (method.isDefault()) {
                 return InvocationHandler.invokeDefault(proxy, method, args);

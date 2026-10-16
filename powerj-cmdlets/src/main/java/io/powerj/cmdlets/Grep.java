@@ -45,7 +45,7 @@ import io.powerj.fs.WalkError;
  * grep -s -v Copyright src -r            # files that never match (line 0)
  * </pre>
  */
-@CmdletInfo(name = "grep", category = "Files", summary = "Searches a regular expression in files or pipeline objects",
+@CmdletInfo(name = "grep", preview = true, category = "Files", summary = "Searches a regular expression in files or pipeline objects",
         examples = {"grep TODO src -r", "grep -i \"error|warn\" *.log", "grep \"class (\\\\w+)\" -r -p 16 | map { m -> m.groups[1] }", "grep class\\s+\\w+ src -r",
                 "grep \"version=\\\"(?<v>[^\\\"]+)\\\"\" pom.xml | map { m -> m.named.v }",
                 "ls -r --filter *.java | grep TODO", "git log --oneline | grep -i fix", "ls | grep --property name \"^a\"",

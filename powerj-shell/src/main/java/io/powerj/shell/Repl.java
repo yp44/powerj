@@ -41,6 +41,9 @@ public final class Repl {
     private final Interpreter interpreter;
     private final Terminal terminal;
     private final PrintWriter out;
+    /** Preview mode (FR-66), or {@code null} if the line reader cannot display it. */
+    private final Previewer previewer;
+    private final boolean colors;
     private List<String> moduleWarnings = List.of();
     private Path profile;
     private boolean runProfile;
@@ -54,17 +57,24 @@ public final class Repl {
         this.terminal = reader.getTerminal();
         this.out = terminal.writer();
         boolean interactive = !terminal.getType().startsWith("dumb");
+        this.colors = interactive && colors(terminal);
         var io = new ShellIo(out, this::printError, interactive, () -> terminal.getWidth(), consoleInput(terminal),
-                interactive && colors(terminal));
+                colors);
         this.interpreter = new Interpreter(session, io, Map.of("history", this::history), registry);
         // Completion (Tab) and input highlighting (FR-08, FR-21 to FR-26).
         var completions = new Completions(interpreter);
         completions.warmUp();
+        Previewer preview = null;
         if (reader instanceof LineReaderImpl impl) {
             impl.setParser(new ShellParser(completions));
             impl.setCompleter(ShellCompletion.completer());
             impl.setHighlighter(ShellCompletion.highlighter(interpreter));
         }
+        if (reader instanceof PreviewLineReader previewReader && interactive) {
+            preview = new Previewer(previewReader, interpreter, completions, terminal::getWidth, colors);
+            preview.bind(this::prompt);
+        }
+        this.previewer = preview;
         // Ctrl+C during execution cancels the command without exiting the shell (FR-03);
         // during input, JLine throws UserInterruptException.
         terminal.handle(Terminal.Signal.INT, _ -> supervisor.cancel());
@@ -112,6 +122,10 @@ public final class Repl {
                 continue; // Ctrl+C during input: the line is cleared
             } catch (EndOfFileException _) {
                 return 0; // Ctrl+D on an empty line, or end of input
+            } finally {
+                if (previewer != null) {
+                    previewer.reset(); // stops the evaluation of the line being previewed (FR-66)
+                }
             }
             switch (supervisor.run(line, () -> execute(line))) {
                 case Outcome.Success _ -> { }
@@ -196,8 +210,14 @@ public final class Repl {
         };
     }
 
+    /** {@code PJ <dir>> }, or {@code PJ? <dir>> } in preview mode (FR-66). */
     String prompt() {
-        return "PJ " + session.currentDirectory() + "> ";
+        String mode = "PJ ";
+        if (previewer != null && previewer.on()) {
+            mode = colors ? new AttributedString("PJ?", AttributedStyle.DEFAULT.foreground(AttributedStyle.CYAN))
+                    .toAnsi(terminal) + " " : "PJ? ";
+        }
+        return mode + session.currentDirectory() + "> ";
     }
 
     private List<Object> execute(String line) throws InterruptedException {

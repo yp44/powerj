@@ -200,6 +200,118 @@ public final class Interpreter {
         }
     }
 
+    /** Stops a preview that has received enough values. */
+    private static final class PreviewFull extends java.util.concurrent.CancellationException { }
+
+    /**
+     * Preview mode (FR-66): evaluates the line as {@link #execute} would, but only with what changes nothing — cmdlets
+     * declared {@code preview = true}, expressions, Java calls of the preview set — and stops after {@code limit}
+     * values. Nothing is displayed, no variable is set, {@code $?} and {@code $errors} are left as they are.
+     * Cancelled by interrupting the calling thread: the values received so far are then returned.
+     *
+     * @param width  width of the formatted lines ({@link PreviewResult.Values#lines()})
+     * @param colors {@code true} if the lines may contain ANSI colors
+     */
+    public PreviewResult preview(String line, int limit, int width, boolean colors) {
+        if (line.isBlank()) {
+            return new PreviewResult.Empty();
+        }
+        Ast.Script script;
+        try {
+            script = Parser.parse(line, session.java()::isStaticReference);
+        } catch (SyntaxException e) {
+            return new PreviewResult.Incomplete(e.getMessage());
+        }
+        if (script.steps().isEmpty()) {
+            return new PreviewResult.Empty();
+        }
+        if (script.steps().size() > 1) {
+            return new PreviewResult.Off(Messages.get("preview.off.several"));
+        }
+        Statement statement = script.steps().getFirst().statement();
+        if (statement.assignTo().isPresent()) {
+            return new PreviewResult.Off(Messages.get("preview.off.assignment"));
+        }
+        if (!statement.pipeline().redirects().isEmpty()) {
+            return new PreviewResult.Off(Messages.get("preview.off.redirection"));
+        }
+        var guard = new PreviewGuard();
+        List<Object> values = java.util.Collections.synchronizedList(new ArrayList<>());
+        boolean more = false;
+        try {
+            guard.call(() -> pipeline(statement.pipeline(), value -> previewValue(value, values, limit), true,
+                    Optional.empty(), Optional.empty()));
+        } catch (PreviewFull _) {
+            more = true;
+        } catch (InterruptedException | java.util.concurrent.CancellationException e) {
+            if (guard.reason() == null) {
+                more = true; // cancelled by the caller (time limit): what has arrived is shown
+            }
+        } catch (PjException e) {
+            if (guard.reason() == null) {
+                return new PreviewResult.Failed(e.error().message());
+            }
+        } catch (RuntimeException | StackOverflowError e) {
+            if (guard.reason() == null) {
+                return new PreviewResult.Failed(Messages.get("error.internal", e));
+            }
+        }
+        if (guard.reason() != null) {
+            return new PreviewResult.Off(guard.reason());
+        }
+        List<Object> shown;
+        synchronized (values) {
+            shown = new ArrayList<>(values.subList(0, Math.min(limit, values.size())));
+            more |= values.size() > limit;
+        }
+        var text = new java.io.StringWriter();
+        try {
+            guard.call(() -> {
+                var formatter = new OutputFormatter(new PrintWriter(text), width, colors);
+                shown.forEach(formatter::accept);
+                formatter.close();
+                return null;
+            });
+        } catch (java.util.concurrent.CancellationException | PjException e) {
+            if (guard.reason() != null) {
+                return new PreviewResult.Off(guard.reason());
+            }
+            more = true; // a lazy value could not be displayed in time: what was formatted is shown
+        }
+        String formatted = text.toString().stripTrailing();
+        List<String> lines = formatted.isEmpty() ? List.of() : List.of(formatted.split("\\R"));
+        return new PreviewResult.Values(shown, lines, more, guard.errors());
+    }
+
+    /** Adds a value of the preview, unrolled like the display does; stops once there is more than {@code limit}. */
+    private static void previewValue(Object value, List<Object> values, int limit) {
+        switch (value) {
+            case null -> { }
+            case Path path -> addPreviewValue(path, values, limit);
+            case java.util.Map<?, ?> map -> addPreviewValue(map, values, limit);
+            case Iterable<?> items -> items.forEach(item -> addPreviewValue(item, values, limit));
+            case java.util.stream.BaseStream<?, ?> stream -> {
+                try (stream) {
+                    stream.iterator().forEachRemaining(item -> addPreviewValue(item, values, limit));
+                }
+            }
+            case java.util.Iterator<?> iterator -> iterator.forEachRemaining(item -> addPreviewValue(item, values, limit));
+            case Object array when array.getClass().isArray() -> {
+                for (int i = 0; i < java.lang.reflect.Array.getLength(array); i++) {
+                    addPreviewValue(java.lang.reflect.Array.get(array, i), values, limit);
+                }
+            }
+            default -> addPreviewValue(value, values, limit);
+        }
+    }
+
+    private static void addPreviewValue(Object value, List<Object> values, int limit) {
+        values.add(value);
+        if (values.size() > limit) {
+            throw new PreviewFull();
+        }
+    }
+
     /** {@code true} if the last executed line hit a blocking error (not just a failure). */
     public boolean hadBlockingError() {
         return blockingError;
@@ -270,7 +382,7 @@ public final class Interpreter {
             Segment segment = segments.get(i);
             Source input = i == 0 ? standardInput : pipes.get(i - 1);
             Pipe output = pipes.get(i);
-            threads.add(Thread.ofVirtual().name("powerj-etape-" + (i + 1)).unstarted(() -> {
+            threads.add(Thread.ofVirtual().name("powerj-etape-" + (i + 1)).unstarted(PreviewGuard.propagate(() -> {
                 output.onAbort(Thread.currentThread()::interrupt);
                 try {
                     segment(segment, input, output, null, false, Optional.empty(), sharedErrors, errors);
@@ -292,7 +404,7 @@ public final class Interpreter {
                         pipe.abort();
                     }
                 }
-            }));
+            })));
         }
         threads.forEach(Thread::start);
         Pipe lastInput = pipes.getLast();
@@ -303,7 +415,7 @@ public final class Interpreter {
             lastInput.abort();
             joinAll(threads);
         }
-        if (blockingErrors.get()) {
+        if (blockingErrors.get() && !PreviewGuard.active()) {
             blockingError = true;
         }
         return succeeded && !blockingErrors.get();
@@ -382,6 +494,7 @@ public final class Interpreter {
         if (!command.forceNative()) {
             Builtin builtin = builtins.get(command.name());
             if (builtin != null) {
+                PreviewGuard.deny(Messages.get("preview.off.builtin", command.name()));
                 if (index > 0) {
                     throw new PjException(Messages.get("pipeline.noInput", command.name()));
                 }
@@ -402,12 +515,16 @@ public final class Interpreter {
                 if (index > 0 && !cmdlet.readsInput()) {
                     throw new PjException(Messages.get("pipeline.noInput", command.name()));
                 }
+                if (!cmdlet.preview()) {
+                    PreviewGuard.deny(Messages.get("preview.off.cmdlet", command.name()));
+                }
                 return new ObjectStep((input, output, errors) -> runCmdlet(cmdlet, args,
                         cmdlet.readsInput() ? input : null, output,
                         stage.errorsToOutput() ? message -> output.accept(message) : errors));
             }
         }
         Path executable = resolver.resolve(command.name(), session).orElseThrow(() -> unknownCommand(command));
+        PreviewGuard.deny(Messages.get("preview.off.native", command.name()));
         List<String> textArgs = args.stream().map(Values::text).toList();
         return new NativeStep(new NativeRunner.Command(executable, textArgs, stage.errorsToOutput()));
     }
@@ -597,6 +714,10 @@ public final class Interpreter {
     }
 
     private Consumer<String> errorSink(Optional<NativeRunner.FileTarget> errTarget) {
+        PreviewGuard guard = PreviewGuard.current();
+        if (guard != null) {
+            return guard::error; // nothing is written while the user types (FR-66)
+        }
         return errTarget.<Consumer<String>>map(target -> message -> append(target.file(), message))
                 .orElse(io.errors());
     }
@@ -610,6 +731,9 @@ public final class Interpreter {
             return error.message();
         }
         Throwable cause = error.cause().get();
+        if (PreviewGuard.active()) {
+            return error.message(); // $errors only keeps the errors of executed commands
+        }
         session.recordError(cause);
         if (!session.debug()) {
             return error.message();

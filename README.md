@@ -119,6 +119,18 @@ Overloads, varargs and argument conversions follow Java rules; `System.exit` and
 
 Persistent history with prefix search on ↑/↓, **Ctrl+R** reverse search, **Tab completion** (commands tagged `[pj]` / `[internal]` / `[native]`, options with descriptions, paths, variables, properties of `$_` and of lambda parameters, Java classes and methods with their signatures), **syntax highlighting** as you type, and a `>>` continuation prompt when a brace, parenthesis or quote is left open or a line ends with `|`, `&&` or `||`.
 
+### Preview mode
+
+Press **Alt+V**: the prompt becomes `PJ?` and the first results of the line appear **below it while you type**, before Enter, for the pipeline stage under the cursor. Only what changes nothing runs: cmdlets declared `preview = true` and a fixed set of JDK methods; a native command, a built-in command, a Java call that could change something, an assignment or a redirection pauses the preview with the reason. Enter executes the line as usual. Details: FR-66 in the specification, checklist [preview](docs/recettes/preview.md).
+
+```text
+PJ? C:\dev> ls -r --filter *.java | where { f -> f.size > 10kb }█
+── FileEntry · 10+ ──────────────────────────────────
+name              size      modified          dir
+Parser.java       12.4 KB   2026-10-12 09:41  false
+…
+```
+
 ### Languages
 
 Messages, help, completion and errors in **English or French**; commands and options are the same in both. See [Configuration](#configuration).
@@ -305,7 +317,8 @@ PowerJ is in active development (version `0.1.0-SNAPSHOT`). Implemented so far:
 - direct access to the JRE's Java API, Java-style lambdas and method references;
 - Tab completion and syntax highlighting;
 - third-party modules loaded from jars;
-- English / French interface, `~` expansion, startup profile.
+- English / French interface, `~` expansion, startup profile;
+- preview mode (Alt+V): results shown while typing.
 
 Next: more cmdlets from the backlog (`find`, `cp`/`mv`/`rm`, `ps`, `select`, `sort`, `group`, `first`/`last`, `to-json`… — [§12.3](docs/SPECIFICATION.md#123-cmdlet-backlog-outside-the-current-scope)), then a scripting language with control structures in v2. The step-by-step plan is in [§11 of the specification](docs/SPECIFICATION.md#11-iterative-development-plan).
 

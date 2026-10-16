@@ -9,7 +9,7 @@ import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
 
 /** {@code env}: session environment variables (specification FR-36b). */
-@CmdletInfo(name = "env", category = "System", summary = "Shows or changes the session environment variables",
+@CmdletInfo(name = "env", preview = true, category = "System", summary = "Shows or changes the session environment variables",
         examples = {"env", "env PATH", "env --set MAVEN_OPTS=-Xmx2g", "env --append PATH C:\\tools", "env --unset MAVEN_OPTS",
                 "(env PATH).value"})
 public final class Env implements Cmdlet<Env.Params, Void, EnvVar> {
@@ -28,6 +28,12 @@ public final class Env implements Cmdlet<Env.Params, Void, EnvVar> {
             String prepend,
             @Option(position = 1, description = "Value used by --append and --prepend")
             String value) {
+    }
+
+    /** Only reading is previewed (FR-66): {@code --set}, {@code --unset}, {@code --append}, {@code --prepend} change the session. */
+    @Override
+    public boolean previewable(Params p) {
+        return count(p.set(), p.unset(), p.append(), p.prepend()) == 0;
     }
 
     @Override

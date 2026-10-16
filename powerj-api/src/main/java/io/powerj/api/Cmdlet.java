@@ -23,4 +23,13 @@ public interface Cmdlet<P extends Record, I, O> {
     /** Called once, after the last object received. */
     default void end(P params, CmdletContext<O> context) throws Exception {
     }
+
+    /**
+     * Preview mode (FR-66), for a cmdlet declared with {@link CmdletInfo#preview()}: {@code false} if these
+     * parameters would change something ({@code env --set}), and the preview stops instead of running the cmdlet.
+     * Called after the options are bound, before {@link #begin}.
+     */
+    default boolean previewable(P params) {
+        return true;
+    }
 }

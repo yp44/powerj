@@ -20,7 +20,7 @@ import io.powerj.api.Collected;
  * ls -r | collect | map { l -> l.stream().sorted((a, b) -> Long.compare(b.size, a.size)).limit(5).toList() }
  * </pre>
  */
-@CmdletInfo(name = "collect", category = "Filters", summary = "Gathers the pipeline objects into a single list",
+@CmdletInfo(name = "collect", preview = true, category = "Filters", summary = "Gathers the pipeline objects into a single list",
         examples = {"(ls -r | collect).size()", "$l = ls | where { f -> f.dir } | collect",
                 "ls -r | collect | map { l -> l.stream().sorted((a, b) -> Long.compare(b.size, a.size)).limit(5).toList() }"})
 public final class Collect implements Cmdlet<Collect.Params, Object, Collected> {

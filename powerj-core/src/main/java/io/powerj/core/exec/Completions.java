@@ -59,6 +59,8 @@ public final class Completions {
     private static final Pattern ASSIGNMENT = Pattern.compile("\\$[\\p{L}_][\\p{L}\\p{N}_]*\\s*=(?!=)\\s*");
 
     private final Interpreter interpreter;
+    /** Preview mode (FR-66): only what can run in a preview is offered. */
+    private volatile boolean previewMode;
     private final JavaIndex index;
     private final NativeCommands natives;
 
@@ -73,6 +75,14 @@ public final class Completions {
     }
 
     /** Prepares, in the background, the index of the classes imported by default. */
+    /**
+     * Preview mode (FR-66): commands are limited to the cmdlets declared {@code preview = true} (no built-in command,
+     * no native program) and Java methods to those of the preview set.
+     */
+    public void previewMode(boolean on) {
+        this.previewMode = on;
+    }
+
     public void warmUp() {
         index.warmUp(JavaClasses.DEFAULT_IMPORTS);
     }
@@ -319,12 +329,16 @@ public final class Completions {
     private Result commands(String line, Frame frame, int identStart, String fragment) {
         String before = line.substring(frame.stageStart(), identStart).strip();
         List<Candidate> candidates = new ArrayList<>();
+        boolean preview = previewMode;
         if (!before.equals("^")) {
-            for (String builtin : new TreeSet<>(interpreter.builtinNames())) {
+            for (String builtin : preview ? List.<String>of() : new TreeSet<>(interpreter.builtinNames())) {
                 candidates.add(new Candidate(builtin, builtin + " " + Messages.get("completion.tag.builtin"),
                         Messages.get("completion.builtin"), true));
             }
             for (var cmdlet : interpreter.registry().all()) {
+                if (preview && !cmdlet.preview()) {
+                    continue;
+                }
                 candidates.add(new Candidate(cmdlet.name(), cmdlet.name() + " " + Messages.get("completion.tag.cmdlet"),
                         cmdlet.summary(), true));
             }
@@ -332,7 +346,7 @@ public final class Completions {
                 importedClasses().forEach(c -> candidates.add(new Candidate(c, c, Messages.get("completion.javaClass"), false)));
             }
         }
-        for (String name : natives.names(session().environment())) {
+        for (String name : preview ? java.util.Set.<String>of() : natives.names(session().environment())) {
             candidates.add(new Candidate(name, name + " " + Messages.get("completion.tag.native"),
                     Messages.get("completion.program"), true));
         }
@@ -818,7 +832,8 @@ public final class Completions {
     }
 
     /** Properties (components, getters, fields) and instance methods, with their signature (FR-24b). */
-    private static List<Candidate> instanceMembers(Class<?> type) {
+    private List<Candidate> instanceMembers(Class<?> type) {
+        boolean preview = previewMode;
         List<Candidate> candidates = new ArrayList<>();
         for (Members.Member m : Members.ofType(type)) {
             if (m.kind() != Members.Kind.METHOD) {
@@ -839,16 +854,21 @@ public final class Completions {
                 if (method.getParameterCount() == 0 && components.contains(name)) {
                     continue; // record accessor: already offered as a property
                 }
+                if (preview && !PreviewPolicy.allows(method)) {
+                    continue;
+                }
                 candidates.add(methodCandidate(method));
             }
         });
         return candidates;
     }
 
-    private static List<Candidate> staticMembers(Class<?> type) {
+    private List<Candidate> staticMembers(Class<?> type) {
+        boolean preview = previewMode;
         List<Candidate> candidates = new ArrayList<>();
         for (Method method : type.getMethods()) {
-            if (Modifier.isStatic(method.getModifiers()) && method.getDeclaringClass() == type) {
+            if (Modifier.isStatic(method.getModifiers()) && method.getDeclaringClass() == type
+                    && (!preview || PreviewPolicy.allows(method))) {
                 candidates.add(methodCandidate(method));
             }
         }

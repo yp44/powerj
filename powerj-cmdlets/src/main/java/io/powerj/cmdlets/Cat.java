@@ -34,7 +34,7 @@ import io.powerj.fs.WalkError;
  * grep TODO -r -s | cat --property path # the file is a property of the objects received
  * </pre>
  */
-@CmdletInfo(name = "cat", category = "Files", summary = "Reads files as lines or as a whole content",
+@CmdletInfo(name = "cat", preview = true, category = "Files", summary = "Reads files as lines or as a whole content",
         examples = {"cat a.txt", "cat a.txt b.txt -n", "cat *.log -t", "cat pom.xml -c",
                 "cat data.txt --encoding ISO-8859-1", "ls --filter *.txt | cat -n",
                 "\"a.txt\" | cat", "grep TODO -r -s | cat --property path -n",
