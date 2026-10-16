@@ -1,61 +1,316 @@
 # PowerJ
 
-An interactive object-oriented shell written in Java 27: commands return **Java objects** (preferably records) whose attributes you extract in a pipeline, with short Unix-style command names, transparent mixing with native commands, and **direct access to the entire Java API of the JRE**.
+[![CI](https://github.com/yp44/powerj/actions/workflows/ci.yml/badge.svg)](https://github.com/yp44/powerj/actions/workflows/ci.yml)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+![Java 27](https://img.shields.io/badge/Java-27-orange.svg)
+
+**An interactive, object-oriented shell written in Java 27.** Commands return **Java objects** instead of text, you filter them on their properties in a pipeline, native programs work as in any shell, and **the whole Java API of the JRE** is available right at the prompt.
 
 ```text
-PJ C:\dev> ls -r --filter *.java | where { $_.size > 10kb }
-PJ C:\dev> grep "TODO|FIXME" src -r -p 16 | map { m -> m.path.fileName + ":" + m.line }
-PJ C:\dev> git status --porcelain | where { $_.startsWith(" M ") }
-PJ C:\dev> java.util.List.of("apple", "banana", "orange") | where { $_.contains("b") }
-PJ C:\dev> LocalDate.now().plusDays(10).dayOfWeek
+PJ C:\dev\powerj> ls -r --filter *.java | where { $_.size > 10kb }
+
+name               size      modified              dir
+----               ----      --------              ---
+Parser.java        14.2 KB   2026-10-05 18:12      false
+Evaluator.java     11.8 KB   2026-10-06 09:40      false
+
+PJ C:\dev\powerj> grep "TODO|FIXME" src -r -p 16 | map { m -> m.path.fileName + ":" + m.line }
+PJ C:\dev\powerj> git status --porcelain | where { $_.startsWith(" M ") }
+ M src/core/Parser.java
+PJ C:\dev\powerj> java.util.List.of("apple", "banana", "orange") | where { $_.contains("b") }
+banana
+PJ C:\dev\powerj> LocalDate.now().plusDays(10).dayOfWeek
+FRIDAY
 ```
+
+## Contents
+
+- [What is PowerJ?](#what-is-powerj)
+- [Philosophy](#philosophy)
+- [Features at a glance](#features-at-a-glance)
+- [Getting started](#getting-started)
+- [Configuration](#configuration)
+- [How it works](#how-it-works)
+- [Writing your own cmdlet](#writing-your-own-cmdlet)
+- [Tests](#tests)
+- [Status and roadmap](#status-and-roadmap)
+- [Documentation](#documentation)
+- [License](#license)
+
+## What is PowerJ?
+
+PowerJ is a command shell in the spirit of PowerShell, built for people who live in a Unix-style terminal and know Java:
+
+- its built-in commands, the **cmdlets** (`ls`, `grep`, `cat`, `where`, `map`…), produce typed Java objects — usually `record`s such as `FileEntry(name, size, modified, path, dir, ext)` — that flow through the pipeline;
+- the expressions you write in `{ … }` blocks, in arguments or at the start of a line **are Java**: `$_.size > 10kb`, `f -> f.name.endsWith(".md")`, `String::toUpperCase`, `Math.max(3, 7)`, `new StringBuilder()`;
+- any other word is looked up on the `PATH` and run as a **native command** (`git`, `mvn`, `docker`…), whose output becomes a stream of `String` lines that cmdlets can filter.
+
+It targets **Windows 10/11** first (shipped as `powerj.exe` with an installer) and also runs on **Linux and macOS**.
+
+## Philosophy
+
+- **Objects, not text.** A cmdlet emits records; you select on properties (`where { $_.size > 1mb }`) instead of cutting columns with `awk`. Displaying is the last step: tables are formatted only when the objects reach the terminal.
+- **Short names, Unix options.** PowerShell's ideas without `Get-ChildItem -Recurse`: each cmdlet has one short lowercase name, and options follow the Unix convention (`-r`, `-ra`, `--recurse`, `--rec`, `--filter=*.java`, `--`).
+- **Native commands are first-class.** `git`, `mvn` or `notepad` run exactly as in a classic shell; their stdout/stderr stay streams; cmdlets and native commands mix freely in a pipeline. `^ls` always runs the native program when a cmdlet has the same name.
+- **Java is the expression language.** No new DSL to learn: Java syntax, operators, lambdas and method references, plus direct access to every public class of the `java.*` modules.
+- **The shell never crashes.** Every line runs under a supervisor; Ctrl+C cancels the running command (a second Ctrl+C abandons a stuck computation) without leaving the shell; errors are short readable messages (`$debug = true` shows the Java stack trace).
+- **Streaming with backpressure.** Pipeline stages are connected by bounded queues: `ls -r C:\` piped into a slow consumer does not fill memory.
+- **Extensible by dropping a jar.** A third-party module is a plain jar implementing a small API; it gets option parsing, completion, help and table display for free.
+- **An exemplary modern Java codebase.** Records, sealed interfaces, pattern matching, virtual threads, scoped values, the FFM API — used where they bring a concrete benefit ([§6 of the specification](docs/SPECIFICATION.md#6-use-of-modern-java-features)).
+
+Out of scope for v1: control structures (`if`, `foreach`, functions — planned for v2), syntax compatibility with bash or PowerShell, remoting.
+
+## Features at a glance
+
+### Cmdlets
+
+| Cmdlet | What it does | Acceptance checklist |
+|---|---|---|
+| `ls` | Lists files as `FileEntry` records (`-r` recursive, `-a` hidden, `--filter *.java`, `-d` dirs, `-p 16` parallel walk) | [etape-3](docs/recettes/etape-3.md) |
+| `grep` | Java regex search in files and folders, or in the pipeline objects; `GrepMatch` records with highlighted matches and capture groups | [grep](docs/recettes/grep.md) |
+| `cat` | Reads files as lines (`-l`), one text (`-t`), numbered `CatLine` records (`-n`) or a `CatContent` (`-c`) | [cat](docs/recettes/cat.md) |
+| `where` | Filters objects: `where { $_.size > 1mb }`, `where { f -> f.dir }`, short form `where name == usr` | [etape-4](docs/recettes/etape-4.md) |
+| `map` | Transforms objects: `map { f -> f.name }`, `map FileEntry::name` | [etape-5b](docs/recettes/etape-5b.md) |
+| `collect` | Gathers a pipeline into one list: `(ls -r \| collect).size()` | [etape-8](docs/recettes/etape-8-collect.md) |
+| `env` | Reads and sets environment variables (`env --set MAVEN_OPTS=-Xmx2g`) | [etape-3](docs/recettes/etape-3.md) |
+
+Built-in commands: `cd` (`cd -`, `cd ~`, `cd D:`), `pwd`, `which`, `help` (`help ls`, `help java.util.List`, `help members $x`), `history` (plus `!!`, `!n`, `!text`), `import`, `mod-load`, `mod-list`, `exit [code]`.
+
+### Java at the prompt
 
 ```text
-C:\> powerj -c "ls -r | where size > 1mb"
-C:\> dir /b | powerj -c "where { $_.endsWith(\".txt\") }"
+PJ> Math.max(3, 7)                                   # static methods and fields (Math.PI)
+PJ> $sb = new StringBuilder("ab"); $sb.reverse()     # constructors, instance methods
+PJ> $l = List.of("b", "a", "ccc")
+PJ> $l.stream().filter(s -> s.length() > 1).toList()  # lambdas → functional interfaces
+PJ> $l | map String::toUpperCase                     # method references
+PJ> (ls)*.name                                       # *. applies .name to each element
+PJ> [long] 5 ; import java.security.*                # casts, imports (java.util, java.io, java.nio.file, java.time… by default)
+PJ> "today is $(LocalDate.now().dayOfWeek)"         # $( … ) inside strings, """ text blocks
 ```
 
-- Specification: [docs/SPECIFICATION.md](docs/SPECIFICATION.md)
-- Acceptance checklists: [docs/recettes/](docs/recettes/)
+Overloads, varargs and argument conversions follow Java rules; `System.exit` and the like are intercepted so that Java code cannot kill the shell.
 
-## Status
+### Shell language
 
-Mini-iteration 13: `cat` cmdlet — reads one or more files (wildcards, `--encoding`) as a `String` per line (`-l`, default), one `String` for the whole content (`-t`), `CatLine` records (`-n`: `line`, `length`, `text`, `path`; numbering goes on from one file to the next) or one `CatContent` (`-c`: `length`, `content`); after a `|` it reads the files received (`String`, `Path`, `File`, `FileEntry`, or a property named with `--property`) ([docs/recettes/cat.md](docs/recettes/cat.md)). Mini-iteration 12: `grep` cmdlet — Java regular expressions in files and folders (`-r`, `--max-depth`, `-i`, `-v`, `--encoding`, wildcards), parallel walk in virtual threads (`-p 16`), `GrepMatch` objects (absolute `path`, `line`, `text` with the matches in color, capturing `groups` and `named` groups), filtering of the pipeline objects or of one of their properties (`git log | grep -i fix`, `ls | grep --property name ^a`). The tree walk is a reusable library, the `powerj-fs` module (`FileWalker`), also used by `ls -r`, which gets the same `-p`/`--parallel` option ([docs/recettes/grep.md](docs/recettes/grep.md)). Mini-iteration 11: startup profile — `~/.powerj/profile.pj` runs at interactive startup (variables, `import`, `env --set`); errors show their line, `--no-profile` skips it, `$profile` gives its path ([docs/recettes/profile.md](docs/recettes/profile.md)). Mini-iteration 10: `~` designates the `HOME` directory (else `USERPROFILE`) in every unquoted argument and redirection (`ls ~/docs`, `"x" > ~/out.txt`; [docs/recettes/tilde.md](docs/recettes/tilde.md)). Mini-iteration 9: internationalization — messages, help, completion and errors in English or French (`POWERJ_LANG` / `language` key, see [Language](#language)); third-party modules translate their cmdlets with `CmdletProvider.messages(Locale)` ([docs/recettes/i18n.md](docs/recettes/i18n.md)). Mini-iteration 8: `collect` cmdlet — gathers the objects of a pipeline into a single list (`(ls -r | collect).size()`, `ls -r | collect | map { l -> l.stream()… }`). Step 7: third-party modules — a jar dropped into `~/.powerj/modules/` adds its cmdlets at startup (an isolated `ModuleLayer` per module), hot loading with `mod-load`, `mod-list`, name collisions (`module:nom`); example module [`examples/greet`](examples/greet) (CI artifact `greet-module`). Step 6: Tab completion (commands `[pj]`/`[internal]`/`[native]`, options, paths, variables, properties of `$_` and of lambda parameters, Java API with signatures) and input highlighting. Steps 5 and 5b: direct access to the JRE's Java API — static calls (`Math.max(3, 7)`, `java.util.List.of(…)`), fields (`Math.PI`), `new`, instance methods (`$l.stream().toList()`), default imports and `import`, overloads, varargs and conversions, casts `[long] 5`, Java-style lambdas (`ls -r | where { f -> f.size > 1mb }`, `$l.sort((a, b) -> a.length() - b.length())`), method references (`map FileEntry::name`, `String::length`), the `*.` operator for each element of a list (`$f*.name`), the `map` cmdlet, `"""` text blocks, readable Java exceptions (`$errors`, `$debug`), `help java.util.List`, `$( … )` in strings, a second Ctrl+C to abort a stuck computation. Earlier steps: pipeline `|` and `where`, non-interactive mode; `ls` and `env` cmdlets, objects and properties; native commands, `cd`, `;` `&&` `||`, variables, redirections; line editing and history. See the development plan (§11 of the specification).
+- **Pipelines** `|` of cmdlets, native commands and expressions; collections are unrolled element by element.
+- **Chaining** like Java statements: `a ; b`, `a && b`, `a || b` (`mvn package && java -jar target/app.jar`); `$?` and `$exit` give the last result.
+- **Variables** `$x = …`, `$_` in blocks, `$errors`, `$profile`.
+- **Unit literals** `512b 10kb 1gb`, `30s 5m 7d`, usable in options and expressions.
+- **Redirections** `>`, `>>`, `2>`, `2>>`, `2>&1`; `~` is the home directory in any unquoted argument.
 
-## Language
+### Line editing
 
-PowerJ speaks **English** or **French**. By default it follows the display language of the system (French → French, anything else → English). To choose:
+Persistent history with prefix search on ↑/↓, **Ctrl+R** reverse search, **Tab completion** (commands tagged `[pj]` / `[internal]` / `[native]`, options with descriptions, paths, variables, properties of `$_` and of lambda parameters, Java classes and methods with their signatures), **syntax highlighting** as you type, and a `>>` continuation prompt when a brace, parenthesis or quote is left open or a line ends with `|`, `&&` or `||`.
+
+### Languages
+
+Messages, help, completion and errors in **English or French**; commands and options are the same in both. See [Configuration](#configuration).
+
+## Getting started
+
+### Prerequisites
+
+- **JDK 27**. Maven is not needed: the `mvnw` wrapper downloads Maven 3.9.11.
+- Without JDK 27 at hand, you can check the build with an older JDK that supports the features used: `./mvnw -Djava.release=25 verify`.
+
+### Build
+
+```bash
+./mvnw verify                 # compile + tests
+./mvnw -Pdist verify          # + standalone application image (jlink runtime + jpackage launcher)
+```
+
+The image is produced in `powerj-dist/target/jpackage/powerj/` (launcher `bin/powerj` on Linux/macOS, `powerj.exe` on Windows), with a zip archive in `powerj-dist/target/`. It embeds its own Java runtime containing all the `java.se` modules: nothing else needs to be installed on the target machine.
+
+On Windows, the `.exe` installer (adds PowerJ to the `PATH` and the Start menu) is built with `mvnw.cmd -Pdist,installer verify` and requires [WiX](https://wixtoolset.org/) (`dotnet tool install --global wix --version 5.0.2`). The GitHub Actions CI builds and smoke-tests the launcher on every push, and produces the Windows installer as a downloadable artifact.
+
+### Run
+
+| Invocation | Effect |
+|---|---|
+| `powerj` | Interactive shell (runs `~/.powerj/profile.pj` first) |
+| `powerj --no-profile` | Interactive shell without the startup profile |
+| `powerj -c "ls -r \| where size > 1mb"` | Runs one line, then exits |
+| `powerj script.pj` | Runs a file line by line, then exits |
+| `dir /b \| powerj -c "where { $_.endsWith(\".txt\") }"` | Standard input feeds the first stage as `String` lines |
+| `powerj --debug …` | Also prints the detailed diagnostic log to the console |
+
+In non-interactive mode the exit code is the argument of `exit` if called, otherwise 0 on success, the code of the last native command if it failed, or 1 for a PowerJ error.
+
+### A first session
+
+```text
+PJ ~> help                                        # overview of commands and syntax
+PJ ~> which ls ; which git                        # cmdlet, built-in or native?
+PJ ~> ls ~/projects | where { $_.dir }            # objects filtered on a property
+PJ ~> ls -r --filter *.java | map { f -> f.size } | collect
+PJ ~> grep -ri "todo" src | where { m -> m.path.toString().contains("core") }
+PJ ~> git log --oneline | grep -i fix             # native output filtered by a cmdlet
+PJ ~> $f = (ls).getFirst() ; help members $f      # what can I do with this object?
+PJ ~> Files.readString(Path.of("README.md")).lines().count()
+```
+
+## Configuration
+
+PowerJ keeps its files in `~/.powerj/` (`%USERPROFILE%\.powerj\` on Windows, or `$POWERJ_HOME`), created on first launch:
+
+| File / folder | Role |
+|---|---|
+| `history` | Command history (UTF-8), reloaded at startup |
+| `config.properties` | `history.size=10000`, `language=en` (or `fr`) |
+| `profile.pj` | Commands run when the interactive shell starts: `$proj = Path.of("D:/dev")`, `import java.time.*`, `env --set MAVEN_OPTS=-Xmx2g` — errors show their line and never prevent startup ([profile](docs/recettes/profile.md)) |
+| `modules/` | Third-party module jars, loaded at startup |
+| `logs/` | Diagnostic log, always in English |
+
+| Environment variable | Role |
+|---|---|
+| `POWERJ_HOME` | Location of the configuration folder |
+| `POWERJ_LANG` | `en` or `fr` |
+| `POWERJ_NATIVE_ENCODING`, `POWERJ_NATIVE_ENCODING_<NAME>` | Encoding of the output of native commands, globally or for one program |
+| `NO_COLOR` | Disables colors |
+
+**Language.** By default PowerJ follows the display language of the system (French → French, anything else → English). Precedence: system property `-Dpowerj.language`, then `POWERJ_LANG`, then the `language` key of `config.properties`, then the system ([i18n](docs/recettes/i18n.md)).
 
 ```text
 set POWERJ_LANG=en                      # Windows (cmd.exe), before launching powerj
 POWERJ_LANG=fr powerj                   # Linux / macOS
 ```
 
-or, permanently, the line `language=en` (or `language=fr`) in `~/.powerj/config.properties` (`%USERPROFILE%\.powerj\config.properties` on Windows, or `$POWERJ_HOME/config.properties`). Precedence: system property `-Dpowerj.language`, then `POWERJ_LANG`, then `config.properties`, then the system. Commands, options and keywords are the same in both languages; the diagnostic log is always in English. Details: FR-61 in the specification.
+## How it works
 
-## Building
+### Modules
 
-Prerequisites: **JDK 27** (Maven is provided by the `mvnw` wrapper, version 3.9.11).
-
-```bash
-./mvnw verify                 # compilation + tests
-./mvnw -Pdist verify          # + standalone application image (jlink runtime + jpackage launcher)
-```
-
-The image is produced in `powerj-dist/target/jpackage/powerj/` (launcher `bin/powerj` on Linux, `powerj.exe` on Windows), with a zip archive in `powerj-dist/target/`.
-
-On Windows, the `.exe` installer is built with `mvnw.cmd -Pdist,installer verify` and requires [WiX](https://wixtoolset.org/) (`dotnet tool install --global wix --version 5.0.2`). The GitHub Actions CI produces it on every push.
-
-Without JDK 27 at hand, you can check the build with an older JDK that supports the features used: `./mvnw -Djava.release=25 verify`.
-
-## Structure
+All modules are JPMS modules (`module-info.java`); the only runtime dependency is [JLine 3](https://github.com/jline/jline3).
 
 | Module | Role |
 |---|---|
-| `powerj-api` | Public API for writing cmdlets |
+| `powerj-api` | Public API for writing cmdlets (`Cmdlet`, `@CmdletInfo`, `@Option`, `CmdletProvider`); no dependencies |
 | `powerj-fs` | File tree walk, sequential or parallel in virtual threads (`FileWalker`), reusable by any cmdlet |
-| `powerj-core` | Parsing, interpretation, pipeline, Java interoperability |
+| `powerj-core` | Lexer, parser, interpreter, pipeline, option binding, Java interoperability, completion engine, output formatting, native execution |
 | `powerj-cmdlets` | Built-in cmdlets (`ls`, `grep`, `cat`, `where`, `map`, `collect`, `env`) |
-| `powerj-shell` | REPL and entry point |
-| `powerj-dist` | Distribution: jlink + jpackage |
-| `examples/greet` | Example third-party module (`greet`), not shipped: a template for writing your own cmdlets |
+| `powerj-shell` | Entry point (`Main`), JLine REPL, profile, script mode, history expansion |
+| `powerj-dist` | Distribution: jlink runtime + jpackage launcher / installer |
+| `examples/greet` | Example third-party module, not shipped: a template for your own cmdlets |
+
+### Life of a line
+
+```text
+ keyboard
+    │   JLine LineReader ── ShellParser / InputCompleteness: open brace or trailing | → ">>" prompt
+    ▼                      ShellCompletion (Tab) and highlighter, backed by core Completions
+ Lexer ──────────► Token stream          (sealed interface, records)
+    ▼
+ Parser ─────────► Ast                    (statements ; && ||, pipelines, commands, redirections)
+    │  └ ExpressionParser                 (Java-syntax expressions, blocks { … }, lambdas)
+    ▼
+ Interpreter ────► per command: built-in → cmdlet → executable on the PATH  (^name = native)
+    │  ├ OptionBinder                     (Unix options → the cmdlet's parameter record)
+    │  └ Evaluator / JavaInvoker          (expressions and Java calls)
+    ▼
+ Pipeline ───────► one virtual thread per stage, bounded queues (Pipe) between stages
+    ▼
+ OutputFormatter ► table / list / text on the terminal
+```
+
+The whole line runs under the `Supervisor`, which catches any `Throwable` and handles cancellation (Ctrl+C).
+
+### The shell
+
+`Main` resolves the configuration folder, the language and the mode: no argument starts the `Repl`, `-c` or a file starts `ScriptMode`. The `Repl` reads lines with JLine (history, Ctrl+R, editing), expands `!!`/`!n` (`HistoryExpander`), runs the profile on startup, and routes Ctrl+C to `Supervisor.cancel()` so that a command is interrupted without leaving the shell.
+
+### Parsing
+
+- The **`Lexer`** splits a line into tokens. Unquoted words are kept as is, backslashes included, so that `cd C:\Users` works; `;`, `&&`, `||`, `|`, `>`, `>>`, `2>`, `2>&1` are operators even when attached to a word; `$x =` at the start of a statement marks an assignment; unit literals (`10kb`, `7d`) are recognized by `Units`.
+- Command syntax and Java syntax live side by side: strings, variables, `{ … }` blocks, `( … )` groups and — at the start of a statement — literals, `new`, `[type]` casts and dotted Java names are handed to the **`ExpressionParser`**, a precedence-climbing parser for Java expressions (ternary, `||`, `&&`, comparisons, arithmetic, casts, member access, lambdas, method references). In a command line an expression stops where the command syntax resumes, so `java -version` stays a native command while `java.lang.Math.max(1, 2)` is a Java call.
+- The **`Parser`** assembles everything into an `Ast` of records (sealed hierarchy), which the interpreter walks with pattern-matching `switch`es.
+
+### Command resolution and options
+
+For the first word of a stage, the `Interpreter` looks for a built-in command, then a cmdlet in the `CmdletRegistry` (built-in cmdlets and third-party modules), then an executable via `CommandResolver` (`PATH`, `PATHEXT` on Windows, explicit paths). For a cmdlet, the `OptionBinder` builds its **parameter record** from the arguments: short and long options, grouped flags, unambiguous abbreviations, `--opt=value`, positionals, typed conversion (`Path`, `int`, `Duration`, enums, sizes…), and errors with suggestions (`unknown option --recurce, did you mean --recurse?`).
+
+### Pipeline
+
+Each stage runs in a **virtual thread**; stages are connected by bounded queues (`Pipe`), so a fast producer waits for a slow consumer. When the last stage stops (end, error, Ctrl+C, or `ls | ^more` then `q`), it closes its input and the upstream stages stop in cascade, killing native processes. A cmdlet receives `begin` / `process(input)` / `end` calls; collections returned by expressions are unrolled. Consecutive native commands are started together with `ProcessBuilder.startPipeline`, so bytes flow directly between them; objects sent to a native command are written to its stdin as displayed text. The current object `$_` and lambda parameters are bound with **scoped values**.
+
+### Java interoperability
+
+`JavaClasses` resolves class names among the public classes of the packages exported by the `java.*` modules (default imports plus session `import`s); classes of third-party modules stay invisible. `JavaInvoker` calls methods, fields and constructors by reflection, choosing among overloads (varargs included) the one with the cheapest conversions, then the most specific. Member metadata is cached per type with `ClassValue` (`Members`). Lambdas and method references are turned into functional interfaces by `FunctionalAdapter` with a `java.lang.reflect.Proxy`. Calls such as `System.exit` or `System.setOut` are intercepted.
+
+### Completion and highlighting
+
+`Completions` (in `powerj-core`) computes Tab candidates **without running anything**: it infers types statically from variable values, the declared output type of the upstream cmdlet (so `ls | where { $_.` offers `name`, `size`, `modified`…), lambda parameters and Java signatures; a Java class index (`JavaIndex`) is warmed up at startup. Options come from the cmdlet's annotations, so a third-party cmdlet is completed with no extra code. `ShellParser` tells JLine which word is being completed, `ShellCompletion` adapts the candidates and the highlighter, and `Highlights` colors the input (cmdlet green, native cyan, unknown red, options, strings, variables).
+
+### Output
+
+`OutputFormatter` displays successive records of the same type as a **table streamed as it arrives** (columns from the record components or from `@Display`; widths computed on the first lines), other objects as `name : value` lists, maps as key/value tables, collections one element per line, and sizes, dates and durations in a readable form. `grep` matches are shown in color through the `Highlight` type.
+
+## Writing your own cmdlet
+
+A cmdlet is a Java class implementing `Cmdlet<P extends Record, I, O>`: `P` is a record of options annotated with `@Option`, `I` the type received from the pipeline (`Void` if none), `O` the type produced (a record is recommended). The shell calls `begin`, then `process` for each input object, then `end`.
+
+```java
+public record GreetParams(
+        @Option(shortName = 'n', mandatory = true, description = "Name to greet") String name,
+        @Option(shortName = 'c', description = "Number of repetitions") int count) {}
+
+public record Greeting(String name, String message, Instant at) {}
+
+@CmdletInfo(name = "greet", category = "Examples", summary = "Greets someone",
+        examples = "greet --name Yves -c 3")
+public final class Greet implements Cmdlet<GreetParams, Void, Greeting> {
+    @Override
+    public void begin(GreetParams p, CmdletContext<Greeting> ctx) {
+        for (int i = 0; i < p.count(); i++) {
+            ctx.emit(new Greeting(p.name(), "Hello " + p.name(), Instant.now()));
+        }
+    }
+}
+```
+
+A `CmdletProvider` lists the module's cmdlets (and may provide translations through `messages(Locale)`), declared in `module-info.java` with `provides io.powerj.api.CmdletProvider with …`. Build the jar and drop it into `~/.powerj/modules/`, or load it without restarting with `mod-load path/to/greet.jar`; `mod-list` shows what is loaded. Each module gets its own `ModuleLayer`, so dependencies of different modules do not clash; if two modules declare the same name, the second one is reachable as `module:name`.
+
+The complete example lives in [`examples/greet`](examples/greet) (also built by the CI as the `greet-module` artifact); the contract is detailed in [§4 of the specification](docs/SPECIFICATION.md#4-extension-api-third-party-cmdlets).
+
+## Tests
+
+```bash
+./mvnw verify
+```
+
+Unit and integration tests use JUnit 5 and AssertJ: lexer, parser, option binding, Java interop, pipeline, completion, native commands, module loading, and the REPL driven through a scripted terminal. Tests force English messages so that they do not depend on the machine. The CI additionally runs a smoke test against the packaged launcher. Each development step has a manual acceptance checklist in [`docs/recettes/`](docs/recettes/).
+
+## Status and roadmap
+
+PowerJ is in active development (version `0.1.0-SNAPSHOT`). Implemented so far:
+
+- REPL with line editing, persistent history and Ctrl+R; native commands, `cd`, chaining, variables, redirections; non-interactive mode;
+- object pipeline with the `ls`, `where`, `map`, `collect`, `env`, `grep` and `cat` cmdlets, and a parallel file walker;
+- direct access to the JRE's Java API, Java-style lambdas and method references;
+- Tab completion and syntax highlighting;
+- third-party modules loaded from jars;
+- English / French interface, `~` expansion, startup profile.
+
+Next: more cmdlets from the backlog (`find`, `cp`/`mv`/`rm`, `ps`, `select`, `sort`, `group`, `first`/`last`, `to-json`… — [§12.3](docs/SPECIFICATION.md#123-cmdlet-backlog-outside-the-current-scope)), then a scripting language with control structures in v2. The step-by-step plan is in [§11 of the specification](docs/SPECIFICATION.md#11-iterative-development-plan).
+
+## Documentation
+
+- [Specification](docs/SPECIFICATION.md): functional requirements, grammar, extension API, architecture.
+- [Acceptance checklists](docs/recettes/) for each development step, and [plans](docs/plans/) of the latest iterations.
+- [Example module `greet`](examples/greet/README.md).
+
+Coming from PowerShell? A few equivalences (full table in [§12.4](docs/SPECIFICATION.md#124-powershell--powerj-mapping)):
+
+| PowerShell | PowerJ |
+|---|---|
+| `Get-ChildItem -Recurse -Filter *.java` | `ls -r --filter *.java` |
+| `Where-Object { $_.Length -gt 1MB }` | `where { $_.size > 1mb }` |
+| `ForEach-Object { $_.Name }` | `map { f -> f.name }` or `map FileEntry::name` |
+| `-and`, `-or`, `-not` | `&&`, `\|\|`, `!` |
+| `$LASTEXITCODE` | `$exit` |
+| `[System.Math]::Max(3, 7)` | `Math.max(3, 7)` |
+| `Get-Member` | `help members` |
+
+## License
+
+PowerJ is released under the [Apache License 2.0](LICENSE).
