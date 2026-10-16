@@ -37,7 +37,7 @@ Property names are validated with `Where.PROPERTY` (`powerj-cmdlets/.../Where.ja
 - **Accumulation**: `process` evaluates the keys of the object **once** and stores `(keys, object)`; `end` sorts and emits. `sort` emits nothing before its input ends (inherent to sorting); memory grows with the input, which is documented in the spec.
 - **Stability**: `List.sort` (TimSort) is stable; objects with equal keys keep their input order, also with `--desc` (descending is the reversed comparison, not a reversed list).
 - **Comparison of two key values** (`SortComparator`, package-private):
-  1. `null` sorts **last**, in both directions;
+  1. `null` is smaller than any value: first in ascending order, last with `--desc` (decision: same as PowerShell's `Sort-Object`);
   2. two `Number`s are compared by value, whatever their classes (`Integer` 3 < `Long` 10 < `Double` 10.5): through `BigDecimal` when one of them is a `BigDecimal`/`BigInteger` or a floating value, otherwise as `long`; `NaN` after every number;
   3. two `String`s: `compareTo`, or `CASE_INSENSITIVE_ORDER` with `-i`;
   4. two `Comparable`s of which one is an instance of the other's class (`LocalDate`, `Instant`, `Path`, `Boolean`, enums…): `compareTo`;
@@ -89,7 +89,7 @@ Docs:
   - a block key (a `ScriptBlock` stub);
   - two keys (`dir` then `name`).
 - Edge values:
-  - `null` values and `null` keys sort last, in both directions;
+  - `null` values and `null` keys sort first ascending, last with `--desc`;
   - mixed types (`String` and `Integer`): sorted by text, one error reported, not one per comparison.
 - Errors:
   - a block that throws: an error, and the object is left out;
@@ -111,7 +111,7 @@ Docs:
   - preview with Alt+V on `ls | sort size -d`
 - Commit on `claude/cmdlet-sort` and push; a PR to `main` once the implementation is done.
 
-## Open questions
-1. A per-key direction (`sort size:desc name`, or `--desc` repeated per key) is not provided: `--desc` applies to all keys. Is that enough for v1?
-2. Should `null` sort last in both directions (proposed), or first when ascending, as PowerShell's `Sort-Object` does?
-3. Should `sort -u` (unique) be added now, or left to `uniq` (phase 6)? Proposed: leave it to `uniq`.
+## Decisions (open questions answered)
+1. `-d`/`--desc` applies to all keys; no per-key direction in v1.
+2. `null` sorts first in ascending order, as PowerShell's `Sort-Object` does (so last with `--desc`).
+3. No `sort -u`: deduplication is left to `uniq` (phase 6).

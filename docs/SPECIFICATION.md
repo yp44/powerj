@@ -403,7 +403,7 @@ Short rule: **`$_` for one-line filters typed at the keyboard, a named lambda as
 
 ### 3.9 Cmdlets in the current scope
 
-Only **four cmdlets** are in the scope of the first steps: `ls`, `where`, `map` and `env`; the mini-iterations add `collect` (FR-36d), `grep` (FR-64) and `cat` (FR-65). The first two alone cover the core mechanisms: producing record objects, attribute access, the pipeline, expressions, and mixing with native commands.
+Only **four cmdlets** are in the scope of the first steps: `ls`, `where`, `map` and `env`; the mini-iterations add `collect` (FR-36d), `grep` (FR-64), `cat` (FR-65) and `sort` (FR-67). The first two alone cover the core mechanisms: producing record objects, attribute access, the pipeline, expressions, and mixing with native commands.
 
 #### FR-35 — `ls`: list files
 
@@ -646,7 +646,7 @@ A key is a property name (`sort size`, same as `sort { $_.size }`), a property p
 
 Output: the received objects, unchanged, in the new order. `sort` emits once its input has ended (it keeps all objects in memory). The sort is **stable**: objects with equal keys keep their order, also with `--desc`.
 
-Comparison of two key values: `null` last, in both directions; numbers by value whatever their class (`3` < `10L` < `10.5`); strings with `compareTo` (or ignoring case with `-i`); other `Comparable`s of the same class (dates, `Path`, enums, booleans) with `compareTo`. Values that cannot be compared (mixed types) are sorted by their text, with a single non-blocking error `cannot compare <type> with <type>: these values are sorted by their text`. An error while evaluating a key is non-blocking: the object is left out.
+Comparison of two key values: `null` is smaller than any value (first in ascending order, last with `--desc`, as in PowerShell's `Sort-Object`); numbers by value whatever their class (`3` < `10L` < `10.5`); strings with `compareTo` (or ignoring case with `-i`); other `Comparable`s of the same class (dates, `Path`, enums, booleans) with `compareTo`. Values that cannot be compared (mixed types) are sorted by their text, with a single non-blocking error `cannot compare <type> with <type>: these values are sorted by their text`. An error while evaluating a key is non-blocking: the object is left out.
 
 `sort` is a filter without side effect (allowed in preview mode, FR-66). The native `sort` remains available with `^sort` or `native.prefer=sort` (FR-14, FR-16).
 
@@ -1377,6 +1377,7 @@ The backlog cmdlets (§12.3) are added **one per mini-iteration**, each with a s
 | 12 | `grep` and `powerj-fs` | FR-64 | `docs/recettes/grep.md` |
 | 13 | `cat` | FR-65 | `docs/recettes/cat.md` |
 | 14 | Preview mode (Alt+V) | FR-66 | `docs/recettes/preview.md` |
+| 15 | `sort` | FR-67 | `docs/recettes/sort.md` |
 
 Version 2 will introduce scripting (`if`, `foreach`, functions, `.pj` files).
 
@@ -1456,7 +1457,7 @@ PJ C:\dev> (ls)*.name.stream().map({ $_.toUpperCase() }).sorted().toList()
 | `cp`, `mv`, `rm`, `mkdir`, `touch` | File operations | `FileEntry` |
 | `ps`, `kill` | Processes | `ProcessEntry` |
 | `select` | Attribute projection, `--expand` | `Row` |
-| `sort` | Sorting (`--desc`) | unchanged |
+| ~~`sort`~~ | Sorting — **done** (FR-67) | unchanged |
 | ~~`collect`~~ | Gather into a list — **done** (FR-36d) | `Collected` |
 | `first`, `last` | First / last N | unchanged |
 | `group` | Grouping | `Group<T>` |
