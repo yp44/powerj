@@ -6,7 +6,7 @@ import java.util.Objects;
 import io.powerj.api.Display;
 
 /**
- * Line of a file read by {@code cat --mode numbered} (specification FR-65).
+ * Line of a file read by {@code cat --numbered} (specification FR-65).
  *
  * @param path   absolute path of the file (not displayed by default: {@code l.path})
  * @param line   line number, from 1; it goes on from one file to the next

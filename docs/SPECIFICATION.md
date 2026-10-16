@@ -276,7 +276,7 @@ The menu displays the signature (`of(E...) : List<E>`). Imported classes (§FR-4
 **FR-30 — Default display.** At the end of a pipeline, each object is displayed according to its type:
 - **record**: as a table if ≤ 5 displayable components (aligned columns, width adapted to the terminal), otherwise as a `nom : valeur` list; a record can declare its columns via `@Display(columns = {"name", "size", "modified"})`;
 - **`Map`**: `clé / valeur` (key / value) table;
-- **scalars** (`String`, numbers, booleans, dates, `Path`, enums): readable form; the line breaks of a text are kept, also in a table cell or a redirected file (`cat a.txt -m text`, `cat a.txt -m content | map { $_.content } > copie.txt`), and a text that already ends with a line break gets no other one (the copy is identical to the file);
+- **scalars** (`String`, numbers, booleans, dates, `Path`, enums): readable form; the line breaks of a text are kept, also in a table cell or a redirected file (`cat a.txt -t`, `cat a.txt -c | map { $_.content } > copie.txt`), and a text that already ends with a line break gets no other one (the copy is identical to the file);
 - **other objects**: `toString()`; `help members` lets you explore their properties.
 
 Successive objects of the same record type are grouped in the same table.
@@ -470,24 +470,24 @@ CA:
 #### FR-65 — `cat`: read files
 
 ```text
-cat [chemin...] [-m|--mode lines|text|numbered|content] [--encoding <charset>] [--property <nom>]
+cat [chemin...] [-l|--lines | -t|--text | -n|--numbered | -c|--content] [--encoding <charset>] [--property <nom>]
 ```
 
 | Option | Type | Description |
 |---|---|---|
 | `chemin` (positional, multiple) | `String` | File(s) to read, in the order given; wildcards on the last element (`*.log`, `src/*.java`), matches in alphabetical order. Default: the pipeline objects. |
-| `-m`, `--mode` | `lines` (default), `text`, `numbered`, `content` | Shape of the output, see below. Case-insensitive. |
+| `-l`, `-t`, `-n`, `-c` | boolean | Shape of the output, see below. **Exclusive**: two of them give the blocking error `only one output at a time among --lines, --text, --numbered, --content`. None: `--lines`. |
 | `--encoding` | charset | Charset of the files; default **UTF-8**, without fallback: a file that is not valid in this charset produces the non-blocking error `cannot read <file>: not readable as UTF-8 text (choose the charset with --encoding)`. |
 | `--property` | name | Property of the pipeline objects that gives the file to read (`String`, `Path` or `File`): `grep TODO -r -s \| cat --property path`. |
 
-Output, according to `--mode`:
+Output, according to the option:
 
-| Mode | Output |
+| Option | Output |
 |---|---|
-| `lines` | One `String` per line, without its end-of-line characters (`\n`, `\r\n`). |
-| `text` | **One** `String`: the content of all the files, one after the other, end-of-line characters included (like Unix `cat`). |
-| `numbered` | One `CatLine` per line. |
-| `content` | **One** `CatContent`: the content of all the files, one after the other. |
+| `-l`, `--lines` (default) | One `String` per line, without its end-of-line characters (`\n`, `\r\n`). |
+| `-t`, `--text` | **One** `String`: the content of all the files, one after the other, end-of-line characters included (like Unix `cat`). |
+| `-n`, `--numbered` | One `CatLine` per line. |
+| `-c`, `--content` | **One** `CatContent`: the content of all the files, one after the other. |
 
 ```java
 @Display(columns = {"line", "length", "text"})
@@ -505,21 +505,21 @@ public record CatContent(
 { }
 ```
 
-**Several files.** They are read one after the other. The line numbers go on: if the first file has 3 lines, the first line of the second file is line 4. With `text` and `content`, a single object holds the content of all the files (`CatContent` has no `path`: it can mix several files).
+**Several files.** They are read one after the other. The line numbers go on: if the first file has 3 lines, the first line of the second file is line 4. With `--text` and `--content`, a single object holds the content of all the files (`CatContent` has no `path`: it can mix several files).
 
 **Pipeline input.** After a `|`, each object received is read **as if it had been given as a `chemin`**, after the `chemin` arguments (numbering and content go on):
-- a `String` is a path, relative to the current directory (no wildcards): `"a.txt" | cat`, `git ls-files | cat -m numbered`;
+- a `String` is a path, relative to the current directory (no wildcards): `"a.txt" | cat`, `git ls-files | cat -n`;
 - a `Path`, a `java.io.File`, or a `FileEntry` (`ls --filter *.txt | cat`) is read; a folder listed by `ls` is skipped;
 - any other object: `--property <nom>` names its property that gives the file (`String`, `Path` or `File`); without `--property`, or if the property is not a file, non-blocking error `not a file: …` and the object is skipped. With `--property`, the property is read on every object.
 
-With `text` and `content`, the single object is emitted at the end of the pipeline, if at least one file was read. A missing file, a folder given as `chemin`, an unreadable or undecodable file produce a non-blocking error and the reading goes on with the next file. `cat` without `chemin` and without pipeline input is a blocking error `file expected: cat <file>... or ... | cat`.
+With `--text` and `--content`, the single object is emitted at the end of the pipeline, if at least one file was read. A missing file, a folder given as `chemin`, an unreadable or undecodable file produce a non-blocking error and the reading goes on with the next file. `cat` without `chemin` and without pipeline input is a blocking error `file expected: cat <file>... or ... | cat`.
 
 CA:
 - `cat a.txt` displays the lines of `a.txt`;
-- `cat a.txt b.txt -m numbered` displays `line length text`; the first line of `b.txt` has the number following the last line of `a.txt`;
-- `cat a.txt b.txt -m text` gives one string; `(cat a.txt -m content).length` the number of characters of the file;
-- `ls --filter *.txt | cat -m numbered` and `"a.txt" | cat`;
-- `grep TODO -r -s | cat --property path -m numbered`;
+- `cat a.txt b.txt -n` displays `line length text`; the first line of `b.txt` has the number following the last line of `a.txt`;
+- `cat a.txt b.txt -t` gives one string; `(cat a.txt -c).length` the number of characters of the file;
+- `ls --filter *.txt | cat -n` and `"a.txt" | cat`;
+- `grep TODO -r -s | cat --property path -n`;
 - `cat latin.txt`: non-blocking error suggesting `--encoding`, then `cat latin.txt --encoding ISO-8859-1` reads it;
 - `cat absent.txt a.txt`: error `cat: not found: …\absent.txt`, then the lines of `a.txt`.
 

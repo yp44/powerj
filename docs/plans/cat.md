@@ -11,23 +11,23 @@ Branch: `claude/adoring-gauss-fj7705` (already exists and checked out, based on 
 
 ## Syntax
 ```text
-cat [chemin...] [-m|--mode lines|text|numbered|content] [--encoding <charset>] [--property <nom>]
+cat [chemin...] [-l|--lines | -t|--text | -n|--numbered | -c|--content] [--encoding <charset>] [--property <nom>]
 ```
 - `chemin` (position 0, multiple): files; wildcards on the last element (`*.log`) as in `grep`.
-- `--mode` (enum, default `lines`; bound case-insensitively by `OptionBinder`, `powerj-core/.../OptionBinder.java:305`):
-  - `lines` → one `String` per line (no EOL chars)
-  - `text` → one `String`: the raw content of all files concatenated as is
-  - `numbered` → one `CatLine(Path path, int line, int length, String text)` per line, `@Display(columns = {"line", "length", "text"})` (path accessible: `m.path`)
-  - `content` → one `CatContent(int length, String content)` (length = number of chars), `@Display(columns = {"length", "content"})`
+- Output: one of the exclusive options below (initially an enum `--mode`, replaced by these options at the user's request); none given: `--lines`:
+  - `-l`/`--lines` → one `String` per line (no EOL chars)
+  - `-t`/`--text` → one `String`: the raw content of all files concatenated as is
+  - `-n`/`--numbered` → one `CatLine(Path path, int line, int length, String text)` per line, `@Display(columns = {"line", "length", "text"})` (path accessible: `m.path`)
+  - `-c`/`--content` → one `CatContent(int length, String content)` (length = number of chars), `@Display(columns = {"length", "content"})`
 - `--encoding`: default UTF-8, no fallback (same behaviour/message style as grep).
 - `--property <nom>`: property of the pipeline objects that designates the file (see below).
 
 ### Pipeline input (`cat` after a `|`)
 Each received object is read **as if it had been given as a parameter** of `cat` (same numbering, same concatenation; numbering continues across objects and after the `chemin` arguments):
-- `String` → converted to `Path` (resolved against the current directory, no wildcard expansion): `"a.txt" | cat`, `git ls-files | cat -m numbered`;
+- `String` → converted to `Path` (resolved against the current directory, no wildcard expansion): `"a.txt" | cat`, `git ls-files | cat -n`;
 - `Path`, `java.io.File` → read directly;
 - `FileEntry` (output of `ls`) → its `path` is read (convenience so that `ls --filter *.txt | cat` works without `--property`);
-- any other object → **`--property <nom>`** names the property holding the file: evaluated with `context.compile("$_." + name)` after validation by `Where.PROPERTY` (exactly as `grep --property`, `Grep.java:212`). Its value must be a `String` (→ `Path`), a `Path` or a `File`; otherwise non-blocking error `cat: property <nom> is not a file: <objet>` and the object is skipped. Example: `grep TODO -r -s | cat --property path -m numbered`.
+- any other object → **`--property <nom>`** names the property holding the file: evaluated with `context.compile("$_." + name)` after validation by `Where.PROPERTY` (exactly as `grep --property`, `Grep.java:212`). Its value must be a `String` (→ `Path`), a `Path` or a `File`; otherwise non-blocking error `cat: property <nom> is not a file: <objet>` and the object is skipped. Example: `grep TODO -r -s | cat --property path -n`.
 - When `--property` is given it applies to every received object (consistent with `grep`).
 - Other object without `--property` → non-blocking error suggesting `--property`, object skipped.
 
@@ -69,5 +69,5 @@ Using `TestContext` + `@TempDir` (like `GrepTest`):
 
 ## Verification
 - `./mvnw -pl powerj-cmdlets -am test` (CatTest + GrepTest unchanged), then `./mvnw verify` for the full build.
-- Manual: `./mvnw -pl powerj-dist -am package` (or the shell module) and run `powerj -c "cat a.txt b.txt -m numbered"`, `powerj -c "cat *.txt -m content"`, `powerj -c "ls --filter *.txt | cat"`, `powerj -c "grep TODO -r -s | cat --property path -m numbered"`, `help cat`.
+- Manual: `./mvnw -pl powerj-dist -am package` (or the shell module) and run `powerj -c "cat a.txt b.txt -n"`, `powerj -c "cat *.txt -c"`, `powerj -c "ls --filter *.txt | cat"`, `powerj -c "grep TODO -r -s | cat --property path -n"`, `help cat`.
 - Commit on `claude/adoring-gauss-fj7705` and `git push -u origin claude/adoring-gauss-fj7705` (no PR unless asked).

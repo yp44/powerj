@@ -27,21 +27,22 @@ import io.powerj.fs.WalkError;
  * {@code cat}: reads files, as lines or as a whole content (specification FR-65).
  * <pre>
  * cat a.txt b.txt                       # a String per line
- * cat a.txt b.txt -m numbered           # CatLine: line (numbering goes on in b.txt), length, text
- * cat *.txt -m text                     # one String: the files one after the other
- * cat a.txt -m content                  # one CatContent: length, content
+ * cat a.txt b.txt -n                    # CatLine: line (numbering goes on in b.txt), length, text
+ * cat *.txt -t                          # one String: the files one after the other
+ * cat a.txt -c                          # one CatContent: length, content
  * ls --filter *.txt | cat               # files received from the pipeline
  * grep TODO -r -s | cat --property path # the file is a property of the objects received
  * </pre>
  */
 @CmdletInfo(name = "cat", category = "Files", summary = "Reads files as lines or as a whole content",
-        examples = {"cat a.txt", "cat a.txt b.txt -m numbered", "cat *.log -m text", "cat pom.xml -m content",
-                "cat data.txt --encoding ISO-8859-1", "ls --filter *.txt | cat -m numbered",
-                "\"a.txt\" | cat", "grep TODO -r -s | cat --property path -m numbered"})
+        examples = {"cat a.txt", "cat a.txt b.txt -n", "cat *.log -t", "cat pom.xml -c",
+                "cat data.txt --encoding ISO-8859-1", "ls --filter *.txt | cat -n",
+                "\"a.txt\" | cat", "grep TODO -r -s | cat --property path -n",
+                "(ls -r --filter *.java | cat -n)[-1].line"})
 public final class Cat implements Cmdlet<Cat.Params, Object, Object> {
 
-    /** Output of {@code cat}. */
-    public enum Mode {
+    /** Output of {@code cat}, chosen by --lines, --text, --numbered or --content. */
+    private enum Mode {
         /** A {@code String} per line. */
         LINES,
         /** One {@code String}: the whole content. */
@@ -57,9 +58,14 @@ public final class Cat implements Cmdlet<Cat.Params, Object, Object> {
             @Option(position = 0, description = "Files to read (wildcards * and ? accepted); "
                     + "default: the pipeline objects")
             List<String> paths,
-            @Option(shortName = 'm', description = "Output: lines (a String per line, default), text (one String), "
-                    + "numbered (line, length, text per line), content (length, content)")
-            Mode mode,
+            @Option(shortName = 'l', description = "Output: a String per line (default)")
+            boolean lines,
+            @Option(shortName = 't', description = "Output: one String, the content of all the files")
+            boolean text,
+            @Option(shortName = 'n', description = "Output: line number, length and text of each line")
+            boolean numbered,
+            @Option(shortName = 'c', description = "Output: length and content of all the files, in one object")
+            boolean content,
             @Option(description = "Charset of the files (default: UTF-8)")
             String encoding,
             @Option(description = "Property of the pipeline objects that gives the file (String, Path or File)")
@@ -122,14 +128,25 @@ public final class Cat implements Cmdlet<Cat.Params, Object, Object> {
         private final String propertyName;
         /** Number of the last line read: goes on from one file to the next. */
         private int line;
-        /** Whole content, with --mode text or content; {@code null} while no file is read. */
+        /** Whole content, with --text or --content; {@code null} while no file is read. */
         private StringBuilder content;
 
         Reading(Params params, CmdletContext<?> context) {
-            mode = params.mode() == null ? Mode.LINES : params.mode();
+            mode = mode(params);
             charset = FileArguments.charset(params.encoding(), "cat.encoding.unknown");
             propertyName = params.property();
             property = propertyName == null ? null : property(propertyName, context);
+        }
+
+        /** Output chosen by the options: one at most, --lines by default. */
+        private static Mode mode(Params params) {
+            int chosen = (params.lines() ? 1 : 0) + (params.text() ? 1 : 0) + (params.numbered() ? 1 : 0)
+                    + (params.content() ? 1 : 0);
+            if (chosen > 1) {
+                throw new IllegalArgumentException(Messages.get("cat.one.output"));
+            }
+            return params.text() ? Mode.TEXT : params.numbered() ? Mode.NUMBERED
+                    : params.content() ? Mode.CONTENT : Mode.LINES;
         }
 
         private static ScriptBlock property(String name, CmdletContext<?> context) {
@@ -212,7 +229,7 @@ public final class Cat implements Cmdlet<Cat.Params, Object, Object> {
             }
         }
 
-        /** Emits the whole content, with --mode text or content, if at least one file was read. */
+        /** Emits the whole content, with --text or --content, if at least one file was read. */
         void finish(CmdletContext<Object> context) {
             if (content == null) {
                 return;
