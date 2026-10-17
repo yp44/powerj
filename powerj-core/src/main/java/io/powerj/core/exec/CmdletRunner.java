@@ -58,13 +58,17 @@ final class CmdletRunner {
         if (input != null) {
             Class<?> expected = registered.input();
             Object value;
-            while ((value = input.next()) != Source.END) {
+            while (!context.inputStopped && (value = input.next()) != Source.END) {
                 if (value != null && !expected.isInstance(value)) {
                     context.error(Messages.get("cmdlet.inputIgnored", value.getClass().getSimpleName(),
                             expected.getSimpleName()));
                     continue;
                 }
                 cmdlet.process((P) params, (I) value, typedContext);
+            }
+            if (context.inputStopped) {
+                // FR-68b: the previous stage is stopped; its interruption is not an error.
+                input.abort();
             }
         }
         cmdlet.end((P) params, typedContext);
@@ -114,6 +118,7 @@ final class CmdletRunner {
         private final Function<String, ScriptBlock> compiler;
         private final boolean hasInput;
         private boolean hadErrors;
+        private volatile boolean inputStopped;
 
         Context(String command, Session session, Consumer<String> errors, Consumer<Object> sink, OnError onError,
                 Function<String, ScriptBlock> compiler, boolean hasInput) {
@@ -176,6 +181,11 @@ final class CmdletRunner {
         @Override
         public ScriptBlock compile(String expression) {
             return compiler.apply(expression);
+        }
+
+        @Override
+        public void stopInput() {
+            inputStopped = true;
         }
     }
 }
