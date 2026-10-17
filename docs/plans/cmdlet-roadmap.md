@@ -43,7 +43,7 @@ Target pipeline at the end (§12.3):
 - Tests: numbers, strings, `FileEntry` records, `--desc`, several keys, `null`, a block that throws (the object is skipped), an invalid key.
 
 ## Phase 2 — `first` / `last` / `range` (FR-68), `claude/cmdlet-first`
-- Spec: `docs/plans/first-last-range.md`. `first [n=1]`, `last [n=1]`; `range [--from b] [--to b] [--property p] [-i] [-x] [--repeat]`: a bound is a position without `--property`, a regex on the property's text with `--property`, and a block is always a condition. `skip` is dropped: `range --from n` replaces it.
+- Spec: `docs/plans/first-last-range.md`. `first [n=1]`, `last [n=1]`; `range [--from b] [--to b] [--property p] [-i] [--include|--exclude] [--repeat]`: a bound is a position without `--property`, a regex on the property's text with `--property`, and a block is always a condition. `skip` is dropped: `range --from n` replaces it.
 - **API change**, the core of the phase: `CmdletContext.stopInput()`. `CmdletRunner` leaves its loop, calls `end()` and `input.abort()`, so the previous stage (cmdlet or native process) is stopped silently. `ls -r / | first 3` and `range --to 10` answer at once.
 - `last` keeps a ring buffer (`ArrayDeque`) of size n. All three are `preview = true`.
 - Tests: unit tests per cmdlet; core tests (an endless producer is stopped, `$?` stays true, also for a native producer); REPL tests.

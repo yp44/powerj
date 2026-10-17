@@ -17,7 +17,7 @@ Branch: `claude/cmdlet-first`, from `main` @ 3d496e8.
 ```text
 first [<n>]
 last [<n>]
-range [--from <bound>] [--to <bound>] [--property <name>] [-i|--ignore-case] [-x|--exclusive] [--repeat]
+range [--from <bound>] [--to <bound>] [--property <name>] [-i|--ignore-case] [--include|--exclude] [--repeat]
 ```
 
 ### `first`, `last`
@@ -36,7 +36,8 @@ range [--from <bound>] [--to <bound>] [--property <name>] [-i|--ignore-case] [-x
 | `--to` | — | bound | Last object kept. Absent: up to the end. |
 | `--property` | — | property name or path | `--from`/`--to` are then text patterns searched in this property. |
 | `--ignore-case` | `-i` | boolean | Patterns ignore case (with `--property`). |
-| `--exclusive` | `-x` | boolean | The objects matching `--from` and `--to` are not emitted (only those between them). |
+| `--include` | — | boolean | Default: the opening and closing objects are emitted. |
+| `--exclude` | — | boolean | The opening and closing objects are not emitted, only those between them. `--include` and `--exclude` together is a blocking error. |
 | `--repeat` | — | boolean | After `--to`, waits for the next `--from` match and emits a new range (like `sed -n '/a/,/b/p'`). Needs a value or condition `--from`. |
 
 A **bound** is read as follows:
@@ -61,7 +62,7 @@ The two bounds are independent: `range --from 3 --to { $_.done }` (position, the
   - The `--to` test starts **with the object after the opening one**, as in `sed`. With `--from Paul --to Paul`, the range runs from one `Paul` to the next.
   - A position `--to` is absolute: if `--to` is lower than `--from`, nothing is emitted.
   - With no `--to`, the range stays open until the input ends.
-- **Bounds:** included by default. `-x` excludes the opening and closing objects.
+- **Bounds:** included by default (`--include`). `--exclude` leaves out the opening and closing objects; giving both options is a blocking error (`range.include.exclude`).
 - **Early stop:** once a range is closed, `range` calls `stopInput()`, unless `--repeat` is given. With `--repeat` it waits for the next opening, and the input is read to the end. `--repeat` with a position `--from` is a blocking error.
 - **Pattern matching:** the property value is converted with `String.valueOf` and searched with `Matcher.find()`. A `null` value never matches. An invalid regex is a blocking error with its position (same message as `grep`).
 - **Errors:** a property evaluation error, or a block that throws or does not return a boolean, gives a non-blocking error (`pipeline.object.skipped`). The object is then neither emitted nor used as a bound.
@@ -95,14 +96,14 @@ New in `powerj-cmdlets/src/main/java/io/powerj/cmdlets/`:
   - Calls `context.stopInput()` once `n` objects are emitted; with `n = 0`, already in `begin`. It ignores any further `process` call, for contexts without `stopInput`.
 - **`Last.java`**: ring buffer, emitted in `end`.
 - **`Range.java`**
-  - `Params(Object from, Object to, String property, boolean ignoreCase, boolean exclusive, boolean repeat)`.
+  - `Params(Object from, Object to, String property, boolean ignoreCase, boolean include, boolean exclude, boolean repeat)`.
   - `begin` turns each bound into a `Bound` (sealed interface): `Position(long n)`, `Pattern(ScriptBlock property, java.util.regex.Pattern regex)`, or `Condition(ScriptBlock block)`.
   - The property block comes from `Keys.block(property, …)` (phase 1).
   - The state (position, open/closed) is kept per execution.
 - **Messages** (`messages_en`/`_fr`):
   - `first.summary`, `first.option.count`, `last.*`, `range.summary`, `range.option.*`;
   - `count.negative`: `expects a number of at least 0, got {0}`;
-  - `range.not.position`, `range.repeat.position`;
+  - `range.not.position`, `range.repeat.position`, `range.include.exclude`;
   - `range.pattern.invalid` (reuse the wording of `grep.pattern.invalid`).
 - **`BuiltinCmdlets`**: register the three cmdlets.
 
@@ -129,7 +130,7 @@ Docs:
   - block conditions: block not boolean → error, object skipped;
   - mixed position + condition;
   - `--to` tested from the next object (same pattern on both bounds);
-  - `-x`;
+  - `--exclude`; `--include` with `--exclude` → error;
   - `--repeat` gives several ranges and does not call `stopInput`;
   - `--repeat` with a position → error;
   - text `--from` without `--property` → error;
@@ -142,7 +143,8 @@ Docs:
   - a native producer (`yes` on Unix) is stopped and `$?` stays true.
 - **`powerj-shell` `BuiltinCmdletsTest`**:
   - `ls | first 1`, `ls | last 1`, `ls | sort name | range --from 2 --to 2`;
-  - `List.of("a","Paul","b","Peter","c") | range --from Paul --to Peter`.
+  - `ls | sort name | range --from BIG --to DOCS --property name -i`;
+  - `List.of(…) | range --from { $_ == "BEGIN" } --to { $_ == "END" } --repeat --exclude`.
 
 ## Verification
 - `./mvnw verify` (locally `-Djava.release=25`; CI uses JDK 27).
@@ -156,5 +158,7 @@ Docs:
   - `help range`.
 
 ## Decisions (open questions answered)
-1. *(pending)* `--to` is tested from the object after the opening one, as in `sed`.
+1. `--to` is tested from the object after the opening one, as in `sed`: `--from Paul --to Paul` runs from one Paul to the next.
 2. With `--property`, `--from`/`--to` are **Java regular expressions** (decided by the user), searched with `Matcher.find()` as in `grep`: `Paul` matches a name containing Paul, `^Peter$` only the name Peter.
+3. Bounds: `--include` (default) or `--exclude`, instead of `-x/--exclusive`.
+4. `first`/`last` are kept; `range` has no `--head`/`--tail`.

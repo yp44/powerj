@@ -403,7 +403,7 @@ Short rule: **`$_` for one-line filters typed at the keyboard, a named lambda as
 
 ### 3.9 Cmdlets in the current scope
 
-Only **four cmdlets** are in the scope of the first steps: `ls`, `where`, `map` and `env`; the mini-iterations add `collect` (FR-36d), `grep` (FR-64), `cat` (FR-65) and `sort` (FR-67). The first two alone cover the core mechanisms: producing record objects, attribute access, the pipeline, expressions, and mixing with native commands.
+Only **four cmdlets** are in the scope of the first steps: `ls`, `where`, `map` and `env`; the mini-iterations add `collect` (FR-36d), `grep` (FR-64), `cat` (FR-65), `sort` (FR-67), `first`, `last` and `range` (FR-68). The first two alone cover the core mechanisms: producing record objects, attribute access, the pipeline, expressions, and mixing with native commands.
 
 #### FR-35 — `ls`: list files
 
@@ -663,7 +663,7 @@ CA:
 ```text
 first [<n>]                      # the first n objects (default 1)
 last [<n>]                       # the last n objects (default 1)
-range [--from <borne>] [--to <borne>] [--property <nom>] [-i|--ignore-case] [-x|--exclusive] [--repeat]
+range [--from <borne>] [--to <borne>] [--property <nom>] [-i|--ignore-case] [--include|--exclude] [--repeat]
 ```
 
 `first n` emits the first `n` objects as they arrive, then **stops the previous stage** (FR-68b): `ls -r C:\ | first 3` answers at once. `last n` emits the last `n` objects, in their order, when the input ends. `n` must be ≥ 0.
@@ -682,18 +682,20 @@ range [--from <borne>] [--to <borne>] [--property <nom>] [-i|--ignore-case] [-x|
 | `--to` | — | Closing bound, tested from the object **after** the opening one (as in `sed`). Absent: until the end. |
 | `--property` | — | Property (or path, `path.fileName`) on which the text bounds are searched. |
 | `--ignore-case` | `-i` | The text bounds ignore case. |
-| `--exclusive` | `-x` | The opening and closing objects are not emitted. |
+| `--include` | — | Default: the opening and closing objects are emitted. |
+| `--exclude` | — | The opening and closing objects are not emitted. Not allowed with `--include`. |
 | `--repeat` | — | After each closing, waits for the next opening (several ranges). Not allowed with a position `--from`. |
 
-Without `--repeat`, `range` stops the previous stage as soon as its range is closed. A `null` property never matches. An evaluation error (missing property, block that throws or does not return a boolean) is non-blocking: the object is skipped. The three cmdlets have no side effect (allowed in preview mode, FR-66).
+A position `--to` already reached when the range opens (`--from { … } --to 3` opening on the 5th object) closes it at once: only the opening object is emitted, as in `sed`. Without `--repeat`, `range` stops the previous stage as soon as its range is closed. A `null` property never matches. An evaluation error (missing property, block that throws or does not return a boolean) is non-blocking: the object is skipped. The three cmdlets have no side effect (allowed in preview mode, FR-66).
 
-**FR-68b — Stopping the previous stage.** A cmdlet that needs no more objects calls `CmdletContext.stopInput()` (§4.2). The shell then stops calling `process`, calls `end`, and stops the previous stage: a cmdlet is interrupted, and a native command is terminated. Being stopped this way is not an error: no message, and `$?` does not change (`git log | first 1` succeeds).
+**FR-68b — Stopping the previous stage.** A cmdlet that needs no more objects calls `CmdletContext.stopInput()` (§4.2). The shell then stops calling `process`, calls `end`, and stops the previous stage: a cmdlet is interrupted, and a native command is terminated. Being stopped this way is not an error: no message, `$?` does not change (`git log | first 1` succeeds), and the exit code of a native command stopped this way is not recorded in `$exit`.
 
 CA:
 - `ls -r C:\ | first 3` displays 3 entries at once; `ls | first` displays the first entry;
 - `ls | sort size | last 2` displays the two largest files;
 - `cat a.log | range --from 3 --to 5` displays lines 3 to 5; `cat a.log | range --from 5` skips the first 4;
-- `List.of("a", "Paul", "b", "Peter", "c") | range --from Paul --to Peter` displays `Paul b Peter`; with `-x`, `b`;
+- `List.of("a", "Paul", "b", "Peter", "c") | range --from { $_ == "Paul" } --to { $_ == "Peter" }` displays `Paul b Peter`; with `--exclude`, `b`;
+- `ls | range --from ^a --to ^d --property name` displays the entries from the first name starting with `a` to the next one starting with `d`;
 - `env | range --from JAVA --to PATH --property name -i`;
 - `cat app.log | range --from { $_.contains("BEGIN") } --to { $_.contains("END") } --repeat` displays every BEGIN…END block;
 - `ls | range --from Paul` is a blocking error that suggests `--property`;
@@ -1420,6 +1422,7 @@ The backlog cmdlets (§12.3) are added **one per mini-iteration**, each with a s
 | 13 | `cat` | FR-65 | `docs/recettes/cat.md` |
 | 14 | Preview mode (Alt+V) | FR-66 | `docs/recettes/preview.md` |
 | 15 | `sort` | FR-67 | `docs/recettes/sort.md` |
+| 16 | `first`, `last`, `range`, `stopInput` | FR-68 | `docs/recettes/first-last-range.md` |
 
 Version 2 will introduce scripting (`if`, `foreach`, functions, `.pj` files).
 
@@ -1501,7 +1504,8 @@ PJ C:\dev> (ls)*.name.stream().map({ $_.toUpperCase() }).sorted().toList()
 | `select` | Attribute projection, `--expand` | `Row` |
 | ~~`sort`~~ | Sorting — **done** (FR-67) | unchanged |
 | ~~`collect`~~ | Gather into a list — **done** (FR-36d) | `Collected` |
-| `first`, `last` | First / last N | unchanged |
+| ~~`first`, `last`~~ | First / last N — **done** (FR-68) | unchanged |
+| ~~`range`~~ | Objects between two bounds — **done** (FR-68) | unchanged |
 | `group` | Grouping | `Group<T>` |
 | `count`, `sum`, `avg`, `min`, `max` | Aggregates | `Stats` |
 | `uniq` | Deduplication | unchanged |

@@ -438,6 +438,10 @@ public final class Interpreter {
             case NativeSegment(var commands) -> {
                 List<NativeRun> runs = nativeRunner.runGroup(commands, session, io, input, inheritsInput(), output,
                         sink, capture, outTarget, errTarget, errors);
+                if (output != null && output.aborted()) {
+                    // FR-68b: stopped by the next stage (first, range…): not a failure, $exit is left as it is.
+                    yield true;
+                }
                 synchronized (session) {
                     session.recordNative(runs.getLast());
                 }
