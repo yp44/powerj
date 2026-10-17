@@ -658,6 +658,47 @@ CA:
 - `git branch | sort` sorts the lines of a native command;
 - `ls | sort nom-invalide!` is a blocking error; `sort` on mixed strings and numbers reports one error and sorts them by text.
 
+#### FR-68 — `first`, `last`, `range`: slices of the pipeline
+
+```text
+first [<n>]                      # the first n objects (default 1)
+last [<n>]                       # the last n objects (default 1)
+range [--from <borne>] [--to <borne>] [--property <nom>] [-i|--ignore-case] [-x|--exclusive] [--repeat]
+```
+
+`first n` emits the first `n` objects as they arrive, then **stops the previous stage** (FR-68b): `ls -r C:\ | first 3` answers at once. `last n` emits the last `n` objects, in their order, when the input ends. `n` must be ≥ 0.
+
+`range` emits the objects between two bounds, both included by default. Each bound is read as follows:
+
+| Bound | Without `--property` | With `--property <nom>` |
+|---|---|---|
+| Integer `5` | Position, from 1: `--from 5` starts at the 5th object, `--to 10` ends at the 10th. | Regular expression searched in the property's text. |
+| Text `Paul` | Blocking error: add `--property` or use a block. | Regular expression searched in the property's text, as with `grep`: `Paul` (contains), `^Peter$` (equals); `-i` ignores case. |
+| Block `{ … }` | Condition on the object (boolean, as with `where`). | Same (the block ignores `--property`). |
+
+| Option | Short | Description |
+|---|---|---|
+| `--from` | — | Opening bound. Absent: from the first object. |
+| `--to` | — | Closing bound, tested from the object **after** the opening one (as in `sed`). Absent: until the end. |
+| `--property` | — | Property (or path, `path.fileName`) on which the text bounds are searched. |
+| `--ignore-case` | `-i` | The text bounds ignore case. |
+| `--exclusive` | `-x` | The opening and closing objects are not emitted. |
+| `--repeat` | — | After each closing, waits for the next opening (several ranges). Not allowed with a position `--from`. |
+
+Without `--repeat`, `range` stops the previous stage as soon as its range is closed. A `null` property never matches. An evaluation error (missing property, block that throws or does not return a boolean) is non-blocking: the object is skipped. The three cmdlets have no side effect (allowed in preview mode, FR-66).
+
+**FR-68b — Stopping the previous stage.** A cmdlet that needs no more objects calls `CmdletContext.stopInput()` (§4.2). The shell then stops calling `process`, calls `end`, and stops the previous stage: a cmdlet is interrupted, and a native command is terminated. Being stopped this way is not an error: no message, and `$?` does not change (`git log | first 1` succeeds).
+
+CA:
+- `ls -r C:\ | first 3` displays 3 entries at once; `ls | first` displays the first entry;
+- `ls | sort size | last 2` displays the two largest files;
+- `cat a.log | range --from 3 --to 5` displays lines 3 to 5; `cat a.log | range --from 5` skips the first 4;
+- `List.of("a", "Paul", "b", "Peter", "c") | range --from Paul --to Peter` displays `Paul b Peter`; with `-x`, `b`;
+- `env | range --from JAVA --to PATH --property name -i`;
+- `cat app.log | range --from { $_.contains("BEGIN") } --to { $_.contains("END") } --repeat` displays every BEGIN…END block;
+- `ls | range --from Paul` is a blocking error that suggests `--property`;
+- `git log --oneline | first 5` then `$?` displays `true`.
+
 ### 3.10 Native commands
 
 **FR-37 — Principle: streams stay streams.** A native command is **not** wrapped in an object: its standard output and its error output are handled as streams, the way a classic shell does.
@@ -940,6 +981,7 @@ public interface CmdletContext<O> {
     default boolean hasInput() { return false; }  // after a |, even if no object arrives (FR-64)
     boolean cancelled();                // Ctrl+C requested
     ScriptBlock compile(String expression);
+    default void stopInput() { }        // reads no more objects: the previous stage is stopped (FR-68b)
 }
 
 @Retention(RUNTIME) @Target(TYPE)

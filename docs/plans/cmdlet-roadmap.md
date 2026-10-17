@@ -42,14 +42,11 @@ Target pipeline at the end (§12.3):
 - Behaviour: accumulate in `process`, then sort and emit in `end`. The sort is stable. `null` sorts last. Keys that cannot be compared raise a non-blocking error and fall back to `toString`. `preview = true`.
 - Tests: numbers, strings, `FileEntry` records, `--desc`, several keys, `null`, a block that throws (the object is skipped), an invalid key.
 
-## Phase 2 — `first` / `last` / `skip` (FR-68), `claude/cmdlet-first`
-- Spec covers: `first [n=1]`, `last [n=1]`, `skip [n]`; the output is unchanged.
-- **API change**, the core of the phase: `first` must stop upstream so that `ls -r / | first 3` answers at once.
-  - `powerj-api/.../CmdletContext.java`: add `default void stopInput() {}` ("I will read nothing more").
-  - `powerj-core/.../CmdletRunner.java`: the `Context` records the request and calls `input.abort()` (`Source.abort()` / `Pipe.abort()` already exist and stop the writer); the `invoke` loop then leaves `while` and calls `end()`.
-  - The upstream stage that receives the `CancellationException` ("pipeline closed by the next stage") must not report an error or change `$?`. A REPL test covers this.
-- `last` keeps a ring buffer (`ArrayDeque`) of size n. `preview = true`.
-- Tests: unit tests, plus a `powerj-shell` integration test checking that `ls -r <big tree> | first 1` ends without walking the whole tree (counter or timeout).
+## Phase 2 — `first` / `last` / `range` (FR-68), `claude/cmdlet-first`
+- Spec: `docs/plans/first-last-range.md`. `first [n=1]`, `last [n=1]`; `range [--from b] [--to b] [--property p] [-i] [-x] [--repeat]`: a bound is a position without `--property`, a regex on the property's text with `--property`, and a block is always a condition. `skip` is dropped: `range --from n` replaces it.
+- **API change**, the core of the phase: `CmdletContext.stopInput()`. `CmdletRunner` leaves its loop, calls `end()` and `input.abort()`, so the previous stage (cmdlet or native process) is stopped silently. `ls -r / | first 3` and `range --to 10` answer at once.
+- `last` keeps a ring buffer (`ArrayDeque`) of size n. All three are `preview = true`.
+- Tests: unit tests per cmdlet; core tests (an endless producer is stopped, `$?` stays true, also for a native producer); REPL tests.
 
 ## Phase 3 — `select` (FR-69), `claude/cmdlet-select`
 - Spec covers: `select prop1 prop2 …`, computed columns (`select name { $_.size / 1kb } --as name,kb`), `-x|--expand prop` (unrolls a collection property, or emits a single property's value alone).
@@ -110,5 +107,5 @@ Target pipeline at the end (§12.3):
 - README "Status and roadmap": the v1 backlog is done (`tee`, `http`, `open`, `table`/`tree` remain), and the next step is v2 control structures.
 
 ## Order and dependencies
-1 `sort` (creates `Keys`) → 2 `first` (`stopInput` API) → 3 `select` (`Row` in the API) → 4 `measure` and 5 `group` (use `Keys`) → 6 `uniq` → 7 `find` (benefits from `first`) → 8 file ops → 9 JSON/CSV (`from-csv` uses `Row`) → 10 `ps`/`kill`.
+1 `sort` (creates `Keys`) → 2 `first`/`last`/`range` (`stopInput` API) → 3 `select` (`Row` in the API) → 4 `measure` and 5 `group` (use `Keys`) → 6 `uniq` → 7 `find` (benefits from `first`) → 8 file ops → 9 JSON/CSV (`from-csv` uses `Row`) → 10 `ps`/`kill`.
 Phases 1–3 come first; phases 4–6 and 10 are independent of each other and can be reordered.
