@@ -155,6 +155,6 @@ Docs:
   - preview of `ls -r / | first 3`;
   - `help range`.
 
-## Open questions
-1. Should `--to` be tested from the object after the opening one (proposed, as in `sed`: `--from Paul --to Paul` runs from one Paul to the next), or on the opening object itself (then `--from Paul --to Paul` gives a single object)?
-2. Should a pattern with `--property` be a regex searched in the text (proposed, consistent with `grep`: `Paul` = contains, `^Peter$` = equals), or plain "contains" text?
+## Decisions (open questions answered)
+1. *(pending)* `--to` is tested from the object after the opening one, as in `sed`.
+2. With `--property`, `--from`/`--to` are **Java regular expressions** (decided by the user), searched with `Matcher.find()` as in `grep`: `Paul` matches a name containing Paul, `^Peter$` only the name Peter.
