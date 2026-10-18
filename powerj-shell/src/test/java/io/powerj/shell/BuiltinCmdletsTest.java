@@ -339,7 +339,7 @@ class BuiltinCmdletsTest {
         assertThat(run("cat files.json | from-json | map { $_.name + \" \" + $_.size }")).isEqualTo("notes.txt 7\n");
         assertThat(run("cat files.json -c | from-json --property content | map { $_.size + 1 }")).isEqualTo("8\n");
         run("ls --filter notes.txt | select name size | to-csv -d \";\" > files.csv");
-        assertThat(Files.readString(tmp.resolve("files.csv"))).isEqualTo("name;size\nnotes.txt;7\n");
+        assertThat(Files.readAllLines(tmp.resolve("files.csv"))).containsExactly("name;size", "notes.txt;7");
         assertThat(run("cat files.csv | from-csv -d \";\" | map { $_.size + \"!\" }")).isEqualTo("7!\n");
         assertThat(errors).isEmpty();
         run("\"files.json\" | from-json");
