@@ -49,13 +49,10 @@ Target pipeline at the end (§12.3):
 - Tests: unit tests per cmdlet; core tests (an endless producer is stopped, `$?` stays true, also for a native producer); REPL tests.
 
 ## Phase 3 — `select` (FR-69), `claude/cmdlet-select`
-- Spec covers: `select prop1 prop2 …`, computed columns (`select name { $_.size / 1kb } --as name,kb`), `-x|--expand prop` (unrolls a collection property, or emits a single property's value alone).
-- Output: a new type `io.powerj.api.Row`, an immutable ordered name→value map with `get(String)`.
-  - `OutputFormatter` (`powerj-core/.../OutputFormatter.java`) displays it as a table (columns = keys), like a record.
-  - `PropertyAccess.property` resolves `row.name`, so `select name size | where { $_.size > 1kb }` works.
-  - `Completions`: complete the properties of `$_` on a `Row` if cheap; otherwise the spec records it as a known limitation.
-- `preview = true`.
-- Tests: projection, a missing property (the spec decides between a non-blocking error and `null`), `--expand`, table display (`OutputFormatter` test), property access on `Row`.
+- Spec: `docs/plans/select.md`. `select <column>...` with properties, paths (`path.fileName` → column `fileName`), renames (`file=name`) and computed columns (`kb={ $_.size / 1kb }`). No `--expand` in v1 (decided with the user).
+- Output: a new API type `io.powerj.api.Row`, an immutable ordered `Map<String, Object>`, so `$_.kb`, `sort kb`, `where` work unchanged. Size columns taken from a `@Bytes` component keep their display.
+- `OutputFormatter` displays `Row`s as a table (its `Column` is generalized to a value reader). `Completions` proposes the selected columns after a `select` stage.
+- A missing property gives an empty cell and one non-blocking error per column.
 
 ## Phase 4 — `count` and `measure` (FR-70), `claude/cmdlet-measure`
 - `count` emits a single `long`.
