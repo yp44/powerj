@@ -61,6 +61,14 @@ final class TestContext<O> implements CmdletContext<O> {
         return false;
     }
 
+    /** Configuration folder given to the cmdlet ({@code null}: none). */
+    Path configDirectory;
+
+    @Override
+    public Optional<Path> configDirectory() {
+        return Optional.ofNullable(configDirectory);
+    }
+
     /** Number of calls to {@link #stopInput()}. */
     int stopInputCalls;
 

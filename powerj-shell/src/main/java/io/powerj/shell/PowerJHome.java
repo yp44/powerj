@@ -6,6 +6,8 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.Objects;
 
+import io.powerj.cmdlets.ProtectedPaths;
+
 /**
  * User configuration directory ({@code ~/.powerj} by default, or {@code POWERJ_HOME}).
  *
@@ -49,9 +51,20 @@ public record PowerJHome(Path dir) {
         return dir.resolve("logs");
     }
 
-    /** Creates the directory and its subdirectories if they do not exist. */
+    /** Paths that {@code rm} and {@code mv} refuse to remove (FR-72). */
+    public Path protectedPathsFile() {
+        return dir.resolve(ProtectedPaths.FILE_NAME);
+    }
+
+    /**
+     * Creates the directory and its subdirectories if they do not exist, and the {@code protected-paths} file with
+     * the defaults of the platform if it does not exist (an existing file is never changed).
+     */
     public PowerJHome createDirectories() throws IOException {
         Files.createDirectories(logsDir());
+        if (Files.notExists(protectedPathsFile())) {
+            Files.write(protectedPathsFile(), ProtectedPaths.defaultFile(dir));
+        }
         return this;
     }
 }

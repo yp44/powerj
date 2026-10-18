@@ -187,5 +187,10 @@ final class CmdletRunner {
         public void stopInput() {
             inputStopped = true;
         }
+
+        @Override
+        public Optional<Path> configDirectory() {
+            return session.configDirectory();
+        }
     }
 }

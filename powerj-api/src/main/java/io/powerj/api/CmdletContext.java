@@ -55,4 +55,12 @@ public interface CmdletContext<O> {
      */
     default void stopInput() {
     }
+
+    /**
+     * PowerJ configuration folder ({@code ~/.powerj}, or {@code POWERJ_HOME}; specification §8), where a cmdlet can
+     * read its settings. Empty when the shell runs without one.
+     */
+    default Optional<Path> configDirectory() {
+        return Optional.empty();
+    }
 }

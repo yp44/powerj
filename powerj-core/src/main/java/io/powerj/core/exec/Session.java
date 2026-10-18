@@ -27,6 +27,7 @@ public final class Session {
     private final Map<String, Object> variables = new HashMap<>();
     private Path currentDirectory;
     private Path previousDirectory;
+    private Path configDirectory;
     private NativeRun lastNative;
     private boolean lastSucceeded = true;
     private Integer exitRequest;
@@ -84,6 +85,15 @@ public final class Session {
 
     public Path currentDirectory() {
         return currentDirectory;
+    }
+
+    /** PowerJ configuration folder (§8), given to the cmdlets ({@code CmdletContext.configDirectory()}). */
+    public Optional<Path> configDirectory() {
+        return Optional.ofNullable(configDirectory);
+    }
+
+    public void configDirectory(Path directory) {
+        this.configDirectory = directory == null ? null : directory.toAbsolutePath().normalize();
     }
 
     public Optional<Path> previousDirectory() {

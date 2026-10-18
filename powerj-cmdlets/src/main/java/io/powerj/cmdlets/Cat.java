@@ -7,7 +7,6 @@ import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
-import java.nio.file.InvalidPathException;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.Collections;
@@ -20,7 +19,6 @@ import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
-import io.powerj.api.ScriptBlock;
 import io.powerj.fs.WalkError;
 
 /**
@@ -124,8 +122,7 @@ public final class Cat implements Cmdlet<Cat.Params, Object, Object> {
 
         private final Mode mode;
         private final Charset charset;
-        private final ScriptBlock property;
-        private final String propertyName;
+        private final PipelineFiles files;
         /** Number of the last line read: goes on from one file to the next. */
         private int line;
         /** Whole content, with --text or --content; {@code null} while no file is read. */
@@ -134,8 +131,8 @@ public final class Cat implements Cmdlet<Cat.Params, Object, Object> {
         Reading(Params params, CmdletContext<?> context) {
             mode = mode(params);
             charset = FileArguments.charset(params.encoding(), "cat.encoding.unknown");
-            propertyName = params.property();
-            property = propertyName == null ? null : property(propertyName, context);
+            files = new PipelineFiles(params.property(), context,
+                    new PipelineFiles.Keys("cat.not.a.file", "cat.property.not.a.file", "cat.read.failed"));
         }
 
         /** Output chosen by the options: one at most, --lines by default. */
@@ -149,40 +146,9 @@ public final class Cat implements Cmdlet<Cat.Params, Object, Object> {
                     : params.content() ? Mode.CONTENT : Mode.LINES;
         }
 
-        private static ScriptBlock property(String name, CmdletContext<?> context) {
-            if (!Where.PROPERTY.matcher(name).matches()) {
-                throw new IllegalArgumentException(Messages.get("where.property.invalid", name));
-            }
-            return context.compile("$_." + name);
-        }
-
         /** File designated by a pipeline object, or {@code null} after reporting why there is none. */
         Path file(Object input, CmdletContext<?> context) {
-            Object value = input;
-            if (property != null) {
-                try {
-                    value = property.invoke(input);
-                } catch (CancellationException e) {
-                    throw e;
-                } catch (RuntimeException e) {
-                    context.error(Messages.get("pipeline.object.skipped", e.getMessage(), Where.abbreviate(input)));
-                    return null;
-                }
-            }
-            Path file;
-            try {
-                file = value instanceof String text ? context.currentDirectory().resolve(text)
-                        : FileArguments.file(value, context);
-            } catch (InvalidPathException e) {
-                context.error(Messages.get("cat.read.failed", value, e.getMessage()));
-                return null;
-            }
-            if (file == null) {
-                context.error(property == null
-                        ? Messages.get("cat.not.a.file", Where.abbreviate(input))
-                        : Messages.get("cat.property.not.a.file", propertyName, Where.abbreviate(input)));
-            }
-            return file;
+            return files.file(input, context);
         }
 
         /** Reads a file: its lines are emitted at once, or its content is gathered for {@link #finish}. */

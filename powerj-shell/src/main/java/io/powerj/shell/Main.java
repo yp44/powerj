@@ -103,9 +103,11 @@ public final class Main {
         }
         var session = new Session(Path.of(System.getProperty("user.home")), Path.of("").toAbsolutePath(),
                 System.getenv());
+        var home = PowerJHome.resolve(System.getenv(), Path.of(System.getProperty("user.home")));
+        session.configDirectory(home.dir());
         int width = console ? columns() : 10_000;
         var script = new ScriptMode(session, CmdletRegistry.discover(), out, err::println, width, input);
-        script.loadModules(PowerJHome.resolve(System.getenv(), Path.of(System.getProperty("user.home"))).modulesDir());
+        script.loadModules(home.modulesDir());
         int code = script.run(lines);
         out.flush();
         err.flush();
@@ -153,6 +155,7 @@ public final class Main {
             var reader = ShellReader.create(terminal, home, config);
             var session = new Session(Path.of(System.getProperty("user.home")), Path.of("").toAbsolutePath(),
                     System.getenv());
+            session.configDirectory(home.dir());
             var repl = new Repl(reader, new Supervisor(), session, CmdletRegistry.discover());
             repl.loadModules(home.modulesDir());
             repl.useProfile(home.profileFile(), runProfile);
