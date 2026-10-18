@@ -28,8 +28,8 @@ public final class Touch implements Cmdlet<Touch.Params, Object, Object> {
 
     /** Parameters of {@code touch}. */
     public record Params(
-            @Option(position = 0, description = "Files to create or update")
-            List<String> paths,
+            @Option(position = 0, description = "Files to create or update, or a block { … } that gives the file of each pipeline object")
+            List<Object> paths,
             @Option(shortName = 'n', description = "Changes nothing: shows what would be done")
             boolean dryRun,
             @Option(description = "Property of the pipeline objects that gives the path (String, Path or File)")
@@ -40,11 +40,12 @@ public final class Touch implements Cmdlet<Touch.Params, Object, Object> {
 
     @Override
     public void begin(Params p, CmdletContext<Object> context) {
-        files.put(context, new PipelineFiles(p.property(), context, FileOps.KEYS));
-        if (p.paths().isEmpty() && !context.hasInput()) {
+        FileOps.Arguments arguments = FileOps.arguments(p.paths(), p.property(), context);
+        files.put(context, new PipelineFiles(p.property(), arguments.block(), context, FileOps.KEYS));
+        if (arguments.words().isEmpty() && !context.hasInput()) {
             throw new IllegalArgumentException(Messages.get("fileops.path.expected", "touch"));
         }
-        for (String argument : p.paths()) {
+        for (String argument : arguments.words()) {
             if (Globs.isPattern(argument)) {
                 FileOps.expand(argument, context).forEach(path -> touch(p, path.toAbsolutePath().normalize(), context));
                 continue; // a wildcard updates the existing files it matches

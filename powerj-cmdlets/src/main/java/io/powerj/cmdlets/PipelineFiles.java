@@ -26,12 +26,23 @@ final class PipelineFiles {
 
     private final String propertyName;
     private final ScriptBlock property;
+    private final ScriptBlock block;
     private final Keys keys;
 
     /** @param propertyName {@code --property}, or {@code null} for the objects themselves */
     PipelineFiles(String propertyName, CmdletContext<?> context, Keys keys) {
+        this(propertyName, null, context, keys);
+    }
+
+    /**
+     * @param propertyName {@code --property}, or {@code null}
+     * @param block        block evaluated for each object to give its path ({@code touch { $_.name }}), or
+     *                     {@code null}; a {@code null} result skips the object without error (FR-72)
+     */
+    PipelineFiles(String propertyName, ScriptBlock block, CmdletContext<?> context, Keys keys) {
         this.propertyName = propertyName;
         this.property = propertyName == null ? null : compile(propertyName, context);
+        this.block = block;
         this.keys = keys;
     }
 
@@ -49,15 +60,19 @@ final class PipelineFiles {
     /** File designated by a pipeline object, or {@code null} after reporting why there is none. */
     Path file(Object input, CmdletContext<?> context) {
         Object value = input;
-        if (property != null) {
+        ScriptBlock evaluated = block != null ? block : property;
+        if (evaluated != null) {
             try {
-                value = property.invoke(input);
+                value = evaluated.invoke(input);
             } catch (CancellationException e) {
                 throw e;
             } catch (RuntimeException e) {
                 context.error(Messages.get("pipeline.object.skipped", e.getMessage(), Where.abbreviate(input)));
                 return null;
             }
+        }
+        if (block != null && value == null) {
+            return null; // the block chose to skip this object
         }
         Path file;
         try {
@@ -67,7 +82,9 @@ final class PipelineFiles {
             context.error(Messages.get(keys.invalidPath(), value, e.getMessage()));
             return null;
         }
-        if (file == null) {
+        if (file == null && block != null) {
+            context.error(Messages.get("fileops.block.not.a.file", block.source(), Where.abbreviate(value)));
+        } else if (file == null) {
             context.error(property == null
                     ? Messages.get(keys.notAFile(), Where.abbreviate(input))
                     : Messages.get(keys.propertyNotAFile(), propertyName, Where.abbreviate(input)));

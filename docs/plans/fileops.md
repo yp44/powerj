@@ -15,6 +15,11 @@ Decisions taken with the user:
    - `mkdir` and `touch` emit the `FileEntry` they create or update;
    - `cp`, `mv` and `rm` are silent, except with `-v`, which emits the `FileEntry` of each destination (for `rm`, of each removed entry).
 3. **Existing target:** `cp` and `mv` refuse to overwrite without `-f`/`--force`. This gives a non-blocking error, and the file is skipped.
+4. **Blocks** (asked by the user after the first version, `ls ~/dev/powerj --files | touch { $_.name }`):
+   - for `mkdir`, `touch` and `rm`, a block `{ … }` among the paths gives the path of each pipeline object, instead of the object itself. Before this, the block was taken as a file name, and the received files were the ones touched;
+   - for `cp` and `mv`, a block as destination gives the destination of each source (`cp *.txt { $_.name + ".bak" }`);
+   - a `null` result skips the object;
+   - one block at most, not with `--property`, and it needs a pipeline input for `mkdir`, `touch` and `rm`.
 
 Branch: `claude/cmdlet-fileops`, from `main` @ e7bfeef.
 

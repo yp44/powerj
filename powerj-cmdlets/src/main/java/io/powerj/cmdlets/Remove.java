@@ -23,8 +23,8 @@ public final class Remove implements Cmdlet<Remove.Params, Object, Object> {
 
     /** Parameters of {@code rm}. */
     public record Params(
-            @Option(position = 0, description = "Files and folders to remove (wildcards accepted)")
-            List<String> paths,
+            @Option(position = 0, description = "Files and folders to remove (wildcards accepted), or a block { … } that gives the path of each pipeline object")
+            List<Object> paths,
             @Option(shortName = 'r', description = "Removes folders with their content")
             boolean recurse,
             @Option(shortName = 'f', description = "A missing path is not an error")
@@ -46,13 +46,15 @@ public final class Remove implements Cmdlet<Remove.Params, Object, Object> {
 
     @Override
     public void begin(Params p, CmdletContext<Object> context) {
-        var state = new State(new PipelineFiles(p.property(), context, FileOps.KEYS), p.allowProtected() ? null
-                : ProtectedPaths.load(context.configDirectory(), context.environment(), context.currentDirectory()));
+        FileOps.Arguments arguments = FileOps.arguments(p.paths(), p.property(), context);
+        var state = new State(new PipelineFiles(p.property(), arguments.block(), context, FileOps.KEYS),
+                p.allowProtected() ? null : ProtectedPaths.load(context.configDirectory(), context.environment(),
+                        context.currentDirectory()));
         states.put(context, state);
-        if (p.paths().isEmpty() && !context.hasInput()) {
+        if (arguments.words().isEmpty() && !context.hasInput()) {
             throw new IllegalArgumentException(Messages.get("fileops.path.expected", "rm"));
         }
-        for (String argument : p.paths()) {
+        for (String argument : arguments.words()) {
             for (Path path : FileOps.expand(argument, context)) {
                 remove(p, state, path.toAbsolutePath().normalize(), context);
             }

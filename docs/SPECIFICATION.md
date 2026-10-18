@@ -800,6 +800,8 @@ rm <chemin>... [-r|--recurse] [-f|--force] [-v|--verbose] [-n|--dry-run] [--allo
 
 The paths are arguments (wildcards on the last element: `rm *.tmp`) or the objects received from the pipeline, read as by `cat` (`String`, `Path`, `File`, `FileEntry`, or `--property <nom>`): `ls --filter *.tmp | rm`. For `cp` and `mv`, the last argument is the destination; with several sources, or an existing folder as destination, each source goes into it under its own name (`ls *.txt | cp backup/`).
 
+A **block** `{ … }` instead of a path is evaluated for each object: for `mkdir`, `touch` and `rm`, its result (`String`, `Path`, `File`, `FileEntry`) is the path to create or remove, instead of the object itself (`ls ../src --files | touch { $_.name }` creates the same names in the current folder, without touching the files of `../src`); for `cp` and `mv`, a block as destination gives the destination of each source, its `$_` being the object received or the `FileEntry` of a source argument (`cp *.txt { $_.name + ".bak" }`; a folder result receives the source under its name). A `null` result skips the object without error (`ls | rm { $_.ext == "tmp" ? $_.name : null }`). One block at most, never with `--property`; for `mkdir`, `touch` and `rm` it needs a pipeline input.
+
 - `mkdir` creates folders (`-p`: with their missing parents, and an existing folder is not an error); `touch` creates an empty file or sets the modification time of an existing one. Both emit the `FileEntry` created or updated.
 - `cp` copies (`-r` for folders), `mv` moves or renames (atomically when possible; across file systems, a copy then a removal, the source being removed only once the copy has succeeded), `rm` removes (`-r` for a non-empty folder; `-f`: a missing path is not an error). They emit nothing, except with `-v`: the `FileEntry` of each destination, or of each removed entry.
 - `cp` and `mv` never overwrite an existing target without `-f`; copying a folder into itself is refused.
@@ -819,7 +821,8 @@ CA:
 - `ls --filter *.txt | rm -v` displays the removed files;
 - `rm -r -n a` lists what would be removed and removes nothing;
 - `rm ~` and `rm -r ..` are refused; `rm --allow-protected` lifts the protection;
-- `rm docs` on a non-empty folder is refused without `-r`.
+- `rm docs` on a non-empty folder is refused without `-r`;
+- `ls ../src --files | touch { $_.name }` creates `a.txt`… in the current folder and leaves `../src` unchanged; `cp *.txt { $_.name + ".bak" }` makes a `.bak` copy of each file.
 
 ### 3.10 Native commands
 

@@ -325,5 +325,9 @@ class BuiltinCmdletsTest {
         assertThat(tmp.resolve("docs/spec.md")).exists();
         run("rm");
         assertThat(errors).containsExactly("rm: path expected: rm <path>... or ... | rm");
+        assertThat(run("ls docs --files | touch { $_.name } | map { $_.path.parent }")).isEqualTo(tmp + "\n");
+        assertThat(tmp.resolve("spec.md")).exists();
+        run("touch { $_.name }");
+        assertThat(errors).singleElement().asString().startsWith("touch: the block $_.name gives the path of each");
     }
 }

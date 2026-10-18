@@ -43,7 +43,7 @@ class FileOpsTest {
         return c;
     }
 
-    private static List<String> args(String... args) {
+    private static List<Object> args(Object... args) {
         return new ArrayList<>(Arrays.asList(args));
     }
 
@@ -68,7 +68,7 @@ class FileOpsTest {
         return run(new MakeDirectory(), new MakeDirectory.Params(args(paths), parents, dryRun, null));
     }
 
-    private List<Object> cp(boolean recurse, boolean force, boolean verbose, boolean dryRun, List<String> paths,
+    private List<Object> cp(boolean recurse, boolean force, boolean verbose, boolean dryRun, List<Object> paths,
                             Object... inputs) throws Exception {
         return run(new Copy(), new Copy.Params(paths, recurse, force, verbose, dryRun, null), inputs);
     }
@@ -78,7 +78,7 @@ class FileOpsTest {
     }
 
     private List<Object> rm(boolean recurse, boolean force, boolean verbose, boolean dryRun, boolean allowProtected,
-                            List<String> paths, Object... inputs) throws Exception {
+                            List<Object> paths, Object... inputs) throws Exception {
         return run(new Remove(), new Remove.Params(paths, recurse, force, verbose, dryRun, allowProtected, null), inputs);
     }
 
@@ -335,5 +335,90 @@ class FileOpsTest {
     void rmNeedsAPath() {
         assertThatThrownBy(() -> rm(false, false, false, false, false, args()))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("path expected");
+    }
+
+    // --- blocks: the path of each pipeline object (FR-72) ---
+
+    private static io.powerj.api.ScriptBlock block(String source, java.util.function.Function<Object, Object> f) {
+        return new io.powerj.api.ScriptBlock() {
+            @Override
+            public Object invoke(Object current) {
+                return f.apply(current);
+            }
+
+            @Override
+            public String source() {
+                return source;
+            }
+        };
+    }
+
+    private static FileEntry entry(Path path) {
+        return FileEntries.of(path).orElseThrow();
+    }
+
+    @Test
+    void touchWithABlockCreatesTheNamesInTheCurrentFolderAndLeavesTheSourcesAlone() throws Exception {
+        Path a = file("src/a.txt", "a");
+        Files.setLastModifiedTime(a, FileTime.from(Instant.parse("2020-01-01T00:00:00Z")));
+        var name = block("$_.name", o -> ((FileEntry) o).name());
+        run(new Touch(), new Touch.Params(args(name), false, null), entry(a));
+        assertThat(work.resolve("a.txt")).isEmptyFile();
+        assertThat(Files.getLastModifiedTime(a).toInstant()).isEqualTo(Instant.parse("2020-01-01T00:00:00Z"));
+    }
+
+    @Test
+    void aNullBlockResultSkipsTheObject() throws Exception {
+        Path keep = file("keep.txt", "k");
+        Path old = file("x.old", "o");
+        var onlyOld = block("$_.ext == \"old\" ? $_.name : null", o -> ((FileEntry) o).ext().equals("old")
+                ? ((FileEntry) o).name() : null);
+        rm(false, false, false, false, false, args(onlyOld), entry(keep), entry(old));
+        assertThat(keep).exists();
+        assertThat(old).doesNotExist();
+        assertThat(context.errors).isEmpty();
+    }
+
+    @Test
+    void mkdirWithABlock() throws Exception {
+        var dir = block("\"d-\" + $_", o -> "d-" + o);
+        run(new MakeDirectory(), new MakeDirectory.Params(args(dir), false, false, null), "a", "b");
+        assertThat(work.resolve("d-a")).isDirectory();
+        assertThat(work.resolve("d-b")).isDirectory();
+    }
+
+    @Test
+    void aBlockGivesTheDestinationOfEachSource() throws Exception {
+        file("a.txt", "a");
+        file("b.txt", "b");
+        Files.createDirectories(work.resolve("into"));
+        var bak = block("$_.name + \".bak\"", o -> ((FileEntry) o).name() + ".bak");
+        cp(false, false, false, false, args("*.txt", bak));
+        assertThat(work.resolve("a.txt.bak")).hasContent("a");
+        assertThat(work.resolve("b.txt.bak")).hasContent("b");
+        var folder = block("\"into\"", o -> "into");
+        run(new Move(), new Move.Params(args(folder), false, false, false, false, null), entry(work.resolve("a.txt")));
+        assertThat(work.resolve("into/a.txt")).hasContent("a");
+        assertThat(context.errors).isEmpty();
+    }
+
+    @Test
+    void blockErrors() {
+        var b = block("$_", o -> o);
+        assertThatThrownBy(() -> run(new Touch(), new Touch.Params(args(b), false, null)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("after a |");
+        assertThatThrownBy(() -> run(new Touch(), new Touch.Params(args(b, b), false, null), "x"))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("only one block");
+        assertThatThrownBy(() -> run(new Touch(), new Touch.Params(args(b), false, "name"), "x"))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("--property");
+        assertThatThrownBy(() -> cp(false, false, false, false, args(b, "dest"), "x"))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("only be the destination");
+    }
+
+    @Test
+    void aBlockResultThatIsNotAPathIsReported() throws Exception {
+        var number = block("42", o -> 42);
+        run(new Touch(), new Touch.Params(args(number), false, null), "x");
+        assertThat(context.errors).singleElement().asString().startsWith("the block 42 does not give a path");
     }
 }

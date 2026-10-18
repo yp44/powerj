@@ -23,8 +23,8 @@ public final class MakeDirectory implements Cmdlet<MakeDirectory.Params, Object,
 
     /** Parameters of {@code mkdir}. */
     public record Params(
-            @Option(position = 0, description = "Folders to create")
-            List<String> paths,
+            @Option(position = 0, description = "Folders to create, or a block { … } that gives the folder of each pipeline object")
+            List<Object> paths,
             @Option(shortName = 'p', description = "Creates the missing parent folders; an existing folder is not an error")
             boolean parents,
             @Option(shortName = 'n', description = "Changes nothing: shows what would be done")
@@ -37,11 +37,12 @@ public final class MakeDirectory implements Cmdlet<MakeDirectory.Params, Object,
 
     @Override
     public void begin(Params p, CmdletContext<Object> context) {
-        files.put(context, new PipelineFiles(p.property(), context, FileOps.KEYS));
-        if (p.paths().isEmpty() && !context.hasInput()) {
+        FileOps.Arguments arguments = FileOps.arguments(p.paths(), p.property(), context);
+        files.put(context, new PipelineFiles(p.property(), arguments.block(), context, FileOps.KEYS));
+        if (arguments.words().isEmpty() && !context.hasInput()) {
             throw new IllegalArgumentException(Messages.get("fileops.path.expected", "mkdir"));
         }
-        for (String argument : p.paths()) {
+        for (String argument : arguments.words()) {
             Path path = FileOps.path(argument, context);
             if (path != null) {
                 make(p, path, context);

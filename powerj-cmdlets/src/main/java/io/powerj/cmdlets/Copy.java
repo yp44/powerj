@@ -18,8 +18,8 @@ public final class Copy implements Cmdlet<Copy.Params, Object, Object> {
 
     /** Parameters of {@code cp}. */
     public record Params(
-            @Option(position = 0, description = "Sources (wildcards accepted), then the destination")
-            List<String> paths,
+            @Option(position = 0, description = "Sources (wildcards accepted), then the destination, or a block { … } that gives the destination of each source")
+            List<Object> paths,
             @Option(shortName = 'r', description = "Copies folders with their content")
             boolean recurse,
             @Option(shortName = 'f', description = "Overwrites existing targets")

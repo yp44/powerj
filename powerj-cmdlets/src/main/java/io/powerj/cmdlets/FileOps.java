@@ -29,6 +29,41 @@ final class FileOps {
     private FileOps() {
     }
 
+    /**
+     * Path arguments of a file operation: the words, and at most one block that gives the path of each pipeline
+     * object ({@code ls ../src --files | touch { $_.name }}).
+     */
+    record Arguments(List<String> words, io.powerj.api.ScriptBlock block) {
+    }
+
+    /**
+     * Splits the arguments into words and block.
+     *
+     * @throws IllegalArgumentException for two blocks, a block with {@code --property}, or a block without pipeline
+     *                                  input (it has no object to evaluate)
+     */
+    static Arguments arguments(List<Object> paths, String property, CmdletContext<?> context) {
+        List<String> words = new ArrayList<>();
+        io.powerj.api.ScriptBlock block = null;
+        for (Object path : paths) {
+            if (path instanceof io.powerj.api.ScriptBlock b) {
+                if (block != null) {
+                    throw new IllegalArgumentException(Messages.get("fileops.block.twice"));
+                }
+                block = b;
+            } else {
+                words.add(String.valueOf(path));
+            }
+        }
+        if (block != null && property != null) {
+            throw new IllegalArgumentException(Messages.get("fileops.block.property"));
+        }
+        if (block != null && !context.hasInput()) {
+            throw new IllegalArgumentException(Messages.get("fileops.block.needs.input", block.source()));
+        }
+        return new Arguments(words, block);
+    }
+
     /** Paths of an argument: the path itself, or the matches of a wildcard on its last element. */
     static List<Path> expand(String argument, CmdletContext<?> context) {
         try {
