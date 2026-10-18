@@ -116,6 +116,16 @@ class PreviewModeTest {
         exit();
     }
 
+    @Test
+    void selectRowsAreShownAsATable() throws Exception {
+        Files.writeString(cwd.resolve("hello.txt"), "hello");
+        terminal.type(ALT_V);
+        type("ls | select file=name kb={ $_.size / 1kb }");
+        awaitUntil(() -> terminal.screen().contains("Row · 1"));
+        assertThat(terminal.screen()).contains("file", "kb", "hello.txt");
+        exit();
+    }
+
     private static void awaitUntil(BooleanSupplier condition) throws InterruptedException {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
         while (!condition.getAsBoolean()) {
