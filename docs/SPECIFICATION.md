@@ -404,7 +404,7 @@ Short rule: **`$_` for one-line filters typed at the keyboard, a named lambda as
 
 ### 3.9 Cmdlets in the current scope
 
-Only **four cmdlets** are in the scope of the first steps: `ls`, `where`, `map` and `env`; the mini-iterations add `collect` (FR-36d), `grep` (FR-64), `cat` (FR-65), `sort` (FR-67), `first`, `last` and `range` (FR-68), `select` (FR-69), `count` and `measure` (FR-70). The first two alone cover the core mechanisms: producing record objects, attribute access, the pipeline, expressions, and mixing with native commands.
+Only **four cmdlets** are in the scope of the first steps: `ls`, `where`, `map` and `env`; the mini-iterations add `collect` (FR-36d), `grep` (FR-64), `cat` (FR-65), `sort` (FR-67), `first`, `last` and `range` (FR-68), `select` (FR-69), `count` and `measure` (FR-70), and `group` (FR-71). The first two alone cover the core mechanisms: producing record objects, attribute access, the pipeline, expressions, and mixing with native commands.
 
 #### FR-35 — `ls`: list files
 
@@ -759,6 +759,34 @@ CA:
 - `(ls -r | measure size).sum` gives the total in bytes;
 - `ls | measure modified` gives the oldest and newest dates;
 - `List.of(1, 2, 3) | measure` gives `count 3`, `sum 6`, `average 2.0`.
+
+#### FR-71 — `group`: group objects by key
+
+```text
+group [<clé>...] [-n|--no-items]
+```
+
+Emits one **`Group`** record per distinct key, when the input ends, in the order the keys first appear:
+
+```java
+@Display(columns = {"key", "count"})
+record Group(Object key, long count, List<Object> items)
+```
+
+- A key is a property, a property path or a block, as for `sort` (FR-67): `group ext`, `group path.parent`, `group { $_.size > 1mb }`. With no key, the objects themselves are grouped (`cat a.log | group`). With several keys (`group ext dir`), the key of a group is the list of the values (`[java, false]`).
+- Keys are compared with `equals`; integral numbers are compared by value (`1` and `1L` fall in the same group). A `null` key forms its own group.
+- `items` holds the objects of the group, in their input order. `-n`/`--no-items` keeps only the count (`items` is empty), so that very large inputs do not fill memory.
+- An error while evaluating a key is non-blocking: the object is in no group.
+
+The groups are displayed as a table `key count`. Their properties are completed by Tab and usable downstream: `ls -r | group ext | sort count -d | first 5`, `(ls -r | group ext)[0].items`. `group` is allowed in preview mode (FR-66).
+
+CA:
+- `ls -r | group ext | sort count -d | first 5` displays the five most frequent extensions;
+- `ls -r | group ext dir` groups by extension and kind;
+- `ls -r | group ext -n` displays the same counts, with empty `items`;
+- `(ls | group dir)[0].items` gives the objects of the first group;
+- `cat app.log | group | where { $_.count > 1 }` displays the repeated lines;
+- `ls | group bad!` is a blocking error.
 
 ### 3.10 Native commands
 
@@ -1490,6 +1518,7 @@ The backlog cmdlets (§12.3) are added **one per mini-iteration**, each with a s
 | 16 | `first`, `last`, `range`, `stopInput` | FR-68 | `docs/recettes/first-last-range.md` |
 | 17 | `select`, `Row` | FR-69 | `docs/recettes/select.md` |
 | 18 | `count`, `measure` | FR-70 | `docs/recettes/count-measure.md` |
+| 19 | `group` | FR-71 | `docs/recettes/group.md` |
 
 Version 2 will introduce scripting (`if`, `foreach`, functions, `.pj` files).
 
@@ -1573,7 +1602,7 @@ PJ C:\dev> (ls)*.name.stream().map({ $_.toUpperCase() }).sorted().toList()
 | ~~`collect`~~ | Gather into a list — **done** (FR-36d) | `Collected` |
 | ~~`first`, `last`~~ | First / last N — **done** (FR-68) | unchanged |
 | ~~`range`~~ | Objects between two bounds — **done** (FR-68) | unchanged |
-| `group` | Grouping | `Group<T>` |
+| ~~`group`~~ | Grouping — **done** (FR-71) | `Group` |
 | ~~`count`, `measure`~~ | Aggregates (count, sum, average, min, max) — **done** (FR-70) | `Long`, `Row` |
 | `uniq` | Deduplication | unchanged |
 | `tee` | Copy into a variable | unchanged |

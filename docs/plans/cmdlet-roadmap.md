@@ -60,8 +60,8 @@ Target pipeline at the end (§12.3):
 - Kept although Java streams can do it: shorter, readable sizes, and no `collect` of the whole input in memory (decided with the user).
 
 ## Phase 5 — `group` (FR-71), `claude/cmdlet-group`
-- `group <key|block> [-n|--no-items]` emits `record Group(Object key, int count, List<Object> items)`, with `@Display(columns = {"key","count"})`. Keys keep first-seen order (`LinkedHashMap`).
-- Tests include `group { $_.ext } | sort count --desc | first 5` and `(… | group ext)*.key`. `preview = true`; reuses `Keys`.
+- Spec: `docs/plans/group.md`. `group [key...] [-n|--no-items]` emits one `record Group(Object key, long count, List<Object> items)` per key (`@Display(columns = {"key","count"})`), in first-seen order. Several keys give a list key; integral numbers are compared by value.
+- Decided with the user: a fixed record (not a `Row` named after the key), several keys allowed, only `-n` as an option (no `-i`, no sorted output). `preview = true`; reuses `Keys`.
 
 ## Phase 6 — `uniq` (FR-72), `claude/cmdlet-uniq`
 - `uniq [key|block] [-c|--count] [-i|--case-insensitive] [--adjacent]`.

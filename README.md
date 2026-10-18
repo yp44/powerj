@@ -92,6 +92,7 @@ Out of scope for v1: control structures (`if`, `foreach`, functions — planned 
 | `range` | Objects between two bounds: positions (`range --from 5 --to 10`), regular expressions on a property (`range --from Paul --to Peter --property name`) or blocks, `--exclude`, `--repeat` | [first-last-range](docs/recettes/first-last-range.md) |
 | `select` | Chooses and computes columns: `select name size`, `select file=name kb={ $_.size / 1kb }`; the `Row`s are tables and their columns stay properties (`\| sort kb -d`) | [select](docs/recettes/select.md) |
 | `count`, `measure` | Count the objects (`ls -r \| count`); count, sum, average, min and max of a property (`ls -r \| measure size`, sizes in readable form) | [count-measure](docs/recettes/count-measure.md) |
+| `group` | Groups by key: `ls -r \| group ext \| sort count -d \| first 5`; one `Group(key, count, items)` per key, several keys allowed, `-n` keeps only the counts | [group](docs/recettes/group.md) |
 | `collect` | Gathers a pipeline into one list: `(ls -r \| collect).size()` | [etape-8](docs/recettes/etape-8-collect.md) |
 | `env` | Reads and sets environment variables (`env --set MAVEN_OPTS=-Xmx2g`) | [etape-3](docs/recettes/etape-3.md) |
 
@@ -221,7 +222,7 @@ All modules are JPMS modules (`module-info.java`); the only runtime dependency i
 | `powerj-api` | Public API for writing cmdlets (`Cmdlet`, `@CmdletInfo`, `@Option`, `CmdletProvider`); no dependencies |
 | `powerj-fs` | File tree walk, sequential or parallel in virtual threads (`FileWalker`), reusable by any cmdlet |
 | `powerj-core` | Lexer, parser, interpreter, pipeline, option binding, Java interoperability, completion engine, output formatting, native execution |
-| `powerj-cmdlets` | Built-in cmdlets (`ls`, `grep`, `cat`, `where`, `map`, `sort`, `first`, `last`, `range`, `select`, `count`, `measure`, `collect`, `env`) |
+| `powerj-cmdlets` | Built-in cmdlets (`ls`, `grep`, `cat`, `where`, `map`, `sort`, `first`, `last`, `range`, `select`, `count`, `measure`, `group`, `collect`, `env`) |
 | `powerj-shell` | Entry point (`Main`), JLine REPL, profile, script mode, history expansion |
 | `powerj-dist` | Distribution: jlink runtime + jpackage launcher / installer |
 | `examples/greet` | Example third-party module, not shipped: a template for your own cmdlets |
@@ -318,14 +319,14 @@ Unit and integration tests use JUnit 5 and AssertJ: lexer, parser, option bindin
 PowerJ is in active development (version `0.1.0-SNAPSHOT`). Implemented so far:
 
 - REPL with line editing, persistent history and Ctrl+R; native commands, `cd`, chaining, variables, redirections; non-interactive mode;
-- object pipeline with the `ls`, `where`, `map`, `sort`, `first`, `last`, `range`, `select`, `count`, `measure`, `collect`, `env`, `grep` and `cat` cmdlets, and a parallel file walker;
+- object pipeline with the `ls`, `where`, `map`, `sort`, `first`, `last`, `range`, `select`, `count`, `measure`, `group`, `collect`, `env`, `grep` and `cat` cmdlets, and a parallel file walker;
 - direct access to the JRE's Java API, Java-style lambdas and method references;
 - Tab completion and syntax highlighting;
 - third-party modules loaded from jars;
 - English / French interface, `~` expansion, startup profile;
 - preview mode (Alt+V): results shown while typing.
 
-Next: more cmdlets from the backlog (`group`, `find`, `cp`/`mv`/`rm`, `to-json`, `ps`… — [roadmap](docs/plans/cmdlet-roadmap.md), [§12.3](docs/SPECIFICATION.md#123-cmdlet-backlog-outside-the-current-scope)), then a scripting language with control structures in v2. The step-by-step plan is in [§11 of the specification](docs/SPECIFICATION.md#11-iterative-development-plan).
+Next: more cmdlets from the backlog (`uniq`, `find`, `cp`/`mv`/`rm`, `to-json`, `ps`… — [roadmap](docs/plans/cmdlet-roadmap.md), [§12.3](docs/SPECIFICATION.md#123-cmdlet-backlog-outside-the-current-scope)), then a scripting language with control structures in v2. The step-by-step plan is in [§11 of the specification](docs/SPECIFICATION.md#11-iterative-development-plan).
 
 ## Documentation
 

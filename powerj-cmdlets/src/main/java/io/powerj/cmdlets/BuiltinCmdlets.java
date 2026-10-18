@@ -14,7 +14,7 @@ public final class BuiltinCmdlets implements CmdletProvider {
     public List<Cmdlet<?, ?, ?>> cmdlets() {
         return List.of(new Ls(), new Grep(), new Cat(), new Where(), new MapCmdlet(), new Sort(), new First(),
                 new Last(), new Range(), new Select(), new Count(),
-                new Measure(), new Collect(), new Env());
+                new Measure(), new GroupCmdlet(), new Collect(), new Env());
     }
 
     @Override

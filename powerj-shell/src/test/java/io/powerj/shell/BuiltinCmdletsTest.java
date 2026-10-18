@@ -290,4 +290,21 @@ class BuiltinCmdletsTest {
         assertThat(run("List.of(1, 2, 3) | measure | map { $_.average }")).isEqualTo("2.0\n");
         assertThat(errors).isEmpty();
     }
+
+    @Test
+    void groupByKeys() throws Exception {
+        Files.writeString(tmp.resolve("todo.txt"), "x");
+        assertThat(run("ls | group dir")).isEqualTo("""
+                key    count
+                ---    -----
+                true       1
+                false      2
+                """);
+        assertThat(run("ls --files | group ext | sort count -d | first | map { $_.key }")).isEqualTo("txt\n");
+        assertThat(run("(ls | group dir)[0].items | map { f -> f.name }")).isEqualTo("docs\n");
+        assertThat(run("ls | group ext dir -n | map { g -> g.items.size() }")).isEqualTo("0\n0\n");
+        assertThat(errors).isEmpty();
+        run("ls | group bad!");
+        assertThat(errors).containsExactly("group: invalid property name: bad!");
+    }
 }
