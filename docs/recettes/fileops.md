@@ -49,6 +49,11 @@ Create the empty folder `C:\tmp\ops`, then `cd C:\tmp\ops`.
 | 22 | `^rm --version` (Linux/macOS) | The native `rm` runs. |
 | 23 | `help rm`, `help cp` | Their help, with `--allow-protected`, `-n, --dry-run`, `-v, --verbose`. |
 | 24 | `POWERJ_LANG=fr`, then `rm absent.txt` | `rm : introuvable : …`. |
+| 25 | Build a large tree: `Stream.iterate(List.of("t"), { l -> l.stream().flatMap({ p -> IntStream.range(0, 20).mapToObj({ i -> p + "/d" + i }) }).toList() }).limit(4).flatMap({ l -> l.stream() }) \| mkdir -p \| count`, then `ls t -r --dirs \| map { d -> IntStream.range(0, 50).mapToObj({ i -> d.path.resolve("f" + i + ".txt") }) } \| touch \| count` | `8421`, then `421000`. |
+| 26 | `$s = System.nanoTime(); cp t t2 -r -p 8; (System.nanoTime() - $s) / 1000000`, then the same without `-p` into `t3` | Both copies are complete (`ls t2 -r \| count` = `ls t -r \| count`); the time in ms is shown, usually lower with `-p` on an SSD (FR-72b). |
+| 27 | `rm t2 -r -p 8 -v \| last 1`, then `rm t3 -r -n -p 8 \| count` | The last entry is `t2` itself (a folder comes after its content); then `429421` operations, and `t3` is still there. |
+| 28 | `rm t3 -r -p 0` | `rm: --parallel expects a number of threads of at least 1, got 0`. |
+| 29 | `rm t3 -r`, rebuild the tree (row 25), then `rm t -r -p 8` and Ctrl+C during the removal | The prompt comes back at once; what was removed stays removed. |
 
 ## Known limitations
 

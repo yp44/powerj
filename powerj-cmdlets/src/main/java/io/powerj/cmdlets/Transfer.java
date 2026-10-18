@@ -23,7 +23,7 @@ import io.powerj.api.ScriptBlock;
 final class Transfer {
 
     /** Settings of the command. */
-    record Options(boolean move, boolean recurse, boolean force, boolean verbose, boolean dryRun,
+    record Options(boolean move, boolean recurse, int parallelism, boolean force, boolean verbose, boolean dryRun,
                    boolean allowProtected) {
     }
 
@@ -176,7 +176,7 @@ final class Transfer {
             return;
         }
         boolean done = options.move() ? move(source, target, context)
-                : FileOps.copyTree(source, target, options.force(), context);
+                : FileOps.copyTree(source, target, options.parallelism(), options.force(), context);
         if (done && options.verbose()) {
             FileEntries.of(target, LinkOption.NOFOLLOW_LINKS).ifPresent(context::emit);
         }
@@ -199,10 +199,10 @@ final class Transfer {
                 return true;
             }
         } catch (DirectoryNotEmptyException e) {
-            if (!FileOps.copyTree(source, target, options.force(), context)) {
+            if (!FileOps.copyTree(source, target, 1, options.force(), context)) {
                 return false; // the source is kept
             }
-            return FileOps.deleteTree(source, false, false, context, (path, entry) -> { });
+            return FileOps.deleteTree(source, 1, false, false, context, (path, entry) -> { });
         } catch (IOException e) {
             FileOps.report(e, source, context);
             return false;

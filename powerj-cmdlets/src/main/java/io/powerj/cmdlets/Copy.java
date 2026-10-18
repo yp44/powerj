@@ -13,7 +13,7 @@ import io.powerj.api.Option;
 /** {@code cp}: copies files and folders; the last argument is the destination (specification FR-72). */
 @CmdletInfo(name = "cp", category = "Files", summary = "Copies files and folders",
         examples = {"cp a.txt b.txt", "cp *.txt backup/", "cp -r src src-copy", "ls --filter *.log | cp archive/",
-                "cp -n -r docs docs-old"})
+                "cp -n -r docs docs-old", "cp -r -p 16 photos /mnt/backup/"})
 public final class Copy implements Cmdlet<Copy.Params, Object, Object> {
 
     /** Parameters of {@code cp}. */
@@ -22,6 +22,9 @@ public final class Copy implements Cmdlet<Copy.Params, Object, Object> {
             List<Object> paths,
             @Option(shortName = 'r', description = "Copies folders with their content")
             boolean recurse,
+            @Option(shortName = 'p', description = "Copies up to n entries of a folder at the same time, in virtual "
+                    + "threads")
+            Integer parallel,
             @Option(shortName = 'f', description = "Overwrites existing targets")
             boolean force,
             @Option(shortName = 'v', description = "Emits each destination created")
@@ -36,8 +39,8 @@ public final class Copy implements Cmdlet<Copy.Params, Object, Object> {
 
     @Override
     public void begin(Params p, CmdletContext<Object> context) {
-        transfers.put(context, new Transfer(new Transfer.Options(false, p.recurse(), p.force(), p.verbose(),
-                p.dryRun(), false), p.paths(), p.property(), context));
+        transfers.put(context, new Transfer(new Transfer.Options(false, p.recurse(),
+                FileOps.parallelism(p.parallel()), p.force(), p.verbose(), p.dryRun(), false), p.paths(), p.property(), context));
     }
 
     @Override

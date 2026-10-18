@@ -7,6 +7,10 @@ Decisions taken with the user:
 1. `rm -r` removes while walking the tree, without listing it first in memory. This was done in PR #32 (commit `909c39f`).
 2. `cp -r` and `rm -r` get an optional `-p/--parallel <n>`, built on virtual threads like `grep`. It is off by default (`1`).
 3. `mv`, `mkdir` and `touch` stay as they are. A `mv` on the same file system is a single rename, and the other two do trivial work.
+4. Answers to the open questions:
+   - `-p` acts only inside a tree, not on the paths received from the pipeline;
+   - `mv` gets no `-p`, not even for its copy-then-remove fallback;
+   - `--dry-run` **reflects the parallelism**: with `-p`, `rm -r -n` walks the tree in parallel and lists the entries in the same free order as a real removal (a folder still comes after its content).
 
 When it helps:
 - on SSDs (NVMe) and network drives (SMB, NFS), which handle several requests at once. With a network drive, the latency of each request then overlaps with the others;
@@ -28,13 +32,13 @@ rm <path>... [-r|--recurse] [-p|--parallel <n>] [-f|--force] [-v|--verbose] [-n|
 
 - `-p` acts **inside a tree** (a folder given with `-r`). It has no effect on a single file.
 - The paths received from the pipeline are still processed one after the other (see open question 1).
-- `-p 0` or a negative value is a blocking error, `cp: invalid parallelism: 0 (expected 1 or more)`, as `grep.parallel.invalid` already does.
+- `-p 0` or a negative value is a blocking error, with the same message as `grep` and `ls`: `--parallel expects a number of threads of at least 1, got 0`.
 
 ## Output
-- Same objects as today. With `-v`, `cp` emits the `FileEntry` of each destination and `rm` the `FileEntry` of each removed entry.
-- With `-p` > 1, **the order is free**, as for `grep -p`. Two guarantees remain:
-  - with `rm`, a folder always comes after its content;
-  - with `cp`, a folder always comes before its content.
+- Same objects as today:
+  - `rm -v` emits the `FileEntry` of each removed entry, and `rm -n` one `FileOperation` per entry;
+  - `cp -v` emits the `FileEntry` of each destination (one per source, not per copied entry), and `cp -n` one `FileOperation` per source. Their order does not change.
+- With `-p` > 1, the entries of `rm -v` and `rm -n` come in a **free order**, as for `grep -p`, but a folder always comes after its content.
 - Errors are non-blocking and also arrive in a free order. The same errors are reported as in sequential mode.
 
 ## Behaviour
@@ -42,6 +46,7 @@ Order rules, which make the result identical to the sequential mode:
 - **`rm -r`**, post-order:
   - a folder is removed only once all its children have been handled;
   - the files of a folder are removed at the same time, and the sub-folders are walked at the same time;
+- the listing of a folder takes a permit before it submits each file, so the number of tasks waiting stays bounded, as in `FileWalker`;
   - each folder keeps a counter of its children still in progress. The last child to finish removes the folder, then decrements the counter of the parent;
   - if a child could not be removed, the removal of the folder is still tried. It then fails with `not empty`, as in sequential mode.
 - **`cp -r`**, pre-order:
@@ -57,7 +62,7 @@ What does not change:
 - **Thread of `emit`/`error`**: they are only called in the cmdlet's thread. The workers hand results and errors over through the queue, as in `FileWalker` (FR-64).
 - **Ctrl+C**: the walk stops all its threads and throws `CancellationException`. Some entries may already have been copied or removed, exactly as in sequential mode.
 - **`mv` across file systems** keeps its sequential copy-then-remove fallback (open question 2).
-- **`--dry-run`** stays sequential and lists in walk order (open question 3).
+- **`--dry-run`**: `rm -r -n -p <n>` runs the same parallel walk, without removing anything (decision 4).
 - **Preview**: no change, these cmdlets never run in preview (FR-66).
 
 ## Implementation
@@ -65,23 +70,24 @@ What does not change:
 
 ```java
 public final class FileTrees {
-    /** Removes a tree, content first; links are not followed. */
-    public static void delete(Path root, int parallelism,
-                              Consumer<? super Removed> removed, Consumer<? super WalkError> errors);
+    /** Removes a tree, content first (nothing with dryRun); links are not followed. */
+    public static boolean delete(Path root, int parallelism, boolean dryRun,
+                                 Consumer<? super Removed> removed, BiConsumer<? super Path, ? super IOException> errors);
 
-    /** Copies a tree to target, folders first; links are copied as links. */
-    public static void copy(Path source, Path target, int parallelism, boolean replace,
-                            Consumer<? super Copied> copied, Consumer<? super WalkError> errors);
+    /** Copies a file, a link or a tree to target, folders first; links are copied as links. */
+    public static boolean copy(Path source, Path target, int parallelism, boolean replace,
+                               BiConsumer<? super Path, ? super IOException> errors);
 
     public record Removed(Path path, BasicFileAttributes attributes) { }
-    public record Copied(Path source, Path target) { }
 }
 ```
 
+- Both return `true` when no error was reported.
 - The consumers are called in the calling thread only, as with `FileWalker`.
-- `Removed.attributes` are read just before the removal, so `-v` costs no extra read.
+- Errors carry the `IOException` itself, not a `WalkError`. This way `FileOps.report` keeps its exact messages (`exists`, `not empty`…), which a `WalkError` would reduce to three kinds.
+- `Removed.attributes` come from the walk (the listing, or `preVisitDirectory` in sequential mode), so `-v` costs no extra read.
 - `replace` adds `REPLACE_EXISTING`, and an existing folder is merged (behaviour of `cp -f`).
-- With `parallelism == 1`, both methods use the current sequential walk (`Files.walkFileTree`), moved here from `FileOps`.
+- With `parallelism == 1`, both methods use the sequential walk (`Files.walkFileTree`), moved here from `FileOps`.
 
 Engine:
 - the engine mirrors `FileWalker.ParallelWalk`: a virtual-thread executor, a `Semaphore(parallelism)`, a counter of pending tasks that signals the end, a bounded `ArrayBlockingQueue` read by the calling thread, and a `stopped` flag with `shutdownNow()` on error or Ctrl+C;
@@ -89,11 +95,14 @@ Engine:
 - memory is bounded by the folders in progress, not by the size of the tree;
 - `FileWalker` is **not changed**: its parallel mode does not order a folder against its content, and it follows links. Sharing the engine between the two is left for later, to avoid any regression in `grep`/`ls`.
 
-**`WalkError.of(path, IOException)`** is reused for the errors. `FileOps.report(WalkError, …)` already turns it into the cmdlet messages.
+Parallel errors follow the sequential walk:
+- a folder that cannot be listed is reported and kept; its parent then fails with `not empty`, and for a copy it is not created;
+- an error while listing keeps the entries already read.
 
 **`powerj-cmdlets`**:
 - `FileOps.deleteTree` and `FileOps.copyTree` take a `parallelism` argument and delegate to `FileTrees`. The sequential code leaves `FileOps`, and the messages stay the same.
-- `Copy.Params` and `Remove.Params` gain `@Option(name = "parallel", shortName = 'p') Integer parallel`. `Transfer.Options` gains `parallelism`, while `mv` passes `1`. The value is validated in `begin` (`fileops.parallel.invalid`).
+- `FileOps.parallelism(Integer)` validates the value (`fileops.parallel.invalid`), with `null` meaning `1`.
+- `Copy.Params` and `Remove.Params` gain `@Option(shortName = 'p') Integer parallel`, after `recurse`. `Transfer.Options` gains `parallelism`, while `mv` passes `1`.
 - i18n: `cp.option.parallel`, `rm.option.parallel` and `fileops.parallel.invalid`, in English and French.
 
 **Docs**:
@@ -118,7 +127,7 @@ Engine:
 - `rm -r -p 4 -v` emits all the removed entries (compared as a set);
 - `-p 0` gives the blocking error;
 - `-p` on a single file works;
-- `--dry-run` with `-p` lists the same entries as without it.
+- `rm -r -n -p 8` lists the same entries as without `-p` (as a set), with the folder last, and removes nothing.
 
 ## Verification
 - `./mvnw -Djava.release=25 verify`
@@ -133,7 +142,15 @@ $s = System.nanoTime(); rm t3 -r; (System.nanoTime() - $s) / 1000000
 ```
 The measured times go into the PR description. They depend on the disk, so no gain is promised in the docs.
 
+## Measures
+Container with 4 vCPUs, virtual disk, the 4-level tree of the verification (8,421 folders, 421,000 empty files, 429,421 entries), in milliseconds:
+
+| Command | `-p 1` | `-p 4` | `-p 16` | `-p 64` | native |
+|---|---|---|---|---|---|
+| `cp t tx -r` | 16,948 | 10,080 | 11,356 | 12,036 | `cp -a`: 25,944 |
+| `rm tx -r` | 9,446 | 5,902 | 5,296 | 4,447 | `rm -rf`: 5,324 |
+
+The best value depends on the disk and the processor; on this machine `cp` peaks around `-p 4`.
+
 ## Open questions
-1. **Pipeline paths**: should `-p` also process the paths received from the pipeline at the same time (`ls -r --files | rm -p 8`), or only the content of a tree? Proposal: **only inside a tree** for now. The paths of the pipeline arrive one by one, and processing them at the same time would mean buffering them and reordering the output.
-2. **`mv -p`**: should `mv` across file systems get `-p` for its copy-then-remove fallback? Proposal: **no**. The case is rare, and an `mv` on the same file system is already a single rename.
-3. **`--dry-run` with `-p`**: proposal: `-p` is accepted but the listing stays **sequential**. Nothing is written, so there is little to gain, and the listing keeps a stable order that is easy to read.
+All answered (decision 4).

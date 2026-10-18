@@ -840,14 +840,15 @@ rm <chemin>... [-r|--recurse] [-p|--parallel <n>] [-f|--force] [-v|--verbose] [-
 - **Scope**:
   - `-p` has no effect on a single file;
   - the paths received from the pipeline are still processed one after the other;
-  - `mv` and `--dry-run` stay sequential.
+  - `mv` stays sequential;
+  - `rm -r -n -p <n>` runs the same parallel walk without removing anything: its listing reflects the parallelism (free order, a folder after its content).
 - **When it helps**: on SSDs and network drives with many files. On a spinning disk it can be slower, which is why it is off by default.
 - The walk lives in `powerj-fs` (`io.powerj.fs.FileTrees`), next to `FileWalker`.
 
 CA:
 - `rm t -r -p 16` and `cp t t2 -r -p 16` give the same result as without `-p`;
 - `rm t -r -p 4 -v` lists every removed entry, each folder after its content;
-- `rm t -r -p 0` is refused: `invalid parallelism: 0 (expected 1 or more)`;
+- `rm t -r -p 0` is refused: `--parallel expects a number of threads of at least 1, got 0`;
 - Ctrl+C during `rm big -r -p 8` returns the prompt.
 
 ### 3.10 Native commands
