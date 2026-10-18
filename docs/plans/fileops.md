@@ -78,7 +78,7 @@ rm <path>... [-r|--recurse] [-f|--force] [-v|--verbose] [-n|--dry-run] [--allow-
 - **`mv`** uses `Files.move`, trying `ATOMIC_MOVE` first.
   - Across file systems, it falls back to a recursive copy and then a removal of the source.
   - That fallback runs only after the whole copy has succeeded, so a failed copy never loses the source.
-- **`rm -r`** removes depth-first with `Files.walkFileTree` and checks Ctrl+C between entries. An entry that cannot be removed gives an error, and the walk goes on.
+- **`rm -r`** removes depth-first while it walks the tree with `Files.walkFileTree` (files in `visitFile`, folders in `postVisitDirectory`), so memory stays bounded by the depth of the tree, not its size; it checks Ctrl+C between entries. An entry that cannot be removed gives an error, and the walk goes on.
 - **`touch`** creates an empty file, or sets the modification time of an existing one to now. A missing parent is an error.
 - **Preview:** none of the five cmdlets runs in preview mode (`preview = false`), including with `-n`, because the preview must never touch the disk even by mistake.
 

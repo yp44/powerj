@@ -126,23 +126,27 @@ final class FileOps {
     }
 
     /**
-     * Entries of a tree, content before folders (the order of a removal); links are not followed. An entry that
-     * cannot be read is reported and left out.
+     * Removes a tree, content first, while walking it: memory stays bounded by the depth of the tree, not its size.
+     * Links are not followed. {@code removed} receives each entry once it is removed (or would be, with
+     * {@code dryRun}), with its {@link FileEntry} read just before the removal when {@code describe} is set
+     * ({@code null} otherwise). An entry that cannot be read or removed is reported. Returns {@code true} if
+     * everything was removed.
      */
-    static List<Path> depthFirst(Path root, CmdletContext<?> context) {
-        List<Path> entries = new ArrayList<>();
+    static boolean deleteTree(Path root, boolean dryRun, boolean describe, CmdletContext<?> context,
+                              java.util.function.BiConsumer<Path, FileEntry> removed) {
+        boolean[] complete = {true};
         try {
             Files.walkFileTree(root, new SimpleFileVisitor<>() {
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
-                    checkCancelled();
-                    entries.add(file);
+                    delete(file, describe ? FileEntries.of(file, attributes) : null);
                     return FileVisitResult.CONTINUE;
                 }
 
                 @Override
                 public FileVisitResult visitFileFailed(Path file, IOException e) {
                     report(e, file, context);
+                    complete[0] = false;
                     return FileVisitResult.CONTINUE;
                 }
 
@@ -150,41 +154,32 @@ final class FileOps {
                 public FileVisitResult postVisitDirectory(Path dir, IOException e) {
                     if (e != null) {
                         report(e, dir, context);
+                        complete[0] = false;
                     }
-                    entries.add(dir);
+                    delete(dir, describe ? FileEntries.of(dir, LinkOption.NOFOLLOW_LINKS).orElse(null) : null);
                     return FileVisitResult.CONTINUE;
+                }
+
+                private void delete(Path entry, FileEntry description) {
+                    checkCancelled();
+                    if (dryRun) {
+                        removed.accept(entry, null);
+                        return;
+                    }
+                    try {
+                        Files.delete(entry);
+                        removed.accept(entry, description);
+                    } catch (IOException e) {
+                        report(e, entry, context);
+                        complete[0] = false;
+                    }
                 }
             });
         } catch (IOException e) {
             report(e, root, context);
+            return false;
         }
-        return entries;
-    }
-
-    /**
-     * Removes a tree, content first. {@code removed} receives each entry once it is removed (or would be, with
-     * {@code dryRun}), with its {@link FileEntry} read just before the removal when {@code describe} is set
-     * ({@code null} otherwise). Returns {@code true} if everything was removed.
-     */
-    static boolean deleteTree(Path root, boolean dryRun, boolean describe, CmdletContext<?> context,
-                              java.util.function.BiConsumer<Path, FileEntry> removed) {
-        boolean complete = true;
-        for (Path entry : depthFirst(root, context)) {
-            checkCancelled();
-            if (dryRun) {
-                removed.accept(entry, null);
-                continue;
-            }
-            FileEntry description = describe ? FileEntries.of(entry, LinkOption.NOFOLLOW_LINKS).orElse(null) : null;
-            try {
-                Files.delete(entry);
-                removed.accept(entry, description);
-            } catch (IOException e) {
-                report(e, entry, context);
-                complete = false;
-            }
-        }
-        return complete;
+        return complete[0];
     }
 
     /**
