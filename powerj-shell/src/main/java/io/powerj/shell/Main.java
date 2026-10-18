@@ -45,6 +45,10 @@ public final class Main {
     }
 
     public static void main(String[] args) {
+        // Without this, JLine draws box characters (the preview banner's '─') through the terminal's
+        // alternate character set, which some terminals do not switch to: they show 'q' instead.
+        // Must be set before any JLine class reads it.
+        System.setProperty(TerminalBuilder.PROP_DISABLE_ALTERNATE_CHARSET, "true");
         boolean debug = Arrays.asList(args).contains("--debug");
         boolean noProfile = Arrays.asList(args).contains("--no-profile");
         var home = PowerJHome.resolve(System.getenv(), Path.of(System.getProperty("user.home")));
