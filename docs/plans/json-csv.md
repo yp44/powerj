@@ -107,24 +107,25 @@ Rules:
 - **Preview**: `preview = true` for all four. They read nothing but their input.
 
 ## Implementation
-New package `io.powerj.cmdlets.json` (not exported), plus the cmdlets in `io.powerj.cmdlets`:
+All the classes are package-private in `io.powerj.cmdlets`, next to the cmdlets, so they share `Messages` (no new exported package):
 
 | Class | Role |
 |---|---|
-| `json/JsonWriter` | `write(Object value, StringBuilder out, boolean pretty, int depth)`: the mapping table above, with a switch and pattern matching. Records are read with `RecordComponent.getAccessor()`; an accessor that cannot be called (record of a closed module) gives the `toString()`. |
-| `json/JsonParser` | Recursive-descent parser of one value over a `CharSequence`, with line and column for errors (`JsonException`). Produces `Row`, `List`, `Long`/`BigInteger`, `Double`, `String`, `Boolean`, `null`. |
-| `json/JsonSplitter` | Linear scanner that cuts a growing text into top-level values: it counts `{[`/`]}` outside strings (a top-level number or literal ends at the next space or line break), and keeps its state (depth, in a string, after `\`) between the strings received. Each value is then parsed once by `JsonParser`, which keeps `from-json` linear for a large document and streaming for JSON Lines. |
-| `json/Csv` | `field(Object)` (formatting and quoting), `line(List<?> fields, char delimiter)`. |
-| `json/CsvReader` | State machine over characters (in a field, in quotes, quote seen), fed line by line; returns the completed records. Keeps the line number for errors. |
-| `Properties` | Ordered columns of an object, `LinkedHashMap<String, Object>`, for `to-csv`: record components, `Row`/`Map` entries, or `value`. |
-| `ToJson`, `FromJson`, `ToCsv`, `FromCsv` | The cmdlets; `from-*` read the text of an object (the object itself, or its `--property` through `context.compile("$_." + name)`, validated with `Where.PROPERTY`, as `Keys` does);  with per-execution state in `Collections.synchronizedMap(new WeakHashMap<>())` keyed by context: the `StringBuilder` and count of `to-json`; the columns of `to-csv`; the splitter or the reader of `from-*`. |
+| `JsonWriter` | `write(Object value, StringBuilder out, int indent)`: the mapping table above, with a switch and pattern matching. `isContainer` tells the values written as objects or arrays (a `Path`, though `Iterable`, is a scalar). `truncated()` tells that `--depth` was reached. |
+| `Properties` | Named values of an object: record components (read with `RecordComponent.getAccessor()`), map entries, or a single column `value`. Used by `JsonWriter` for records and by `to-csv` for its columns. |
+| `JsonParser` | Recursive-descent parser of one value over a `CharSequence`, with line and column for errors (`JsonException`), at most 1,000 levels of nesting. Produces `Row`, `List`, `Long`/`BigInteger`, `Double`, `String`, `Boolean`, `null`. |
+| `JsonSplitter` | Linear scanner that cuts a growing text into top-level values: it counts `{[`/`]}` outside strings (a top-level number or literal ends at the next space or line break), and keeps its state (depth, in a string, after `\`) between the strings received. Each value is then parsed once by `JsonParser`, which keeps `from-json` linear for a large document and streaming for JSON Lines. Only the value being read stays in its buffer. |
+| `CsvWriter` | `line(List<?> values)`: formatting and quoting of the fields; `delimiter(String)` checks `--delimiter`. |
+| `CsvReader` | State machine over characters (in quotes, quote seen), fed piece by piece; returns the completed records with their line. |
+| `PipelineText` | Text of an object received by `from-*`: the `String` itself, or its `--property` (compiled with `Keys.block`). |
+| `ToJson`, `FromJson`, `ToCsv`, `FromCsv` | The cmdlets, with per-execution state in `Collections.synchronizedMap(new WeakHashMap<>())` keyed by context: the `StringBuilder` and count of `to-json`; the columns of `to-csv`; the splitter or the reader of `from-*`. |
 
 Reused:
 - `Keys` / `Where.PROPERTY` for `--property` (phase 1);
 - `Row.of` (phase 3).
 
 Other changes:
-- registration in `BuiltinCmdlets`;
+- registration in `BuiltinCmdlets`, category `Data`;
 - i18n: `to-json.*`, `from-json.*`, `to-csv.*`, `from-csv.*`, `json.*`, `csv.*`, in English and French;
 - no API or core change.
 
@@ -135,6 +136,7 @@ Docs:
 - roadmap (FR number 75 → 73).
 
 ## Tests
+Implemented as `JsonTest` (writer, parser, splitter), `CsvTest` (writer, reader), `JsonCsvCmdletsTest` (the four cmdlets) and `BuiltinCmdletsTest.jsonAndCsv` (in the shell, with `>`):
 - `JsonWriterTest`:
   - every row of the mapping table;
   - escapes (`"`, `\`, `\n`, `\u0001`, `é` as is);
@@ -185,7 +187,7 @@ cat files.json | from-json | where { $_.size > 1kb }
 cat files.json -c | from-json --property content | sort size --desc | first 3
 "[{\"a\": 1, \"b\": [1, 2]}, {\"a\": 2}]" | from-json
 ls | select name size modified | to-csv -d ";" > files.csv
-cat files.csv | from-csv -d ";" | map { Long.parseLong($_.size) } | measure --sum
+cat files.csv | from-csv -d ";" | measure { Long.parseLong($_.size) }
 "{\"a\": 1,}" | from-json
 ```
 

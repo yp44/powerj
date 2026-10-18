@@ -81,7 +81,7 @@ Target pipeline at the end (§12.3):
 - Follow-up (FR-72b, `claude/cmdlet-fileops-parallel`, spec `docs/plans/fileops-parallel.md`): `rm -r` removes while walking (no list in memory); `cp -r` and `rm -r` get `-p/--parallel <n>` on virtual threads (`io.powerj.fs.FileTrees`).
 
 ## Phase 9 — `to-json`, `from-json`, `to-csv`, `from-csv` (FR-73), `claude/cmdlet-json-csv`
-- Spec: `docs/plans/json-csv.md`.
+- Spec: `docs/plans/json-csv.md`. Decided with the user: no output file (redirect with `>`), pipeline input only (`--property` for the text), always an array, CSV values as strings, `Row` objects.
 - No external dependency: the project has none beyond JLine/JUnit and ships a modular jlink runtime. An in-house writer and recursive-descent parser go in `powerj-cmdlets/.../json/` (sealed token types, pattern matching).
 - `to-json [file] [--compact] [--depth n]` handles records, `Row`, `Map`, collections and scalars (`Path`, ISO-8601 dates, enums as strings, sizes in bytes). With no file it emits a `String`. With a file it writes one JSON array; `previewable` is then `false`.
 - `from-json [file]`, or pipeline `String` input (`cat x.json -t | from-json`), emits `LinkedHashMap`/`List`; a root array is unrolled.

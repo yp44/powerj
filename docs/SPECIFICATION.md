@@ -404,7 +404,7 @@ Short rule: **`$_` for one-line filters typed at the keyboard, a named lambda as
 
 ### 3.9 Cmdlets in the current scope
 
-Only **four cmdlets** are in the scope of the first steps: `ls`, `where`, `map` and `env`; the mini-iterations add `collect` (FR-36d), `grep` (FR-64), `cat` (FR-65), `sort` (FR-67), `first`, `last` and `range` (FR-68), `select` (FR-69), `count` and `measure` (FR-70), `group` (FR-71), and the file operations `mkdir`, `touch`, `cp`, `mv`, `rm` (FR-72). The first two alone cover the core mechanisms: producing record objects, attribute access, the pipeline, expressions, and mixing with native commands.
+Only **four cmdlets** are in the scope of the first steps: `ls`, `where`, `map` and `env`; the mini-iterations add `collect` (FR-36d), `grep` (FR-64), `cat` (FR-65), `sort` (FR-67), `first`, `last` and `range` (FR-68), `select` (FR-69), `count` and `measure` (FR-70), `group` (FR-71), and the file operations `mkdir`, `touch`, `cp`, `mv`, `rm` (FR-72), and the conversions `to-json`, `from-json`, `to-csv`, `from-csv` (FR-73). The first two alone cover the core mechanisms: producing record objects, attribute access, the pipeline, expressions, and mixing with native commands.
 
 #### FR-35 — `ls`: list files
 
@@ -1731,7 +1731,7 @@ PJ C:\dev> (ls)*.name.stream().map({ $_.toUpperCase() }).sorted().toList()
 | `uniq` | Deduplication | unchanged |
 | `tee` | Copy into a variable | unchanged |
 | `table`, `tree` | Display formats | — |
-| `from-json`, `to-json`, `from-csv`, `to-csv` | Conversions | `Map` / `String` |
+| ~~`from-json`, `to-json`, `from-csv`, `to-csv`~~ | Conversions — **done** (FR-73) | `Row` / `String` |
 | `http`, `ping` | Network | `HttpResponse`, `PingResult` |
 | `env` | Environment variables | `EnvVar` |
 | `open` | Open with the associated application | — |
@@ -1740,7 +1740,7 @@ Target vision once the backlog is complete:
 
 ```text
 find src --name *.java --since 7d | where { $_.size > 2kb } | group { $_.path.parent }
-    | sort count --desc | first 5 | to-json rapport.json
+    | sort count --desc | first 5 | to-json > rapport.json
 ```
 
 ### 12.4 PowerShell → PowerJ mapping

@@ -330,4 +330,20 @@ class BuiltinCmdletsTest {
         run("touch { $_.name }");
         assertThat(errors).singleElement().asString().startsWith("touch: the block $_.name gives the path of each");
     }
+
+    @Test
+    void jsonAndCsv() throws Exception {
+        assertThat(run("ls --filter notes.txt | select name size | to-json -c"))
+                .isEqualTo("[{\"name\":\"notes.txt\",\"size\":7}]\n");
+        run("ls --filter notes.txt | select name size | to-json > files.json");
+        assertThat(run("cat files.json | from-json | map { $_.name + \" \" + $_.size }")).isEqualTo("notes.txt 7\n");
+        assertThat(run("cat files.json -c | from-json --property content | map { $_.size + 1 }")).isEqualTo("8\n");
+        run("ls --filter notes.txt | select name size | to-csv -d \";\" > files.csv");
+        assertThat(Files.readString(tmp.resolve("files.csv"))).isEqualTo("name;size\nnotes.txt;7\n");
+        assertThat(run("cat files.csv | from-csv -d \";\" | map { $_.size + \"!\" }")).isEqualTo("7!\n");
+        assertThat(errors).isEmpty();
+        run("\"files.json\" | from-json");
+        assertThat(errors).singleElement().asString()
+                .isEqualTo("from-json: invalid JSON at line 1, column 1: unexpected text: files.json");
+    }
 }
