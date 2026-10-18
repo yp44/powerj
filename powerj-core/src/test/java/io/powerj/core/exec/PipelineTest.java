@@ -248,6 +248,27 @@ class PipelineTest {
     }
 
     @Test
+    @Timeout(20)
+    void aCmdletThatStopsItsInputStopsTheUpstreamStage() throws Exception {
+        assertThat(run("infinite | take 3")).isEqualTo("0\n1\n2\ndone\n");
+        assertThat(errors).isEmpty();
+        assertThat(run("infinite | take 2 && \"ok\"")).isEqualTo("0\n1\ndone\nok\n");
+        assertThat(run("infinite | take 2 | count")).isEqualTo("3\n"); // 2 objects, then "done"
+        assertThat(errors).isEmpty();
+    }
+
+    @Test
+    @Timeout(20)
+    void aCmdletThatStopsItsInputStopsANativeProducer() throws Exception {
+        assumeFalse(Platform.isWindows());
+        assertThat(run("yes | take 2 && \"ok\"")).isEqualTo("y\ny\ndone\nok\n");
+        assertThat(errors).isEmpty();
+        run("sh -c \"exit 0\"");
+        run("yes | take 1");
+        assertThat(run("$exit")).isEqualTo("0\n"); // the stopped yes does not count
+    }
+
+    @Test
     void errorsToOutput() throws Exception {
         assumeFalse(Platform.isWindows());
         assertThat(run("sh -c \"echo dehors; echo erreur >&2\" 2>&1 | filter { $_ == \"erreur\" }")).isEqualTo("erreur\n");

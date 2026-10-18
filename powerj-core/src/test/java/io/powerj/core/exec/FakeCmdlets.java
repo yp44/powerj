@@ -123,7 +123,35 @@ final class FakeCmdlets {
         }
     }
 
+    /** Mini {@code first}: emits the first n objects, stops its input (FR-68b), then emits "done". */
+    @CmdletInfo(name = "take", category = "Test", summary = "Takes the first objects", examples = "infinite | take 3")
+    static final class Take implements Cmdlet<Take.Params, Object, Object> {
+
+        record Params(@Option(position = 0) Integer count) { }
+
+        private final java.util.Map<CmdletContext<?>, int[]> taken = new java.util.concurrent.ConcurrentHashMap<>();
+
+        @Override
+        public void begin(Params params, CmdletContext<Object> context) {
+            taken.put(context, new int[1]);
+        }
+
+        @Override
+        public void process(Params params, Object input, CmdletContext<Object> context) {
+            context.emit(input);
+            if (++taken.get(context)[0] == params.count()) {
+                context.stopInput();
+            }
+        }
+
+        @Override
+        public void end(Params params, CmdletContext<Object> context) {
+            taken.remove(context);
+            context.emit("done");
+        }
+    }
+
     static List<Cmdlet<?, ?, ?>> all() {
-        return List.of(new Items(), new Filter(), new Count(), new Eval(), new Infinite(), new EvalEach());
+        return List.of(new Items(), new Filter(), new Count(), new Eval(), new Infinite(), new EvalEach(), new Take());
     }
 }

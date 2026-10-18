@@ -61,6 +61,14 @@ final class TestContext<O> implements CmdletContext<O> {
         return false;
     }
 
+    /** Number of calls to {@link #stopInput()}. */
+    int stopInputCalls;
+
+    @Override
+    public void stopInput() {
+        stopInputCalls++;
+    }
+
     /** Simulated compilation: not available by default. */
     Function<String, ScriptBlock> compiler = source -> {
         throw new UnsupportedOperationException(source);

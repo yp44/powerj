@@ -239,4 +239,21 @@ class BuiltinCmdletsTest {
         run("ls | sort bad!");
         assertThat(errors).containsExactly("sort: invalid property name: bad!");
     }
+
+    @Test
+    void firstLastAndRange() throws Exception {
+        Files.writeString(tmp.resolve("big.txt"), "x".repeat(100));
+        assertThat(run("ls | sort name | first | map { f -> f.name }")).isEqualTo("big.txt\n");
+        assertThat(run("ls | sort size | last 1 | map { f -> f.name }")).isEqualTo("big.txt\n");
+        assertThat(run("List.of(1, 2, 3, 4, 5) | range --from 2 --to 4")).isEqualTo("2\n3\n4\n");
+        assertThat(run("ls | sort name | range --from BIG --to DOCS --property name -i | map { f -> f.name }"))
+                .isEqualTo("big.txt\ndocs\n");
+        assertThat(run("List.of(\"x\", \"BEGIN\", \"1\", \"END\", \"BEGIN\", \"2\", \"END\") "
+                + "| range --from { $_ == \"BEGIN\" } --to { $_ == \"END\" } --repeat --exclude")).isEqualTo("1\n2\n");
+        assertThat(run("ls | sort name | range --from ^docs$ --property name | map { f -> f.name }"))
+                .isEqualTo("docs\nnotes.txt\n");
+        assertThat(errors).isEmpty();
+        run("ls | range --from Paul");
+        assertThat(errors).singleElement().asString().startsWith("range: --from Paul is not a position");
+    }
 }

@@ -47,4 +47,12 @@ public interface CmdletContext<O> {
      * @throws IllegalArgumentException if the expression is syntactically invalid
      */
     ScriptBlock compile(String expression);
+
+    /**
+     * The cmdlet will read no more objects (specification FR-68b): {@link Cmdlet#process} is no longer called,
+     * {@link Cmdlet#end} is called, and the previous stage of the pipeline is stopped (a cmdlet is interrupted, a
+     * native command terminated) without any error. No effect at the head of a pipeline.
+     */
+    default void stopInput() {
+    }
 }
