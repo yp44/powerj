@@ -18,7 +18,7 @@ import io.powerj.api.Option;
  * unless {@code --allow-protected} is given.
  */
 @CmdletInfo(name = "rm", category = "Files", summary = "Removes files and folders",
-        examples = {"rm notes.txt", "rm *.tmp", "rm -r build", "ls -r --filter *.log | rm -v", "rm -r -n target"})
+        examples = {"rm notes.txt", "rm *.tmp", "rm -r build", "ls -r --filter *.log | rm -v", "rm -r -n target", "rm -r -p 16 node_modules"})
 public final class Remove implements Cmdlet<Remove.Params, Object, Object> {
 
     /** Parameters of {@code rm}. */
@@ -27,6 +27,9 @@ public final class Remove implements Cmdlet<Remove.Params, Object, Object> {
             List<Object> paths,
             @Option(shortName = 'r', description = "Removes folders with their content")
             boolean recurse,
+            @Option(shortName = 'p', description = "Removes up to n entries of a folder at the same time, in virtual "
+                    + "threads (order of the output free)")
+            Integer parallel,
             @Option(shortName = 'f', description = "A missing path is not an error")
             boolean force,
             @Option(shortName = 'v', description = "Emits each entry removed")
@@ -39,7 +42,7 @@ public final class Remove implements Cmdlet<Remove.Params, Object, Object> {
             String property) {
     }
 
-    private record State(PipelineFiles files, ProtectedPaths protectedPaths) {
+    private record State(PipelineFiles files, ProtectedPaths protectedPaths, int parallelism) {
     }
 
     private final Map<CmdletContext<?>, State> states = Collections.synchronizedMap(new WeakHashMap<>());
@@ -47,9 +50,10 @@ public final class Remove implements Cmdlet<Remove.Params, Object, Object> {
     @Override
     public void begin(Params p, CmdletContext<Object> context) {
         FileOps.Arguments arguments = FileOps.arguments(p.paths(), p.property(), context);
+        int parallelism = FileOps.parallelism(p.parallel());
         var state = new State(new PipelineFiles(p.property(), arguments.block(), context, FileOps.KEYS),
                 p.allowProtected() ? null : ProtectedPaths.load(context.configDirectory(), context.environment(),
-                        context.currentDirectory()));
+                        context.currentDirectory()), parallelism);
         states.put(context, state);
         if (arguments.words().isEmpty() && !context.hasInput()) {
             throw new IllegalArgumentException(Messages.get("fileops.path.expected", "rm"));
@@ -100,7 +104,7 @@ public final class Remove implements Cmdlet<Remove.Params, Object, Object> {
                 return;
             }
         }
-        FileOps.deleteTree(path, p.dryRun(), p.verbose(), context, (removed, entry) -> {
+        FileOps.deleteTree(path, state.parallelism(), p.dryRun(), p.verbose(), context, (removed, entry) -> {
             if (p.dryRun()) {
                 context.emit(new FileOperation("remove", removed, null));
             } else if (entry != null) {

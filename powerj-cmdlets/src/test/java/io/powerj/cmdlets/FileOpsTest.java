@@ -70,7 +70,7 @@ class FileOpsTest {
 
     private List<Object> cp(boolean recurse, boolean force, boolean verbose, boolean dryRun, List<Object> paths,
                             Object... inputs) throws Exception {
-        return run(new Copy(), new Copy.Params(paths, recurse, force, verbose, dryRun, null), inputs);
+        return run(new Copy(), new Copy.Params(paths, recurse, null, force, verbose, dryRun, null), inputs);
     }
 
     private List<Object> mv(boolean force, boolean allowProtected, String... paths) throws Exception {
@@ -79,7 +79,7 @@ class FileOpsTest {
 
     private List<Object> rm(boolean recurse, boolean force, boolean verbose, boolean dryRun, boolean allowProtected,
                             List<Object> paths, Object... inputs) throws Exception {
-        return run(new Remove(), new Remove.Params(paths, recurse, force, verbose, dryRun, allowProtected, null), inputs);
+        return run(new Remove(), new Remove.Params(paths, recurse, null, force, verbose, dryRun, allowProtected, null), inputs);
     }
 
     // --- mkdir ---
@@ -335,6 +335,83 @@ class FileOpsTest {
     void rmNeedsAPath() {
         assertThatThrownBy(() -> rm(false, false, false, false, false, args()))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("path expected");
+    }
+
+    // --- -p/--parallel (FR-72b) ---
+
+    /** Ten folders of twenty files each, under {@code name}. */
+    private Path wideTree(String name) throws IOException {
+        for (int d = 0; d < 10; d++) {
+            for (int f = 0; f < 20; f++) {
+                file(name + "/d" + d + "/f" + f + ".txt", "x" + f);
+            }
+        }
+        return work.resolve(name);
+    }
+
+    private static List<Path> tree(Path root) throws IOException {
+        try (var walk = Files.walk(root)) {
+            return walk.toList();
+        }
+    }
+
+    @Test
+    void rmParallelRemovesTheTreeAndEmitsEachEntryAfterItsContent() throws Exception {
+        Path root = wideTree("w");
+        List<Path> before = tree(root);
+
+        List<Object> out = run(new Remove(), new Remove.Params(args("w"), true, 8, false, true, false, false, null));
+
+        assertThat(root).doesNotExist();
+        assertThat(context.errors).isEmpty();
+        List<Path> removed = out.stream().map(o -> ((FileEntry) o).path()).toList();
+        assertThat(removed).containsExactlyInAnyOrderElementsOf(before);
+        assertThat(removed.getLast()).isEqualTo(root);
+    }
+
+    @Test
+    void rmParallelDryRunListsTheSameEntriesAndRemovesNothing() throws Exception {
+        Path root = wideTree("w");
+        List<Path> before = tree(root);
+
+        List<Object> out = run(new Remove(), new Remove.Params(args("w"), true, 8, false, false, true, false, null));
+
+        assertThat(tree(root)).containsExactlyInAnyOrderElementsOf(before);
+        assertThat(out).hasSize(before.size()).allMatch(o -> o instanceof FileOperation op && op.action().equals("remove"));
+        assertThat(((FileOperation) out.getLast()).path()).isEqualTo(root);
+    }
+
+    @Test
+    void cpParallelCopiesTheTree() throws Exception {
+        Path root = wideTree("w");
+
+        List<Object> out = run(new Copy(), new Copy.Params(args("w", "copy"), true, 8, false, true, false, null));
+
+        assertThat(context.errors).isEmpty();
+        assertThat(tree(work.resolve("copy"))).hasSameSizeAs(tree(root));
+        assertThat(work.resolve("copy/d9/f19.txt")).hasContent("x19");
+        assertThat(out).singleElement().extracting(o -> ((FileEntry) o).path()).isEqualTo(work.resolve("copy"));
+    }
+
+    @Test
+    void parallelOnASingleFile() throws Exception {
+        Path a = file("a.txt", "a");
+
+        run(new Copy(), new Copy.Params(args("a.txt", "b.txt"), false, 4, false, false, false, null));
+        run(new Remove(), new Remove.Params(args("a.txt"), false, 4, false, false, false, false, null));
+
+        assertThat(work.resolve("b.txt")).hasContent("a");
+        assertThat(a).doesNotExist();
+    }
+
+    @Test
+    void parallelMustBeAtLeastOne() {
+        assertThatThrownBy(() -> run(new Remove(), new Remove.Params(args("x"), true, 0, false, false, false, false, null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("--parallel expects a number of threads of at least 1, got 0");
+        assertThatThrownBy(() -> run(new Copy(), new Copy.Params(args("x", "y"), true, -1, false, false, false, null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("--parallel expects a number of threads of at least 1, got -1");
     }
 
     // --- blocks: the path of each pipeline object (FR-72) ---

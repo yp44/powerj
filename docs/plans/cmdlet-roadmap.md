@@ -78,6 +78,7 @@ Target pipeline at the end (§12.3):
   - `-n`/`--dry-run` everywhere (emits `FileOperation`s);
   - `rm` and `mv` refuse protected paths, listed in `~/.powerj/protected-paths` (created at first launch with platform defaults), unless `--allow-protected` is given.
 - API: `CmdletContext.configDirectory()`. Symbolic links never followed; `preview = false` for all five.
+- Follow-up (FR-72b, `claude/cmdlet-fileops-parallel`, spec `docs/plans/fileops-parallel.md`): `rm -r` removes while walking (no list in memory); `cp -r` and `rm -r` get `-p/--parallel <n>` on virtual threads (`io.powerj.fs.FileTrees`).
 
 ## Phase 9 — `to-json`, `from-json`, `to-csv`, `from-csv` (FR-75), `claude/cmdlet-json-csv`
 - No external dependency: the project has none beyond JLine/JUnit and ships a modular jlink runtime. An in-house writer and recursive-descent parser go in `powerj-cmdlets/.../json/` (sealed token types, pattern matching).

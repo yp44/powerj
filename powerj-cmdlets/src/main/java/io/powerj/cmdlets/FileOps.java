@@ -4,20 +4,16 @@ import java.io.IOException;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.DirectoryNotEmptyException;
 import java.nio.file.FileAlreadyExistsException;
-import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.LinkOption;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.StandardCopyOption;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CancellationException;
 
 import io.powerj.api.CmdletContext;
+import io.powerj.fs.FileTrees;
 import io.powerj.fs.WalkError;
 
 /** What the file operations share (specification FR-72): paths, error messages, copy and removal of trees. */
@@ -118,132 +114,34 @@ final class FileOps {
         });
     }
 
-    /** Ctrl+C between two entries of a tree. */
-    private static void checkCancelled() {
-        if (Thread.currentThread().isInterrupted()) {
-            throw new CancellationException();
-        }
-    }
-
     /**
-     * Removes a tree, content first, while walking it: memory stays bounded by the depth of the tree, not its size.
-     * Links are not followed. {@code removed} receives each entry once it is removed (or would be, with
-     * {@code dryRun}), with its {@link FileEntry} read just before the removal when {@code describe} is set
-     * ({@code null} otherwise). An entry that cannot be read or removed is reported. Returns {@code true} if
-     * everything was removed.
+     * Removes a tree, content first, with up to {@code parallelism} entries removed at the same time (specification
+     * FR-72b); links are not followed. {@code removed} receives each entry once it is removed (or would be, with
+     * {@code dryRun}), with its {@link FileEntry} when {@code describe} is set ({@code null} otherwise). An entry that
+     * cannot be read or removed is reported. Returns {@code true} if everything was removed.
      */
-    static boolean deleteTree(Path root, boolean dryRun, boolean describe, CmdletContext<?> context,
+    static boolean deleteTree(Path root, int parallelism, boolean dryRun, boolean describe, CmdletContext<?> context,
                               java.util.function.BiConsumer<Path, FileEntry> removed) {
-        boolean[] complete = {true};
-        try {
-            Files.walkFileTree(root, new SimpleFileVisitor<>() {
-                @Override
-                public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
-                    delete(file, describe ? FileEntries.of(file, attributes) : null);
-                    return FileVisitResult.CONTINUE;
-                }
-
-                @Override
-                public FileVisitResult visitFileFailed(Path file, IOException e) {
-                    report(e, file, context);
-                    complete[0] = false;
-                    return FileVisitResult.CONTINUE;
-                }
-
-                @Override
-                public FileVisitResult postVisitDirectory(Path dir, IOException e) {
-                    if (e != null) {
-                        report(e, dir, context);
-                        complete[0] = false;
-                    }
-                    delete(dir, describe ? FileEntries.of(dir, LinkOption.NOFOLLOW_LINKS).orElse(null) : null);
-                    return FileVisitResult.CONTINUE;
-                }
-
-                private void delete(Path entry, FileEntry description) {
-                    checkCancelled();
-                    if (dryRun) {
-                        removed.accept(entry, null);
-                        return;
-                    }
-                    try {
-                        Files.delete(entry);
-                        removed.accept(entry, description);
-                    } catch (IOException e) {
-                        report(e, entry, context);
-                        complete[0] = false;
-                    }
-                }
-            });
-        } catch (IOException e) {
-            report(e, root, context);
-            return false;
-        }
-        return complete[0];
+        return FileTrees.delete(root, parallelism, dryRun,
+                entry -> removed.accept(entry.path(),
+                        describe ? FileEntries.of(entry.path(), entry.attributes()) : null),
+                (path, e) -> report(e, path, context));
     }
 
     /**
-     * Copies a file, a link or a tree to {@code target}, keeping the attributes; links are copied as links.
-     * With {@code force}, existing files are replaced and existing folders are merged. Returns {@code true} if
-     * everything was copied.
+     * Copies a file, a link or a tree to {@code target}, keeping the attributes, with up to {@code parallelism}
+     * entries copied at the same time (specification FR-72b); links are copied as links. With {@code force},
+     * existing files are replaced and existing folders are merged. Returns {@code true} if everything was copied.
      */
-    static boolean copyTree(Path source, Path target, boolean force, CmdletContext<?> context) {
-        var options = force
-                ? new java.nio.file.CopyOption[] {StandardCopyOption.COPY_ATTRIBUTES, LinkOption.NOFOLLOW_LINKS,
-                        StandardCopyOption.REPLACE_EXISTING}
-                : new java.nio.file.CopyOption[] {StandardCopyOption.COPY_ATTRIBUTES, LinkOption.NOFOLLOW_LINKS};
-        if (!isDirectory(source)) {
-            try {
-                Files.copy(source, target, options);
-                return true;
-            } catch (IOException e) {
-                report(e, target, context);
-                return false;
-            }
-        }
-        boolean[] complete = {true};
-        try {
-            Files.walkFileTree(source, new SimpleFileVisitor<>() {
-                @Override
-                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attributes) {
-                    checkCancelled();
-                    Path copy = target.resolve(source.relativize(dir).toString());
-                    try {
-                        if (!(force && isDirectory(copy))) {
-                            Files.copy(dir, copy, StandardCopyOption.COPY_ATTRIBUTES);
-                        }
-                        return FileVisitResult.CONTINUE;
-                    } catch (IOException e) {
-                        report(e, copy, context);
-                        complete[0] = false;
-                        return FileVisitResult.SKIP_SUBTREE;
-                    }
-                }
+    static boolean copyTree(Path source, Path target, int parallelism, boolean force, CmdletContext<?> context) {
+        return FileTrees.copy(source, target, parallelism, force, (path, e) -> report(e, path, context));
+    }
 
-                @Override
-                public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
-                    checkCancelled();
-                    Path copy = target.resolve(source.relativize(file).toString());
-                    try {
-                        Files.copy(file, copy, options);
-                    } catch (IOException e) {
-                        report(e, copy, context);
-                        complete[0] = false;
-                    }
-                    return FileVisitResult.CONTINUE;
-                }
-
-                @Override
-                public FileVisitResult visitFileFailed(Path file, IOException e) {
-                    report(e, file, context);
-                    complete[0] = false;
-                    return FileVisitResult.CONTINUE;
-                }
-            });
-        } catch (IOException e) {
-            report(e, source, context);
-            return false;
+    /** Checks the value of {@code -p/--parallel}: {@code null} is sequential. */
+    static int parallelism(Integer parallel) {
+        if (parallel != null && parallel < 1) {
+            throw new IllegalArgumentException(Messages.get("fileops.parallel.invalid", parallel));
         }
-        return complete[0];
+        return parallel == null ? 1 : parallel;
     }
 }

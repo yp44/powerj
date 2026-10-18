@@ -824,6 +824,33 @@ CA:
 - `rm docs` on a non-empty folder is refused without `-r`;
 - `ls ../src --files | touch { $_.name }` creates `a.txt`… in the current folder and leaves `../src` unchanged; `cp *.txt { $_.name + ".bak" }` makes a `.bak` copy of each file.
 
+**FR-72b — Parallel `cp -r` and `rm -r`.** `cp` and `rm` accept `-p`/`--parallel <n>` (`int` ≥ 1, default `1`: sequential). Inside a tree given with `-r`, up to `n` entries are copied or removed at the same time, in **virtual threads**:
+
+```text
+cp <source>... <destination> [-r|--recurse] [-p|--parallel <n>] [-f|--force] [-v|--verbose] [-n|--dry-run]
+rm <chemin>... [-r|--recurse] [-p|--parallel <n>] [-f|--force] [-v|--verbose] [-n|--dry-run] [--allow-protected]
+```
+
+- **Result**: the same as in sequential mode, with the same checks (protected paths, existing targets…) and the same errors.
+- **Order**:
+  - `rm` removes a folder only once its content is removed, and `cp` creates a folder before copying its content;
+  - apart from that, the order of the `-v` output and of the errors is free, as for `grep -p`.
+- **Links** are never followed, and hidden files are included.
+- **Resources**: at most `n` operations run at once, `emit` and `error` happen only in the cmdlet's thread, and Ctrl+C stops every thread.
+- **Scope**:
+  - `-p` has no effect on a single file;
+  - the paths received from the pipeline are still processed one after the other;
+  - `mv` stays sequential;
+  - `rm -r -n -p <n>` runs the same parallel walk without removing anything: its listing reflects the parallelism (free order, a folder after its content).
+- **When it helps**: on SSDs and network drives with many files. On a spinning disk it can be slower, which is why it is off by default.
+- The walk lives in `powerj-fs` (`io.powerj.fs.FileTrees`), next to `FileWalker`.
+
+CA:
+- `rm t -r -p 16` and `cp t t2 -r -p 16` give the same result as without `-p`;
+- `rm t -r -p 4 -v` lists every removed entry, each folder after its content;
+- `rm t -r -p 0` is refused: `--parallel expects a number of threads of at least 1, got 0`;
+- Ctrl+C during `rm big -r -p 8` returns the prompt.
+
 ### 3.10 Native commands
 
 **FR-37 — Principle: streams stay streams.** A native command is **not** wrapped in an object: its standard output and its error output are handled as streams, the way a classic shell does.
@@ -1558,6 +1585,7 @@ The backlog cmdlets (§12.3) are added **one per mini-iteration**, each with a s
 | 18 | `count`, `measure` | FR-70 | `docs/recettes/count-measure.md` |
 | 19 | `group` | FR-71 | `docs/recettes/group.md` |
 | 20 | `mkdir`, `touch`, `cp`, `mv`, `rm` | FR-72 | `docs/recettes/fileops.md` |
+| 21 | `cp -r -p`, `rm -r -p` (parallel) | FR-72b | `docs/recettes/fileops.md` |
 
 Version 2 will introduce scripting (`if`, `foreach`, functions, `.pj` files).
 

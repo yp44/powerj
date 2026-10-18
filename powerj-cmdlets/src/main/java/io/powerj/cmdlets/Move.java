@@ -38,7 +38,7 @@ public final class Move implements Cmdlet<Move.Params, Object, Object> {
 
     @Override
     public void begin(Params p, CmdletContext<Object> context) {
-        transfers.put(context, new Transfer(new Transfer.Options(true, true, p.force(), p.verbose(), p.dryRun(),
+        transfers.put(context, new Transfer(new Transfer.Options(true, true, 1, p.force(), p.verbose(), p.dryRun(),
                 p.allowProtected()), p.paths(), p.property(), context));
     }
 
