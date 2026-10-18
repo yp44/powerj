@@ -855,15 +855,17 @@ CA:
 
 ```text
 to-json [-c|--compact] [-l|--lines] [--depth <n>]
-from-json [fichier...] [--encoding <charset>]
+from-json [--property <nom>]
 to-csv [-d|--delimiter <char>] [--no-header]
-from-csv [fichier...] [-d|--delimiter <char>] [--no-header] [-t|--typed] [--encoding <charset>]
+from-csv [-d|--delimiter <char>] [--no-header] [--property <nom>]
 ```
 
-No external library: the writers and parsers are part of PowerJ. The four cmdlets change nothing on disk and run in preview (FR-66); to write a file, redirect their text (`ls | select name size | to-json > files.json`).
+No external library: the writers and parsers are part of PowerJ. The four cmdlets change nothing on disk and run in preview (FR-66).
+- **No file name.** To write a file, redirect their text: `ls | select name size | to-json > files.json`.
+- **Pipeline only.** To read one, pipe it: `cat files.json | from-json`. A `String` received is always text, never a file name. With `--property <nom>`, that property of each object received holds the text: `cat files.json -c | from-json --property content`.
 
 **`to-json`** turns the objects received into JSON text.
-- **Output**: by default, one `String` emitted at the end, holding an indented array of all the objects. `--compact` writes it on one line, and `-l`/`--lines` emits one compact `String` per object as they arrive (JSON Lines).
+- **Output**: by default, one `String` emitted at the end, holding an indented array of all the objects, **always an array**, even for a single object. `--compact` writes it on one line, and `-l`/`--lines` emits one compact `String` per object as they arrive (JSON Lines).
 - **Mapping**:
   - a record becomes an object of all its components (a `@Bytes` size stays a number of bytes);
   - a `Row` or a `Map` becomes an object;
@@ -872,7 +874,7 @@ No external library: the writers and parsers are part of PowerJ. The four cmdlet
   - dates are written as ISO-8601 strings, and enums, paths and other objects as their text.
 - `--depth` (default 10) limits the nesting: deeper values are written as their text, with one non-blocking error.
 
-**`from-json`** reads JSON text: the `String` objects received (joined with line breaks: `cat data.json | from-json`), or the files given (read as by `cat`).
+**`from-json`** reads JSON text: the `String` objects received, joined with line breaks (`cat data.json | from-json`), or their `--property`.
 - The text may hold several values one after the other (JSON Lines); each one is emitted as soon as it is complete.
 - A top-level array is unrolled.
 - An object gives a `Row` (FR-69), keys in order; an inner array gives a `List`.
@@ -887,23 +889,22 @@ No external library: the writers and parsers are part of PowerJ. The four cmdlet
   - nested values are written as compact JSON.
 - `--delimiter` takes one character or `tab` (`;` for Excel in French). `--no-header` omits the header.
 
-**`from-csv`** reads CSV, either the `String` lines received or the files given, and emits one `Row` per record as soon as it is complete.
+**`from-csv`** reads CSV, either the `String` lines received or their `--property`, and emits one `Row` per record as soon as it is complete.
 - **Header**: the first record gives the column names. With `--no-header`, the columns are `c1`, `c2`…
 - **Lines**:
   - a quoted field may span several lines;
   - empty lines and a UTF-8 byte order mark are skipped;
   - a record with too many fields gives a non-blocking error, and a record with too few fields gets `null` values.
-- **Values**:
-  - fields are strings;
-  - with `-t`/`--typed`, integers give `Long`, decimals `Double`, and `true`/`false` give `Boolean`;
-  - with `-t`, a number with a leading zero (`007`) stays a string, and an empty field gives `null`.
+- **Values**: always `String`, as in PowerShell's `Import-Csv` (`007` stays `007`). An empty field is `""`, and a missing column is `null`.
 
 CA:
 - `ls | select name size | to-json` displays an indented array; `ls | to-json -l` one line per file;
-- `ls | select name size | to-json > f.json`, then `from-json f.json | where { $_.size > 1kb }`;
+- `ls a.txt | select name size | to-json` gives `[ { … } ]`;
+- `ls | select name size | to-json > f.json`, then `cat f.json | from-json | where { $_.size > 1kb }`;
 - `cat f.json | from-json` gives the same rows; `"[1, 2]" | from-json` gives `1` and `2`;
 - `"{\"a\": 1,}" | from-json`: error `invalid JSON at line 1, column 9: …`;
-- `ls | select name size | to-csv -d ";" > f.csv`, then `from-csv f.csv -d ";" -t | measure size --sum`;
+- `ls | select name size | to-csv -d ";" > f.csv`, then `cat f.csv | from-csv -d ";"` gives the same names, with the sizes as strings;
+- `cat f.json -c | from-json --property content` reads the content of a `CatContent`; `"data.json" | from-json` is invalid JSON;
 - a CSV field with a `,`, a `"` and a line break survives `to-csv | from-csv`.
 
 ### 3.10 Native commands
