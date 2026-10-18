@@ -160,4 +160,9 @@ class CompletionsTest {
         assertThat(Completions.selectColumns(" a b.c d=e f={ x { y } } { z } --on-error stop"))
                 .containsExactly("a", "c", "d", "f", "column1");
     }
+
+    @Test
+    void groupPropertiesAreProposedDownstream() {
+        assertThat(values("ls | group ext | where { $_.")).contains("key", "count", "items");
+    }
 }
