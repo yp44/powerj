@@ -21,12 +21,12 @@ Then `cd C:\tmp\g`.
 
 | # | Action | Expected result |
 |---|---|---|
-| 1 | `ls \| group ext` | Table `key count`: the folder (empty key) 1, `md` 1, `txt` 3 (in their order of appearance in `ls`). |
-| 2 | `ls \| group ext \| sort count -d \| first` | The group `txt`, count 3. |
-| 3 | `ls \| group ext dir` | Keys `[, true]`, `[md, false]`, `[txt, false]`, … |
+| 1 | `ls \| group ext` | Table `key count`, in the order of appearance in `ls`: the folder (empty key) 1, `txt` 4 (`lines.txt` included), `md` 1. |
+| 2 | `ls \| group ext \| sort count -d \| first` | The group `txt`, count 4. |
+| 3 | `ls \| group ext dir` | Keys `[, true]`, `[txt, false]`, `[md, false]`. |
 | 4 | `ls \| group ext -n`, then `ls \| group ext -n \| map { $_.items.size() }` | The same counts; then only `0`s. |
 | 5 | `(ls \| group ext)[0].items` | The objects of the first group (the folder `docs`). |
-| 6 | `ls \| group ext \| where { $_.key == "txt" } \| map { $_.items } \| map { f -> f.name }` | `a.txt`, `b.txt`, `c.txt`. |
+| 6 | `ls \| group ext \| where { $_.key == "txt" } \| map { $_.items } \| map { f -> f.name }` | `a.txt`, `b.txt`, `c.txt`, `lines.txt`. |
 | 7 | `cat lines.txt \| group \| where { $_.count > 1 }` | `error`, count 3. |
 | 8 | `ls \| group { $_.size > 10 }` | Two groups `false` and `true`. |
 | 9 | `ls \| group ext \| select key count size={ $_.items.stream().mapToLong(f -> f.size).sum() }` | Columns `key count size`, the total size of each group. |
