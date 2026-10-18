@@ -613,12 +613,17 @@ public final class Completions {
         record Unknown() implements TypeInfo { }
     }
 
-    /** Types known in a block: {@code $_} and lambda parameters. */
-    private record Scope(Class<?> current, Map<String, Class<?>> parameters) { }
+    /**
+     * Types known in a block: {@code $_} and lambda parameters.
+     *
+     * @param sample {@link io.powerj.api.Row} with the columns of an upstream {@code select} (FR-69), or {@code null}
+     */
+    private record Scope(Class<?> current, io.powerj.api.Row sample, Map<String, Class<?>> parameters) { }
 
     private Scope scope(String line, Frame frame) {
         Map<String, Class<?>> parameters = new LinkedHashMap<>();
         Class<?> current = null;
+        io.powerj.api.Row sample = null;
         for (Frame f = frame; f != null; f = f.parent) {
             if (f.kind != FrameKind.BLOCK) {
                 continue;
@@ -626,13 +631,82 @@ public final class Completions {
             Class<?> type = f.parent != null && f.parent.kind == FrameKind.COMMAND ? upstreamType(line, f.parent) : null;
             if (current == null) {
                 current = type;
+                if (type == io.powerj.api.Row.class) {
+                    sample = upstreamSelect(line, f.parent);
+                }
             }
             Matcher param = LAMBDA_PARAM.matcher(line).region(f.start, line.length());
             if (param.lookingAt()) {
                 parameters.putIfAbsent(param.group(1), type == null ? Object.class : type);
             }
         }
-        return new Scope(current, parameters);
+        return new Scope(current, sample, parameters);
+    }
+
+    /** Row with the columns written in the {@code select} stage before the current one (values {@code null}). */
+    private static io.powerj.api.Row upstreamSelect(String line, Frame command) {
+        List<Integer> starts = command.stageStarts;
+        for (int k = starts.size() - 2; k >= 0; k--) {
+            String stage = line.substring(starts.get(k), starts.get(k + 1) - 1).strip();
+            if (splitWords(stage).getFirst().equals("select")) {
+                Map<String, Object> columns = new LinkedHashMap<>();
+                selectColumns(stage.substring("select".length())).forEach(name -> columns.put(name, null));
+                return io.powerj.api.Row.of(columns);
+            }
+        }
+        return null;
+    }
+
+    /** Column names of the arguments of {@code select}, by its naming rules (FR-69). */
+    public static List<String> selectColumns(String arguments) {
+        List<String> tokens = new ArrayList<>(); // words, and "{" for a block
+        int i = 0;
+        while (i < arguments.length()) {
+            char c = arguments.charAt(i);
+            if (Character.isWhitespace(c)) {
+                i++;
+            } else if (c == '{') {
+                int depth = 0;
+                while (i < arguments.length()) {
+                    char d = arguments.charAt(i++);
+                    if (d == '{') {
+                        depth++;
+                    } else if (d == '}' && --depth == 0) {
+                        break;
+                    }
+                }
+                tokens.add("{");
+            } else {
+                int start = i;
+                while (i < arguments.length() && !Character.isWhitespace(arguments.charAt(i)) && arguments.charAt(i) != '{') {
+                    i++;
+                }
+                tokens.add(arguments.substring(start, i));
+            }
+        }
+        List<String> names = new ArrayList<>();
+        int unnamed = 0;
+        for (int k = 0; k < tokens.size(); k++) {
+            String token = tokens.get(k);
+            if (token.equals("{")) {
+                names.add("column" + ++unnamed);
+            } else if (token.startsWith("-")) {
+                if (token.equals("--on-error")) {
+                    k++; // its value
+                }
+            } else if (token.endsWith("=")) {
+                names.add(token.substring(0, token.length() - 1));
+                if (k + 1 < tokens.size() && tokens.get(k + 1).equals("{")) {
+                    k++;
+                }
+            } else if (token.contains("=")) {
+                names.add(token.substring(0, token.indexOf('=')));
+            } else {
+                names.add(token.substring(token.lastIndexOf('.') + 1));
+            }
+        }
+        names.removeIf(String::isEmpty);
+        return names;
     }
 
     /** Type of the objects received by the current stage: output of the previous cmdlet (FR-24). */
@@ -681,7 +755,9 @@ public final class Completions {
             case Ast.VariableExpression(var name, var accessors) when accessors.isEmpty() -> variableType(name, scope);
             case Ast.Name(var name) -> {
                 if (scope.parameters().containsKey(name)) {
-                    yield instance(scope.parameters().get(name));
+                    Class<?> type = scope.parameters().get(name);
+                    yield type == io.powerj.api.Row.class && scope.sample() != null
+                            ? new TypeInfo.Instance(type, scope.sample()) : instance(type);
                 }
                 yield session().java().simpleClass(name).<TypeInfo>map(TypeInfo.Static::new)
                         .orElse(new TypeInfo.Package(name));
@@ -708,6 +784,9 @@ public final class Completions {
 
     private TypeInfo variableType(String name, Scope scope) {
         if (name.equals("_")) {
+            if (scope.sample() != null) {
+                return new TypeInfo.Instance(io.powerj.api.Row.class, scope.sample());
+            }
             return scope.current() == null ? new TypeInfo.Unknown() : instance(scope.current());
         }
         try {
@@ -823,6 +902,13 @@ public final class Completions {
 
     private List<Candidate> members(TypeInfo type) {
         return switch (type) {
+            case TypeInfo.Instance(var t, var value) when value instanceof io.powerj.api.Row row -> {
+                List<Candidate> candidates = new ArrayList<>();
+                row.forEach((name, cell) -> candidates.add(new Candidate(name, name, Members.Kind.PROPERTY.toString(),
+                        false)));
+                candidates.addAll(instanceMembers(t));
+                yield candidates;
+            }
             case TypeInfo.Instance(var t, _) -> instanceMembers(t);
             case TypeInfo.ListOf _ -> instanceMembers(List.class);
             case TypeInfo.Static(var t) -> staticMembers(t);

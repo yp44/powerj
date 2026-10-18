@@ -25,6 +25,8 @@ import io.powerj.api.Span;
  * <ul>
  *   <li>successive records of the same type: a table (columns from {@link Display}, or all components
  *       if there are at most {@value #MAX_TABLE_COLUMNS}); otherwise a {@code name : value} list;</li>
+ *   <li>successive {@link io.powerj.api.Row}s with the same columns ({@code select}): a table, whatever the
+ *       number of columns;</li>
  *   <li>{@code Map}: key / value table; collections and arrays: one element per line;</li>
  *   <li>scalars: one readable line ({@link Bytes} sizes, local dates, durations).</li>
  * </ul>
@@ -44,8 +46,15 @@ public final class OutputFormatter implements AutoCloseable {
     private static final String HIGHLIGHT_ON = "\u001b[1;31m";
     private static final String HIGHLIGHT_OFF = "\u001b[0m";
 
-    /** @param highlight accessor of the {@code List<Span>} component of a {@link Highlight} column, or {@code null} */
-    private record Column(String name, Method accessor, boolean bytes, Method highlight) { }
+    /**
+     * Column of a table.
+     *
+     * @param reader    reads the value of the column in a record or a {@link io.powerj.api.Row}
+     * @param type      declared type of the values (right alignment of numbers)
+     * @param highlight accessor of the {@code List<Span>} component of a {@link Highlight} column, or {@code null}
+     */
+    private record Column(String name, java.util.function.Function<Object, Object> reader, Class<?> type, boolean bytes,
+                          Method highlight) { }
 
     /** Row of a table: the text of the cells and, for each one, the parts to highlight ({@code null}: none). */
     private record Row(String[] cells, List<List<Span>> highlights) {
@@ -58,7 +67,8 @@ public final class OutputFormatter implements AutoCloseable {
     private final int width;
     private final boolean colors;
 
-    private Class<?> tableType;
+    /** Type of the current table: the record class, or the column names of {@link io.powerj.api.Row}s. */
+    private Object tableType;
     private List<Column> columns;
     private final List<Row> sample = new ArrayList<>();
     private int[] widths;
@@ -96,6 +106,7 @@ public final class OutputFormatter implements AutoCloseable {
                 }
             }
             case Record record -> record(record);
+            case io.powerj.api.Row row -> row(row);
             case Map<?, ?> map -> map(map);
             case String text -> text(text);
             default -> line(cell(value, false));
@@ -132,7 +143,31 @@ public final class OutputFormatter implements AutoCloseable {
             listRecord(record);
             return;
         }
-        if (type != tableType) {
+        tableRow(type, tableColumns, record);
+    }
+
+    /** Rows of {@code select}: a table per list of columns, whatever their number (FR-69). */
+    private void row(io.powerj.api.Row row) {
+        List<String> names = List.copyOf(row.keySet());
+        if (names.isEmpty()) {
+            return;
+        }
+        if (!names.equals(tableType)) {
+            List<Column> rowColumns = new ArrayList<>(names.size());
+            for (String name : names) {
+                Object first = row.get(name);
+                rowColumns.add(new Column(name, value -> ((Map<?, ?>) value).get(name),
+                        first == null ? Object.class : first.getClass(), row.sizeColumns().contains(name), null));
+            }
+            tableRow(names, rowColumns, row);
+        } else {
+            tableRow(names, columns, row);
+        }
+    }
+
+    /** Adds a line to the table of type {@code type}, starting a new table if the type changes. */
+    private void tableRow(Object type, List<Column> tableColumns, Object value) {
+        if (!type.equals(tableType)) {
             endTable();
             tableType = type;
             columns = tableColumns;
@@ -141,9 +176,9 @@ public final class OutputFormatter implements AutoCloseable {
         List<List<Span>> highlights = new ArrayList<>(cells.length);
         for (int i = 0; i < cells.length; i++) {
             Column column = columns.get(i);
-            Object value = read(column.accessor(), record);
-            cells[i] = cell(value, column.bytes());
-            highlights.add(highlights(value, column.highlight(), record));
+            Object cell = column.reader().apply(value);
+            cells[i] = cell(cell, column.bytes());
+            highlights.add(value instanceof Record record ? highlights(cell, column.highlight(), record) : null);
         }
         Row row = new Row(cells, highlights);
         if (widths == null) {
@@ -174,7 +209,7 @@ public final class OutputFormatter implements AutoCloseable {
         rightAligned = new boolean[n];
         for (int i = 0; i < n; i++) {
             widths[i] = columns.get(i).name().length();
-            Class<?> t = columns.get(i).accessor().getReturnType();
+            Class<?> t = columns.get(i).type();
             rightAligned[i] = columns.get(i).bytes() || Number.class.isAssignableFrom(t)
                     || (t.isPrimitive() && t != boolean.class && t != char.class);
         }
@@ -297,7 +332,8 @@ public final class OutputFormatter implements AutoCloseable {
                     .filter(other -> other.getName().equals(annotation.value()) && other.getType() == List.class)
                     .map(RecordComponent::getAccessor).findFirst().orElse(null);
         }
-        return new Column(c.getName(), accessor, c.isAnnotationPresent(Bytes.class), highlight);
+        return new Column(c.getName(), value -> read(accessor, (Record) value), accessor.getReturnType(),
+                c.isAnnotationPresent(Bytes.class), highlight);
     }
 
     /** Parts to highlight in the text of {@code value}, or {@code null} if none (or no colors). */

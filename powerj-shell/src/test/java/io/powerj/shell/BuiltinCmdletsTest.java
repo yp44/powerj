@@ -256,4 +256,24 @@ class BuiltinCmdletsTest {
         run("ls | range --from Paul");
         assertThat(errors).singleElement().asString().startsWith("range: --from Paul is not a position");
     }
+
+    @Test
+    void selectChoosesAndComputesColumns() throws Exception {
+        Files.writeString(tmp.resolve("big.txt"), "x".repeat(2048));
+        assertThat(run("ls --files | sort name | select name size")).isEqualTo("""
+                name         size
+                ----         ----
+                big.txt    2.0 KB
+                notes.txt     7 B
+                """);
+        assertThat(run("ls --files | select file=name kb={ $_.size / 1kb } | sort kb -d | first | map { r -> r.file }"))
+                .isEqualTo("big.txt\n");
+        assertThat(run("ls --files | select name kb={ $_.size / 1kb } | where { $_.kb >= 2 } | map { $_.name }"))
+                .isEqualTo("big.txt\n");
+        assertThat(errors).isEmpty();
+        run("ls --files | select nmae");
+        assertThat(errors).singleElement().asString().startsWith("select: column nmae: ");
+        run("ls | select");
+        assertThat(errors).singleElement().asString().startsWith("select: column expected");
+    }
 }

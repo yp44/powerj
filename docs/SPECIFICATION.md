@@ -308,6 +308,7 @@ The menu displays the signature (`of(E...) : List<E>`). Imported classes (§FR-4
 
 **FR-30 — Default display.** At the end of a pipeline, each object is displayed according to its type:
 - **record**: as a table if ≤ 5 displayable components (aligned columns, width adapted to the terminal), otherwise as a `nom : valeur` list; a record can declare its columns via `@Display(columns = {"name", "size", "modified"})`;
+- **`Row`** (output of `select`, FR-69): successive rows with the same columns form one table, whatever the number of columns;
 - **`Map`**: `clé / valeur` (key / value) table;
 - **scalars** (`String`, numbers, booleans, dates, `Path`, enums): readable form; the line breaks of a text are kept, also in a table cell or a redirected file (`cat a.txt -t`, `cat a.txt -c | map { $_.content } > copie.txt`), and a text that already ends with a line break gets no other one (the copy is identical to the file);
 - **other objects**: `toString()`; `help members` lets you explore their properties.
@@ -403,7 +404,7 @@ Short rule: **`$_` for one-line filters typed at the keyboard, a named lambda as
 
 ### 3.9 Cmdlets in the current scope
 
-Only **four cmdlets** are in the scope of the first steps: `ls`, `where`, `map` and `env`; the mini-iterations add `collect` (FR-36d), `grep` (FR-64), `cat` (FR-65), `sort` (FR-67), `first`, `last` and `range` (FR-68). The first two alone cover the core mechanisms: producing record objects, attribute access, the pipeline, expressions, and mixing with native commands.
+Only **four cmdlets** are in the scope of the first steps: `ls`, `where`, `map` and `env`; the mini-iterations add `collect` (FR-36d), `grep` (FR-64), `cat` (FR-65), `sort` (FR-67), `first`, `last` and `range` (FR-68), and `select` (FR-69). The first two alone cover the core mechanisms: producing record objects, attribute access, the pipeline, expressions, and mixing with native commands.
 
 #### FR-35 — `ls`: list files
 
@@ -701,6 +702,38 @@ CA:
 - `ls | range --from Paul` is a blocking error that suggests `--property`;
 - `git log --oneline | first 5` then `$?` displays `true`.
 
+#### FR-69 — `select`: choose and compute columns
+
+```text
+select <colonne>...
+```
+
+Each received object gives a **`Row`** (`io.powerj.api.Row`): an immutable, ordered `Map` of column name → value. Downstream, a column is read like any property (`$_.kb`, `sort kb`, `where { $_.kb > 10 }`), and a `Row` is never unrolled (FR-30b).
+
+| Column | Example | Name | Value |
+|---|---|---|---|
+| Property | `name` | `name` | `$_.name` |
+| Property path | `path.fileName` | `fileName` (last segment) | `$_.path.fileName` |
+| Renamed property | `file=name` | `file` | `$_.name` |
+| Computed column | `kb={ $_.size / 1kb }` | `kb` | result of the block |
+| Unnamed block | `{ $_.name.length() }` | `column1`, `column2`… | result of the block |
+
+Column names are identifiers. No column, an invalid name or a duplicate name is a blocking error.
+
+A property missing on an object, or a block that fails, gives an empty cell (`null`). The `Row` is still emitted, and **one** non-blocking error is reported per column (`select: column nmae: …`), not one per object.
+
+Display: consecutive `Row`s with the same columns form one table, whatever the number of columns. Numbers are right-aligned. A column taken directly from a `@Bytes` component (`select name size` after `ls`) is still shown as a size (`14.2 KB`).
+
+Tab after `ls | select name size | where { $_.` proposes the selected columns. `select` is allowed in preview mode (FR-66). The `--expand` option of the backlog is not part of v1.
+
+CA:
+- `ls | select name size` displays a two-column table, sizes in readable form;
+- `ls | select file=name kb={ $_.size / 1kb }` displays the columns `file` and `kb`;
+- `ls | select name kb={ $_.size / 1kb } | sort kb -d | first 3`;
+- `ls -r | select path.fileName size` displays a column `fileName`;
+- `ls | select nmae` displays an empty column and a single error;
+- `ls | select` and `ls | select a name a=size` are blocking errors.
+
 ### 3.10 Native commands
 
 **FR-37 — Principle: streams stay streams.** A native command is **not** wrapped in an object: its standard output and its error output are handled as streams, the way a classic shell does.
@@ -984,6 +1017,12 @@ public interface CmdletContext<O> {
     boolean cancelled();                // Ctrl+C requested
     ScriptBlock compile(String expression);
     default void stopInput() { }        // reads no more objects: the previous stage is stopped (FR-68b)
+}
+
+// Immutable ordered Map of named columns, output of select (FR-69); sizeColumns(): columns shown as sizes
+public final class Row extends AbstractMap<String, Object> {
+    static Row of(Map<String, ?> values);
+    static Row of(Map<String, ?> values, Set<String> sizeColumns);
 }
 
 @Retention(RUNTIME) @Target(TYPE)
@@ -1423,6 +1462,7 @@ The backlog cmdlets (§12.3) are added **one per mini-iteration**, each with a s
 | 14 | Preview mode (Alt+V) | FR-66 | `docs/recettes/preview.md` |
 | 15 | `sort` | FR-67 | `docs/recettes/sort.md` |
 | 16 | `first`, `last`, `range`, `stopInput` | FR-68 | `docs/recettes/first-last-range.md` |
+| 17 | `select`, `Row` | FR-69 | `docs/recettes/select.md` |
 
 Version 2 will introduce scripting (`if`, `foreach`, functions, `.pj` files).
 
@@ -1501,7 +1541,7 @@ PJ C:\dev> (ls)*.name.stream().map({ $_.toUpperCase() }).sorted().toList()
 | `find` | Advanced search (`--name --since --size --type`) | `FileEntry` |
 | `cp`, `mv`, `rm`, `mkdir`, `touch` | File operations | `FileEntry` |
 | `ps`, `kill` | Processes | `ProcessEntry` |
-| `select` | Attribute projection, `--expand` | `Row` |
+| ~~`select`~~ | Attribute projection — **done** (FR-69); `--expand` not done | `Row` |
 | ~~`sort`~~ | Sorting — **done** (FR-67) | unchanged |
 | ~~`collect`~~ | Gather into a list — **done** (FR-36d) | `Collected` |
 | ~~`first`, `last`~~ | First / last N — **done** (FR-68) | unchanged |

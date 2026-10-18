@@ -115,7 +115,21 @@ public final class Members {
     }
 
     /** Members of a value: properties (components, getters, fields) then methods. */
+    /** Methods of {@code Map} that a {@link io.powerj.api.Row} refuses (it is immutable): not listed. */
+    private static final Set<String> ROW_MUTATORS = Set.of("put", "putAll", "putIfAbsent", "remove", "replace",
+            "replaceAll", "compute", "computeIfAbsent", "computeIfPresent", "merge", "clear");
+
     public static List<Member> of(Object value) {
+        if (value instanceof io.powerj.api.Row row) {
+            // columns of select (FR-69) first: they are read like properties
+            List<Member> members = new ArrayList<>();
+            row.forEach((name, cell) -> members.add(new Member(name, Kind.PROPERTY,
+                    cell == null ? "Object" : cell.getClass().getSimpleName())));
+            ofType(value.getClass()).stream()
+                    .filter(m -> m.kind() != Kind.METHOD || !ROW_MUTATORS.contains(m.name().replaceAll("\\(.*", "")))
+                    .forEach(members::add);
+            return members;
+        }
         return ofType(value.getClass());
     }
 

@@ -13,7 +13,7 @@ public final class BuiltinCmdlets implements CmdletProvider {
     @Override
     public List<Cmdlet<?, ?, ?>> cmdlets() {
         return List.of(new Ls(), new Grep(), new Cat(), new Where(), new MapCmdlet(), new Sort(), new First(),
-                new Last(), new Range(), new Collect(), new Env());
+                new Last(), new Range(), new Select(), new Collect(), new Env());
     }
 
     @Override
