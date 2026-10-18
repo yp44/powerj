@@ -151,4 +151,13 @@ class CompletionsTest {
         assertThat(values("l")).contains("ls", "lsblk-like");
         assertThat(values("java.nio.file.Files.")).contains("delete(");
     }
+
+    @Test
+    void selectedColumnsAreProposedDownstream() {
+        assertThat(values("ls | select name size | where { $_.")).contains("name", "size").doesNotContain("dir");
+        assertThat(values("ls | select file=name kb={ $_.size / 1kb } | sort { r -> r.")).contains("file", "kb");
+        assertThat(values("ls | select path.fileName { $_.name } | where { $_.")).contains("fileName", "column1");
+        assertThat(Completions.selectColumns(" a b.c d=e f={ x { y } } { z } --on-error stop"))
+                .containsExactly("a", "c", "d", "f", "column1");
+    }
 }

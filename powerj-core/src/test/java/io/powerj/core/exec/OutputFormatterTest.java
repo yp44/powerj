@@ -49,6 +49,41 @@ class OutputFormatterTest {
         return out.toString().replace(System.lineSeparator(), "\n");
     }
 
+    private static io.powerj.api.Row row(Object... namesAndValues) {
+        var values = new java.util.LinkedHashMap<String, Object>();
+        for (int i = 0; i < namesAndValues.length; i += 2) {
+            values.put((String) namesAndValues[i], namesAndValues[i + 1]);
+        }
+        return io.powerj.api.Row.of(values, java.util.Set.of("size"));
+    }
+
+    @Test
+    void rowsWithTheSameColumnsFormOneTable() {
+        assertThat(render(80, row("name", "a.txt", "size", 12L, "kb", 0L), row("name", "long-name.txt", "size", 2048L,
+                "kb", 2L), row("name", "c", "size", null, "kb", null)))
+                .isEqualTo("""
+                        name             size  kb
+                        ----             ----  --
+                        a.txt            12 B   0
+                        long-name.txt  2.0 KB   2
+                        c
+                        """);
+    }
+
+    @Test
+    void rowsWithManyColumnsStayATableAndChangingColumnsStartsANewOne() {
+        String table = render(80, row("a", 1, "b", 2, "c", 3, "d", 4, "e", 5, "f", 6), row("x", "y"));
+        assertThat(table).isEqualTo("""
+                a  b  c  d  e  f
+                -  -  -  -  -  -
+                1  2  3  4  5  6
+                x
+                -
+                y
+                """);
+        assertThat(render(80, java.util.Map.of("k", "v"))).contains("k").contains("v"); // a plain Map is unchanged
+    }
+
     @Test
     void recordsOfTheSameTypeFormOneTable() {
         assertThat(render(80, new Small("a.txt", 12), new Small("long-name.txt", 2048)))

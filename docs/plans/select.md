@@ -106,7 +106,7 @@ select <column>...
   - `docs/plans/cmdlet-roadmap.md` (phase 3 without `--expand`).
 
 ## Tests
-- `powerj-api` `RowTest`:
+- `Row` (tested in `powerj-cmdlets` `SelectTest`, because `powerj-api` has no test setup):
   - order is kept;
   - immutable (`put` throws);
   - `get` of a missing column gives `null`;

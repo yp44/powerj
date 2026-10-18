@@ -308,6 +308,7 @@ The menu displays the signature (`of(E...) : List<E>`). Imported classes (§FR-4
 
 **FR-30 — Default display.** At the end of a pipeline, each object is displayed according to its type:
 - **record**: as a table if ≤ 5 displayable components (aligned columns, width adapted to the terminal), otherwise as a `nom : valeur` list; a record can declare its columns via `@Display(columns = {"name", "size", "modified"})`;
+- **`Row`** (output of `select`, FR-69): successive rows with the same columns form one table, whatever the number of columns;
 - **`Map`**: `clé / valeur` (key / value) table;
 - **scalars** (`String`, numbers, booleans, dates, `Path`, enums): readable form; the line breaks of a text are kept, also in a table cell or a redirected file (`cat a.txt -t`, `cat a.txt -c | map { $_.content } > copie.txt`), and a text that already ends with a line break gets no other one (the copy is identical to the file);
 - **other objects**: `toString()`; `help members` lets you explore their properties.
@@ -403,7 +404,7 @@ Short rule: **`$_` for one-line filters typed at the keyboard, a named lambda as
 
 ### 3.9 Cmdlets in the current scope
 
-Only **four cmdlets** are in the scope of the first steps: `ls`, `where`, `map` and `env`; the mini-iterations add `collect` (FR-36d), `grep` (FR-64), `cat` (FR-65), `sort` (FR-67), `first`, `last` and `range` (FR-68). The first two alone cover the core mechanisms: producing record objects, attribute access, the pipeline, expressions, and mixing with native commands.
+Only **four cmdlets** are in the scope of the first steps: `ls`, `where`, `map` and `env`; the mini-iterations add `collect` (FR-36d), `grep` (FR-64), `cat` (FR-65), `sort` (FR-67), `first`, `last` and `range` (FR-68), and `select` (FR-69). The first two alone cover the core mechanisms: producing record objects, attribute access, the pipeline, expressions, and mixing with native commands.
 
 #### FR-35 — `ls`: list files
 
@@ -1018,6 +1019,12 @@ public interface CmdletContext<O> {
     default void stopInput() { }        // reads no more objects: the previous stage is stopped (FR-68b)
 }
 
+// Immutable ordered Map of named columns, output of select (FR-69); sizeColumns(): columns shown as sizes
+public final class Row extends AbstractMap<String, Object> {
+    static Row of(Map<String, ?> values);
+    static Row of(Map<String, ?> values, Set<String> sizeColumns);
+}
+
 @Retention(RUNTIME) @Target(TYPE)
 public @interface CmdletInfo {
     String name();
@@ -1455,6 +1462,7 @@ The backlog cmdlets (§12.3) are added **one per mini-iteration**, each with a s
 | 14 | Preview mode (Alt+V) | FR-66 | `docs/recettes/preview.md` |
 | 15 | `sort` | FR-67 | `docs/recettes/sort.md` |
 | 16 | `first`, `last`, `range`, `stopInput` | FR-68 | `docs/recettes/first-last-range.md` |
+| 17 | `select`, `Row` | FR-69 | `docs/recettes/select.md` |
 
 Version 2 will introduce scripting (`if`, `foreach`, functions, `.pj` files).
 
