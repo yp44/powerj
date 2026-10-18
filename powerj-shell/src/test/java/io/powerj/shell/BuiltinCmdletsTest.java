@@ -276,4 +276,18 @@ class BuiltinCmdletsTest {
         run("ls | select");
         assertThat(errors).singleElement().asString().startsWith("select: column expected");
     }
+
+    @Test
+    void countAndMeasure() throws Exception {
+        Files.writeString(tmp.resolve("big.txt"), "x".repeat(2048));
+        assertThat(run("ls | count")).isEqualTo("3\n");
+        assertThat(run("ls --files | measure size")).isEqualTo("""
+                count     sum  average  min     max
+                -----     ---  -------  ---     ---
+                    2  2.0 KB   1.0 KB  7 B  2.0 KB
+                """);
+        assertThat(run("(ls --files | measure size).sum")).isEqualTo("2055\n");
+        assertThat(run("List.of(1, 2, 3) | measure | map { $_.average }")).isEqualTo("2.0\n");
+        assertThat(errors).isEmpty();
+    }
 }

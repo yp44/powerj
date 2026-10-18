@@ -1,6 +1,5 @@
 package io.powerj.cmdlets;
 
-import java.lang.reflect.RecordComponent;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -12,7 +11,6 @@ import java.util.WeakHashMap;
 import java.util.concurrent.CancellationException;
 import java.util.regex.Pattern;
 
-import io.powerj.api.Bytes;
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
@@ -149,20 +147,12 @@ public final class Select implements Cmdlet<Select.Params, Object, Row> {
         return property.contains(".") ? null : property;
     }
 
-    /** Columns that read a {@link Bytes} component of the first object received. */
+    /** Columns that read a {@link io.powerj.api.Bytes} component of the first object received. */
     private static Set<String> sizeColumns(List<Column> columns, Object first) {
-        if (first == null || !first.getClass().isRecord()) {
-            return Set.of();
-        }
         Set<String> sizes = new HashSet<>();
         for (Column column : columns) {
-            if (column.property() == null) {
-                continue;
-            }
-            for (RecordComponent component : first.getClass().getRecordComponents()) {
-                if (component.getName().equals(column.property()) && component.isAnnotationPresent(Bytes.class)) {
-                    sizes.add(column.name());
-                }
+            if (Sizes.isSizeProperty(first, column.property())) {
+                sizes.add(column.name());
             }
         }
         return sizes;

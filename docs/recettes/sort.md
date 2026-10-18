@@ -35,12 +35,12 @@ Then `cd C:\tmp\s`.
 | 11 | `List.of("b", 2, "a", 1) \| sort` | `1 2 a b`, and a single error `sort: cannot compare … with …: these values are sorted by their text`. |
 | 12 | `ls \| sort { $_.name.substring(5) }` | Error `sort: … (object skipped: …)` for the names shorter than 5 characters; the other objects are sorted. |
 | 13 | `ls \| sort bad!` | Error `sort: invalid property name: bad!`; nothing is displayed. |
-| 14 | `ls \| sort 3` | Error `sort: sort key expected: property name or block { … }, got 3`. |
+| 14 | `ls \| sort 3` | Error `sort: invalid property name: 3`. |
 | 15 | `git branch \| sort` (in a Git repository) | The branches sorted alphabetically. |
 | 16 | `^sort notes.txt` | The native `sort` program runs. |
 | 17 | Alt+V, then type `ls \| sort size -d` | The preview shows the files sorted by decreasing size. |
 | 18 | `help sort` | Help with `keys`, `-d, --desc`, `-i, --ignore-case` and the examples. |
-| 19 | `POWERJ_LANG=fr`, then `ls \| sort 3` | `sort : clé de tri attendue : nom de propriété ou bloc { … }, reçu 3`. |
+| 19 | `POWERJ_LANG=fr`, then `ls \| sort 3` | `sort : nom de propriété invalide : 3`. |
 
 ## Known limitations
 
