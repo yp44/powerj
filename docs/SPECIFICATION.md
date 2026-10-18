@@ -404,7 +404,7 @@ Short rule: **`$_` for one-line filters typed at the keyboard, a named lambda as
 
 ### 3.9 Cmdlets in the current scope
 
-Only **four cmdlets** are in the scope of the first steps: `ls`, `where`, `map` and `env`; the mini-iterations add `collect` (FR-36d), `grep` (FR-64), `cat` (FR-65), `sort` (FR-67), `first`, `last` and `range` (FR-68), and `select` (FR-69). The first two alone cover the core mechanisms: producing record objects, attribute access, the pipeline, expressions, and mixing with native commands.
+Only **four cmdlets** are in the scope of the first steps: `ls`, `where`, `map` and `env`; the mini-iterations add `collect` (FR-36d), `grep` (FR-64), `cat` (FR-65), `sort` (FR-67), `first`, `last` and `range` (FR-68), `select` (FR-69), `count` and `measure` (FR-70). The first two alone cover the core mechanisms: producing record objects, attribute access, the pipeline, expressions, and mixing with native commands.
 
 #### FR-35 — `ls`: list files
 
@@ -733,6 +733,32 @@ CA:
 - `ls -r | select path.fileName size` displays a column `fileName`;
 - `ls | select nmae` displays an empty column and a single error;
 - `ls | select` and `ls | select a name a=size` are blocking errors.
+
+#### FR-70 — `count`, `measure`: count and aggregate
+
+```text
+count
+measure [<clé>]
+```
+
+`count` emits one number: the objects received (`ls -r | count`). With no input it emits `0`.
+
+`measure` emits one `Row` (FR-69) with the columns `count sum average min max`, computed as the objects arrive (constant memory) and emitted when the input ends. Without a key it measures the objects themselves; a key is a property, a property path or a block, as for `sort` (`ls -r | measure size`, `env | measure { $_.value.length() }`). The values are read like any `Row`: `(ls -r | measure size).sum`.
+
+- `count`: the values measured; a `null` value is left out.
+- `sum`, `average`: when all values are numbers. The integral sum is exact (`Long`, `BigInteger` beyond); a decimal value gives a `Double` sum. Otherwise (strings, dates…) both are empty, without error.
+- `min`, `max`: compared with the rules of `sort` (FR-67), so dates and strings have a minimum and a maximum (`ls | measure modified`).
+- When the key is a size property (`@Bytes`, `measure size` after `ls`), `sum`, `average`, `min` and `max` are shown as sizes.
+- An error while evaluating the key is non-blocking: the object is not measured.
+
+Both cmdlets have no side effect (allowed in preview mode, FR-66).
+
+CA:
+- `ls -r | count`;
+- `ls -r | measure size` displays the count and the total, average, smallest and largest sizes in readable form;
+- `(ls -r | measure size).sum` gives the total in bytes;
+- `ls | measure modified` gives the oldest and newest dates;
+- `List.of(1, 2, 3) | measure` gives `count 3`, `sum 6`, `average 2.0`.
 
 ### 3.10 Native commands
 
@@ -1463,6 +1489,7 @@ The backlog cmdlets (§12.3) are added **one per mini-iteration**, each with a s
 | 15 | `sort` | FR-67 | `docs/recettes/sort.md` |
 | 16 | `first`, `last`, `range`, `stopInput` | FR-68 | `docs/recettes/first-last-range.md` |
 | 17 | `select`, `Row` | FR-69 | `docs/recettes/select.md` |
+| 18 | `count`, `measure` | FR-70 | `docs/recettes/count-measure.md` |
 
 Version 2 will introduce scripting (`if`, `foreach`, functions, `.pj` files).
 
@@ -1547,7 +1574,7 @@ PJ C:\dev> (ls)*.name.stream().map({ $_.toUpperCase() }).sorted().toList()
 | ~~`first`, `last`~~ | First / last N — **done** (FR-68) | unchanged |
 | ~~`range`~~ | Objects between two bounds — **done** (FR-68) | unchanged |
 | `group` | Grouping | `Group<T>` |
-| `count`, `sum`, `avg`, `min`, `max` | Aggregates | `Stats` |
+| ~~`count`, `measure`~~ | Aggregates (count, sum, average, min, max) — **done** (FR-70) | `Long`, `Row` |
 | `uniq` | Deduplication | unchanged |
 | `tee` | Copy into a variable | unchanged |
 | `table`, `tree` | Display formats | — |

@@ -55,13 +55,9 @@ Target pipeline at the end (§12.3):
 - A missing property gives an empty cell and one non-blocking error per column.
 
 ## Phase 4 — `count` and `measure` (FR-70), `claude/cmdlet-measure`
-- `count` emits a single `long`.
-- `measure [prop|block] [-s|--sum] [-a|--avg] [--min] [--max] [--all]` emits `record Stats(long count, Number sum, Double avg, Object min, Object max)`.
-  - `min`/`max` accept any `Comparable` (dates, strings).
-  - `sum`/`avg` require `Number`; any other value raises a non-blocking error.
-  - Integer sum in `long`, with `BigDecimal`/`double` when a value is not integral.
-  - Whether byte-size sums are displayed readably is decided in the spec.
-- `preview = true`; reuses `Keys`.
+- Spec: `docs/plans/count-measure.md`. `count` emits one `Long`. `measure [key]` emits one `Row` with `count sum average min max`, always all of them (no `--sum`/`--avg` options), computed in constant memory.
+- `sum`/`average` when every value is a number (exact integral sum); `min`/`max` with the `sort` rules (dates, strings). Size keys (`@Bytes`) give size columns, through the `Sizes` helper shared with `select`.
+- Kept although Java streams can do it: shorter, readable sizes, and no `collect` of the whole input in memory (decided with the user).
 
 ## Phase 5 — `group` (FR-71), `claude/cmdlet-group`
 - `group <key|block> [-n|--no-items]` emits `record Group(Object key, int count, List<Object> items)`, with `@Display(columns = {"key","count"})`. Keys keep first-seen order (`LinkedHashMap`).
