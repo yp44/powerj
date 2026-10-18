@@ -1,0 +1,249 @@
+package io.powerj.cmdlets;
+
+import java.io.IOException;
+import java.nio.file.AccessDeniedException;
+import java.nio.file.DirectoryNotEmptyException;
+import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
+import java.nio.file.LinkOption;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CancellationException;
+
+import io.powerj.api.CmdletContext;
+import io.powerj.fs.WalkError;
+
+/** What the file operations share (specification FR-72): paths, error messages, copy and removal of trees. */
+final class FileOps {
+
+    static final PipelineFiles.Keys KEYS = new PipelineFiles.Keys("fileops.not.a.file", "fileops.property.not.a.file",
+            "fileops.invalid.path");
+
+    private FileOps() {
+    }
+
+    /**
+     * Path arguments of a file operation: the words, and at most one block that gives the path of each pipeline
+     * object ({@code ls ../src --files | touch { $_.name }}).
+     */
+    record Arguments(List<String> words, io.powerj.api.ScriptBlock block) {
+    }
+
+    /**
+     * Splits the arguments into words and block.
+     *
+     * @throws IllegalArgumentException for two blocks, a block with {@code --property}, or a block without pipeline
+     *                                  input (it has no object to evaluate)
+     */
+    static Arguments arguments(List<Object> paths, String property, CmdletContext<?> context) {
+        List<String> words = new ArrayList<>();
+        io.powerj.api.ScriptBlock block = null;
+        for (Object path : paths) {
+            if (path instanceof io.powerj.api.ScriptBlock b) {
+                if (block != null) {
+                    throw new IllegalArgumentException(Messages.get("fileops.block.twice"));
+                }
+                block = b;
+            } else {
+                words.add(String.valueOf(path));
+            }
+        }
+        if (block != null && property != null) {
+            throw new IllegalArgumentException(Messages.get("fileops.block.property"));
+        }
+        if (block != null && !context.hasInput()) {
+            throw new IllegalArgumentException(Messages.get("fileops.block.needs.input", block.source()));
+        }
+        return new Arguments(words, block);
+    }
+
+    /** Paths of an argument: the path itself, or the matches of a wildcard on its last element. */
+    static List<Path> expand(String argument, CmdletContext<?> context) {
+        try {
+            return FileArguments.expand(argument, false, context, error -> report(error, context), "fileops.no.match");
+        } catch (InvalidPathException e) {
+            context.error(Messages.get("fileops.invalid.path", argument, e.getMessage()));
+            return List.of();
+        }
+    }
+
+    /** Path of an argument taken as is (a name to create, a destination), or {@code null} after an error. */
+    static Path path(String argument, CmdletContext<?> context) {
+        try {
+            return context.currentDirectory().resolve(argument).toAbsolutePath().normalize();
+        } catch (InvalidPathException e) {
+            context.error(Messages.get("fileops.invalid.path", argument, e.getMessage()));
+            return null;
+        }
+    }
+
+    static boolean exists(Path path) {
+        return Files.exists(path, LinkOption.NOFOLLOW_LINKS);
+    }
+
+    /** A real folder: a link to a folder is not one (links are never followed). */
+    static boolean isDirectory(Path path) {
+        return Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS);
+    }
+
+    static boolean isEmptyDirectory(Path path) throws IOException {
+        try (var entries = Files.list(path)) {
+            return entries.findAny().isEmpty();
+        }
+    }
+
+    /** Reports a failed operation on {@code path} as a non-blocking error with a readable reason. */
+    static void report(IOException e, Path path, CmdletContext<?> context) {
+        context.error(switch (e) {
+            case NoSuchFileException _ -> Messages.get("fileops.not.found", path);
+            case AccessDeniedException _ -> Messages.get("fileops.access.denied", path);
+            case FileAlreadyExistsException _ -> Messages.get("fileops.exists", path);
+            case DirectoryNotEmptyException _ -> Messages.get("fileops.not.empty", path);
+            default -> Messages.get("fileops.failed", path, e.getMessage() == null ? e.toString() : e.getMessage());
+        });
+    }
+
+    static void report(WalkError error, CmdletContext<?> context) {
+        context.error(switch (error.kind()) {
+            case ACCESS_DENIED -> Messages.get("fileops.access.denied", error.path());
+            case NOT_FOUND -> Messages.get("fileops.not.found", error.path());
+            case IO -> Messages.get("fileops.failed", error.path(), error.message());
+        });
+    }
+
+    /** Ctrl+C between two entries of a tree. */
+    private static void checkCancelled() {
+        if (Thread.currentThread().isInterrupted()) {
+            throw new CancellationException();
+        }
+    }
+
+    /**
+     * Removes a tree, content first, while walking it: memory stays bounded by the depth of the tree, not its size.
+     * Links are not followed. {@code removed} receives each entry once it is removed (or would be, with
+     * {@code dryRun}), with its {@link FileEntry} read just before the removal when {@code describe} is set
+     * ({@code null} otherwise). An entry that cannot be read or removed is reported. Returns {@code true} if
+     * everything was removed.
+     */
+    static boolean deleteTree(Path root, boolean dryRun, boolean describe, CmdletContext<?> context,
+                              java.util.function.BiConsumer<Path, FileEntry> removed) {
+        boolean[] complete = {true};
+        try {
+            Files.walkFileTree(root, new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
+                    delete(file, describe ? FileEntries.of(file, attributes) : null);
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult visitFileFailed(Path file, IOException e) {
+                    report(e, file, context);
+                    complete[0] = false;
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult postVisitDirectory(Path dir, IOException e) {
+                    if (e != null) {
+                        report(e, dir, context);
+                        complete[0] = false;
+                    }
+                    delete(dir, describe ? FileEntries.of(dir, LinkOption.NOFOLLOW_LINKS).orElse(null) : null);
+                    return FileVisitResult.CONTINUE;
+                }
+
+                private void delete(Path entry, FileEntry description) {
+                    checkCancelled();
+                    if (dryRun) {
+                        removed.accept(entry, null);
+                        return;
+                    }
+                    try {
+                        Files.delete(entry);
+                        removed.accept(entry, description);
+                    } catch (IOException e) {
+                        report(e, entry, context);
+                        complete[0] = false;
+                    }
+                }
+            });
+        } catch (IOException e) {
+            report(e, root, context);
+            return false;
+        }
+        return complete[0];
+    }
+
+    /**
+     * Copies a file, a link or a tree to {@code target}, keeping the attributes; links are copied as links.
+     * With {@code force}, existing files are replaced and existing folders are merged. Returns {@code true} if
+     * everything was copied.
+     */
+    static boolean copyTree(Path source, Path target, boolean force, CmdletContext<?> context) {
+        var options = force
+                ? new java.nio.file.CopyOption[] {StandardCopyOption.COPY_ATTRIBUTES, LinkOption.NOFOLLOW_LINKS,
+                        StandardCopyOption.REPLACE_EXISTING}
+                : new java.nio.file.CopyOption[] {StandardCopyOption.COPY_ATTRIBUTES, LinkOption.NOFOLLOW_LINKS};
+        if (!isDirectory(source)) {
+            try {
+                Files.copy(source, target, options);
+                return true;
+            } catch (IOException e) {
+                report(e, target, context);
+                return false;
+            }
+        }
+        boolean[] complete = {true};
+        try {
+            Files.walkFileTree(source, new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attributes) {
+                    checkCancelled();
+                    Path copy = target.resolve(source.relativize(dir).toString());
+                    try {
+                        if (!(force && isDirectory(copy))) {
+                            Files.copy(dir, copy, StandardCopyOption.COPY_ATTRIBUTES);
+                        }
+                        return FileVisitResult.CONTINUE;
+                    } catch (IOException e) {
+                        report(e, copy, context);
+                        complete[0] = false;
+                        return FileVisitResult.SKIP_SUBTREE;
+                    }
+                }
+
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
+                    checkCancelled();
+                    Path copy = target.resolve(source.relativize(file).toString());
+                    try {
+                        Files.copy(file, copy, options);
+                    } catch (IOException e) {
+                        report(e, copy, context);
+                        complete[0] = false;
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult visitFileFailed(Path file, IOException e) {
+                    report(e, file, context);
+                    complete[0] = false;
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+        } catch (IOException e) {
+            report(e, source, context);
+            return false;
+        }
+        return complete[0];
+    }
+}

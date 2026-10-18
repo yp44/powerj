@@ -138,17 +138,10 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
     }
 
     private static Optional<FileEntry> entry(Path path) {
-        try {
-            return Optional.of(entry(path, Files.readAttributes(path, BasicFileAttributes.class)));
-        } catch (java.io.IOException _) {
-            return Optional.empty(); // file vanished between listing and reading
-        }
+        return FileEntries.of(path);
     }
 
     private static FileEntry entry(Path path, BasicFileAttributes attributes) {
-        String name = path.getFileName() == null ? path.toString() : path.getFileName().toString();
-        boolean dir = attributes.isDirectory();
-        return new FileEntry(name, dir ? 0 : attributes.size(), attributes.lastModifiedTime().toInstant(),
-                path.toAbsolutePath(), dir, FileEntry.extensionOf(name, dir));
+        return FileEntries.of(path, attributes);
     }
 }

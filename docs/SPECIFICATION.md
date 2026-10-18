@@ -404,7 +404,7 @@ Short rule: **`$_` for one-line filters typed at the keyboard, a named lambda as
 
 ### 3.9 Cmdlets in the current scope
 
-Only **four cmdlets** are in the scope of the first steps: `ls`, `where`, `map` and `env`; the mini-iterations add `collect` (FR-36d), `grep` (FR-64), `cat` (FR-65), `sort` (FR-67), `first`, `last` and `range` (FR-68), `select` (FR-69), `count` and `measure` (FR-70), and `group` (FR-71). The first two alone cover the core mechanisms: producing record objects, attribute access, the pipeline, expressions, and mixing with native commands.
+Only **four cmdlets** are in the scope of the first steps: `ls`, `where`, `map` and `env`; the mini-iterations add `collect` (FR-36d), `grep` (FR-64), `cat` (FR-65), `sort` (FR-67), `first`, `last` and `range` (FR-68), `select` (FR-69), `count` and `measure` (FR-70), `group` (FR-71), and the file operations `mkdir`, `touch`, `cp`, `mv`, `rm` (FR-72). The first two alone cover the core mechanisms: producing record objects, attribute access, the pipeline, expressions, and mixing with native commands.
 
 #### FR-35 — `ls`: list files
 
@@ -788,6 +788,42 @@ CA:
 - `cat app.log | group | where { $_.count > 1 }` displays the repeated lines;
 - `ls | group bad!` is a blocking error.
 
+#### FR-72 — `mkdir`, `touch`, `cp`, `mv`, `rm`: file operations
+
+```text
+mkdir <chemin>... [-p|--parents] [-n|--dry-run]
+touch <chemin>... [-n|--dry-run]
+cp <source>... <destination> [-r|--recurse] [-f|--force] [-v|--verbose] [-n|--dry-run]
+mv <source>... <destination> [-f|--force] [-v|--verbose] [-n|--dry-run] [--allow-protected]
+rm <chemin>... [-r|--recurse] [-f|--force] [-v|--verbose] [-n|--dry-run] [--allow-protected]
+```
+
+The paths are arguments (wildcards on the last element: `rm *.tmp`) or the objects received from the pipeline, read as by `cat` (`String`, `Path`, `File`, `FileEntry`, or `--property <nom>`): `ls --filter *.tmp | rm`. For `cp` and `mv`, the last argument is the destination; with several sources, or an existing folder as destination, each source goes into it under its own name (`ls *.txt | cp backup/`).
+
+A **block** `{ … }` instead of a path is evaluated for each object: for `mkdir`, `touch` and `rm`, its result (`String`, `Path`, `File`, `FileEntry`) is the path to create or remove, instead of the object itself (`ls ../src --files | touch { $_.name }` creates the same names in the current folder, without touching the files of `../src`); for `cp` and `mv`, a block as destination gives the destination of each source, its `$_` being the object received or the `FileEntry` of a source argument (`cp *.txt { $_.name + ".bak" }`; a folder result receives the source under its name). A `null` result skips the object without error (`ls | rm { $_.ext == "tmp" ? $_.name : null }`). One block at most, never with `--property`; for `mkdir`, `touch` and `rm` it needs a pipeline input.
+
+- `mkdir` creates folders (`-p`: with their missing parents, and an existing folder is not an error); `touch` creates an empty file or sets the modification time of an existing one. Both emit the `FileEntry` created or updated.
+- `cp` copies (`-r` for folders), `mv` moves or renames (atomically when possible; across file systems, a copy then a removal, the source being removed only once the copy has succeeded), `rm` removes (`-r` for a non-empty folder; `-f`: a missing path is not an error). They emit nothing, except with `-v`: the `FileEntry` of each destination, or of each removed entry.
+- `cp` and `mv` never overwrite an existing target without `-f`; copying a folder into itself is refused.
+- Symbolic links are never followed: `rm` removes the link, `cp` copies the link.
+- `-n`/`--dry-run` changes nothing and emits one `FileOperation(action, path, target)` per action that would be done.
+- Each error (not found, exists, is a folder, parent missing, access denied, protected path) is non-blocking: the other paths are processed.
+- None of these cmdlets runs in preview mode (FR-66).
+
+**Protected paths.** `rm`, and `mv` for its sources, refuse a path that is protected or contains a protected path (removing `C:\Users` would remove the home folder), as well as the current folder and its parents: `rm: protected path: C:\Windows (remove it anyway with --allow-protected)`. The list is the file `protected-paths` of the configuration folder (§8): one path per line, `~` for the home folder, `#` for comments; it is read at each execution. The shell creates it at first launch with the defaults of the platform (file-system roots, `~`, the configuration folder, and the system folders: `C:\Windows`, `C:\Program Files`…, or `/etc`, `/usr`…); if it is missing, the same defaults apply. `--allow-protected` lifts the protection for one command.
+
+The native programs of the same name remain available with `^` or `native.prefer` (FR-14, FR-16).
+
+CA:
+- `mkdir -p a/b/c` then `touch a/x.txt` display the created entries;
+- `cp a/x.txt a/y.txt`, then again: error `exists` without `-f`;
+- `cp -r a b`, `mv b c`, `rm -r c`;
+- `ls --filter *.txt | rm -v` displays the removed files;
+- `rm -r -n a` lists what would be removed and removes nothing;
+- `rm ~` and `rm -r ..` are refused; `rm --allow-protected` lifts the protection;
+- `rm docs` on a non-empty folder is refused without `-r`;
+- `ls ../src --files | touch { $_.name }` creates `a.txt`… in the current folder and leaves `../src` unchanged; `cp *.txt { $_.name + ".bak" }` makes a `.bak` copy of each file.
+
 ### 3.10 Native commands
 
 **FR-37 — Principle: streams stay streams.** A native command is **not** wrapped in an object: its standard output and its error output are handled as streams, the way a classic shell does.
@@ -1071,6 +1107,7 @@ public interface CmdletContext<O> {
     boolean cancelled();                // Ctrl+C requested
     ScriptBlock compile(String expression);
     default void stopInput() { }        // reads no more objects: the previous stage is stopped (FR-68b)
+    default Optional<Path> configDirectory() { return Optional.empty(); }  // configuration folder (§8)
 }
 
 // Immutable ordered Map of named columns, output of select (FR-69); sizeColumns(): columns shown as sizes
@@ -1316,6 +1353,7 @@ User folder `~/.powerj/` (created on first launch):
 | `modules/` | Third-party module jars (§4.4). |
 | `config.properties` | `history.size=10000`, `language=en` (or `fr`, FR-61), `native.prefer=find,sort`, `colors.cmdlet=green`… |
 | `logs/` | Diagnostic log, in English (FR-60). |
+| `protected-paths` | Paths that `rm` and `mv` refuse to remove (FR-72): one per line, `~` for the home folder, `#` for comments; created at first launch with the defaults of the platform. |
 | `profile.pj` | Commands run when the interactive shell starts (FR-63): variable assignments (`$proj = Path.of("D:/dev")`), `import java.time.*`, `env --set MAVEN_OPTS=-Xmx2g`. `$profile` contains its path. |
 
 Environment variables read by PowerJ:
@@ -1519,6 +1557,7 @@ The backlog cmdlets (§12.3) are added **one per mini-iteration**, each with a s
 | 17 | `select`, `Row` | FR-69 | `docs/recettes/select.md` |
 | 18 | `count`, `measure` | FR-70 | `docs/recettes/count-measure.md` |
 | 19 | `group` | FR-71 | `docs/recettes/group.md` |
+| 20 | `mkdir`, `touch`, `cp`, `mv`, `rm` | FR-72 | `docs/recettes/fileops.md` |
 
 Version 2 will introduce scripting (`if`, `foreach`, functions, `.pj` files).
 
@@ -1595,7 +1634,7 @@ PJ C:\dev> (ls)*.name.stream().map({ $_.toUpperCase() }).sorted().toList()
 |---|---|---|
 | ~~`cat`~~ | Read files — **done** (FR-65) | `String`, `CatLine`, `CatContent` |
 | `find` | Advanced search (`--name --since --size --type`) | `FileEntry` |
-| `cp`, `mv`, `rm`, `mkdir`, `touch` | File operations | `FileEntry` |
+| ~~`cp`, `mv`, `rm`, `mkdir`, `touch`~~ | File operations — **done** (FR-72) | `FileEntry`, `FileOperation` |
 | `ps`, `kill` | Processes | `ProcessEntry` |
 | ~~`select`~~ | Attribute projection — **done** (FR-69); `--expand` not done | `Row` |
 | ~~`sort`~~ | Sorting — **done** (FR-67) | unchanged |

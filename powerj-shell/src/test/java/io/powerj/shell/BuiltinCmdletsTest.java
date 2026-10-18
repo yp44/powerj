@@ -307,4 +307,27 @@ class BuiltinCmdletsTest {
         run("ls | group bad!");
         assertThat(errors).containsExactly("group: invalid property name: bad!");
     }
+
+    @Test
+    void fileOperations() throws Exception {
+        session.configDirectory(Files.createDirectories(tmp.resolve("config")));
+        Files.write(tmp.resolve("config/protected-paths"), List.of(tmp.resolve("docs").toString()));
+        assertThat(run("mkdir -p out/sub | map { $_.name }")).isEqualTo("sub\n");
+        assertThat(run("touch out/a.txt | map { $_.name }")).isEqualTo("a.txt\n");
+        assertThat(run("cp notes.txt out/")).isEmpty();
+        assertThat(Files.readString(tmp.resolve("out/notes.txt"))).isEqualTo("bonjour");
+        assertThat(run("mv out/a.txt out/b.txt -v | map { $_.name }")).isEqualTo("b.txt\n");
+        assertThat(run("rm -r -n out | map { $_.action }")).isEqualTo("remove\nremove\nremove\nremove\n");
+        assertThat(run("ls out --files | rm -v | map { $_.name }")).isEqualTo("b.txt\nnotes.txt\n");
+        assertThat(errors).isEmpty();
+        run("rm -r docs");
+        assertThat(errors).singleElement().asString().startsWith("rm: protected path: ");
+        assertThat(tmp.resolve("docs/spec.md")).exists();
+        run("rm");
+        assertThat(errors).containsExactly("rm: path expected: rm <path>... or ... | rm");
+        assertThat(run("ls docs --files | touch { $_.name } | map { $_.path.parent }")).isEqualTo(tmp + "\n");
+        assertThat(tmp.resolve("spec.md")).exists();
+        run("touch { $_.name }");
+        assertThat(errors).singleElement().asString().startsWith("touch: the block $_.name gives the path of each");
+    }
 }
