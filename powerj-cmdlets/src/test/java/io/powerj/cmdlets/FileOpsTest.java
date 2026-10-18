@@ -130,7 +130,9 @@ class FileOpsTest {
         file("b.java", "");
         List<Object> out = run(new Touch(), new Touch.Params(args("*.java"), false, null));
         assertThat(out).hasSize(2);
-        assertThat(work.resolve("*.java")).doesNotExist();
+        try (var names = Files.list(work)) { // no file named "*.java" (an invalid name on Windows anyway)
+            assertThat(names.map(f -> f.getFileName().toString())).containsExactlyInAnyOrder("a.java", "b.java");
+        }
     }
 
     // --- cp ---
