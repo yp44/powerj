@@ -63,25 +63,21 @@ Target pipeline at the end (§12.3):
 - Spec: `docs/plans/group.md`. `group [key...] [-n|--no-items]` emits one `record Group(Object key, long count, List<Object> items)` per key (`@Display(columns = {"key","count"})`), in first-seen order. Several keys give a list key; integral numbers are compared by value.
 - Decided with the user: a fixed record (not a `Row` named after the key), several keys allowed, only `-n` as an option (no `-i`, no sorted output). `preview = true`; reuses `Keys`.
 
-## Phase 6 — `uniq` (FR-72), `claude/cmdlet-uniq`
-- `uniq [key|block] [-c|--count] [-i|--case-insensitive] [--adjacent]`.
-- Default: global streaming dedup (a `HashSet` of keys, the first occurrence emitted at once).
-- `--adjacent`: Unix `uniq` behaviour, constant memory.
-- `-c` emits `record Counted(Object value, long count)` at the end. `preview = true`.
+## Phase 6 — `uniq` — cancelled
+- Cancelled by the user: `group` (phase 5) already covers `uniq -c` (`cat a.log | group`).
 
-## Phase 7 — `find` (FR-73), `claude/cmdlet-find`
-- `find [root...] [--name glob] [--iname glob] [--regex re] [--type f|d|l] [--since 7d] [--before date] [--size +1mb|-10kb] [--depth n] [-a|--all] [-p n]` emits `FileEntry`.
-- Reuses the `Ls` / `powerj-fs` walk (parallel, lazy, non-blocking access errors) and `FileArguments` for roots and wildcards. Unit literals (`7d`, `1mb`) already go through `OptionBinder`.
-- The spec details any extraction from `Ls.java` (`FileEntry` construction, walk setup); `LsTest` must stay green. `^find` and `native.prefer` (FR-16) keep working.
-- `preview = true`; `find / | first 1` stops immediately (phase 2).
+## Phase 7 — `find` — cancelled
+- Cancelled by the user.
 
-## Phase 8 — `mkdir`, `touch`, `cp`, `mv`, `rm` (FR-74), `claude/cmdlet-fileops`
-- These are the only state-changing cmdlets: `preview = false`, and each accepts `-n|--dry-run`, which emits what would be done.
-- Input: path arguments (wildcards via `FileArguments`) **or** the pipeline (`String`/`Path`/`File`/`FileEntry`/`--property`, same logic as `cat`, via `FileArguments.file`).
-- `mkdir [-p] path…` and `touch path…` emit the created or updated `FileEntry`.
-- `cp src… dest [-r] [-f|--force]` and `mv src… dest [-f]`: `dest` may be a directory. An existing target without `-f` raises a non-blocking error. Both emit the destination `FileEntry`.
-- `rm path… [-r] [-f] [-v]`: a non-empty directory without `-r` is refused (non-blocking). There is no trash. `-v` emits the removed entries. Symlinks are not followed.
-- Tests: `@TempDir`, `--dry-run` leaves everything untouched, collisions, recursion, symlinks, Windows separators, `ls --filter *.tmp | rm`.
+## Phase 8 — `mkdir`, `touch`, `cp`, `mv`, `rm` (FR-72), `claude/cmdlet-fileops`
+- Spec: `docs/plans/fileops.md`. Paths from arguments (wildcards) or from the pipeline (`String`/`Path`/`File`/`FileEntry`/`--property`); for `cp`/`mv`, the last argument is the destination.
+- Decided with the user:
+  - `mkdir`/`touch` emit the `FileEntry` created; `cp`/`mv`/`rm` are silent except with `-v`;
+  - `cp`/`mv` refuse to overwrite without `-f`;
+  - `rm` needs `-r` for a non-empty folder;
+  - `-n`/`--dry-run` everywhere (emits `FileOperation`s);
+  - `rm` and `mv` refuse protected paths, listed in `~/.powerj/protected-paths` (created at first launch with platform defaults), unless `--allow-protected` is given.
+- API: `CmdletContext.configDirectory()`. Symbolic links never followed; `preview = false` for all five.
 
 ## Phase 9 — `to-json`, `from-json`, `to-csv`, `from-csv` (FR-75), `claude/cmdlet-json-csv`
 - No external dependency: the project has none beyond JLine/JUnit and ships a modular jlink runtime. An in-house writer and recursive-descent parser go in `powerj-cmdlets/.../json/` (sealed token types, pattern matching).
@@ -101,4 +97,4 @@ Target pipeline at the end (§12.3):
 
 ## Order and dependencies
 1 `sort` (creates `Keys`) → 2 `first`/`last`/`range` (`stopInput` API) → 3 `select` (`Row` in the API) → 4 `measure` and 5 `group` (use `Keys`) → 6 `uniq` → 7 `find` (benefits from `first`) → 8 file ops → 9 JSON/CSV (`from-csv` uses `Row`) → 10 `ps`/`kill`.
-Phases 1–3 come first; phases 4–6 and 10 are independent of each other and can be reordered.
+Phases 1–3 come first; phases 4–6 and 10 are independent of each other and can be reordered. Phases 6 and 7 were cancelled.
