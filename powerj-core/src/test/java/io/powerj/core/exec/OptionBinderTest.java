@@ -74,6 +74,13 @@ class OptionBinderTest {
     }
 
     @Test
+    void pathIsOneValueOfAListButACollectionGivesItsElements() {
+        Path path = Path.of("tmp", "dir", "file.txt").toAbsolutePath();
+        assertThat(bind(path).paths()).containsExactly(path.toString());
+        assertThat(bind(List.of("a", "b"), "c").paths()).containsExactly("a", "b", "c");
+    }
+
+    @Test
     void unambiguousAbbreviation() {
         assertThat(bind("--rec").recurse()).isTrue();
         assertThat(bind("--max", "2").maxDepth()).isEqualTo(2);
