@@ -23,7 +23,7 @@ import io.powerj.api.ScriptBlock;
  * ls -r | sort { $_.name.length() }
  * </pre>
  */
-@CmdletInfo(name = "sort", preview = true, category = "Filters", summary = "Sorts pipeline objects by keys",
+@CmdletInfo(name = "sort", preview = true, passThrough = true, category = "Filters", summary = "Sorts pipeline objects by keys",
         examples = {"ls | sort size --desc", "ls | sort dir name", "ls -r | sort { $_.name.length() } -d",
                 "(ls)*.name | sort -i", "git branch | sort"})
 public final class Sort implements Cmdlet<Sort.Params, Object, Object> {

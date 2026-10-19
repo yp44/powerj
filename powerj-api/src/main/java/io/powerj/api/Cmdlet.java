@@ -1,5 +1,7 @@
 package io.powerj.api;
 
+import java.util.List;
+
 /**
  * PowerJ command written in Java. The shell builds the parameter record {@code P} from the
  * options typed ({@link Option}), then calls {@link #begin}, {@link #process} for each object received
@@ -31,5 +33,16 @@ public interface Cmdlet<P extends Record, I, O> {
      */
     default boolean previewable(P params) {
         return true;
+    }
+
+    /**
+     * Names of the columns of the {@link Row}s this cmdlet emits, read from the text of its arguments while the user
+     * types, for Tab completion in the next stage ({@code ls | select name kb={ … } | where { $_.kb > 1 }}).
+     * Called on text that may be incomplete or invalid: it must not fail. Default: none known.
+     *
+     * @param arguments text following the command name in the stage, as typed
+     */
+    default List<String> columns(String arguments) {
+        return List.of();
     }
 }

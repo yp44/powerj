@@ -169,4 +169,12 @@ class SelectTest {
         assertThatThrownBy(() -> row.entrySet().clear()).isInstanceOf(UnsupportedOperationException.class);
         assertThat(Row.of(Map.of("x", 1)).sizeColumns()).isEmpty();
     }
+
+    @Test
+    void columnsReadFromTheArgumentsForCompletion() {
+        assertThat(new Select().columns(" a b.c d=e f={ x { y } } { z } --on-error stop"))
+                .containsExactly("a", "c", "d", "f", "column1");
+        assertThat(new Select().columns(" name kb={ $_.size")).containsExactly("name", "kb"); // still being typed
+        assertThat(new Select().columns("")).isEmpty();
+    }
 }

@@ -55,6 +55,22 @@ final class FakeCmdlets {
         }
     }
 
+    /** Short form declared by the cmdlet itself, as {@code where} does: {@code items | pick size > 10}. */
+    @CmdletInfo(name = "pick", category = "Test", summary = "Picks by comparison", examples = "items | pick size > 10",
+            comparison = true, passThrough = true)
+    static final class Pick implements Cmdlet<Pick.Params, Object, Object> {
+
+        record Params(@Option(position = 0) List<Object> words) { }
+
+        @Override
+        public void process(Params params, Object input, CmdletContext<Object> context) {
+            List<Object> w = params.words();
+            if (context.compile("$_." + w.get(0) + " " + w.get(1) + " " + w.get(2)).test(input)) {
+                context.emit(input);
+            }
+        }
+    }
+
     /** Counts the objects received. */
     @CmdletInfo(name = "count", category = "Test", summary = "Counts", examples = "items | count")
     static final class Count implements Cmdlet<Count.Params, Object, Long> {
@@ -152,6 +168,6 @@ final class FakeCmdlets {
     }
 
     static List<Cmdlet<?, ?, ?>> all() {
-        return List.of(new Items(), new Filter(), new Count(), new Eval(), new Infinite(), new EvalEach(), new Take());
+        return List.of(new Items(), new Filter(), new Pick(), new Count(), new Eval(), new Infinite(), new EvalEach(), new Take());
     }
 }

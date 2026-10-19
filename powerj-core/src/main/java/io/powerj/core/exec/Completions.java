@@ -625,7 +625,8 @@ public final class Completions {
     /**
      * Types known in a block: {@code $_} and lambda parameters.
      *
-     * @param sample {@link io.powerj.api.Row} with the columns of an upstream {@code select} (FR-69), or {@code null}
+     * @param sample {@link io.powerj.api.Row} with the columns declared by an upstream cmdlet ({@code select}, FR-69),
+     *               or {@code null}
      */
     private record Scope(Class<?> current, io.powerj.api.Row sample, Map<String, Class<?>> parameters) { }
 
@@ -641,7 +642,7 @@ public final class Completions {
             if (current == null) {
                 current = type;
                 if (type == io.powerj.api.Row.class) {
-                    sample = upstreamSelect(line, f.parent);
+                    sample = upstreamColumns(line, f.parent);
                 }
             }
             Matcher param = LAMBDA_PARAM.matcher(line).region(f.start, line.length());
@@ -652,70 +653,37 @@ public final class Completions {
         return new Scope(current, sample, parameters);
     }
 
-    /** Row with the columns written in the {@code select} stage before the current one (values {@code null}). */
-    private static io.powerj.api.Row upstreamSelect(String line, Frame command) {
+    /**
+     * Row with the columns that the cmdlet of the stage before the current one declares from its arguments
+     * ({@code Cmdlet.columns}, e.g. {@code select}), looking through the stages that let objects through unchanged;
+     * values {@code null}. {@code null} if no columns are known.
+     */
+    private io.powerj.api.Row upstreamColumns(String line, Frame command) {
         List<Integer> starts = command.stageStarts;
         for (int k = starts.size() - 2; k >= 0; k--) {
             String stage = line.substring(starts.get(k), starts.get(k + 1) - 1).strip();
-            if (splitWords(stage).getFirst().equals("select")) {
-                Map<String, Object> columns = new LinkedHashMap<>();
-                selectColumns(stage.substring("select".length())).forEach(name -> columns.put(name, null));
-                return io.powerj.api.Row.of(columns);
+            String name = splitWords(stage).getFirst();
+            var cmdlet = interpreter.registry().find(name);
+            if (cmdlet.isEmpty()) {
+                return null;
             }
+            if (cmdlet.get().passThrough()) {
+                continue;
+            }
+            List<String> names;
+            try {
+                names = cmdlet.get().cmdlet().columns(stage.substring(name.length()));
+            } catch (RuntimeException e) {
+                return null; // a module's cmdlet must never break completion
+            }
+            if (names == null || names.isEmpty()) {
+                return null;
+            }
+            Map<String, Object> columns = new LinkedHashMap<>();
+            names.forEach(column -> columns.put(column, null));
+            return io.powerj.api.Row.of(columns);
         }
         return null;
-    }
-
-    /** Column names of the arguments of {@code select}, by its naming rules (FR-69). */
-    public static List<String> selectColumns(String arguments) {
-        List<String> tokens = new ArrayList<>(); // words, and "{" for a block
-        int i = 0;
-        while (i < arguments.length()) {
-            char c = arguments.charAt(i);
-            if (Character.isWhitespace(c)) {
-                i++;
-            } else if (c == '{') {
-                int depth = 0;
-                while (i < arguments.length()) {
-                    char d = arguments.charAt(i++);
-                    if (d == '{') {
-                        depth++;
-                    } else if (d == '}' && --depth == 0) {
-                        break;
-                    }
-                }
-                tokens.add("{");
-            } else {
-                int start = i;
-                while (i < arguments.length() && !Character.isWhitespace(arguments.charAt(i)) && arguments.charAt(i) != '{') {
-                    i++;
-                }
-                tokens.add(arguments.substring(start, i));
-            }
-        }
-        List<String> names = new ArrayList<>();
-        int unnamed = 0;
-        for (int k = 0; k < tokens.size(); k++) {
-            String token = tokens.get(k);
-            if (token.equals("{")) {
-                names.add("column" + ++unnamed);
-            } else if (token.startsWith("-")) {
-                if (token.equals("--on-error")) {
-                    k++; // its value
-                }
-            } else if (token.endsWith("=")) {
-                names.add(token.substring(0, token.length() - 1));
-                if (k + 1 < tokens.size() && tokens.get(k + 1).equals("{")) {
-                    k++;
-                }
-            } else if (token.contains("=")) {
-                names.add(token.substring(0, token.indexOf('=')));
-            } else {
-                names.add(token.substring(token.lastIndexOf('.') + 1));
-            }
-        }
-        names.removeIf(String::isEmpty);
-        return names;
     }
 
     /** Type of the objects received by the current stage: output of the previous cmdlet (FR-24). */
@@ -733,8 +701,8 @@ public final class Completions {
                 if (output != Object.class) {
                     return output;
                 }
-                if (name.equals("where")) {
-                    continue; // where lets objects through unchanged
+                if (cmdlet.get().passThrough()) {
+                    continue; // where, sort…: the objects go through unchanged
                 }
                 return null;
             }

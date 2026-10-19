@@ -163,6 +163,11 @@ public final class ExpressionParser {
         }
     }
 
+    /** The names given by the caller, without the parameters of enclosing lambdas added here. */
+    static Predicate<String> syntax(Predicate<String> staticNames) {
+        return staticNames instanceof Names(var statics, var _) ? statics : staticNames;
+    }
+
     /** Is {@code name} a parameter of an enclosing lambda? */
     static boolean isParameter(Predicate<String> staticNames, String name) {
         return staticNames instanceof Names(var _, var parameters) && parameters.contains(name);

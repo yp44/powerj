@@ -49,6 +49,17 @@ class CmdletInterpreterTest {
     }
 
     @Test
+    void shortFormForTheCmdletsThatDeclareIt() throws Exception {
+        // pick declares @CmdletInfo(comparison = true): its > is a comparison, also inside ( … ).
+        assertThat(run("items | pick size > 10")).contains("item2", "item3").doesNotContain("item1");
+        assertThat(run("(items | pick size > 10).size()")).isEqualTo("2\n");
+        assertThat(tmp.resolve("10")).doesNotExist();
+        // filter does not declare it: > redirects its output to the file 10, as after any command.
+        run("items | filter { $_.size > 10 } > 10");
+        assertThat(tmp.resolve("10")).exists();
+    }
+
+    @Test
     void cmdletOutputIsATable() throws Exception {
         assertThat(run("items -n 2")).isEqualTo("""
                 name   size

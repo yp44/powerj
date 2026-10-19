@@ -156,18 +156,53 @@ class ParserTest {
                 new Ast.Redirect(Token.Stream.ERR, false, new WordArgument("err.txt")));
     }
 
+    /** The commands declared {@code @CmdletInfo(comparison = true)}, as the interpreter gives them. */
+    private static final Syntax WHERE = new Syntax(_ -> false, "where"::equals);
+
+    private static Statement onlyWithWhere(String line) {
+        var steps = Parser.parse(line, WHERE).steps();
+        assertThat(steps).hasSize(1);
+        return steps.getFirst().statement();
+    }
+
     @Test
     void whereShortForm() {
-        assertThat(only("ls | where size > 10kb > out.txt").pipeline()).satisfies(p -> {
+        assertThat(onlyWithWhere("ls | where size > 10kb > out.txt").pipeline()).satisfies(p -> {
             assertThat(((Command) p.stages().get(1).body()).arguments()).containsExactly(
                     new WordArgument("size"), new WordArgument(">"), new WordArgument("10kb"));
             assertThat(p.redirects()).containsExactly(new Ast.Redirect(Token.Stream.OUT, false, new WordArgument("out.txt")));
         });
-        assertThat(((Command) only("where ext == log").body()).arguments()).containsExactly(
+        assertThat(((Command) onlyWithWhere("where ext == log").body()).arguments()).containsExactly(
                 new WordArgument("ext"), new WordArgument("=="), new WordArgument("log"));
-        assertThat(((Command) only("where size >= 1").body()).arguments()).hasSize(3);
-        // Outside of where, > remains a redirection.
-        assertThat(only("echo a > b").redirects()).hasSize(1);
+        assertThat(((Command) onlyWithWhere("where size >= 1").body()).arguments()).hasSize(3);
+        // Outside of where, > remains a redirection; ^where is a native program.
+        assertThat(onlyWithWhere("echo a > b").redirects()).hasSize(1);
+        assertThat(onlyWithWhere("^where a > b").redirects()).hasSize(1);
+    }
+
+    @Test
+    void shortFormOnlyForTheDeclaredCommands() {
+        // No command declared: the > of where is a redirection, like after any command.
+        assertThat(only("ls | where size > 1mb").redirects())
+                .containsExactly(new Ast.Redirect(Token.Stream.OUT, false, new WordArgument("1mb")));
+        // Any command name can be declared; none is known by the parser itself.
+        var keep = new Syntax(_ -> false, "keep"::equals);
+        assertThat(Parser.parse("ls | keep size > 1mb", keep).steps().getFirst().statement().redirects()).isEmpty();
+    }
+
+    @Test
+    void shortFormInParenthesesAndLambdas() {
+        // ( … ) is parsed by ExpressionParser, which hands the Syntax over to the pipeline inside.
+        var group = (ExpressionBody) onlyWithWhere("(ls | where size > 1mb)").body();
+        var pipeline = ((Ast.SubExpression) group.expression()).pipeline();
+        assertThat(((Command) pipeline.stages().get(1).body()).arguments()).containsExactly(
+                new WordArgument("size"), new WordArgument(">"), new WordArgument("1mb"));
+        assertThat(pipeline.redirects()).isEmpty();
+        // Also inside a lambda, where the static names are wrapped with the lambda parameters.
+        var lambda = (Ast.Lambda) ((ExpressionBody) onlyWithWhere("{ f -> (ls | where size > 1mb) }").body()).expression();
+        var inner = ((Ast.SubExpression) lambda.body()).pipeline();
+        assertThat(inner.redirects()).isEmpty();
+        assertThat(((Command) inner.stages().get(1).body()).arguments()).hasSize(3);
     }
 
     @Test

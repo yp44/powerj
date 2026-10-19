@@ -565,7 +565,7 @@ where { <expression> }
 where <attribut> <opérateur> <valeur>        # short form
 ```
 
-Evaluates the condition for each received object (lambda parameter, or `$_`) and lets through only those for which it is `true`. Works on records, scalars and therefore on **`String` lines produced by a native command**. The short form `where size > 1mb` is equivalent to `where { $_.size > 1mb }`.
+Evaluates the condition for each received object (lambda parameter, or `$_`) and lets through only those for which it is `true`. Works on records, scalars and therefore on **`String` lines produced by a native command**. The short form `where size > 1mb` is equivalent to `where { $_.size > 1mb }`. The `>` after the first word is a comparison, not a redirection, because `where` declares `@CmdletInfo(comparison = true)` (§4.1); the parser knows no command by name.
 
 The condition must return a `boolean` (FR-33b); any other value, or an evaluation error, produces a non-blocking error and the object is skipped.
 
@@ -1218,6 +1218,10 @@ CA:
 - The Maven module **`powerj-api`** is the **only dependency** needed to write a cmdlet. It is published separately and semantically versioned.
 - A cmdlet is a class that implements `Cmdlet<P, I, O>`; the output type `O` is free (**a record is recommended** to benefit from table display and attribute completion).
 - A cmdlet that changes nothing (no file written, no environment changed, no network side effect) declares `@CmdletInfo(preview = true)`, so that it runs in preview mode (FR-66); `previewable(params)` excludes the options that change something.
+- A cmdlet that takes the short form `property operator value` declares `@CmdletInfo(comparison = true)`: the `>` that follows its first word is then a comparison, not a redirection (`where size > 1mb`, FR-36). Without it, `>` redirects the output, as after any command.
+- A cmdlet that emits the objects it receives, unchanged (filter, sort, choice of positions), declares `@CmdletInfo(passThrough = true)`: Tab completion looks through it to find the type of `$_` in the next stage (`ls | sort name | map { $_.`). Built-in: `where`, `sort`, `first`, `last`, `range`.
+- A cmdlet that emits `Row`s overrides `columns(arguments)` to give their column names from the text of its arguments, for Tab completion in the next stage (`select`, `measure`).
+- The shell reads these declarations from the registry, for built-in and third-party cmdlets alike: its core names no cmdlet.
 - Options are declared by a **parameter record** whose components are annotated with `@Option`.
 - Modules are discovered by `ServiceLoader` and loaded into an **isolated `ModuleLayer`** per jar.
 
@@ -1233,6 +1237,7 @@ public interface Cmdlet<P extends Record, I, O> {
     default void process(P params, I input, CmdletContext<O> ctx) throws Exception { }
     default void end(P params, CmdletContext<O> ctx) throws Exception { }
     default boolean previewable(P params) { return true; }  // preview = true, but not with these options (FR-66)
+    default List<String> columns(String arguments) { return List.of(); }  // columns of the emitted Rows (completion)
 }
 
 public interface CmdletContext<O> {

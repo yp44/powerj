@@ -5,6 +5,7 @@ import java.math.BigInteger;
 import java.math.MathContext;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
@@ -109,6 +110,12 @@ public final class Measure implements Cmdlet<Measure.Params, Object, Row> {
         values.put("max", state.max);
         Set<String> sizes = Boolean.TRUE.equals(state.size) ? Set.of("sum", "average", "min", "max") : Set.of();
         context.emit(Row.of(values, sizes));
+    }
+
+    /** The columns of the row emitted by {@link #end}, whatever the arguments. */
+    @Override
+    public List<String> columns(String arguments) {
+        return List.of("count", "sum", "average", "min", "max");
     }
 
     /** Exact sum: {@code Long}, or {@code BigInteger} beyond the range of a long; {@code Double} if a value is not integral. */

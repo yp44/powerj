@@ -15,10 +15,12 @@ import io.powerj.core.lang.Ast.Step;
 public final class Parser {
 
     private final List<Token> tokens;
+    private final Predicate<String> staticNames;
     private int pos;
 
-    private Parser(List<Token> tokens) {
+    private Parser(List<Token> tokens, Predicate<String> staticNames) {
         this.tokens = tokens;
+        this.staticNames = staticNames;
     }
 
     public static Ast.Script parse(String line) {
@@ -27,15 +29,16 @@ public final class Parser {
 
     /**
      * @param staticNames recognizes qualified names designating a Java class or static field
-     *                    ({@code Math.PI}), expressions at the start of a statement (FR-46)
+     *                    ({@code Math.PI}), expressions at the start of a statement (FR-46); a {@link Syntax}
+     *                    also gives the commands that take the short form {@code where size > 1mb}
      */
     public static Ast.Script parse(String line, Predicate<String> staticNames) {
-        return new Parser(Lexer.tokenize(line, staticNames)).script();
+        return new Parser(Lexer.tokenize(line, staticNames), staticNames).script();
     }
 
     /** Pipeline alone (content of a group {@code ( … )}). */
     static Ast.Pipeline pipeline(String text, Predicate<String> staticNames) {
-        var parser = new Parser(Lexer.tokenize(text, staticNames));
+        var parser = new Parser(Lexer.tokenize(text, staticNames), staticNames);
         if (parser.atEnd()) {
             throw new SyntaxException(Messages.get("syntax.emptyParentheses"));
         }
@@ -170,10 +173,11 @@ public final class Parser {
 
     /**
      * In the short form {@code where size > 1mb} (FR-36), the {@code >} following the property name is
-     * the comparison operator, not a redirection.
+     * the comparison operator, not a redirection, for a command whose cmdlet declares it
+     * ({@code @CmdletInfo(comparison = true)}).
      */
     private boolean isShortFormOperator(String command, boolean forceNative, List<Argument> arguments) {
-        return !forceNative && command.equals("where") && arguments.size() == 1
+        return !forceNative && Syntax.acceptsComparison(staticNames, command) && arguments.size() == 1
                 && arguments.getFirst() instanceof Ast.WordArgument
                 && peek() instanceof Token.Redirection(var stream, var append)
                 && stream == Token.Stream.OUT && !append;

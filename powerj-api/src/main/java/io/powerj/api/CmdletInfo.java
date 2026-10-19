@@ -31,4 +31,18 @@ public @interface CmdletInfo {
      * {@link Cmdlet#previewable(Record)}.
      */
     boolean preview() default false;
+
+    /**
+     * {@code true} if the cmdlet takes the short form {@code property operator value} as its arguments
+     * ({@code where size > 1mb}): the {@code >} that follows the first word is then a comparison operator, not a
+     * redirection. Default {@code false}: {@code >} redirects the output, as after any command.
+     */
+    boolean comparison() default false;
+
+    /**
+     * {@code true} if the cmdlet emits the objects it receives, unchanged (filter, sort, choice of positions): Tab
+     * completion then looks through it to find the type of {@code $_} in the next stage
+     * ({@code ls | sort name | map { $_.name }}).
+     */
+    boolean passThrough() default false;
 }

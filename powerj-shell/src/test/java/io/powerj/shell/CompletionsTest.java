@@ -157,8 +157,19 @@ class CompletionsTest {
         assertThat(values("ls | select name size | where { $_.")).contains("name", "size").doesNotContain("dir");
         assertThat(values("ls | select file=name kb={ $_.size / 1kb } | sort { r -> r.")).contains("file", "kb");
         assertThat(values("ls | select path.fileName { $_.name } | where { $_.")).contains("fileName", "column1");
-        assertThat(Completions.selectColumns(" a b.c d=e f={ x { y } } { z } --on-error stop"))
-                .containsExactly("a", "c", "d", "f", "column1");
+        // The columns go through the stages declared passThrough (sort, first…).
+        assertThat(values("ls | select name kb={ $_.size / 1kb } | sort kb -d | first 3 | where { $_."))
+                .contains("name", "kb").doesNotContain("dir");
+        // measure declares its columns whatever its arguments.
+        assertThat(values("ls | measure size | where { $_.")).contains("count", "sum", "average", "min", "max");
+    }
+
+    @Test
+    void typeGoesThroughTheStagesThatLetObjectsThrough() {
+        assertThat(values("ls | sort name | map { $_.")).contains("name", "size", "dir");
+        assertThat(values("ls | first 3 | map { f -> f.na")).contains("name");
+        assertThat(values("ls | last 2 | where { $_.")).contains("size");
+        assertThat(values("ls | range --from 2 | map { $_.")).contains("ext");
     }
 
     @Test
