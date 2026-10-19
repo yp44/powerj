@@ -404,7 +404,7 @@ Short rule: **`$_` for one-line filters typed at the keyboard, a named lambda as
 
 ### 3.9 Cmdlets in the current scope
 
-Only **four cmdlets** are in the scope of the first steps: `ls`, `where`, `map` and `env`; the mini-iterations add `collect` (FR-36d), `grep` (FR-64), `cat` (FR-65), `sort` (FR-67), `first`, `last` and `range` (FR-68), `select` (FR-69), `count` and `measure` (FR-70), `group` (FR-71), and the file operations `mkdir`, `touch`, `cp`, `mv`, `rm` (FR-72), and the conversions `to-json`, `from-json`, `to-csv`, `from-csv` (FR-73). The first two alone cover the core mechanisms: producing record objects, attribute access, the pipeline, expressions, and mixing with native commands.
+Only **four cmdlets** are in the scope of the first steps: `ls`, `where`, `map` and `env`; the mini-iterations add `collect` (FR-36d), `grep` (FR-64), `cat` (FR-65), `sort` (FR-67), `first`, `last` and `range` (FR-68), `select` (FR-69), `count` and `measure` (FR-70), `group` (FR-71), and the file operations `mkdir`, `touch`, `cp`, `mv`, `rm` (FR-72), the conversions `to-json`, `from-json`, `to-csv`, `from-csv` (FR-73), and the processes `ps`, `kill` (FR-74). The first two alone cover the core mechanisms: producing record objects, attribute access, the pipeline, expressions, and mixing with native commands.
 
 #### FR-35 — `ls`: list files
 
@@ -1763,7 +1763,7 @@ PJ C:\dev> (ls)*.name.stream().map({ $_.toUpperCase() }).sorted().toList()
 | ~~`cat`~~ | Read files — **done** (FR-65) | `String`, `CatLine`, `CatContent` |
 | `find` | Advanced search (`--name --since --size --type`) | `FileEntry` |
 | ~~`cp`, `mv`, `rm`, `mkdir`, `touch`~~ | File operations — **done** (FR-72) | `FileEntry`, `FileOperation` |
-| `ps`, `kill` | Processes | `ProcessEntry` |
+| ~~`ps`, `kill`~~ | Processes — **done** (FR-74) | `ProcessEntry` |
 | ~~`select`~~ | Attribute projection — **done** (FR-69); `--expand` not done | `Row` |
 | ~~`sort`~~ | Sorting — **done** (FR-67) | unchanged |
 | ~~`collect`~~ | Gather into a list — **done** (FR-36d) | `Collected` |
@@ -1785,6 +1785,8 @@ Target vision once the backlog is complete:
 find src --name *.java --since 7d | where { $_.size > 2kb } | group { $_.path.parent }
     | sort count --desc | first 5 | to-json > rapport.json
 ```
+
+With the cmdlets of the roadmap (`find` was cancelled), the end-to-end check is `docs/recettes/pipeline-v1.md`.
 
 ### 12.4 PowerShell → PowerJ mapping
 

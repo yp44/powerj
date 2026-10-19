@@ -89,13 +89,13 @@ Target pipeline at the end (§12.3):
 - Tests: JSON round trip, Unicode escapes, numbers, invalid JSON (error with position), CSV quoting.
 
 ## Phase 10 — `ps` / `kill` (FR-74), `claude/cmdlet-ps`
-- Spec: `docs/plans/ps-kill.md`.
+- Spec: `docs/plans/ps-kill.md`. Decided with the user: all processes by default, wildcards for names, pids only for `kill`, `-w` to wait, no protected process, JDK API only (`destroy`/`destroyForcibly`): no other signal, and PowerJ cannot stop itself.
 - `ps [name|glob] [--user u]` uses `ProcessHandle.allProcesses()` and emits `record ProcessEntry(long pid, Long parent, String name, String command, String user, Instant start, Duration cpu)`, with `@Display(columns = {"pid","name","cpu","start"})`. Memory is not available from the JDK and is documented as a limitation. No native calls, so it works on every platform.
 - `kill pid… [-f|--force]`, or pipeline `ProcessEntry`/`Long` input (`ps java | kill`), calls `destroy()` / `destroyForcibly()`. `preview = false`. Killing PowerJ's own PID is refused.
 - Tests: `ps` sees `ProcessHandle.current()`, name filtering, killing a process started by the test, an unknown PID (non-blocking error).
 
-## Wrap-up (in the phase 10 PR)
-- An end-to-end acceptance checklist for the §12.3 target pipeline in `docs/recettes/`.
+## Wrap-up (in the phase 10 PR) — done
+- An end-to-end acceptance checklist for the §12.3 target pipeline: `docs/recettes/pipeline-v1.md`.
 - README "Status and roadmap": the v1 backlog is done (`tee`, `http`, `open`, `table`/`tree` remain), and the next step is v2 control structures.
 
 ## Order and dependencies

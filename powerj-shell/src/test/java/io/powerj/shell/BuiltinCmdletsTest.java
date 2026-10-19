@@ -346,4 +346,16 @@ class BuiltinCmdletsTest {
         assertThat(errors).singleElement().asString()
                 .isEqualTo("from-json: invalid JSON at line 1, column 1: unexpected text: files.json");
     }
+
+    @Test
+    void psAndKill() throws Exception {
+        long pid = ProcessHandle.current().pid();
+        assertThat(run("ps | where { $_.pid == ProcessHandle.current().pid() } | map { $_.pid }")).isEqualTo(pid + "\n");
+        assertThat(run("ps java* | where { $_.pid == ProcessHandle.current().pid() } | count")).isEqualTo("1\n");
+        assertThat(run("ps | where { $_.pid == ProcessHandle.current().pid() } | kill -n | map { $_.pid }"))
+                .isEqualTo(pid + "\n");
+        assertThat(errors).isEmpty();
+        run("kill " + pid);
+        assertThat(errors).containsExactly("kill: cannot stop PowerJ itself (use exit)");
+    }
 }
