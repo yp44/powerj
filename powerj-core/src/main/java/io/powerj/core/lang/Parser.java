@@ -57,9 +57,17 @@ public final class Parser {
                 }
                 throw new SyntaxException(Messages.get("syntax.noCommandBefore", symbol(c)));
             }
+            if (peek() instanceof Token.Background) {
+                throw new SyntaxException(Messages.get("syntax.noCommandBefore", "&"));
+            }
             steps.add(new Step(connector, statement()));
             if (atEnd()) {
                 break;
+            }
+            if (peek() instanceof Token.Background) {
+                pos++; // already marked on the statement; the next one follows at once, like after ";"
+                connector = Connector.ALWAYS;
+                continue;
             }
             if (!(next() instanceof Token.Separator(var c))) {
                 throw new IllegalStateException("separator expected");
@@ -77,15 +85,19 @@ public final class Parser {
         if (peek() instanceof Token.AssignTo(var name)) {
             pos++;
             assignTo = Optional.of(name);
-            if (atEnd() || peek() instanceof Token.Separator) {
+            if (atEnd() || peek() instanceof Token.Separator || peek() instanceof Token.Background) {
                 throw new SyntaxException(Messages.get("syntax.valueExpectedAfterAssignment", name));
             }
         }
         Ast.Pipeline pipeline = pipeline();
-        if (!atEnd() && !(peek() instanceof Token.Separator)) {
+        boolean background = !atEnd() && peek() instanceof Token.Background;
+        if (background && assignTo.isPresent()) {
+            throw new SyntaxException(Messages.get("syntax.backgroundAssignment", assignTo.get()));
+        }
+        if (!atEnd() && !(peek() instanceof Token.Separator) && !background) {
             throw unexpected(peek());
         }
-        return new Statement(assignTo, pipeline);
+        return new Statement(assignTo, pipeline, background);
     }
 
     /** Stages separated by {@code |}, each followed by its redirections. */
@@ -93,7 +105,8 @@ public final class Parser {
         List<Ast.Stage> stages = new ArrayList<>();
         List<Redirect> redirects = new ArrayList<>();
         while (true) {
-            if (atEnd() || peek() instanceof Token.Separator || peek() instanceof Token.Pipe) {
+            if (atEnd() || peek() instanceof Token.Separator || peek() instanceof Token.Pipe
+                    || peek() instanceof Token.Background) {
                 throw new SyntaxException(stages.isEmpty() ? Messages.get("syntax.commandExpected")
                         : Messages.get("syntax.commandExpectedAfter", "|"));
             }
@@ -190,6 +203,7 @@ public final class Parser {
             case Token.AssignTo(var name) -> "$" + name + " =";
             case Token.Separator(var c) -> symbol(c);
             case Token.Pipe _ -> "|";
+            case Token.Background _ -> "&";
             case Token.Redirection(var stream, var append) -> switch (stream) {
                 case OUT -> append ? ">>" : ">";
                 case ERR -> append ? "2>>" : "2>";

@@ -32,6 +32,7 @@ public final class Session {
     private boolean lastSucceeded = true;
     private Integer exitRequest;
     private final JavaClasses java = new JavaClasses();
+    private final Jobs jobs = new Jobs();
     /** Recent Java exceptions, most recent first ({@code $errors}, FR-53). */
     private final Deque<Throwable> errors = new ArrayDeque<>();
     private static final int MAX_ERRORS = 20;
@@ -120,6 +121,11 @@ public final class Session {
 
     public Optional<NativeRun> lastNative() {
         return Optional.ofNullable(lastNative);
+    }
+
+    /** Commands launched in the background with {@code &} (FR-75). */
+    public Jobs jobs() {
+        return jobs;
     }
 
     void recordNative(NativeRun run) {

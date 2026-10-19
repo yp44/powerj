@@ -35,18 +35,18 @@ make & echo started           # & also separates statements, like ;
 ## `jobs`
 A built-in, not a cmdlet: it needs the job table of the session, which lives in `powerj-core`.
 ```java
-@Display(columns = {"id", "pid", "state", "command"})
-public record Job(int id, long pid, String command, Instant start, String state /* running | done */, Integer exitCode) { }
+@Display(columns = {"id", "pid", "running", "exitCode", "command"})
+public record Job(int id, long pid, String command, Instant start, boolean running, Integer exitCode) { }
 ```
-- `jobs` emits one `Job` per job still tracked (running, or done but not yet notified), sorted by id.
+- `jobs` emits one `Job` per job still tracked (running, or ended but not yet reported), sorted by id; the ended ones are then forgotten, as in bash.
 - Numbering: the smallest free id from 1, as in bash.
 - `jobs | kill`: `Kill` (`powerj-cmdlets`, which does not depend on `powerj-core`) also accepts **any record with a `pid` component of type `long`/`Long`** (`Class.getRecordComponents()`). This covers `Job`, and user records, without coupling the modules.
 
 ## Implementation
 | File | Change |
 |---|---|
-| `lang/Lexer.java` | A lone `&` gives `Token.Separator(Connector.BACKGROUND)` instead of the exception. |
-| `lang/Connector.java`, `lang/Parser.java`, `lang/Ast.java` | New `BACKGROUND`. In `script()`, the connector that **follows** a statement marks it as background: `boolean background` on `Ast.Statement`. The next step is chained with `ALWAYS`. `&` allowed at the end of the line. Background + assignment rejected. `symbol()`: `"&"`. |
+| `lang/Token.java`, `lang/Lexer.java` | New token `Token.Background`: a lone `&` gives it instead of the exception; attached to a word, `&` ends the word only before a blank, `;` or the end of the line (`?a=1&b=2` stays whole). |
+| `lang/Parser.java`, `lang/Ast.java` | The `&` that **follows** a statement marks it: `boolean background` on `Ast.Statement`. The next step is chained with `ALWAYS`. `&` allowed at the end of the line. Background + assignment rejected. |
 | `lang/messages_*.properties` | Remove `syntax.loneAmpersand`; add `syntax.backgroundAssignment`. |
 | `exec/Interpreter.java` | `statement()`: if `background`, check that every stage resolves to a native command (reuse `segments()` / `prepare()`: only `NativeStep`s), otherwise `PjException(background.nativeOnly)`. Call `nativeRunner.startBackground(…)`, record the job, print `[id] pid`, set `$last`. `jobs` built-in. Preview off. |
 | `exec/NativeRunner.java` | `startBackground(List<Command>, Session, ShellIo, Optional<FileTarget> out, Optional<FileTarget> err)` → `List<Process>`. Factor out the existing construction of the `ProcessBuilder`s (environment, directory, redirections); `sh -c trap` wrapper on Unix (`Platform.isWindows()`). |

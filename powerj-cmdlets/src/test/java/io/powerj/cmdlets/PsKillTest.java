@@ -120,6 +120,20 @@ class PsKillTest {
         assertThat(List.of(a, b, c)).noneMatch(Process::isAlive);
     }
 
+    /** Any record with a {@code pid} component, such as a job of {@code jobs} (FR-75). */
+    public record WithPid(int id, long pid) { }
+
+    public record WithoutPid(String pid) { }
+
+    @Test
+    void killARecordWithAPid() throws Exception {
+        Process sleeper = sleeper();
+        run(new Kill(), new Kill.Params(List.of(), false, true, false, false), new WithPid(1, sleeper.pid()),
+                new WithoutPid("12"));
+        assertThat(sleeper.isAlive()).isFalse();
+        assertThat(context.errors).singleElement().asString().startsWith("not a process: ");
+    }
+
     @Test
     void dryRunStopsNothing() throws Exception {
         Process sleeper = sleeper();

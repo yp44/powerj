@@ -162,6 +162,9 @@ public final class Completions {
                         frame.stageStarts.clear();
                         frame.stageStarts.add(i + 2);
                         i++;
+                    } else if (frame.kind == FrameKind.COMMAND && isBackground(line, i, cursor)) {
+                        frame.stageStarts.clear(); // &: background, new statement (FR-75)
+                        frame.stageStarts.add(i + 1);
                     }
                 }
                 default -> { }
@@ -169,6 +172,12 @@ public final class Completions {
             i++;
         }
         return new Context(frame, false, -1);
+    }
+
+    /** Lone {@code &} that ends a statement (FR-75): not inside a word such as {@code ?a=1&b=2}. */
+    private static boolean isBackground(String line, int at, int cursor) {
+        return at + 1 >= cursor || line.charAt(at + 1) == ';' || io.powerj.core.lang.Lexer.isBlank(line.charAt(at + 1))
+                || at > 0 && io.powerj.core.lang.Lexer.isBlank(line.charAt(at - 1));
     }
 
     /** End (exclusive) of the string opened at {@code open}, or -1 if it is not closed before {@code limit}. */

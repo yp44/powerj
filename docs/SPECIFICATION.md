@@ -147,6 +147,7 @@ The current directory belongs to the shell: it is the base for relative paths of
 | `a ; b` | Runs `a` then `b`, regardless of the result. |
 | `a && b` | Runs `b` only if `a` **succeeded**. |
 | `a \|\| b` | Runs `b` only if `a` **failed**. |
+| `a & b` | Starts the native command `a` **in the background** and runs `b` at once (FR-75). |
 
 "Succeeded" is defined as follows: native command → return code 0; cmdlet or Java expression → no terminating error; expression with a `Boolean` value → its value. This rule gives the same reading as in Java (`&&`/`||` short-circuit, a command "evaluates to" its success): `mvn package && java -jar target/app.jar`, `Files.exists(Path.of("build")) || mkdir build`. `$?` reflects the success of the last command executed.
 
@@ -191,7 +192,7 @@ Interpreter.java
 - **What runs.** Only what changes nothing:
   - the **cmdlets declared `@CmdletInfo(preview = true)`** (§4.2; default `false`). Built-in cmdlets: `ls`, `where`, `map`, `collect`, `env`, `grep`, `cat`. A cmdlet whose options can change something refines the decision with `Cmdlet.previewable(params)`: `env` is previewed, `env --set` (`--unset`, `--append`, `--prepend`) is not;
   - **expressions**, and the **Java calls of the fixed preview set**, built into PowerJ and not configurable: methods of `Object` (`toString`, `equals`, `hashCode`, `getClass`, `compareTo`); all methods of `String`, `CharSequence`, wrappers (`Integer`, `Long`…), `Math`, `StrictMath`, `BigInteger`, `BigDecimal`, `Enum`, `Optional*`, `Comparator`, `Objects`, `Pattern`, `Matcher`, `Paths`, and of the packages `java.time.*`, `java.util.stream`, `java.util.function`; `Path` (except `register`); the **reading** methods of collections, maps and iterators (`size`, `get`, `contains`, `stream`, `forEach`, `keySet`, `List.of`…, not `add`, `put`, `sort`, `remove`…, nor `parallelStream`); `Arrays` and `Collections` except their mutators (`sort`, `fill`, `shuffle`…); `Files` in read-only mode (`exists`, `size`, `isDirectory`, `readString`, `readAllLines`, `lines`, `list`, `walk`…); `Class` for its names and type tests only (not reflection); the constructors of `String`, `BigInteger`, `BigDecimal` and of the empty collections (`new ArrayList(…)`, `new HashMap()`…). Only JDK classes are concerned: a method of a third-party module never runs in a preview; record accessors always do.
-- **What stops the preview:** a native command, a built-in command (`cd`, `help`, `mod-load`…), a cmdlet not declared `preview = true` or whose options change something, a Java call outside the set (including reflection, `System.exit`, a constructor outside the set), an assignment `$x = …`, a redirection, several commands (`;`, `&&`, `||`), a variable holding a stream or an iterator (it could be read only once). The preview then **stays on its last results**, under a gray banner that says why: `⏸ preview off: native command git`, `⏸ preview off: Java call outside the preview set: Files.delete`. Typing goes on normally.
+- **What stops the preview:** a native command, a built-in command (`cd`, `help`, `mod-load`…), a cmdlet not declared `preview = true` or whose options change something, a Java call outside the set (including reflection, `System.exit`, a constructor outside the set), an assignment `$x = …`, a redirection, several commands (`;`, `&&`, `||`), a variable holding a stream or an iterator (it could be read only once), a command launched in the background (`&`, FR-75). The preview then **stays on its last results**, under a gray banner that says why: `⏸ preview off: native command git`, `⏸ preview off: Java call outside the preview set: Files.delete`. Typing goes on normally.
 - The check is made **when the call is about to happen**, not by reading the line: it also covers the calls made in a lambda (`stream().forEach(f -> Files.delete(f))`), in a `$( … )`, in a pipeline stage running in its own thread, in a block converted to a Java function before the preview, and while the values are formatted (a stream inside a list is read under the same checks). Parallel streams (`parallel`, `parallelStream`, `Arrays.parallelSort`…) are outside the set: they would call the lambdas in other threads. The forbidden call is never made.
 - **Nothing changes during a preview:** nothing is displayed outside the preview area, non-blocking errors are only counted, `$?`, `$errors`, `$exit` and the variables are left as they are.
 - **Syntax error** while typing (`ls |`): the last results stay, under a gray banner `… <message>`. **Blocking error** (`"abc".nope()`, unknown command): the message in red replaces the results.
@@ -983,6 +984,17 @@ accessible via `$last`; `$exit` is `$last.exitCode`; `$?` is `true` if the code 
 **FR-39 — Graphical applications.** A Windows executable of the GUI subsystem (detected by reading the PE header) is launched **detached**: the shell returns control immediately, `$last.pid` is set, `$exit` is `null`.
 - CA: `notepad` opens Notepad and the prompt comes back right away.
 
+**FR-75 — Background execution.** A statement ended by `&` starts its native command, or its pipeline of native commands, **in the background**, as on Unix: the shell gives control back at once (`xeyes &`, `make > build.log 2>&1 &`). `&` also separates statements, like `;`: `xclock & xeyes &`, `make & echo started`.
+- **Native commands only**: a cmdlet, a built-in command or an expression followed by `&` is a blocking error: `& only applies to native commands (programs), not to cmdlets, built-in commands or expressions`. An assignment cannot be put in the background (`$x = cmd &`: syntax error).
+- **Lexing**: a lone `&` is the operator; attached to a word, it ends the word only if a blank, `;` or the end of the line follows (`xeyes&` runs `xeyes` in the background, `curl http://x?a=1&b=2` passes the URL whole). `&&` and `2>&1` are unchanged.
+- **Input and output**: the background command never reads the console (its standard input is the null device). Its output and errors go to the terminal, as on Unix, and may mix with the prompt; `>`, `>>`, `2>`, `2>&1` apply as usual. Without a terminal (script, `-c`), they are discarded unless redirected.
+- **Launch**: interactive mode displays `[1] 12345` (job number, pid of the last process). `$last` describes that process, with `$exit` = `null` (as for FR-39); `$?` is `true` if the launch succeeded.
+- **Ctrl+C**: it stops the command in the foreground only. On Unix, the background processes ignore `SIGINT` and `SIGQUIT` (they are started by `sh`, which ignores the signals then `exec`s the program, as `sh` does for its own background jobs). On Windows, graphical programs are not affected, but a **console** program in the background still receives the console's Ctrl+C (known limitation: Java cannot start a process in a new process group).
+- **End**: before the next prompt, the shell reports each background job that has ended: `[1] done xeyes (exit 0)`, then forgets it.
+- **`jobs`** (built-in command) lists the jobs still tracked as `Job` objects (`id`, `pid`, `running`, `exitCode`, `command`, `start`); the ended jobs are then forgotten, as they have been reported. Numbering: the smallest free number from 1. A job is stopped with `kill`, which accepts any record with a `pid` component: `jobs | kill`, `jobs | where { $_.command.startsWith("xclock") } | kill`. No `fg`/`bg`/`wait` in v1.
+- **Exit of the shell**: the background jobs keep running.
+- CA: on Linux with X, `xeyes &` displays `[1] <pid>` and the prompt comes back at once; `sleep 60 &` then `sleep 100` and Ctrl+C stops only `sleep 100`, and `jobs` still shows `sleep 60` running; `jobs | kill` then Enter displays `[2] done sleep 60 (exit 143)`; `ls &` gives the error above.
+
 **FR-40b — Native command encoding.** Text exchanged with native commands (stdout/stderr decoded into `String`, objects written to stdin) uses the encoding defined by the **`POWERJ_NATIVE_ENCODING` environment variable**:
 
 | Value | Effect |
@@ -1686,6 +1698,7 @@ The backlog cmdlets (§12.3) are added **one per mini-iteration**, each with a s
 | 21 | `cp -r -p`, `rm -r -p` (parallel) | FR-72b | `docs/recettes/fileops.md` |
 | 22 | `to-json`, `from-json`, `to-csv`, `from-csv` | FR-73 | `docs/recettes/json-csv.md` |
 | 23 | `ps`, `kill` | FR-74 | `docs/recettes/ps-kill.md` |
+| 24 | Background execution `&`, `jobs` | FR-75 | `docs/recettes/background.md` |
 
 Version 2 will introduce scripting (`if`, `foreach`, functions, `.pj` files).
 
@@ -1696,6 +1709,7 @@ Version 2 will introduce scripting (`if`, `foreach`, functions, `.pj` files).
 ### 12.1 Grammar (EBNF, v1)
 
 ```ebnf
+script        = ligne { ( ";" | "&&" | "||" | "&" ) ligne } [ ";" | "&" ] ;   (* "&": background, FR-75 *)
 ligne         = import | [ affectation | pipeline ] [ redirection* ] ;
 import        = "import" nom_qualifie [ ".*" ] ;
 affectation   = variable "=" pipeline ;
@@ -1800,6 +1814,7 @@ With the cmdlets of the roadmap (`find` was cancelled), the end-to-end check is 
 | `$_ -match 'IPv4'` | `$_.contains("IPv4")` / `$_.matches(".*IPv4.*")` |
 | `$LASTEXITCODE` | `$exit` |
 | `& "C:\outil.exe"` | `^"C:\outil.exe"` |
+| `Start-Process notepad`, `Start-Job` | `notepad &` (native commands only, FR-75); `jobs` |
 | `Get-Member` | `help members` |
 | `[System.Math]::Max(3, 7)` | `Math.max(3, 7)` |
 | `[System.IO.File]::ReadAllLines("a.txt")` | `java.nio.file.Files.readAllLines(Path.of("a.txt"))` |

@@ -18,6 +18,9 @@ public sealed interface Token {
     /** Statement separator {@code ;}, {@code &&} or {@code ||}. */
     record Separator(Connector connector) implements Token { }
 
+    /** {@code &} ending a statement: it runs in the background (FR-75), and the next one follows at once. */
+    record Background() implements Token { }
+
     /** {@code |} (pipeline). */
     record Pipe() implements Token { }
 

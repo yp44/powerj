@@ -56,6 +56,23 @@ class ParserTest {
     }
 
     @Test
+    void background() {
+        var steps = Parser.parse("xclock & xeyes -g 10 &").steps();
+        assertThat(steps).extracting(step -> step.statement().background()).containsExactly(true, true);
+        assertThat(steps).extracting(Ast.Step::connector).containsExactly(Connector.ALWAYS, Connector.ALWAYS);
+        assertThat(steps.get(1).statement().body())
+                .isEqualTo(new Command("xeyes", false, List.of(new WordArgument("-g"), new WordArgument("10"))));
+
+        steps = Parser.parse("make &; echo ok && echo fini").steps();
+        assertThat(steps).extracting(step -> step.statement().background()).containsExactly(true, false, false);
+        assertThat(steps).extracting(Ast.Step::connector)
+                .containsExactly(Connector.ALWAYS, Connector.ALWAYS, Connector.IF_SUCCESS);
+
+        assertThat(only("find / > out.txt 2> err.txt &").redirects()).hasSize(2);
+        assertThat(only("ls").background()).isFalse();
+    }
+
+    @Test
     void redirections() {
         var statement = only("git log > log.txt 2>> err.txt");
         assertThat(statement.redirects()).containsExactly(
@@ -78,6 +95,12 @@ class ParserTest {
         assertThatThrownBy(() -> Parser.parse("where }")).hasMessageContaining("\"}\" without a matching \"{\"");
         assertThatThrownBy(() -> Parser.parse("where { $_.x ")).hasMessageContaining("unclosed block");
         assertThatThrownBy(() -> Parser.parse("$x.y = 1")).hasMessageContaining("assignment: $name = value");
+        assertThatThrownBy(() -> Parser.parse("&")).hasMessageContaining("\"&\" without a command before it");
+        assertThatThrownBy(() -> Parser.parse("a & &")).hasMessageContaining("\"&\" without a command before it");
+        assertThatThrownBy(() -> Parser.parse("a & && b")).hasMessageContaining("\"&&\" without a command before it");
+        assertThatThrownBy(() -> Parser.parse("ls | &")).hasMessageContaining("command expected after \"|\"");
+        assertThatThrownBy(() -> Parser.parse("$x = a &")).hasMessageContaining("cannot be captured in $x");
+        assertThatThrownBy(() -> Parser.parse("$x = &")).hasMessageContaining("value expected");
     }
 
     @Test

@@ -196,6 +196,75 @@ class InterpreterTest {
     }
 
     @Test
+    void backgroundCommandGivesControlBackAtOnce() throws Exception {
+        long start = System.nanoTime();
+        run("sleep 30 &");
+        assertThat(java.time.Duration.ofNanos(System.nanoTime() - start)).isLessThan(java.time.Duration.ofSeconds(5));
+        assertThat(errors).isEmpty();
+        NativeRun last = session.lastNative().orElseThrow();
+        assertThat(last.exitCode()).isNull();
+        assertThat(session.lastSucceeded()).isTrue();
+        ProcessHandle sleep = ProcessHandle.of(last.pid()).orElseThrow();
+        try {
+            assertThat(sleep.isAlive()).isTrue();
+            assertThat(session.jobs().list()).singleElement().satisfies(job -> {
+                assertThat(job.id()).isEqualTo(1);
+                assertThat(job.pid()).isEqualTo(last.pid());
+                assertThat(job.command()).isEqualTo("sleep 30");
+                assertThat(job.running()).isTrue();
+            });
+            // Ctrl+C in the terminal reaches the whole process group: the background command ignores it.
+            new ProcessBuilder("kill", "-INT", String.valueOf(last.pid())).start().waitFor();
+            Thread.sleep(300);
+            assertThat(sleep.isAlive()).isTrue();
+        } finally {
+            sleep.destroyForcibly();
+        }
+        sleep.onExit().get(10, java.util.concurrent.TimeUnit.SECONDS);
+        awaitEnd();
+        assertThat(session.jobs().drainFinished()).singleElement().asString().startsWith("[1] done sleep 30 (exit ");
+        assertThat(session.jobs().list()).isEmpty();
+    }
+
+    @Test
+    void backgroundRedirectionsPipelinesAndNextStatement() throws Exception {
+        assertThat(run("sh -c \"echo dehors; echo erreur >&2\" > out.txt 2> err.txt & printf \"suite\""))
+                .isEqualTo("suite" + System.lineSeparator());
+        run("printf \"b\\na\\n\" | sort > tri.txt &");
+        awaitEnd();
+        assertThat(Files.readString(tmp.resolve("out.txt"))).isEqualTo("dehors\n");
+        assertThat(Files.readString(tmp.resolve("err.txt"))).isEqualTo("erreur\n");
+        assertThat(Files.readString(tmp.resolve("tri.txt"))).isEqualTo("a\nb\n");
+        // jobs reports the ended jobs once, then forgets them.
+        assertThat(session.jobs().list()).extracting(Job::id, Job::command, Job::running, Job::exitCode)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple(1, "sh -c \"echo dehors; echo erreur >&2\"", false, 0),
+                        org.assertj.core.groups.Tuple.tuple(2, "printf \"b\\na\\n\" | sort", false, 0));
+        assertThat(session.jobs().list()).isEmpty();
+        assertThat(session.jobs().drainFinished()).isEmpty();
+    }
+
+    @Test
+    void backgroundOnlyForNativeCommands() throws Exception {
+        String message = "& only applies to native commands (programs), not to cmdlets, built-in commands or expressions";
+        run("pwd &");
+        assertThat(errors).containsExactly(message);
+        run("\"x\" &");
+        assertThat(errors).containsExactly(message);
+        assertThat(session.jobs().list()).isEmpty();
+    }
+
+    /** Waits for the end of the background jobs. */
+    private void awaitEnd() throws InterruptedException {
+        long deadline = System.nanoTime() + 10_000_000_000L;
+        while (session.jobs().anyRunning()) {
+            if (System.nanoTime() > deadline) {
+                throw new AssertionError("background job still running");
+            }
+            Thread.sleep(20);
+        }
+    }
+
+    @Test
     void tildeIsTheHomeVariableInUnquotedArguments() throws Exception {
         Path home = tmp.resolve("home");
         String nl = System.lineSeparator();
