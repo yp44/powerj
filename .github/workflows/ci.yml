@@ -125,6 +125,8 @@ jobs:
           grep -qx "$HOME" tilde.txt
           grep -qx 'note.txt' tilde.txt
           test -f $HOME/out.txt
+          # java.net.http is in the boot layer of the launcher (FR-52, FR-55b)
+          test "$($pj -c 'HttpClient.newBuilder().build().version()')" = HTTP_2
 
       - name: Module d'exemple greet.jar
         uses: actions/upload-artifact@v5
@@ -208,6 +210,8 @@ jobs:
           $lignes = 'x.txt', 'y.log', 'z.txt' | & $pj filtre.pj
           $lignes
           if (($lignes -join ',') -ne 'x.txt,z.txt') { throw "filtrage de l'entrée standard incorrect : $lignes" }
+          $http = & $pj -c 'HttpClient.newBuilder().build().version()'
+          if ($http -ne 'HTTP_2') { throw "java.net.http absent du launcher : $http" }
           exit 0
 
       - name: Test de fumée des modules tiers

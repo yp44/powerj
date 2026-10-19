@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.io.File;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.lang.module.ModuleDescriptor;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -81,6 +82,16 @@ class JavaInteropTest {
         assertThat(run("import")).contains("java.util.*", "java.security.*");
         run("import java.awt.List");
         assertThat(run("help List")).contains("class java.awt.List");
+    }
+
+    @Test
+    void theWholeJavaSeLibraryIsResolved() throws Exception {
+        // The launcher starts with --module: without this requires, java.net.http, java.sql… are missing (FR-52).
+        Path classes = Path.of(Interpreter.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+        try (var in = Files.newInputStream(classes.resolve("module-info.class"))) {
+            assertThat(ModuleDescriptor.read(in).requires()).anyMatch(r -> r.name().equals("java.se"));
+        }
+        assertThat(value("HttpClient.newBuilder().build().version().name()")).isEqualTo("HTTP_2");
     }
 
     @Test
