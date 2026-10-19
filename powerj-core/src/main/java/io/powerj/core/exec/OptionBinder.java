@@ -253,7 +253,7 @@ public final class OptionBinder {
         if (type == List.class) {
             Class<?> element = elementType(spec.component().getGenericType());
             List<Object> values = new ArrayList<>();
-            if (value instanceof Iterable<?> items) {
+            if (value instanceof Iterable<?> items && !(value instanceof Path)) { // a Path, though Iterable, is one value
                 for (Object item : items) {
                     values.add(convertScalar(command, spec, element, item));
                 }
