@@ -911,10 +911,10 @@ CA:
 
 ```text
 ps [nom...] [-u|--user <utilisateur>]
-kill [pid...] [-f|--force] [-w|--wait] [-v|--verbose] [-n|--dry-run]
+kill [pid...] [-s|--signal <nom>] [-f|--force] [-w|--wait] [-v|--verbose] [-n|--dry-run]
 ```
 
-Both cmdlets use the JDK (`ProcessHandle`), without native calls, and behave the same on every platform. The native programs remain available with `^ps`, `^kill` or `native.prefer` (FR-14, FR-16).
+`ps` uses the JDK (`ProcessHandle`); `kill` sends its signals with the Foreign Function & Memory API (C function `kill` on Linux and macOS, `TerminateProcess` on Windows), without JNI nor native library. The native programs remain available with `^ps`, `^kill` or `native.prefer` (FR-14, FR-16).
 
 **`ps`** lists the processes, sorted by pid, as `ProcessEntry` objects:
 
@@ -932,11 +932,11 @@ public record ProcessEntry(long pid, Long parent, String name, String command, S
 - `ps` runs in preview (FR-66).
 
 **`kill`** stops the processes given by pid, or received from the pipeline: `ProcessEntry`, `ProcessHandle`, `Process`, or an integer (`ps notepad | kill`).
-- **Stop mode**: without `-f`, a normal stop (`SIGTERM` on Unix); with `-f`, a forcible one. On Windows, every stop is forcible.
+- **Signal**: `-s` sends `HUP`, `INT`, `QUIT`, `KILL`, `TERM` (default), `USR1`, `USR2`, `STOP` or `CONT` (`SIG` prefix optional). `-f` is short for `-s KILL`. On Windows, `TERM` and `KILL` both stop the process forcibly, and any other signal is a blocking error.
 - **Output**:
   - `kill` returns without waiting, and `-w` waits for each end;
   - it emits nothing, except with `-v` (the processes stopped) or `-n` (the processes that would be stopped, without stopping them).
-- **PowerJ itself**: its own pid closes PowerJ like `exit`, after the other targets; with `-f`, at once. Its parents (the terminal) are stopped like any other process.
+- **No exception**: PowerJ itself and its parents receive the signal like any other process.
 - **Errors**: a pid that does not exist, or a process that cannot be stopped, gives a non-blocking error.
 - `kill` never runs in preview.
 
@@ -944,7 +944,7 @@ CA:
 - `ps | first 5` displays `pid name user cpu start`; `ps java` lists the Java processes, PowerJ included;
 - `ps java | sort cpu --desc | first 3`;
 - a process started for the test: `ps <nom> | kill -n` lists it and leaves it alive; `ps <nom> | kill -w -v` stops it and displays it;
-- `kill 999999`: `kill: no process 999999`; `kill (ProcessHandle.current().pid())` closes PowerJ.
+- `kill 999999`: `kill: no process 999999`; `kill -s STOP <pid>` then `kill -s CONT <pid>` pause and resume a process (Linux, macOS); `kill -s HUP 1234` on Windows: blocking error.
 
 ### 3.10 Native commands
 
