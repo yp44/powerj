@@ -366,10 +366,17 @@ public final class FileWalker {
                 return; // consequence of the stop
             }
             stopped = true;
-            signal(new Failure(e));
+            deliver(new Failure(e)); // read by the calling thread, which waits for it
         }
 
+        /** Signals the end, unless the walk is stopped: nobody reads anymore, and a full queue would block. */
         private void signal(Object item) {
+            if (!stopped) {
+                deliver(item);
+            }
+        }
+
+        private void deliver(Object item) {
             try {
                 queue.put(item);
             } catch (InterruptedException _) {

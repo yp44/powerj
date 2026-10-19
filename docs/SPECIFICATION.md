@@ -404,7 +404,7 @@ Short rule: **`$_` for one-line filters typed at the keyboard, a named lambda as
 
 ### 3.9 Cmdlets in the current scope
 
-Only **four cmdlets** are in the scope of the first steps: `ls`, `where`, `map` and `env`; the mini-iterations add `collect` (FR-36d), `grep` (FR-64), `cat` (FR-65), `sort` (FR-67), `first`, `last` and `range` (FR-68), `select` (FR-69), `count` and `measure` (FR-70), `group` (FR-71), and the file operations `mkdir`, `touch`, `cp`, `mv`, `rm` (FR-72), and the conversions `to-json`, `from-json`, `to-csv`, `from-csv` (FR-73). The first two alone cover the core mechanisms: producing record objects, attribute access, the pipeline, expressions, and mixing with native commands.
+Only **four cmdlets** are in the scope of the first steps: `ls`, `where`, `map` and `env`; the mini-iterations add `collect` (FR-36d), `grep` (FR-64), `cat` (FR-65), `sort` (FR-67), `first`, `last` and `range` (FR-68), `select` (FR-69), `count` and `measure` (FR-70), `group` (FR-71), and the file operations `mkdir`, `touch`, `cp`, `mv`, `rm` (FR-72), the conversions `to-json`, `from-json`, `to-csv`, `from-csv` (FR-73), and the processes `ps`, `kill` (FR-74). The first two alone cover the core mechanisms: producing record objects, attribute access, the pipeline, expressions, and mixing with native commands.
 
 #### FR-35 — `ls`: list files
 
@@ -906,6 +906,48 @@ CA:
 - `ls | select name size | to-csv -d ";" > f.csv`, then `cat f.csv | from-csv -d ";"` gives the same names, with the sizes as strings;
 - `cat f.json -c | from-json --property content` reads the content of a `CatContent`; `"data.json" | from-json` is invalid JSON;
 - a CSV field with a `,`, a `"` and a line break survives `to-csv | from-csv`.
+
+#### FR-74 — `ps`, `kill`: processes
+
+```text
+ps [nom...] [-u|--user <utilisateur>]
+kill [pid...] [-f|--force] [-w|--wait] [-v|--verbose] [-n|--dry-run]
+```
+
+Both cmdlets use the JDK (`ProcessHandle`), without native calls, and behave the same on every platform. The native programs remain available with `^ps`, `^kill` or `native.prefer` (FR-14, FR-16).
+
+**`ps`** lists the processes, sorted by pid, as `ProcessEntry` objects:
+
+```java
+@Display(columns = {"pid", "name", "user", "cpu", "start"})
+public record ProcessEntry(long pid, Long parent, String name, String command, String commandLine,
+                           String user, Instant start, Duration cpu) { }
+```
+
+- **Filters**:
+  - `nom` keeps the processes whose name matches one of the patterns: wildcards, case ignored, `.exe` optional on Windows (`ps notepad`);
+  - `-u` keeps those of a user.
+- **Unknown values**: information the system does not give is `null`. On Windows without administrator rights, this is the case for the command and the user of other users' processes.
+- **Limitations**: the memory and the state of a process are not available from the JDK.
+- `ps` runs in preview (FR-66).
+
+**`kill`** stops the processes given by pid, or received from the pipeline: `ProcessEntry`, `ProcessHandle`, `Process`, or an integer (`ps notepad | kill`).
+- **Stop mode**: without `-f`, a normal stop (`SIGTERM` on Unix); with `-f`, a forcible one (`SIGKILL`). On Windows, every stop is forcible. Other signals (`HUP`, `STOP`…) are not available: use the native program (`^kill -HUP 1234`).
+- **Output**:
+  - `kill` returns without waiting, and `-w` waits for each end;
+  - it emits nothing, except with `-v` (the processes stopped) or `-n` (the processes that would be stopped, without stopping them).
+- **Errors** (non-blocking, the other targets are processed):
+  - a pid that does not exist;
+  - a process that cannot be stopped;
+  - PowerJ itself: the JDK forbids it, `cannot stop PowerJ itself (use exit)`.
+- The parents of PowerJ (the terminal) are stopped like any other process.
+- `kill` never runs in preview.
+
+CA:
+- `ps | first 5` displays `pid name user cpu start`; `ps java` lists the Java processes, PowerJ included;
+- `ps java | sort cpu --desc | first 3`;
+- a process started for the test: `ps <nom> | kill -n` lists it and leaves it alive; `ps <nom> | kill -w -v` stops it and displays it;
+- `kill 999999`: `kill: no process 999999`; `kill (ProcessHandle.current().pid())`: `kill: cannot stop PowerJ itself (use exit)`.
 
 ### 3.10 Native commands
 
@@ -1643,6 +1685,7 @@ The backlog cmdlets (§12.3) are added **one per mini-iteration**, each with a s
 | 20 | `mkdir`, `touch`, `cp`, `mv`, `rm` | FR-72 | `docs/recettes/fileops.md` |
 | 21 | `cp -r -p`, `rm -r -p` (parallel) | FR-72b | `docs/recettes/fileops.md` |
 | 22 | `to-json`, `from-json`, `to-csv`, `from-csv` | FR-73 | `docs/recettes/json-csv.md` |
+| 23 | `ps`, `kill` | FR-74 | `docs/recettes/ps-kill.md` |
 
 Version 2 will introduce scripting (`if`, `foreach`, functions, `.pj` files).
 
@@ -1720,7 +1763,7 @@ PJ C:\dev> (ls)*.name.stream().map({ $_.toUpperCase() }).sorted().toList()
 | ~~`cat`~~ | Read files — **done** (FR-65) | `String`, `CatLine`, `CatContent` |
 | `find` | Advanced search (`--name --since --size --type`) | `FileEntry` |
 | ~~`cp`, `mv`, `rm`, `mkdir`, `touch`~~ | File operations — **done** (FR-72) | `FileEntry`, `FileOperation` |
-| `ps`, `kill` | Processes | `ProcessEntry` |
+| ~~`ps`, `kill`~~ | Processes — **done** (FR-74) | `ProcessEntry` |
 | ~~`select`~~ | Attribute projection — **done** (FR-69); `--expand` not done | `Row` |
 | ~~`sort`~~ | Sorting — **done** (FR-67) | unchanged |
 | ~~`collect`~~ | Gather into a list — **done** (FR-36d) | `Collected` |
@@ -1742,6 +1785,8 @@ Target vision once the backlog is complete:
 find src --name *.java --since 7d | where { $_.size > 2kb } | group { $_.path.parent }
     | sort count --desc | first 5 | to-json > rapport.json
 ```
+
+With the cmdlets of the roadmap (`find` was cancelled), the end-to-end check is `docs/recettes/pipeline-v1.md`.
 
 ### 12.4 PowerShell → PowerJ mapping
 
