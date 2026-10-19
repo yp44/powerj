@@ -114,6 +114,9 @@ public final class Kill implements Cmdlet<Kill.Params, Object, ProcessEntry> {
         if (p.await()) {
             try {
                 process.onExit().get();
+                while (process.isAlive()) { // Windows: the end may be seen a moment after onExit completes
+                    Thread.sleep(10);
+                }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new CancellationException();
