@@ -88,7 +88,8 @@ Target pipeline at the end (§12.3):
 - `to-csv [file] [--delimiter ,] [--no-header]` and `from-csv [file] [--delimiter] [--no-header]` follow RFC 4180 (quotes, line breaks inside fields). `from-csv` emits `Row` (phase 3).
 - Tests: JSON round trip, Unicode escapes, numbers, invalid JSON (error with position), CSV quoting.
 
-## Phase 10 — `ps` / `kill` (FR-76), `claude/cmdlet-ps`
+## Phase 10 — `ps` / `kill` (FR-74), `claude/cmdlet-ps`
+- Spec: `docs/plans/ps-kill.md`.
 - `ps [name|glob] [--user u]` uses `ProcessHandle.allProcesses()` and emits `record ProcessEntry(long pid, Long parent, String name, String command, String user, Instant start, Duration cpu)`, with `@Display(columns = {"pid","name","cpu","start"})`. Memory is not available from the JDK and is documented as a limitation. No native calls, so it works on every platform.
 - `kill pid… [-f|--force]`, or pipeline `ProcessEntry`/`Long` input (`ps java | kill`), calls `destroy()` / `destroyForcibly()`. `preview = false`. Killing PowerJ's own PID is refused.
 - Tests: `ps` sees `ProcessHandle.current()`, name filtering, killing a process started by the test, an unknown PID (non-blocking error).

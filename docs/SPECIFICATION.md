@@ -907,6 +907,44 @@ CA:
 - `cat f.json -c | from-json --property content` reads the content of a `CatContent`; `"data.json" | from-json` is invalid JSON;
 - a CSV field with a `,`, a `"` and a line break survives `to-csv | from-csv`.
 
+#### FR-74 — `ps`, `kill`: processes
+
+```text
+ps [nom...] [-u|--user <utilisateur>]
+kill [pid...] [-f|--force] [-w|--wait] [-v|--verbose] [-n|--dry-run]
+```
+
+Both cmdlets use the JDK (`ProcessHandle`), without native calls, and behave the same on every platform. The native programs remain available with `^ps`, `^kill` or `native.prefer` (FR-14, FR-16).
+
+**`ps`** lists the processes, sorted by pid, as `ProcessEntry` objects:
+
+```java
+@Display(columns = {"pid", "name", "user", "cpu", "start"})
+public record ProcessEntry(long pid, Long parent, String name, String command, String commandLine,
+                           String user, Instant start, Duration cpu) { }
+```
+
+- **Filters**:
+  - `nom` keeps the processes whose name matches one of the patterns: wildcards, case ignored, `.exe` optional on Windows (`ps notepad`);
+  - `-u` keeps those of a user.
+- **Unknown values**: information the system does not give is `null`. On Windows without administrator rights, this is the case for the command and the user of other users' processes.
+- **Limitations**: the memory and the state of a process are not available from the JDK.
+- `ps` runs in preview (FR-66).
+
+**`kill`** stops the processes given by pid, or received from the pipeline: `ProcessEntry`, `ProcessHandle`, `Process`, or an integer (`ps notepad | kill`).
+- **Stop mode**: without `-f`, a normal stop (`SIGTERM` on Unix); with `-f`, a forcible one. On Windows, every stop is forcible.
+- **Output**:
+  - `kill` returns without waiting, and `-w` waits for each end;
+  - it emits nothing, except with `-v` (the processes stopped) or `-n` (the processes that would be stopped, without stopping them).
+- **Refusals**: PowerJ itself and its parents (the terminal) are refused, `refused: 4321 is PowerJ or one of its parents`. A pid that does not exist, or a process that cannot be stopped, gives a non-blocking error.
+- `kill` never runs in preview.
+
+CA:
+- `ps | first 5` displays `pid name user cpu start`; `ps java` lists the Java processes, PowerJ included;
+- `ps java | sort cpu --desc | first 3`;
+- a process started for the test: `ps <nom> | kill -n` lists it and leaves it alive; `ps <nom> | kill -w -v` stops it and displays it;
+- `kill 999999`: `kill: no process 999999`; `ps | where { $_.pid == ProcessHandle.current().pid() } | kill`: refused.
+
 ### 3.10 Native commands
 
 **FR-37 — Principle: streams stay streams.** A native command is **not** wrapped in an object: its standard output and its error output are handled as streams, the way a classic shell does.
@@ -1643,6 +1681,7 @@ The backlog cmdlets (§12.3) are added **one per mini-iteration**, each with a s
 | 20 | `mkdir`, `touch`, `cp`, `mv`, `rm` | FR-72 | `docs/recettes/fileops.md` |
 | 21 | `cp -r -p`, `rm -r -p` (parallel) | FR-72b | `docs/recettes/fileops.md` |
 | 22 | `to-json`, `from-json`, `to-csv`, `from-csv` | FR-73 | `docs/recettes/json-csv.md` |
+| 23 | `ps`, `kill` | FR-74 | `docs/recettes/ps-kill.md` |
 
 Version 2 will introduce scripting (`if`, `foreach`, functions, `.pj` files).
 
