@@ -53,6 +53,14 @@ class PsKillTest {
         return context.emitted;
     }
 
+    /**
+     * Whether the process still runs, asked to the system: on Windows, {@link Process#isAlive()} may still answer
+     * {@code true} for a moment after another handle has seen the end of the process.
+     */
+    private static boolean alive(Process process) {
+        return process.toHandle().isAlive();
+    }
+
     private static long self() {
         return ProcessHandle.current().pid();
     }
@@ -104,7 +112,7 @@ class PsKillTest {
         Process sleeper = sleeper();
         List<ProcessEntry> out = run(new Kill(), new Kill.Params(List.of(String.valueOf(sleeper.pid())), false, true,
                 true, false));
-        assertThat(sleeper.isAlive()).isFalse();
+        assertThat(alive(sleeper)).isFalse();
         assertThat(out).singleElement().extracting(ProcessEntry::pid).isEqualTo(sleeper.pid());
         assertThat(context.errors).isEmpty();
     }
@@ -117,7 +125,21 @@ class PsKillTest {
         List<ProcessEntry> out = run(new Kill(), new Kill.Params(List.of(), true, true, false, false),
                 ProcessEntry.of(a.toHandle()), b.toHandle(), c.pid());
         assertThat(out).isEmpty();
-        assertThat(List.of(a, b, c)).noneMatch(Process::isAlive);
+        assertThat(List.of(a, b, c)).noneMatch(PsKillTest::alive);
+    }
+
+    /** Any record with a {@code pid} component, such as a job of {@code jobs} (FR-75). */
+    public record WithPid(int id, long pid) { }
+
+    public record WithoutPid(String pid) { }
+
+    @Test
+    void killARecordWithAPid() throws Exception {
+        Process sleeper = sleeper();
+        run(new Kill(), new Kill.Params(List.of(), false, true, false, false), new WithPid(1, sleeper.pid()),
+                new WithoutPid("12"));
+        assertThat(alive(sleeper)).isFalse();
+        assertThat(context.errors).singleElement().asString().startsWith("not a process: ");
     }
 
     @Test

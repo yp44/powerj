@@ -22,7 +22,8 @@ import io.powerj.core.lang.SyntaxException;
 import io.powerj.core.lang.Token;
 
 /**
- * Executes a line: statements chained by {@code ;}, {@code &&}, {@code ||} (FR-04c), pipelines
+ * Executes a line: statements chained by {@code ;}, {@code &&}, {@code ||} (FR-04c) or launched in the background
+ * by {@code &} (FR-75), pipelines
  * {@code |}, built-in commands, cmdlets, native commands, expressions, assignments and redirections. Resolution order
  * of a command (FR-13): built-in command, cmdlet, program on the {@code PATH}; {@code ^name} forces the
  * program.
@@ -68,6 +69,7 @@ public final class Interpreter {
         builtins.put("pwd", Builtins::pwd);
         builtins.put("exit", Builtins::exit);
         builtins.put("which", this::which);
+        builtins.put("jobs", (_, s) -> new ArrayList<>(s.jobs().list()));
         builtins.put("help", (args, _) -> Help.run(args, registry, session.java()));
         builtins.put("import", (args, _) -> importClasses(args));
         builtins.put("mod-load", this::modLoad);
@@ -181,6 +183,9 @@ public final class Interpreter {
         try {
             errTarget = redirect(statement.pipeline(), Token.Stream.ERR);
             Optional<NativeRunner.FileTarget> outTarget = redirect(statement.pipeline(), Token.Stream.OUT);
+            if (statement.background()) {
+                return background(statement.pipeline(), outTarget, errTarget);
+            }
             if (statement.assignTo().isPresent()) {
                 if (outTarget.isPresent()) {
                     throw new PjException(Messages.get("redirect.assignment"));
@@ -198,6 +203,39 @@ public final class Interpreter {
             reportError(describe(e.error()), errTarget);
             return false;
         }
+    }
+
+    /**
+     * {@code cmd &} (FR-75): starts the native commands of the pipeline without waiting for them, and records the job.
+     * {@code $last} describes the last process, with no exit code, as for a detached application (FR-39).
+     */
+    private boolean background(Ast.Pipeline pipeline, Optional<NativeRunner.FileTarget> outTarget,
+                               Optional<NativeRunner.FileTarget> errTarget) throws InterruptedException {
+        List<Segment> segments = segments(pipeline.stages());
+        if (segments.size() != 1 || !(segments.getFirst() instanceof NativeSegment(var commands))) {
+            throw new PjException(Messages.get("background.nativeOnly"));
+        }
+        long start = System.nanoTime();
+        List<Process> processes = nativeRunner.startBackground(commands, session, io, outTarget, shared(errTarget));
+        String text = String.join(" | ", commands.stream().map(Interpreter::commandText).toList());
+        Job job = session.jobs().add(text, processes);
+        NativeRunner.Command last = commands.getLast();
+        session.recordNative(new NativeRun(last.executable(), last.args(), job.pid(), null,
+                java.time.Duration.ofNanos(System.nanoTime() - start)));
+        if (io.interactive()) {
+            io.out().println(Messages.get("background.started", job.id(), job.pid()));
+            io.out().flush();
+        }
+        return true;
+    }
+
+    /** {@code xeyes -geometry 100x100}: program name and arguments, on one line, for {@code jobs}. */
+    private static String commandText(NativeRunner.Command command) {
+        List<String> words = new ArrayList<>(command.args().size() + 1);
+        words.add(command.executable().getFileName().toString());
+        command.args().forEach(arg -> words.add(arg.isEmpty() || arg.chars().anyMatch(Character::isWhitespace)
+                ? '"' + arg.replace("\n", "\\n").replace("\t", "\\t") + '"' : arg));
+        return String.join(" ", words);
     }
 
     /** Stops a preview that has received enough values. */
@@ -229,6 +267,9 @@ public final class Interpreter {
             return new PreviewResult.Off(Messages.get("preview.off.several"));
         }
         Statement statement = script.steps().getFirst().statement();
+        if (statement.background()) {
+            return new PreviewResult.Off(Messages.get("preview.off.background"));
+        }
         if (statement.assignTo().isPresent()) {
             return new PreviewResult.Off(Messages.get("preview.off.assignment"));
         }

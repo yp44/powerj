@@ -99,7 +99,7 @@ Out of scope for v1: control structures (`if`, `foreach`, functions — planned 
 | `collect` | Gathers a pipeline into one list: `(ls -r \| collect).size()` | [etape-8](docs/recettes/etape-8-collect.md) |
 | `env` | Reads and sets environment variables (`env --set MAVEN_OPTS=-Xmx2g`) | [etape-3](docs/recettes/etape-3.md) |
 
-Built-in commands: `cd` (`cd -`, `cd ~`, `cd D:`), `pwd`, `which`, `help` (`help ls`, `help java.util.List`, `help members $x`), `history` (plus `!!`, `!n`, `!text`), `import`, `mod-load`, `mod-list`, `exit [code]`.
+Built-in commands: `cd` (`cd -`, `cd ~`, `cd D:`), `pwd`, `which`, `help` (`help ls`, `help java.util.List`, `help members $x`), `history` (plus `!!`, `!n`, `!text`), `import`, `mod-load`, `mod-list`, `jobs`, `exit [code]`.
 
 ### Java at the prompt
 
@@ -120,6 +120,7 @@ Overloads, varargs and argument conversions follow Java rules; `System.exit` and
 
 - **Pipelines** `|` of cmdlets, native commands and expressions; collections are unrolled element by element.
 - **Chaining** like Java statements: `a ; b`, `a && b`, `a || b` (`mvn package && java -jar target/app.jar`); `$?` and `$exit` give the last result.
+- **Background** native commands with `&`, as on Unix: `xeyes &` gives the prompt back at once; `jobs` lists them, `jobs | kill` stops them, and the end of each one is reported before the prompt.
 - **Variables** `$x = …`, `$_` in blocks, `$errors`, `$profile`.
 - **Unit literals** `512b 10kb 1gb`, `30s 5m 7d`, usable in options and expressions.
 - **Redirections** `>`, `>>`, `2>`, `2>>`, `2>&1`; `~` is the home directory in any unquoted argument.
@@ -322,7 +323,7 @@ Unit and integration tests use JUnit 5 and AssertJ: lexer, parser, option bindin
 
 PowerJ is in active development (version `0.1.0-SNAPSHOT`). Implemented so far:
 
-- REPL with line editing, persistent history and Ctrl+R; native commands, `cd`, chaining, variables, redirections; non-interactive mode;
+- REPL with line editing, persistent history and Ctrl+R; native commands, `cd`, chaining, background commands (`&`, `jobs`), variables, redirections; non-interactive mode;
 - object pipeline with the `ls`, `where`, `map`, `sort`, `first`, `last`, `range`, `select`, `count`, `measure`, `group`, `mkdir`, `touch`, `cp`, `mv`, `rm`, `to-json`, `from-json`, `to-csv`, `from-csv`, `ps`, `kill`, `collect`, `env`, `grep` and `cat` cmdlets, and a parallel file walker;
 - direct access to the JRE's Java API, Java-style lambdas and method references;
 - Tab completion and syntax highlighting;

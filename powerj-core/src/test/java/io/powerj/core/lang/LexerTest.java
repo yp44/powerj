@@ -125,6 +125,20 @@ class LexerTest {
     }
 
     @Test
+    void loneAmpersandRunsInTheBackground() {
+        assertThat(Lexer.tokenize("xeyes &")).containsExactly(w("xeyes"), new Token.Background());
+        assertThat(Lexer.tokenize("xeyes& xclock")).containsExactly(w("xeyes"), new Token.Background(), w("xclock"));
+        assertThat(Lexer.tokenize("a &; b")).containsExactly(w("a"), new Token.Background(),
+                new Token.Separator(Connector.ALWAYS), w("b"));
+        assertThat(Lexer.tokenize("a && b")).containsExactly(w("a"), new Token.Separator(Connector.IF_SUCCESS), w("b"));
+        assertThat(Lexer.tokenize("cmd 2>&1 &")).containsExactly(w("cmd"),
+                new Token.Redirection(Token.Stream.ERR_TO_OUT, false), new Token.Background());
+        // Inside a word, & followed by something else stays in the word (URL parameters).
+        assertThat(Lexer.tokenize("curl http://x?a=1&b=2")).containsExactly(w("curl"), w("http://x?a=1&b=2"));
+        assertThat(Lexer.tokenize("echo \"a & b\"")).hasSize(2);
+    }
+
+    @Test
     void assignmentAndOptionsWithEquals() {
         assertThat(Lexer.tokenize("$x = ls --count=5")).containsExactly(
                 new Token.AssignTo("x"), w("ls"), w("--count=5"));

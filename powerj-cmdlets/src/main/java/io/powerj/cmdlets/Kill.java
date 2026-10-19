@@ -1,5 +1,6 @@
 package io.powerj.cmdlets;
 
+import java.lang.reflect.RecordComponent;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CancellationException;
@@ -66,8 +67,25 @@ public final class Kill implements Cmdlet<Kill.Params, Object, ProcessEntry> {
             case ProcessHandle handle -> kill(p, handle.pid(), context);
             case Process process -> kill(p, process.pid(), context);
             case Long _, Integer _, Short _ -> kill(p, ((Number) input).longValue(), context);
+            case Record record when pidOf(record) != null -> kill(p, pidOf(record), context);
             case null, default -> context.error(Messages.get("kill.not.process", Where.abbreviate(input)));
         }
+    }
+
+    /** Component {@code pid} of a record ({@code jobs | kill}, FR-75), or {@code null} if it has none. */
+    private static Long pidOf(Record record) {
+        for (RecordComponent component : record.getClass().getRecordComponents()) {
+            if (component.getName().equals("pid")
+                    && (component.getType() == long.class || component.getType() == Long.class)) {
+                try {
+                    component.getAccessor().setAccessible(true);
+                    return (Long) component.getAccessor().invoke(record);
+                } catch (ReflectiveOperationException | RuntimeException e) {
+                    return null;
+                }
+            }
+        }
+        return null;
     }
 
     private static void kill(Params p, long pid, CmdletContext<ProcessEntry> context) {
@@ -96,6 +114,9 @@ public final class Kill implements Cmdlet<Kill.Params, Object, ProcessEntry> {
         if (p.await()) {
             try {
                 process.onExit().get();
+                while (process.isAlive()) { // Windows: the end may be seen a moment after onExit completes
+                    Thread.sleep(10);
+                }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new CancellationException();

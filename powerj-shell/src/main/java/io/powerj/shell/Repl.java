@@ -116,6 +116,8 @@ public final class Repl {
             if (terminal.paused()) {
                 terminal.resume(); // a command abandoned with a second Ctrl+C may still hold the console
             }
+            session.jobs().drainFinished().forEach(out::println); // FR-75: background jobs ended meanwhile
+            out.flush();
             try {
                 line = reader.readLine(prompt());
             } catch (UserInterruptException _) {

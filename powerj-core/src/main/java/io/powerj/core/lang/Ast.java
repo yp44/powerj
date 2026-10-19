@@ -9,7 +9,7 @@ public final class Ast {
     private Ast() {
     }
 
-    /** Complete line: sequence of statements chained by {@code ;}, {@code &&}, {@code ||}. */
+    /** Complete line: sequence of statements chained by {@code ;}, {@code &&}, {@code ||}, {@code &}. */
     public record Script(List<Step> steps) {
         public Script {
             steps = List.copyOf(steps);
@@ -22,9 +22,14 @@ public final class Ast {
     /**
      * Statement: optional assignment and pipeline.
      *
-     * @param assignTo assigned variable ({@code $x = …}), if present
+     * @param assignTo   assigned variable ({@code $x = …}), if present
+     * @param background ended by {@code &}: runs in the background (FR-75)
      */
-    public record Statement(Optional<String> assignTo, Pipeline pipeline) {
+    public record Statement(Optional<String> assignTo, Pipeline pipeline, boolean background) {
+
+        public Statement(Optional<String> assignTo, Pipeline pipeline) {
+            this(assignTo, pipeline, false);
+        }
 
         /** Body of the first stage (shortcut for a statement without a pipeline). */
         public Body body() {

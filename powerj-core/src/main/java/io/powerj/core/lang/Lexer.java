@@ -13,6 +13,8 @@ import java.util.regex.Pattern;
  *   <li>unquoted words are taken as is, backslashes included ({@code cd C:\Users});</li>
  *   <li>{@code ;}, {@code &&}, {@code ||}, {@code |}, {@code >}, {@code >>}, {@code 2>}, {@code 2>>},
  *       {@code 2>&1} are operators, even when attached to a word;</li>
+ *   <li>{@code &} alone runs the statement in the background (FR-75); attached to a word, it ends the word
+ *       only if a blank, {@code ;} or the end of the line follows ({@code xeyes&}, but {@code ?a=1&b=2});</li>
  *   <li>{@code $x =} at the start of a statement marks an assignment;</li>
  *   <li>expressions are handed to {@link ExpressionParser}: strings {@code "…"}, variables, blocks
  *       {@code { … }}, groups {@code ( … )}, and at the start of a statement literals, {@code new},
@@ -59,9 +61,10 @@ public final class Lexer {
             if (atEnd()) {
                 return tokens;
             }
-            boolean head = tokens.isEmpty() || tokens.getLast() instanceof Token.Separator
-                    || tokens.getLast() instanceof Token.Pipe || tokens.getLast() instanceof Token.AssignTo;
-            tokens.add(next(head, tokens.isEmpty() || tokens.getLast() instanceof Token.Separator));
+            boolean statement = tokens.isEmpty() || tokens.getLast() instanceof Token.Separator
+                    || tokens.getLast() instanceof Token.Background;
+            boolean head = statement || tokens.getLast() instanceof Token.Pipe || tokens.getLast() instanceof Token.AssignTo;
+            tokens.add(next(head, statement));
         }
     }
 
@@ -109,7 +112,10 @@ public final class Lexer {
                 pos++;
                 return new Token.Pipe();
             }
-            case '&' -> throw new SyntaxException(Messages.get("syntax.loneAmpersand"));
+            case '&' -> {
+                pos++;
+                return new Token.Background();
+            }
             case ')' -> throw new SyntaxException(Messages.get("syntax.unexpectedAt", ")", pos + 1));
             case '}' -> throw new SyntaxException(Messages.get("syntax.unmatchedBrace", pos + 1));
             case '=' -> throw new SyntaxException(Messages.get("syntax.unexpectedEquals", pos + 1));
@@ -220,8 +226,17 @@ public final class Lexer {
         char c = input.charAt(at);
         return isBlank(c) || c == ';' || c == '|' || c == '"' || c == '>' || c == '(' || c == ')'
                 || c == '{' || c == '}'
-                || input.startsWith("&&", at)
+                || input.startsWith("&&", at) || isBackground(input, at)
                 || (c == '2' && input.startsWith("2>", at) && (at == 0 || isBlank(input.charAt(at - 1))));
+    }
+
+    /** {@code &} followed by a blank, {@code ;} or the end of the line: background (FR-75). */
+    private static boolean isBackground(String input, int at) {
+        if (input.charAt(at) != '&' || at > 0 && input.charAt(at - 1) == '&') {
+            return false;
+        }
+        int next = at + 1;
+        return next == input.length() || isBlank(input.charAt(next)) || input.charAt(next) == ';';
     }
 
     /**

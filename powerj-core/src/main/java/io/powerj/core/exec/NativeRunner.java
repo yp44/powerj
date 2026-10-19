@@ -21,13 +21,17 @@ import java.util.function.Consumer;
  *   <li>display on a real terminal: inherited stdin/stdout/stderr (colors, {@code vim}, {@code ssh});</li>
  *   <li>capture ({@code $x = cmd}): stdout read as {@code String} lines, stderr to the error stream;</li>
  *   <li>redirections {@code >}, {@code >>}, {@code 2>}, {@code 2>>}: raw bytes to the file;</li>
- *   <li>Windows graphical application: launched detached (FR-39).</li>
+ *   <li>Windows graphical application: launched detached (FR-39);</li>
+ *   <li>{@code &}: launched in the background (FR-75).</li>
  * </ul>
  * Ctrl+C (thread interruption) stops the process and all its descendants (FR-57).
  */
 public final class NativeRunner {
 
     private static final long GRACE_SECONDS = 2;
+
+    /** Standard input of a background command: nothing to read. */
+    private static final java.io.File NULL_DEVICE = new java.io.File(Platform.isWindows() ? "NUL" : "/dev/null");
 
     /** Target file of a redirection. */
     public record FileTarget(Path file, boolean append) {
@@ -269,6 +273,54 @@ public final class NativeRunner {
             throw e;
         }
         return runs;
+    }
+
+    /**
+     * Starts native commands connected to one another in the background (FR-75), without waiting for them. Their
+     * standard input is the null device: they never read the console. Their output goes to the terminal (inherited)
+     * or to the file of a redirection; without a terminal, it is discarded. On Unix, the processes ignore
+     * {@code SIGINT} and {@code SIGQUIT}, which the terminal sends to the whole foreground process group on Ctrl+C:
+     * Java cannot start a process in another group, so the program is started by {@code sh}, which ignores the
+     * signals and replaces itself with the program ({@code exec}: the pid is the program's).
+     *
+     * @param stderrFile file of {@code 2>} (in append mode: it is shared by all stages)
+     * @return the processes, in order
+     */
+    List<Process> startBackground(List<Command> commands, Session session, ShellIo io, Optional<FileTarget> stdout,
+                                  Optional<FileTarget> stderrFile) {
+        List<ProcessBuilder> builders = new ArrayList<>(commands.size());
+        for (int i = 0; i < commands.size(); i++) {
+            Command command = commands.get(i);
+            List<String> line = new ArrayList<>(command.args().size() + 4);
+            if (!Platform.isWindows()) {
+                line.addAll(List.of("/bin/sh", "-c", "trap '' INT QUIT; exec \"$0\" \"$@\""));
+            }
+            line.add(command.executable().toString());
+            line.addAll(command.args());
+            var builder = new ProcessBuilder(line).directory(session.currentDirectory().toFile());
+            builder.environment().clear();
+            builder.environment().putAll(session.environment());
+            if (i == 0) {
+                builder.redirectInput(ProcessBuilder.Redirect.from(NULL_DEVICE));
+            }
+            if (i == commands.size() - 1) {
+                builder.redirectOutput(stdout.map(FileTarget::redirect).orElse(io.interactive()
+                        ? ProcessBuilder.Redirect.INHERIT : ProcessBuilder.Redirect.DISCARD));
+            }
+            if (command.errorsToOutput()) {
+                builder.redirectErrorStream(true);
+            } else {
+                builder.redirectError(stderrFile.map(f -> ProcessBuilder.Redirect.appendTo(f.file().toFile()))
+                        .orElse(io.interactive() ? ProcessBuilder.Redirect.INHERIT : ProcessBuilder.Redirect.DISCARD));
+            }
+            builders.add(builder);
+        }
+        try {
+            return ProcessBuilder.startPipeline(builders);
+        } catch (IOException e) {
+            throw new PjException(PjError.of(Messages.get("native.startFailed", commands.stream()
+                    .map(c -> c.executable().getFileName().toString()).toList(), e.getMessage()), e));
+        }
     }
 
     /** Writes the objects received to the process's stdin, in their displayed form (FR-37). */

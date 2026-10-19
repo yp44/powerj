@@ -13,7 +13,7 @@ class InputCompletenessTest {
     @ParameterizedTest
     @ValueSource(strings = {
             "", "ls -r", "cd C:\\", "ls C:\\temp\\", "where { $_.dir }", "\"a | b\"",
-            "\"guillemet \\\" échappé\"", "a || b && c", "ls |\nwhere { $_.dir }", "f(\")\")"})
+            "\"guillemet \\\" échappé\"", "a || b && c", "xeyes &", "a & b", "ls |\nwhere { $_.dir }", "f(\")\")"})
     void completeInputs(String input) {
         assertThat(InputCompleteness.check(input)).isEqualTo(new Result.Complete());
     }

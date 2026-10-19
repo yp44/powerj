@@ -15,7 +15,7 @@ final class Help {
      * {@code help.builtin.<name>.usage} and {@code help.builtin.<name>.description}.
      */
     private static final List<String> BUILTINS = List.of("cd", "pwd", "which", "help", "import", "mod-load",
-            "mod-list", "history", "exit");
+            "mod-list", "jobs", "history", "exit");
 
     private Help() {
     }
