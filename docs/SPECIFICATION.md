@@ -404,7 +404,7 @@ Short rule: **`$_` for one-line filters typed at the keyboard, a named lambda as
 
 ### 3.9 Cmdlets in the current scope
 
-Only **four cmdlets** are in the scope of the first steps: `ls`, `where`, `map` and `env`; the mini-iterations add `collect` (FR-36d), `grep` (FR-64), `cat` (FR-65), `sort` (FR-67), `first`, `last` and `range` (FR-68), `select` (FR-69), `count` and `measure` (FR-70), `group` (FR-71), and the file operations `mkdir`, `touch`, `cp`, `mv`, `rm` (FR-72). The first two alone cover the core mechanisms: producing record objects, attribute access, the pipeline, expressions, and mixing with native commands.
+Only **four cmdlets** are in the scope of the first steps: `ls`, `where`, `map` and `env`; the mini-iterations add `collect` (FR-36d), `grep` (FR-64), `cat` (FR-65), `sort` (FR-67), `first`, `last` and `range` (FR-68), `select` (FR-69), `count` and `measure` (FR-70), `group` (FR-71), and the file operations `mkdir`, `touch`, `cp`, `mv`, `rm` (FR-72), and the conversions `to-json`, `from-json`, `to-csv`, `from-csv` (FR-73). The first two alone cover the core mechanisms: producing record objects, attribute access, the pipeline, expressions, and mixing with native commands.
 
 #### FR-35 — `ls`: list files
 
@@ -850,6 +850,62 @@ CA:
 - `rm t -r -p 4 -v` lists every removed entry, each folder after its content;
 - `rm t -r -p 0` is refused: `--parallel expects a number of threads of at least 1, got 0`;
 - Ctrl+C during `rm big -r -p 8` returns the prompt.
+
+#### FR-73 — `to-json`, `from-json`, `to-csv`, `from-csv`: JSON and CSV
+
+```text
+to-json [-c|--compact] [-l|--lines] [--depth <n>]
+from-json [--property <nom>]
+to-csv [-d|--delimiter <char>] [--no-header]
+from-csv [-d|--delimiter <char>] [--no-header] [--property <nom>]
+```
+
+No external library: the writers and parsers are part of PowerJ. The four cmdlets change nothing on disk and run in preview (FR-66).
+- **No file name.** To write a file, redirect their text: `ls | select name size | to-json > files.json`.
+- **Pipeline only.** To read one, pipe it: `cat files.json | from-json`. A `String` received is always text, never a file name. With `--property <nom>`, that property of each object received holds the text: `cat files.json -c | from-json --property content`.
+
+**`to-json`** turns the objects received into JSON text.
+- **Output**: by default, one `String` emitted at the end, holding an indented array of all the objects, **always an array**, even for a single object. `--compact` writes it on one line, and `-l`/`--lines` emits one compact `String` per object as they arrive (JSON Lines).
+- **Mapping**:
+  - a record becomes an object of all its components (a `@Bytes` size stays a number of bytes);
+  - a `Row` or a `Map` becomes an object;
+  - collections, arrays and streams become arrays;
+  - numbers and booleans stay as they are; `NaN` and infinities become `null`;
+  - dates are written as ISO-8601 strings, and enums, paths and other objects as their text.
+- `--depth` (default 10) limits the nesting: deeper values are written as their text, with one non-blocking error.
+
+**`from-json`** reads JSON text: the `String` objects received, joined with line breaks (`cat data.json | from-json`), or their `--property`.
+- The text may hold several values one after the other (JSON Lines); each one is emitted as soon as it is complete.
+- A top-level array is unrolled.
+- An object gives a `Row` (FR-69), keys in order; an inner array gives a `List`.
+- Integers give `Long` (`BigInteger` beyond), other numbers `Double`.
+- Invalid JSON gives a non-blocking error with its position (`invalid JSON at line 3, column 7: expected ':' after a key`), and reading resumes at the next value.
+
+**`to-csv`** emits CSV (RFC 4180), one `String` per line, as the objects arrive: the header, then one line per object.
+- **Columns**: those of the first object (record components, `Row` or `Map` keys, or `value` for a scalar). A missing column gives an empty field.
+- **Fields**:
+  - they are quoted when they contain the delimiter, a quote or a line break;
+  - numbers use `.` and no exponent;
+  - nested values are written as compact JSON.
+- `--delimiter` takes one character or `tab` (`;` for Excel in French). `--no-header` omits the header.
+
+**`from-csv`** reads CSV, either the `String` lines received or their `--property`, and emits one `Row` per record as soon as it is complete.
+- **Header**: the first record gives the column names. With `--no-header`, the columns are `c1`, `c2`…
+- **Lines**:
+  - a quoted field may span several lines;
+  - empty lines and a UTF-8 byte order mark are skipped;
+  - a record with too many fields gives a non-blocking error, and a record with too few fields gets `null` values.
+- **Values**: always `String`, as in PowerShell's `Import-Csv` (`007` stays `007`). An empty field is `""`, and a missing column is `null`.
+
+CA:
+- `ls | select name size | to-json` displays an indented array; `ls | to-json -l` one line per file;
+- `ls a.txt | select name size | to-json` gives `[ { … } ]`;
+- `ls | select name size | to-json > f.json`, then `cat f.json | from-json | where { $_.size > 1kb }`;
+- `cat f.json | from-json` gives the same rows; `"[1, 2]" | from-json` gives `1` and `2`;
+- `"{\"a\": 1,}" | from-json`: error `invalid JSON at line 1, column 9: …`;
+- `ls | select name size | to-csv -d ";" > f.csv`, then `cat f.csv | from-csv -d ";"` gives the same names, with the sizes as strings;
+- `cat f.json -c | from-json --property content` reads the content of a `CatContent`; `"data.json" | from-json` is invalid JSON;
+- a CSV field with a `,`, a `"` and a line break survives `to-csv | from-csv`.
 
 ### 3.10 Native commands
 
@@ -1586,6 +1642,7 @@ The backlog cmdlets (§12.3) are added **one per mini-iteration**, each with a s
 | 19 | `group` | FR-71 | `docs/recettes/group.md` |
 | 20 | `mkdir`, `touch`, `cp`, `mv`, `rm` | FR-72 | `docs/recettes/fileops.md` |
 | 21 | `cp -r -p`, `rm -r -p` (parallel) | FR-72b | `docs/recettes/fileops.md` |
+| 22 | `to-json`, `from-json`, `to-csv`, `from-csv` | FR-73 | `docs/recettes/json-csv.md` |
 
 Version 2 will introduce scripting (`if`, `foreach`, functions, `.pj` files).
 
@@ -1674,7 +1731,7 @@ PJ C:\dev> (ls)*.name.stream().map({ $_.toUpperCase() }).sorted().toList()
 | `uniq` | Deduplication | unchanged |
 | `tee` | Copy into a variable | unchanged |
 | `table`, `tree` | Display formats | — |
-| `from-json`, `to-json`, `from-csv`, `to-csv` | Conversions | `Map` / `String` |
+| ~~`from-json`, `to-json`, `from-csv`, `to-csv`~~ | Conversions — **done** (FR-73) | `Row` / `String` |
 | `http`, `ping` | Network | `HttpResponse`, `PingResult` |
 | `env` | Environment variables | `EnvVar` |
 | `open` | Open with the associated application | — |
@@ -1683,7 +1740,7 @@ Target vision once the backlog is complete:
 
 ```text
 find src --name *.java --since 7d | where { $_.size > 2kb } | group { $_.path.parent }
-    | sort count --desc | first 5 | to-json rapport.json
+    | sort count --desc | first 5 | to-json > rapport.json
 ```
 
 ### 12.4 PowerShell → PowerJ mapping
