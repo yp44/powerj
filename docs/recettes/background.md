@@ -10,7 +10,7 @@ As in the previous steps: **Actions** tab, latest run of the **CI** workflow, ar
 
 ## Scenario
 
-On Windows, read `notepad` for `xeyes`, `mspaint` for `xclock`, and `ping -n 60 localhost > NUL` for `sleep 60`.
+On Windows, read `charmap` for `xeyes`, `ping -t localhost > NUL` for `xclock`, and `ping -n 60 localhost > NUL` for `sleep 60`. Do not use `notepad`, `calc` or `mspaint` on Windows 11: these are launchers that start the Store application and end at once (see the known limitations).
 
 | # | Action | Expected result |
 |---|---|---|
@@ -33,6 +33,8 @@ On Windows, read `notepad` for `xeyes`, `mspaint` for `xclock`, and `ping -n 60 
 | 17 | `POWERJ_LANG=fr`, `sleep 1 &`, then Enter after a second | `[1] terminé sleep 1 (code 0)`. |
 
 ## Known limitations
+
+- Windows 11: `notepad`, `calc`, `mspaint` (and other Store applications) are launchers: `notepad.exe` starts the real application through Windows, then ends at once with code 0. The job is therefore `done` right away, and its pid no longer exists; the window that opened is another process, which is not a child of PowerJ. Stop it with `ps notepad | kill`.
 
 - Windows: a **console** program in the background still receives the console's Ctrl+C (Java cannot start a process in a new process group). Graphical programs are not affected.
 - The output of a background command is not captured: it goes to the terminal, where it may mix with the prompt, unless redirected.
