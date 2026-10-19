@@ -112,9 +112,13 @@ PJ> $l | map String::toUpperCase                     # method references
 PJ> (ls)*.name                                       # *. applies .name to each element
 PJ> [long] 5 ; import java.security.*                # casts, imports (java.util, java.io, java.nio.file, java.time… by default)
 PJ> "today is $(LocalDate.now().dayOfWeek)"         # $( … ) inside strings, """ text blocks
+PJ> $c = HttpClient.newHttpClient()                  # HTTP: the JDK client, one request per pipeline object
+PJ> List.of(1, 2) | map { id -> $c.send(HttpRequest.newBuilder(URI.create("https://api.example.com/users/$(id)")).build(), HttpResponse.BodyHandlers.ofString()).body() } | from-json
 ```
 
 Overloads, varargs and argument conversions follow Java rules; `System.exit` and the like are intercepted so that Java code cannot kill the shell.
+
+HTTP calls need no cmdlet: `java.net.http` is imported by default, a `map` block builds each request from the object it receives (URL, headers, body), and `from-json` reads the payload. A block kept in a variable is a reusable call (`$get = { url -> … }`, then `cat urls.txt | map $get`), ready in every session when defined in `profile.pj`. Details: FR-55b in the specification, checklist [http](docs/recettes/http.md).
 
 ### Shell language
 
@@ -325,13 +329,13 @@ PowerJ is in active development (version `0.1.0-SNAPSHOT`). Implemented so far:
 
 - REPL with line editing, persistent history and Ctrl+R; native commands, `cd`, chaining, background commands (`&`, `jobs`), variables, redirections; non-interactive mode;
 - object pipeline with the `ls`, `where`, `map`, `sort`, `first`, `last`, `range`, `select`, `count`, `measure`, `group`, `mkdir`, `touch`, `cp`, `mv`, `rm`, `to-json`, `from-json`, `to-csv`, `from-csv`, `ps`, `kill`, `collect`, `env`, `grep` and `cat` cmdlets, and a parallel file walker;
-- direct access to the JRE's Java API, Java-style lambdas and method references;
+- direct access to the JRE's Java API, Java-style lambdas and method references, HTTP calls with the JDK's `HttpClient` driven by the pipeline;
 - Tab completion and syntax highlighting;
 - third-party modules loaded from jars;
 - English / French interface, `~` expansion, startup profile;
 - preview mode (Alt+V): results shown while typing.
 
-The v1 cmdlet roadmap is done ([roadmap](docs/plans/cmdlet-roadmap.md), end-to-end check in [pipeline-v1](docs/recettes/pipeline-v1.md)). Still in the backlog ([§12.3](docs/SPECIFICATION.md#123-cmdlet-backlog-outside-the-current-scope)): `uniq`, `find`, `tee`, `table`/`tree`, `http`/`ping`, `open`. Next: a scripting language with control structures in v2. The step-by-step plan is in [§11 of the specification](docs/SPECIFICATION.md#11-iterative-development-plan).
+The v1 cmdlet roadmap is done ([roadmap](docs/plans/cmdlet-roadmap.md), end-to-end check in [pipeline-v1](docs/recettes/pipeline-v1.md)). Still in the backlog ([§12.3](docs/SPECIFICATION.md#123-cmdlet-backlog-outside-the-current-scope)): `uniq`, `find`, `tee`, `table`/`tree`, `ping`, `open` (HTTP calls use the JDK's `HttpClient`, without a cmdlet). Next: a scripting language with control structures in v2. The step-by-step plan is in [§11 of the specification](docs/SPECIFICATION.md#11-iterative-development-plan).
 
 ## Documentation
 

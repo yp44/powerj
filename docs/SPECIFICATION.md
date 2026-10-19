@@ -1123,6 +1123,26 @@ PJ> String.join(", ", (ls)*.name)
 PJ> (ls -r | where size > 1mb).size()
 ```
 
+**FR-55b — HTTP calls driven by the pipeline.** There is no `http` cmdlet: HTTP calls use the JDK client, `java.net.http.HttpClient` (imported by default, FR-47), and the pipeline gives their parameters. A `map` block builds one request per object received (URL, headers, body taken from its properties) and returns the payload, `body()`, or the whole `HttpResponse`. `from-json` and `from-csv` turn a payload into objects; `to-json -l` gives the JSON body of each object.
+
+```text
+PJ> $c = HttpClient.newHttpClient()
+PJ> List.of(1, 2, 3) | map { id -> $c.send(HttpRequest.newBuilder(URI.create("https://api.example.com/users/$(id)")).build(), HttpResponse.BodyHandlers.ofString()).body() } | from-json
+PJ> $get = { url -> $c.send(HttpRequest.newBuilder(URI.create(url)).build(), HttpResponse.BodyHandlers.ofString()).body() }
+PJ> cat urls.txt | map $get | from-json | where { $_.active }
+PJ> ($get.invoke("https://api.example.com/users/1") | from-json).name
+PJ> cat calls.csv | from-csv | map { r -> $c.send(HttpRequest.newBuilder(URI.create(r.url)).header("Authorization", "Bearer " + r.token).POST(HttpRequest.BodyPublishers.ofString(r.body)).build(), HttpResponse.BodyHandlers.ofString()) } | select status={ $_.statusCode() } url={ $_.uri() }
+PJ> ls | select name size | to-json -l | map { j -> $c.send(HttpRequest.newBuilder(URI.create("https://api.example.com/files")).header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(j)).build(), HttpResponse.BodyHandlers.ofString()).statusCode() }
+```
+
+- A block kept in a variable is a reusable call: `map $get`, or `$get.invoke(url)` for one call. Defined in `profile.pj` (FR-63), the client and the blocks are ready in every session.
+- `HttpResponse` is an interface: `statusCode()`, `body()`, `headers()`, `uri()` are methods, written with parentheses (they are not properties, FR-28).
+- An HTTP error status (404, 500…) is not an error: the response is returned as is, and `where { $_.statusCode() == 200 }` keeps the successful ones.
+- A call that fails (invalid URL, connection refused, `.timeout(10s)` exceeded) throws a Java exception: inside `map`, a non-blocking error, and the object is skipped (FR-36c); at the start of a line, a blocking error (FR-53). Ctrl+C interrupts a call in progress (FR-57).
+- `HttpResponse.BodyHandlers.ofLines()` gives a `Stream` of lines, unrolled in the pipeline (FR-30b).
+- Calls in parallel: `sendAsync` returns a `CompletableFuture`; `$f = List.of(1, 2, 3) | map { id -> $c.sendAsync(…) }` starts them all, `$f | map { f -> f.join().body() }` reads the payloads.
+- Proxy: the JDK's own settings (`https.proxyHost`, `http.nonProxyHosts`…), or an explicit `HttpClient.newBuilder().proxy(ProxySelector.of(new InetSocketAddress("proxy", 8080))).build()`; the `HTTPS_PROXY` variable is not read.
+
 ### 3.14 Robustness
 
 Principle: **nothing that a line executes can bring the shell down.** A command always ends with one of four outcomes, and the REPL loop never sees an exception.
@@ -1700,6 +1720,7 @@ The backlog cmdlets (§12.3) are added **one per mini-iteration**, each with a s
 | 22 | `to-json`, `from-json`, `to-csv`, `from-csv` | FR-73 | `docs/recettes/json-csv.md` |
 | 23 | `ps`, `kill` | FR-74 | `docs/recettes/ps-kill.md` |
 | 24 | Background execution `&`, `jobs` | FR-75 | `docs/recettes/background.md` |
+| 25 | HTTP calls with the JDK `HttpClient`, driven by the pipeline (no cmdlet) | FR-55b | `docs/recettes/http.md` |
 
 Version 2 will introduce scripting (`if`, `foreach`, functions, `.pj` files).
 
@@ -1790,7 +1811,8 @@ PJ C:\dev> (ls)*.name.stream().map({ $_.toUpperCase() }).sorted().toList()
 | `tee` | Copy into a variable | unchanged |
 | `table`, `tree` | Display formats | — |
 | ~~`from-json`, `to-json`, `from-csv`, `to-csv`~~ | Conversions — **done** (FR-73) | `Row` / `String` |
-| `http`, `ping` | Network | `HttpResponse`, `PingResult` |
+| ~~`http`~~ | HTTP calls — **no cmdlet**: the JDK's `HttpClient`, driven by the pipeline (FR-55b) | `java.net.http.HttpResponse` |
+| `ping` | Network | `PingResult` |
 | `env` | Environment variables | `EnvVar` |
 | `open` | Open with the associated application | — |
 
