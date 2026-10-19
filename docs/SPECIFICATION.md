@@ -936,14 +936,15 @@ public record ProcessEntry(long pid, Long parent, String name, String command, S
 - **Output**:
   - `kill` returns without waiting, and `-w` waits for each end;
   - it emits nothing, except with `-v` (the processes stopped) or `-n` (the processes that would be stopped, without stopping them).
-- **Refusals**: PowerJ itself and its parents (the terminal) are refused, `refused: 4321 is PowerJ or one of its parents`. A pid that does not exist, or a process that cannot be stopped, gives a non-blocking error.
+- **PowerJ itself**: its own pid closes PowerJ like `exit`, after the other targets; with `-f`, at once. Its parents (the terminal) are stopped like any other process.
+- **Errors**: a pid that does not exist, or a process that cannot be stopped, gives a non-blocking error.
 - `kill` never runs in preview.
 
 CA:
 - `ps | first 5` displays `pid name user cpu start`; `ps java` lists the Java processes, PowerJ included;
 - `ps java | sort cpu --desc | first 3`;
 - a process started for the test: `ps <nom> | kill -n` lists it and leaves it alive; `ps <nom> | kill -w -v` stops it and displays it;
-- `kill 999999`: `kill: no process 999999`; `ps | where { $_.pid == ProcessHandle.current().pid() } | kill`: refused.
+- `kill 999999`: `kill: no process 999999`; `kill (ProcessHandle.current().pid())` closes PowerJ.
 
 ### 3.10 Native commands
 

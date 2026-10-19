@@ -11,7 +11,13 @@ Constraints:
   - `destroy()` is always forcible on Windows (`supportsNormalTermination()` is `false`).
 - `kill` is the second cmdlet family, after the file operations, that changes the system. It therefore gets the same safety measures: `-n/--dry-run`, refusals, and silence by default.
 
-Decisions taken with the user: see "Open questions" (to answer before coding).
+Decisions taken with the user:
+1. `ps` without argument lists **all** the processes of the machine; `-u` filters by user.
+2. The name filter uses **wildcards**, as `ls --filter`: case ignored, `.exe` optional on Windows.
+3. `kill` takes **pids only**, never names: `ps notepad | kill`.
+4. `kill` **returns at once**; `-w` waits for the end.
+5. **No protection**: `kill` may stop PowerJ itself and its parents. The JDK forbids `destroy()` on the current process, so stopping PowerJ's own pid closes PowerJ like `exit`, with its shutdown hooks (`System.exit`). With `-f` it stops at once (`Runtime.halt`).
+6. Other signals than the stop: see open question 6.
 
 Branch: `claude/cmdlet-ps`, from `main` @ 19f9452.
 
@@ -61,8 +67,8 @@ public record ProcessEntry(
   - arguments that are numbers (`kill 1234 5678`);
   - and/or pipeline objects: `ProcessEntry`, `ProcessHandle`, `Process` (from Java), or an integer (`Long`/`Integer`).
   - Any other object gives the non-blocking error `not a process: …`, and the object is skipped. An argument that is not a number gives a blocking error.
-- **Refusals** (non-blocking errors, the other targets are processed):
-  - PowerJ itself and its ancestors (the terminal, the ssh session…): `kill: refused: 4321 is PowerJ or one of its parents (stop it with ^kill)`;
+- **PowerJ itself** (decision 5): its own pid closes PowerJ, after the other targets of the command are processed. Its parents (the terminal) are stopped like any other process.
+- **Errors** (non-blocking, the other targets are processed):
   - a pid that does not exist, or no longer exists: `kill: no process 1234`;
   - a process that cannot be stopped (`destroy` returns `false`, or access is denied): `kill: cannot stop 1234 (notepad.exe)`.
 - **Wait**:
@@ -77,7 +83,7 @@ public record ProcessEntry(
 |---|---|
 | `ProcessEntry` (record, `io.powerj.cmdlets`) | Output of `ps`; `static ProcessEntry of(ProcessHandle)` reads `info()` and `parent()`. |
 | `Ps` | `@CmdletInfo(name = "ps", category = "System", preview = true)`. Sorts `ProcessHandle.allProcesses()` by pid, filters by name with `Globs` (`powerj-fs`, already used by `ls --filter`) in case-insensitive mode, ignoring `.exe` on Windows, and by user. |
-| `Kill` | `@CmdletInfo(name = "kill", category = "System")`. Per-execution state: the set of protected pids (`ProcessHandle.current()` and its ancestors, computed in `begin`). `begin` processes the arguments, `process` the pipeline objects. |
+| `Kill` | `@CmdletInfo(name = "kill", category = "System")`. Per-execution state: whether PowerJ's own pid was given, to close PowerJ in `end`. `begin` processes the arguments, `process` the pipeline objects. |
 
 Other changes:
 - registration in `BuiltinCmdlets`;
@@ -107,7 +113,7 @@ Docs:
   - `-n`: emits the entry and the process is still alive;
   - `-v`;
   - pipeline `ProcessEntry`, `ProcessHandle`, `Long`;
-  - an unknown pid, the pid of the test JVM (refused), an object that is not a process;
+  - an unknown pid, an object that is not a process (the closing of PowerJ itself is checked by hand: it would stop the test JVM);
   - an argument that is not a number.
 - `BuiltinCmdletsTest`: `ps | where { $_.pid == … }` in the shell, and `help kill`.
 
@@ -123,12 +129,10 @@ notepad                  # Windows; on Linux: ^sleep 300 &
 ps notepad | kill -n
 ps notepad | kill -v -w
 kill 999999
-kill $pid                # refused
+kill (ProcessHandle.current().pid())   # closes PowerJ
 ```
 
 ## Open questions
-1. **`ps` without argument**: all the processes of the machine (as PowerShell's `Get-Process`), or only the user's own (as Unix `ps -u $USER`)? Proposal: **all**, with `-u` to filter.
-2. **Name filter**: wildcards (`ps java*`), case ignored and `.exe` optional, as above? Or regular expressions, as `grep`? Proposal: **wildcards**, the same as `ls --filter`.
-3. **`kill` by name**: should `kill notepad` stop every process named `notepad`, as `pkill` or `Stop-Process -Name` do? Proposal: **no**. `kill` takes pids only, and by name you write `ps notepad | kill`. The `ps` step shows what will be stopped (`ps notepad | kill -n` before), and a typo in a name cannot stop the wrong processes.
-4. **Waiting**: `kill` returns at once by default, and `-w` waits for the end. Or should it wait by default, with a timeout? Proposal: **return at once**, as Unix `kill` and `Stop-Process` do, with `-w` to wait.
-5. **Protection**: refuse to stop PowerJ and its parents (the terminal), with no option to force it (`^kill` remains)? Proposal: **yes**. Stopping its own terminal is almost always a mistake, for example in `ps | where { $_.name == "bash" } | kill`.
+Questions 1 to 5 are answered (see the decisions in Context).
+
+6. **Other signals**: should `kill` send other signals than the stop (`HUP` to reload a configuration, `INT`, `USR1`, `STOP`/`CONT` to pause and resume)? The JDK sends only two: `destroy()` (`TERM`) and `destroyForcibly()` (`KILL`). Others would need, on Linux and macOS, a call to the C function `kill(pid, sig)` through the Foreign Function API, which PowerJ already uses for the terminal. Windows has no signals: there, `-s` other than `TERM`/`KILL` would be an error.
