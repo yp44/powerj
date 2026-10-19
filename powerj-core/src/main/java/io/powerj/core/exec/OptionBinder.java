@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -253,7 +254,7 @@ public final class OptionBinder {
         if (type == List.class) {
             Class<?> element = elementType(spec.component().getGenericType());
             List<Object> values = new ArrayList<>();
-            if (value instanceof Iterable<?> items && !(value instanceof Path)) { // a Path, though Iterable, is one value
+            if (value instanceof Collection<?> items) { // not any Iterable: a Path is one value
                 for (Object item : items) {
                     values.add(convertScalar(command, spec, element, item));
                 }
