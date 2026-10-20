@@ -149,4 +149,65 @@ class LexerTest {
     void dollarNotFollowedByANameIsAWord() {
         assertThat(Lexer.tokenize("echo $ 5$")).containsExactly(w("echo"), w("$"), w("5$"));
     }
+
+    private static List<StringPart> parts(String line) {
+        return ((Ast.StringExpression) ((Token.Expr) Lexer.tokenize(line).getFirst()).expression()).parts();
+    }
+
+    @Test
+    void interpolatedVariablesWithIndexes() {
+        assertThat(parts("\"$l[0] $l[-1].name $? $_\"")).containsExactly(
+                new StringPart.Interpolation("l", List.of(new Accessor.Index(0))),
+                new StringPart.Text(" "),
+                new StringPart.Interpolation("l", List.of(new Accessor.Index(-1), new Accessor.Property("name"))),
+                new StringPart.Text(" "),
+                new StringPart.Interpolation("?", List.of()),
+                new StringPart.Text(" "),
+                new StringPart.Interpolation("_", List.of()));
+        assertThatThrownBy(() -> Lexer.tokenize("\"$l[x]\"")).hasMessage("syntax: invalid index at position 4 (expected: [number])");
+        assertThatThrownBy(() -> Lexer.tokenize("\"$l[-]\"")).hasMessageContaining("invalid index");
+        assertThatThrownBy(() -> Lexer.tokenize("\"$l[")).hasMessageContaining("invalid index");
+    }
+
+    @Test
+    void allStringEscapes() {
+        assertThat(Lexer.tokenize("\"\\r\\b\\f\\0\\$x\"")).containsExactly(s("\r\b\f\0$x"));
+        assertThatThrownBy(() -> Lexer.tokenize("\"abc\\")).hasMessage("syntax: backslash at end of string");
+        assertThatThrownBy(() -> Lexer.tokenize("\"\\u00\"")).hasMessage("syntax: incomplete \\u escape");
+        assertThatThrownBy(() -> Lexer.tokenize("\"\\uZZZZ\"")).hasMessage("syntax: invalid \\uZZZZ escape");
+    }
+
+    @Test
+    void textBlocks() {
+        assertThat(Lexer.tokenize("\"\"\"\n    one\n      two\n    \"\"\"")).containsExactly(s("one\n  two\n"));
+        assertThat(Lexer.tokenize("\"\"\" \t\r\n  say \"hi\"\r\n  \"\"\"")).containsExactly(s("say \"hi\"\n"));
+        assertThat(Lexer.tokenize("\"\"\"\n  a \\\"\"\" b\n  \"\"\"")).containsExactly(s("a \"\"\" b\n"));
+        assertThatThrownBy(() -> Lexer.tokenize("\"\"\"abc\"\"\""))
+                .hasMessage("syntax: a text block opens with \"\"\" followed by a line break (position 1)");
+        assertThatThrownBy(() -> Lexer.tokenize("x \"\"\"\n abc"))
+                .hasMessage("syntax: unclosed text block (opened at position 3)");
+    }
+
+    @Test
+    void whatStartsAnExpressionAtCommandPosition() {
+        assertThat(Lexer.expressionAt("", 0, _ -> false)).isFalse();
+        assertThat(Lexer.expressionAt("$", 0, _ -> false)).isFalse();
+        assertThat(Lexer.expressionAt("$?", 0, _ -> false)).isTrue();
+        assertThat(Lexer.expressionAt("'a'", 0, _ -> false)).isTrue();
+        assertThat(Lexer.expressionAt("42", 0, _ -> false)).isTrue();
+        assertThat(Lexer.expressionAt("-x", 0, _ -> false)).isFalse();
+        assertThat(Lexer.expressionAt("null", 0, _ -> false)).isTrue();
+        assertThat(Lexer.expressionAt("String::valueOf", 0, _ -> false)).isTrue();
+        assertThat(Lexer.expressionAt("new File(\"x\")", 0, _ -> false)).isTrue();
+        assertThat(Lexer.expressionAt("new 1", 0, _ -> false)).isFalse();
+        assertThat(Lexer.expressionAt("new", 0, _ -> false)).isFalse();
+        assertThat(Lexer.expressionAt("java.lang.Math.PI", 0, "java.lang.Math.PI"::equals)).isTrue();
+        assertThat(Lexer.expressionAt("java.lang.Math.PI x", 0, _ -> false)).isFalse();
+    }
+
+    @Test
+    void errorRedirectionOnlyAfterABlank() {
+        assertThat(Lexer.tokenize("a2>b")).containsExactly(w("a2"), new Token.Redirection(Token.Stream.OUT, false), w("b"));
+        assertThat(Lexer.tokenize("2>x")).containsExactly(new Token.Redirection(Token.Stream.ERR, false), w("x"));
+    }
 }

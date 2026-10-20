@@ -218,4 +218,24 @@ class ParserTest {
         assertThat(Parser.parse("   ").steps()).isEmpty();
         assertThat(Parser.parse(";;").steps()).isEmpty();
     }
+
+    @Test
+    void misplacedTokensAreNamedInTheError() {
+        assertThatThrownBy(() -> Parser.parse("> f")).hasMessage("syntax: unexpected \">\"");
+        assertThatThrownBy(() -> Parser.parse(">> f")).hasMessage("syntax: unexpected \">>\"");
+        assertThatThrownBy(() -> Parser.parse("2> f")).hasMessage("syntax: unexpected \"2>\"");
+        assertThatThrownBy(() -> Parser.parse("2>> f")).hasMessage("syntax: unexpected \"2>>\"");
+        assertThatThrownBy(() -> Parser.parse("2>&1")).hasMessage("syntax: unexpected \"2>&1\"");
+        assertThatThrownBy(() -> Parser.parse("|| ls")).hasMessage("syntax: \"||\" without a command before it");
+        assertThatThrownBy(() -> Parser.parse("ls > f $y")).hasMessage("syntax: unexpected expression");
+        assertThatThrownBy(() -> Parser.parse("ls 2>&1 > f x")).hasMessage("syntax: unexpected \"x\"");
+    }
+
+    @Test
+    void aGroupHoldsOnePipeline() {
+        assertThatThrownBy(() -> Parser.parse("(ls ; pwd)")).hasMessage("syntax: unexpected \";\"");
+        assertThatThrownBy(() -> Parser.parse("(ls &)")).hasMessage("syntax: unexpected \"&\"");
+        assertThatThrownBy(() -> Parser.parse("ls | String::valueOf")).hasMessageContaining("write map { … }");
+        assertThatThrownBy(() -> Parser.parse("$x = ;")).hasMessageContaining("value expected");
+    }
 }

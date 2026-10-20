@@ -157,4 +157,95 @@ class ExpressionParserTest {
         assertThat(Units.parse("10")).isEmpty();
         assertThat(Units.parse("abc")).isEmpty();
     }
+
+    @Test
+    void characterLiteralsWithEscapes() {
+        assertThat(ExpressionParser.parse("'\\\\'")).isEqualTo(new Literal('\\'));
+        assertThat(ExpressionParser.parse("'\\\"'")).isEqualTo(new Literal('"'));
+        assertThat(ExpressionParser.parse("'\\t'")).isEqualTo(new Literal('\t'));
+        assertThat(ExpressionParser.parse("'\\r'")).isEqualTo(new Literal('\r'));
+        assertThat(ExpressionParser.parse("'\\b'")).isEqualTo(new Literal('\b'));
+        assertThat(ExpressionParser.parse("'\\f'")).isEqualTo(new Literal('\f'));
+        assertThat(ExpressionParser.parse("'\\0'")).isEqualTo(new Literal('\0'));
+        assertThat(ExpressionParser.parse("'\\u0041'")).isEqualTo(new Literal('A'));
+    }
+
+    @Test
+    void characterLiteralErrors() {
+        assertThatThrownBy(() -> ExpressionParser.parse("'\\u00'")).hasMessage("syntax: incomplete \\u escape");
+        assertThatThrownBy(() -> ExpressionParser.parse("'\\uZZZZ'")).hasMessage("syntax: invalid \\uZZZZ escape");
+        assertThatThrownBy(() -> ExpressionParser.parse("'\\q'")).hasMessage("syntax: unknown escape \\q");
+        assertThatThrownBy(() -> ExpressionParser.parse("''")).hasMessage("syntax: empty character '' (position 1)");
+        assertThatThrownBy(() -> ExpressionParser.parse("'ab'")).hasMessageContaining("between single quotes");
+        assertThatThrownBy(() -> ExpressionParser.parse("'")).hasMessage("syntax: unclosed character (position 1)");
+        assertThatThrownBy(() -> ExpressionParser.parse("'\\")).hasMessage("syntax: unclosed character (position 1)");
+    }
+
+    @Test
+    void numberErrors() {
+        assertThatThrownBy(() -> ExpressionParser.parse("99999999999999999999"))
+                .hasMessage("syntax: number too large: 99999999999999999999");
+        assertThatThrownBy(() -> ExpressionParser.parse("1.5L")).hasMessageContaining("invalid number: 1.5L");
+    }
+
+    @Test
+    void unaryPlusAndAllComparisons() {
+        assertThat(ExpressionParser.parse("+3")).isEqualTo(new Literal(3));
+        assertThat(ExpressionParser.parse("1 <= 2")).isEqualTo(new Binary(Operator.LE, new Literal(1), new Literal(2)));
+        assertThat(ExpressionParser.parse("1 >= 2")).isEqualTo(new Binary(Operator.GE, new Literal(1), new Literal(2)));
+        assertThat(ExpressionParser.parse("1 < 2")).isEqualTo(new Binary(Operator.LT, new Literal(1), new Literal(2)));
+    }
+
+    @Test
+    void spreadAndMethodReferences() {
+        var list = new VariableExpression("l", List.of());
+        assertThat(ExpressionParser.parse("$l*.name")).isEqualTo(new Ast.SpreadGet(list, "name"));
+        assertThat(ExpressionParser.parse("$l*.trim()")).isEqualTo(new Ast.SpreadInvoke(list, "trim", List.of()));
+        assertThat(ExpressionParser.parse("String::length")).isEqualTo(new Ast.MethodRef(new Ast.Name("String"), "length"));
+        assertThatThrownBy(() -> ExpressionParser.parse("String::"))
+                .hasMessage("syntax: method name expected after \"::\" at end of expression");
+        assertThatThrownBy(() -> ExpressionParser.parse("String:: 1"))
+                .hasMessage("syntax: method name expected after \"::\" at position 10");
+    }
+
+    @Test
+    void instantiationErrors() {
+        assertThat(ExpressionParser.parse("new java.util.ArrayList()")).isEqualTo(new Ast.New("java.util.ArrayList", List.of()));
+        assertThatThrownBy(() -> ExpressionParser.parse("new"))
+                .hasMessage("syntax: class name expected after new at end of expression");
+        assertThatThrownBy(() -> ExpressionParser.parse("new 1"))
+                .hasMessage("syntax: class name expected after new at position 5");
+        assertThatThrownBy(() -> ExpressionParser.parse("new java."))
+                .hasMessage("syntax: name expected after \".\" at end of expression");
+    }
+
+    @Test
+    void groupsCastsAndLists() {
+        assertThatThrownBy(() -> ExpressionParser.parse("( )")).hasMessage("syntax: empty parentheses");
+        assertThatThrownBy(() -> ExpressionParser.parse(")")).hasMessage("syntax: unexpected \")\" (position 1)");
+        assertThat(ExpressionParser.parse("[int] -1")).isEqualTo(new Ast.Cast("int", new Ast.Unary(Operator.NEG, new Literal(1))));
+        assertThat(ExpressionParser.parse("[String] 'a'")).isEqualTo(new Ast.Cast("String", new Literal('a')));
+        assertThat(ExpressionParser.parse("[String]")).isEqualTo(new Ast.ListLiteral(List.of(new Ast.Name("String"))));
+        assertThat(ExpressionParser.parse("[x] + 1")).isInstanceOf(Binary.class);
+        assertThat(ExpressionParser.parse("(\"a $(1 + 2) b\")")).isInstanceOf(Ast.StringExpression.class);
+        assertThat(ExpressionParser.parse("('\\n')")).isEqualTo(new Literal('\n'));
+        assertThat(ExpressionParser.parse("('\\u0029')")).isEqualTo(new Literal(')'));
+        assertThat(ExpressionParser.parse("(')')")).isEqualTo(new Literal(')'));
+        assertThatThrownBy(() -> ExpressionParser.parse("(\"a $(1\")")).hasMessageContaining("missing \")\"");
+    }
+
+    @Test
+    void blocksAndLambdaHeaders() {
+        assertThat(ExpressionParser.block("$_.x")).isEqualTo(new Ast.BlockExpression("$_.x", new Get(CURRENT, "x")));
+        assertThat(ExpressionParser.lambdaHeader("(a, a) -> 1", 0)).isEmpty();
+        assertThat(ExpressionParser.lambdaHeader("a -> 1", 0)).get().extracting(e -> e.getKey()).isEqualTo(List.of("a"));
+        assertThat(ExpressionParser.lambdaHeader("1 + 2", 0)).isEmpty();
+        var lambda = (Ast.Lambda) ExpressionParser.function("f -> (Math.max(1, 2))", name -> name.equals("Math.max"));
+        assertThat(lambda.body()).isInstanceOf(Invoke.class);
+    }
+
+    @Test
+    void anIncompleteExpressionOutsideABlockHasNoBlockContext() {
+        assertThatThrownBy(() -> Parser.parse("$x = 1 +")).hasMessage("syntax: incomplete expression");
+    }
 }

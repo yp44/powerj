@@ -176,4 +176,114 @@ class CompletionsTest {
     void groupPropertiesAreProposedDownstream() {
         assertThat(values("ls | group ext | where { $_.")).contains("key", "count", "items");
     }
+
+    @Test
+    void everyStatementSeparatorStartsANewCommand() {
+        assertThat(values("ls || wh")).contains("where");
+        assertThat(values("ls ; wh")).contains("where");
+        assertThat(values("ls && wh")).contains("where");
+        assertThat(values("ls & wh")).contains("where");
+        // An & inside a word is not a background: still an argument of ls.
+        assertThat(values("ls a&b")).isEmpty();
+    }
+
+    @Test
+    void stringsWithEscapedCharacters() {
+        assertThat(values("cat \"a\\\"b\" no")).containsExactly("notes.txt");
+        assertThat(values("ls \"Prog\\ra")).containsExactly("Program Files" + java.io.File.separator);
+    }
+
+    @Test
+    void pathsFromHomeHiddenFilesAndMissingFolders() throws Exception {
+        Files.writeString(tmp.resolve(".hidden"), "x");
+        assertThat(values("ls ~/do")).containsExactly("~/docs/");
+        assertThat(values("ls ")).contains("notes.txt").doesNotContain(".hidden");
+        assertThat(values("ls \".h")).containsExactly(".hidden");
+        assertThat(values("ls nope/x")).isEmpty();
+        assertThat(values("^ls do")).containsExactly("docs" + java.io.File.separator);
+    }
+
+    @Test
+    void manyFilesAreCappedAt500() throws Exception {
+        Path many = Files.createDirectories(tmp.resolve("many"));
+        for (int i = 0; i < 510; i++) {
+            Files.writeString(many.resolve("f" + i), "");
+        }
+        assertThat(complete("ls many/").candidates()).hasSize(500);
+    }
+
+    @Test
+    void currentObjectAndClassesInBlocks() throws Exception {
+        assertThat(values("ls | where { $")).contains("$_");
+        assertThat(values("ls | map { new StringB")).contains("StringBuilder");
+        assertThat(values("ls | map { Str")).contains("String", "StringBuilder");
+        assertThat(values("ls | map { tr")).contains("true");
+        interpreter.execute("import java.security.MessageDigest");
+        assertThat(values("ls | map { new MessageD")).contains("MessageDigest");
+    }
+
+    @Test
+    void importStartsWithTheRootPackages() {
+        assertThat(values("import ja")).contains("java.");
+    }
+
+    @Test
+    void textComesFromNativeCommands() {
+        assertThat(values("^ls | where { $_.")).contains("length()", "isBlank()");
+        assertThat(values("lsblk-like | where { $_.")).contains("length()");
+        assertThat(values("nope | where { $_.")).isEmpty();
+        assertThat(values("ls | map { $_ } | where { $_.")).isEmpty();
+        assertThat(values("ls | select | where { $_.")).doesNotContain("name");
+    }
+
+    @Test
+    void typesOfExpressions() throws Exception {
+        interpreter.execute("$f = ls");
+        interpreter.execute("$l = List.of(1, 2)");
+        interpreter.execute("$s = \"abc\"");
+        assertThat(values("(ls).")).contains("size()", "stream()");
+        assertThat(values("(ls)[0].")).contains("name", "size");
+        assertThat(values("(ls)*.na")).contains("name");
+        assertThat(values("(^ls)[0].")).contains("length()");
+        assertThat(values("(ls | map { $_ }).")).isEmpty();
+        assertThat(values("(ls).stream().")).contains("filter(");
+        assertThat(values("(ls)[0].path.")).contains("fileName", "getName(");
+        assertThat(values("(ls)[0].path.fileName.")).contains("fileName", "getName(");
+        assertThat(values("$f[0].path.")).contains("fileName", "getName(");
+        assertThat(values("$f*.name.")).contains("size()");
+        assertThat(values("$l[-1].")).contains("intValue()");
+        assertThat(values("$l[5].")).contains("intValue()");
+        assertThat(values("$s*.len")).contains("length()");
+        assertThat(values("$l.clear().")).isEmpty();
+        assertThat(values("(new StringBuilder()).")).contains("append(", "reverse()");
+        assertThat(values("true.")).contains("booleanValue()");
+        assertThat(values("null.")).isEmpty();
+        assertThat(values("[1, 2].")).contains("size()");
+        assertThat(values("now.")).contains("epochSecond");
+        assertThat(values("\"a,b\".split(\",\")[0].")).contains("length()");
+        assertThat(values("\"abc\".substring().")).contains("length()");
+        assertThat(values("String.valueOf(1).")).contains("length()");
+        assertThat(values("System.out.")).contains("println(");
+        assertThat(values("Map.")).contains("Entry", "of(");
+        assertThat(values("Map.Entry.")).contains("comparingByKey()");
+        assertThat(values("ls | where { a).")).isEmpty();
+    }
+
+    @Test
+    void methodReferences() throws Exception {
+        interpreter.execute("$l = List.of(1, 2)");
+        assertThat(values("ls | map $l::")).contains("size", "get");
+        assertThat(values("ls | map List::")).contains("of").doesNotContain("new");
+        assertThat(values("ls | map StringBuilder::")).contains("new", "append");
+    }
+
+    @Test
+    void optionValuesAndCommandsWithoutArguments() {
+        assertThat(complete("ls -f ").candidates()).isEmpty();
+        assertThat(complete("ls --filter ").candidates()).isEmpty();
+        assertThat(values("ls --filter=*.md --")).doesNotContain("--filter").contains("--all");
+        assertThat(values("ls --on-error stop --")).doesNotContain("--on-error");
+        assertThat(complete("pwd ").candidates()).isEmpty();
+        assertThat(complete("where ").candidates()).isEmpty();
+    }
 }
