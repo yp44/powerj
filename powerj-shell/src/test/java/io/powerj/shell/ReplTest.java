@@ -282,4 +282,35 @@ class ReplTest {
         assertThat(session("")).isEqualTo(3);
         assertThat(screen).doesNotContain("PJ ");
     }
+
+    @Test
+    void anUnreadableProfileIsReported() throws Exception {
+        home = new PowerJHome(tmp.resolve("home")).createDirectories();
+        java.nio.file.Files.createDirectories(home.profileFile());
+        assertThat(session("exit 1" + ENTER)).isEqualTo(1);
+        assertThat(screen).contains("profile.pj");
+    }
+
+    @Test
+    void profileErrorsNameTheirLineAndTheProfileGoesOn() throws Exception {
+        home = new PowerJHome(tmp.resolve("home")).createDirectories();
+        java.nio.file.Files.writeString(home.profileFile(), "bonjour\n$x = 5\n");
+        assertThat(session("\"x=$x\"" + ENTER + "exit 0" + ENTER)).isZero();
+        assertThat(screen).contains("profile.pj:1: unknown command: bonjour", "x=5");
+    }
+
+    @Test
+    void moduleWarningsAreShownBelowTheBanner() throws Exception {
+        home = new PowerJHome(tmp.resolve("home")).createDirectories();
+        java.nio.file.Files.createDirectories(home.modulesDir());
+        java.nio.file.Files.writeString(home.modulesDir().resolve("broken.jar"), "not a jar");
+        try (var terminal = new TestTerminal("exit 5" + ENTER)) {
+            var reader = ShellReader.create(terminal.terminal(), home, ShellConfig.defaults());
+            var repl = new Repl(reader, new Supervisor(), session(), CmdletRegistry.discover());
+            repl.loadModules(home.modulesDir());
+            terminal.startTyping();
+            assertThat(repl.run(BUILD)).isEqualTo(5);
+            assertThat(terminal.screen()).contains("broken.jar");
+        }
+    }
 }
