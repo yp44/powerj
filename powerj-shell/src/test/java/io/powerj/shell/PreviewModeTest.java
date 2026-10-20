@@ -47,7 +47,7 @@ class PreviewModeTest {
         var repl = new Repl(reader, new Supervisor(), new Session(tmp, cwd, System.getenv()), CmdletRegistry.discover());
         terminal.startTyping();
         code = new CompletableFuture<>();
-        Thread.ofVirtual().start(() -> code.complete(repl.run(new BuildInfo("0.1.0", Runtime.Version.parse("27")))));
+        Thread.ofVirtual().start(() -> code.complete(repl.run(new BuildInfo("0.1.0", Runtime.Version.parse("25")))));
         awaitUntil(() -> reader.isReading());
     }
 

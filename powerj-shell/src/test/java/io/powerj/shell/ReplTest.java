@@ -30,7 +30,7 @@ import io.powerj.core.exec.Supervisor;
 @Timeout(30)
 class ReplTest {
 
-    private static final BuildInfo BUILD = new BuildInfo("0.1.0", Runtime.Version.parse("27"));
+    private static final BuildInfo BUILD = new BuildInfo("0.1.0", Runtime.Version.parse("25"));
 
     @TempDir
     Path tmp;
@@ -69,7 +69,7 @@ class ReplTest {
     @Test
     void bannerPromptAndExitCode() throws Exception {
         assertThat(session("exit 3" + ENTER)).isEqualTo(3);
-        assertThat(screen).contains("PowerJ 0.1.0 (Java 27)", "PJ " + tmp.resolve("dev") + "> ");
+        assertThat(screen).contains("PowerJ 0.1.0 (Java 25)", "PJ " + tmp.resolve("dev") + "> ");
     }
 
     @Test

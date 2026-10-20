@@ -170,7 +170,7 @@ All tests use `@TempDir`; none touches a real system folder.
   - `BuiltinCmdletsTest`: end to end for the five cmdlets.
 
 ## Verification
-- `./mvnw verify` (locally `-Djava.release=25`; CI uses JDK 27, Linux and Windows).
+- `./mvnw verify` (JDK 25; the CI runs it on Linux and Windows).
 - Manual, in a scratch folder:
   - `mkdir -p a/b/c`
   - `touch a/x.txt`

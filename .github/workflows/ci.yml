@@ -19,7 +19,7 @@ jobs:
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '27'
+          java-version: '25'
           cache: maven
 
       - name: Build, tests et image applicative
@@ -148,7 +148,7 @@ jobs:
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '27'
+          java-version: '25'
           cache: maven
 
       - name: Installation de WiX (requis par jpackage pour l'installeur)

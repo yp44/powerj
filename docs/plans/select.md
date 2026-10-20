@@ -139,7 +139,7 @@ select <column>...
   - `ls | select nmae` → empty cells and one error.
 
 ## Verification
-- `./mvnw verify` (locally `-Djava.release=25`; CI uses JDK 27).
+- `./mvnw verify` (JDK 25).
 - Manual:
   - `ls | select name size`
   - `ls | select file=name kb={ $_.size / 1kb } modified`

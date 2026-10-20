@@ -23,8 +23,8 @@
     </modules>
 
     <properties>
-        <!-- Target Java version. Can be overridden on a machine without JDK 27: -Djava.release=21 -->
-        <java.release>27</java.release>
+        <!-- Target Java version. -->
+        <java.release>25</java.release>
         <maven.compiler.release>${java.release}</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
@@ -161,7 +161,7 @@
                                 </requireMavenVersion>
                                 <requireJavaVersion>
                                     <version>[${java.release},)</version>
-                                    <message>PowerJ requires JDK ${java.release} or newer (local override: -Djava.release=25).</message>
+                                    <message>PowerJ requires JDK ${java.release} or newer.</message>
                                 </requireJavaVersion>
                             </rules>
                         </configuration>

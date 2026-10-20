@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/yp44/powerj/actions/workflows/ci.yml/badge.svg)](https://github.com/yp44/powerj/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-![Java 27](https://img.shields.io/badge/Java-27-orange.svg)
+![Java 25](https://img.shields.io/badge/Java-25-orange.svg)
 
-**An interactive, object-oriented shell written in Java 27.** Commands return **Java objects** instead of text, you filter them on their properties in a pipeline, native programs work as in any shell, and **the whole Java API of the JRE** is available right at the prompt.
+**An interactive, object-oriented shell written in Java 25.** Commands return **Java objects** instead of text, you filter them on their properties in a pipeline, native programs work as in any shell, and **the whole Java API of the JRE** is available right at the prompt.
 
 ```text
 PJ ~/dev/powerj> ls -r --filter *.java | where { $_.size > 10kb }
@@ -149,8 +149,7 @@ Messages, help, completion and errors in **English or French**; commands and opt
 
 ### Prerequisites
 
-- **JDK 27**. Maven is not needed: the `mvnw` wrapper downloads Maven 3.9.11.
-- Without JDK 27 at hand, you can check the build with an older JDK that supports the features used: `./mvnw -Djava.release=25 verify`.
+- **JDK 25** or newer. Maven is not needed: the `mvnw` wrapper downloads Maven 3.9.11.
 
 ### Build
 

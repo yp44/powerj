@@ -5,7 +5,7 @@
 | **Document version** | 0.10 (`~` = `HOME` directory in every argument) |
 | **Status** | Pending approval |
 | **Target platform** | Windows 10/11 x64 (`powerj.exe`), Linux/macOS as a bonus |
-| **Technical foundation** | Java 27, Maven 3.9, JLine 3 |
+| **Technical foundation** | Java 25, Maven 3.9, JLine 3 |
 
 ---
 
@@ -62,7 +62,7 @@ FRIDAY
 | OBJ-3 | Pipeline of typed Java objects (preferably records, but any object) with attribute access (`$_.size`). |
 | OBJ-4 | Seamless mixing of cmdlets ↔ native commands. |
 | OBJ-5 | Extensibility: a third-party developer adds cmdlets by dropping in a `.jar`. |
-| OBJ-6 | Exemplary codebase in modern Java (Java 27). |
+| OBJ-6 | Exemplary codebase in modern Java (Java 25). |
 | OBJ-7 | Direct access to the entire public Java API of the JRE (static methods, constructors, instance methods). |
 
 ### 1.2 Non-goals of v1
@@ -101,7 +101,7 @@ Each requirement has an identifier `FR-xx` and one or more verifiable **acceptan
 
 ### 3.1 REPL
 
-**FR-01 — Prompt.** On startup, PowerJ displays a banner (`PowerJ 0.x — Java 27`) then the prompt `PJ <répertoire courant>> ` (`<current directory>`).
+**FR-01 — Prompt.** On startup, PowerJ displays a banner (`PowerJ 0.x — Java 25`) then the prompt `PJ <répertoire courant>> ` (`<current directory>`).
 - CA: launching `powerj.exe` from `C:\Users\yves` displays `PJ C:\Users\yves> `.
 
 **FR-02 — Multi-line input.** If a line ends with `|`, `&&` or `||`, or if a brace, parenthesis or quote is left open (no continuation with `\`, so that `cd C:\` remains valid), the shell displays a continuation prompt `>> ` and waits for the rest.
@@ -1466,15 +1466,15 @@ Java's new features are used **where they bring a concrete benefit**:
 | **Reflection, `Proxy`, `ClassValue`** | Java interoperability: method/constructor calls with per-type cache, conversion of `{ }` blocks into functional interfaces (`MethodHandles`: possible optimization later). |
 | **`ClassValue`** | Cache of member metadata per type, without classloader leaks (third-party modules). |
 | **Module import declarations, flexible constructors** | Code readability. |
-| **Primitive patterns** | In the evaluator for numeric comparisons, if finalized in JDK 27. |
+| **Primitive patterns** | In the evaluator for numeric comparisons, once finalized (still in preview in JDK 25). |
 
-**Rule:** a feature still in *preview* in JDK 27 is enabled (`--enable-preview`) only after PM approval. The list above is rechecked against the JEPs actually delivered in JDK 27 at the start of step 0.
+**Rule:** a feature still in *preview* in JDK 25 is enabled (`--enable-preview`) only after PM approval. The list above is rechecked against the JEPs actually delivered in JDK 25 at the start of step 0.
 
 ---
 
 ## 7. Build and distribution
 
-- **Maven 3.9**; `maven-enforcer-plugin` enforces Java 27 and Maven ≥ 3.9; `maven.compiler.release=27`.
+- **Maven 3.9**; `maven-enforcer-plugin` enforces Java 25 and Maven ≥ 3.9; `maven.compiler.release=25`.
 - `mvn verify`: compilation, tests, coverage (JaCoCo).
 - `powerj-dist` module:
   1. **jlink**: Java runtime containing **all the `java.se` modules** (required so that the whole standard API can be called, §3.13), without the development tools (`--strip-debug --no-header-files --no-man-pages`);
@@ -1548,7 +1548,7 @@ Each step:
 
 ### Step 0 — Skeleton and exe
 
-**Content:** Maven multi-module structure, JPMS, enforcer Java 27 / Maven 3.9, jlink + jpackage, CI on Linux + Windows. The REPL is minimal (simple reading, `exit`).
+**Content:** Maven multi-module structure, JPMS, enforcer Java 25 / Maven 3.9, jlink + jpackage, CI on Linux + Windows. The REPL is minimal (simple reading, `exit`).
 
 **Acceptance test:**
 1. Download the CI artifact, install `powerj.exe`.

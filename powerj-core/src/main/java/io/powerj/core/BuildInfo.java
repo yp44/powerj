@@ -26,7 +26,7 @@ public record BuildInfo(String version, Runtime.Version javaVersion) {
         return new BuildInfo(readVersion(), Runtime.version());
     }
 
-    /** Banner displayed when the shell starts, e.g. {@code PowerJ 0.1.0 (Java 27)}. */
+    /** Banner displayed when the shell starts, e.g. {@code PowerJ 0.1.0 (Java 25)}. */
     public String banner() {
         return "PowerJ " + version + " (Java " + javaVersion.feature() + ")";
     }
