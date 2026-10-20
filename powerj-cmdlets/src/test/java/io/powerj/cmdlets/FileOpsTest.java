@@ -498,4 +498,78 @@ class FileOpsTest {
         run(new Touch(), new Touch.Params(args(number), false, null), "x");
         assertThat(context.errors).singleElement().asString().startsWith("the block 42 does not give a path");
     }
+
+    // --- cp and mv: refusals and errors ---
+
+    @Test
+    void cpRefusesTheSameFileAMissingParentAndAMissingFolder() throws Exception {
+        Path a = file("a.txt", "a");
+        cp(false, false, false, false, args("a.txt", "a.txt"));
+        assertThat(context.errors).containsExactly("source and destination are the same: " + a);
+        context = newContext();
+        cp(false, false, false, false, args("a.txt", "nodir/b.txt"));
+        assertThat(context.errors).containsExactly("parent folder missing: " + work.resolve("nodir/b.txt"));
+        context = newContext();
+        cp(false, false, false, false, args("a.txt", "backup/"));
+        assertThat(context.errors).containsExactly("destination is not a folder: " + work.resolve("backup"));
+        context = newContext();
+        cp(false, false, false, false, args("dest"), work.resolve("missing.txt"));
+        assertThat(context.errors).containsExactly("not found: " + work.resolve("missing.txt"));
+        assertThat(work.resolve("dest")).doesNotExist();
+    }
+
+    @Test
+    void destinationBlockErrorsSkipTheSource() throws Exception {
+        file("a.txt", "a");
+        var failing = block("$_.nope", o -> {
+            throw new IllegalStateException("no property nope");
+        });
+        cp(false, false, false, false, args("a.txt", failing));
+        assertThat(context.errors).singleElement().asString().startsWith("no property nope (object skipped: ");
+        context = newContext();
+        cp(false, false, false, false, args("a.txt", block("null", o -> null)));
+        assertThat(context.errors).isEmpty();
+        cp(false, false, false, false, args("a.txt", block("42", o -> 42)));
+        assertThat(context.errors).singleElement().asString().startsWith("the block 42 does not give a path");
+        context = newContext();
+        cp(false, false, false, false, args("a.txt", block("bad", o -> "a\0b")));
+        assertThat(context.errors).singleElement().asString().startsWith("invalid path a\0b: ");
+        try (var names = Files.list(work)) {
+            assertThat(names.map(p -> p.getFileName().toString())).containsExactly("a.txt");
+        }
+    }
+
+    @Test
+    void invalidPathsAndMissingFoldersInArguments() throws Exception {
+        file("a.txt", "a");
+        rm(false, false, false, false, false, args("bad\0dir/*.txt"));
+        assertThat(context.errors).singleElement().asString().startsWith("invalid path bad\0dir/*.txt: ");
+        context = newContext();
+        cp(false, false, false, false, args("a.txt", "a\0b"));
+        assertThat(context.errors).singleElement().asString().startsWith("invalid path a\0b: ");
+        context = newContext();
+        rm(false, false, false, false, false, args("nodir/*.txt"));
+        assertThat(context.errors).contains("no file matches nodir/*.txt")
+                .anySatisfy(e -> assertThat(e).startsWith("not found: "));
+    }
+
+    @Test
+    void mvForceReplacesAnExistingFile() throws Exception {
+        file("a.txt", "new");
+        file("b.txt", "old");
+        mv(true, false, "a.txt", "b.txt");
+        assertThat(work.resolve("a.txt")).doesNotExist();
+        assertThat(work.resolve("b.txt")).hasContent("new");
+        assertThat(context.errors).isEmpty();
+    }
+
+    @Test
+    void cpForceDoesNotReplaceANonEmptyFolderWithAFile() throws Exception {
+        file("src/x", "file");
+        file("out/src/x/y", "kept");
+        cp(true, true, false, false, args("src", "out"));
+        assertThat(context.errors).containsExactly("folder not empty: " + work.resolve("out/src/x")
+                + " (use -r to remove it with its content)");
+        assertThat(work.resolve("out/src/x/y")).hasContent("kept");
+    }
 }

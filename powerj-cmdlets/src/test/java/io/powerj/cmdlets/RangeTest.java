@@ -224,4 +224,19 @@ class RangeTest {
         run(params(null, boom), letters()); // b fails: it is skipped, but still counted
         assertThat(context.emitted).containsExactly("a", "c", "d", "e", "f");
     }
+
+    @Test
+    void contradictoryOptions() {
+        assertThatThrownBy(() -> run(new Range.Params(1, 2, null, false, true, true, false), letters()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("--include and --exclude cannot be used together");
+        assertThatThrownBy(() -> run(new Range.Params(1, 2, null, false, false, false, true), letters()))
+                .hasMessageStartingWith("--repeat needs a --from that is a regular expression");
+    }
+
+    @Test
+    void positionsAndExcludedBounds() {
+        run(new Range.Params(2, 4, null, false, false, true, false), letters());
+        assertThat(context.emitted).containsExactly("c");
+    }
 }

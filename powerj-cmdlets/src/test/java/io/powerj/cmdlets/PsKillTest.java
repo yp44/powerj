@@ -161,4 +161,23 @@ class PsKillTest {
         assertThatThrownBy(() -> run(new Kill(), new Kill.Params(List.of(), false, false, false, false)))
                 .hasMessage("pid expected: kill <pid>... or ... | kill");
     }
+
+    public record WithBoxedPid(Long pid) { }
+
+    public record WithIntPid(int pid) { }
+
+    @Test
+    void pidsOfEveryNumberTypeAndRecordComponent() {
+        int me = (int) self();
+        var dryRun = new Kill.Params(null, false, false, false, true);
+        assertThat(run(new Kill(), dryRun, me, new WithBoxedPid(self()))).extracting(ProcessEntry::pid)
+                .containsExactly(self(), self());
+        context.emitted.clear();
+        run(new Kill(), new Kill.Params(List.of(me), false, false, false, true));
+        assertThat(context.emitted).extracting(ProcessEntry::pid).containsExactly(self());
+        context.emitted.clear();
+        run(new Kill(), dryRun, (short) 1, new WithIntPid(me), new WithBoxedPid(null));
+        assertThat(context.errors).doesNotContain("not a process: 1")
+                .contains("not a process: WithIntPid[pid=" + me + "]", "not a process: WithBoxedPid[pid=null]");
+    }
 }

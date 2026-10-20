@@ -287,4 +287,72 @@ class GrepTest {
         grep.end(params, context);
         assertThat(context.emitted).containsExactly(a);
     }
+
+    private static Grep.Params full(String pattern, Integer maxDepth, boolean invert, String encoding, String property) {
+        return new Grep.Params(pattern, List.of(), false, null, maxDepth, false, invert, false, encoding, property,
+                false, false);
+    }
+
+    @Test
+    void maxDepthAndPropertyMustBeValid() {
+        assertThatThrownBy(() -> run(full("x", 0, false, null, null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("--max-depth expects a depth of at least 1, got 0");
+        assertThatThrownBy(() -> run(full("x", null, false, null, "1x")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("invalid property name: 1x");
+    }
+
+    @Test
+    void propertyErrorsSkipTheObjectAndNullIsEmptyText() {
+        context.hasInput = true;
+        context.compiler = source -> new ScriptBlock() {
+            @Override
+            public Object invoke(Object current) {
+                if (current.equals("bad")) {
+                    throw new IllegalStateException("no property name");
+                }
+                return current.equals("none") ? null : current;
+            }
+
+            @Override
+            public String source() {
+                return source;
+            }
+        };
+        var grep = new Grep();
+        var params = full("^$", null, false, null, "name");
+        grep.process(params, "bad", context); // without begin: the search is created on first use
+        grep.process(params, "none", context);
+        grep.process(params, "text", context);
+        grep.end(params, context);
+        assertThat(context.emitted).containsExactly("none");
+        assertThat(context.errors).containsExactly("no property name (object skipped: bad)");
+    }
+
+    @Test
+    void aFolderFromThePipelineIsSearchedOnlyWithADepth() {
+        context.hasInput = true;
+        var grep = new Grep();
+        var flat = full("todo", null, false, null, null);
+        grep.begin(flat, context);
+        grep.process(flat, tmp.resolve("src"), context);
+        grep.end(flat, context);
+        assertThat(context.emitted).isEmpty();
+
+        var deep = full("todo", 2, false, null, null);
+        grep.begin(deep, context);
+        grep.process(deep, tmp.resolve("src"), context);
+        grep.end(deep, context);
+        assertThat(context.emitted).extracting(m -> ((GrepMatch) m).path().getFileName().toString())
+                .containsExactly("C.java");
+    }
+
+    @Test
+    void utf16FilesAreNotTakenForBinaryOnes() throws Exception {
+        Files.writeString(tmp.resolve("wide.txt"), "find me\n", java.nio.charset.StandardCharsets.UTF_16LE);
+        var params = new Grep.Params("find", List.of("wide.txt"), false, null, null, false, false, false, "UTF-16LE",
+                null, false, false);
+        assertThat(found(params)).containsExactly("wide.txt:1");
+    }
 }

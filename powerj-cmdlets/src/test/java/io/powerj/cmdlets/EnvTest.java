@@ -91,4 +91,23 @@ class EnvTest {
         assertThat(provider.messages(Locale.FRENCH).getString("env.option.set"))
                 .isEqualTo("Crée ou modifie une variable : NOM=valeur");
     }
+
+    @Test
+    void oneActionAtATimeAndAValueToAppend() {
+        assertThatThrownBy(() -> env(null, "A=1", "B", null, null, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("only one action at a time among --set, --unset, --append, --prepend");
+        assertThatThrownBy(() -> env(null, null, null, "PATH", null, null))
+                .hasMessage("value expected: env --append NAME value");
+        env(null, null, null, "NEW_LIST", null, "/a");
+        context.environment.put("EMPTY", "");
+        env(null, null, null, null, "EMPTY", "/b");
+        assertThat(context.environment).containsEntry("NEW_LIST", "/a").containsEntry("EMPTY", "/b");
+    }
+
+    @Test
+    void onlyReadingIsPreviewed() {
+        assertThat(new Env().previewable(new Env.Params("PATH", null, null, null, null, null))).isTrue();
+        assertThat(new Env().previewable(new Env.Params(null, "A=1", null, null, null, null))).isFalse();
+    }
 }
