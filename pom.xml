@@ -18,6 +18,7 @@
         <module>powerj-core</module>
         <module>powerj-cmdlets</module>
         <module>powerj-shell</module>
+        <module>powerj-coverage</module>
         <module>powerj-dist</module>
         <module>examples/greet</module>
     </modules>
@@ -32,6 +33,7 @@
         <junit.version>5.13.4</junit.version>
         <assertj.version>3.27.4</assertj.version>
         <jline.version>4.4.7</jline.version>
+        <jacoco.version>0.8.15</jacoco.version>
     </properties>
 
     <dependencyManagement>
@@ -140,6 +142,11 @@
                     <artifactId>maven-clean-plugin</artifactId>
                     <version>3.5.0</version>
                 </plugin>
+                <plugin>
+                    <groupId>org.jacoco</groupId>
+                    <artifactId>jacoco-maven-plugin</artifactId>
+                    <version>${jacoco.version}</version>
+                </plugin>
             </plugins>
         </pluginManagement>
 
@@ -165,6 +172,21 @@
                                 </requireJavaVersion>
                             </rules>
                         </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Coverage (NFR-05): each module records its tests in target/jacoco.exec (the agent is passed to
+                 surefire through argLine); powerj-coverage merges them and enforces the threshold.
+                 -Djacoco.skip=true turns it off. -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
                     </execution>
                 </executions>
             </plugin>

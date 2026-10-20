@@ -154,7 +154,7 @@ Messages, help, completion and errors in **English or French**; commands and opt
 ### Build
 
 ```bash
-./mvnw verify                 # compile + tests
+./mvnw verify                 # compile + tests + coverage (80% of lines and branches)
 ./mvnw -Pdist verify          # + standalone application image (jlink runtime + jpackage launcher)
 ```
 
@@ -228,6 +228,7 @@ All modules are JPMS modules (`module-info.java`); the only runtime dependency i
 | `powerj-core` | Lexer, parser, interpreter, pipeline, option binding, Java interoperability, completion engine, output formatting, native execution |
 | `powerj-cmdlets` | Built-in cmdlets (`ls`, `grep`, `cat`, `where`, `map`, `sort`, `first`, `last`, `range`, `select`, `count`, `measure`, `group`, `mkdir`, `touch`, `cp`, `mv`, `rm`, `collect`, `env`) |
 | `powerj-shell` | Entry point (`Main`), JLine REPL, profile, script mode, history expansion |
+| `powerj-coverage` | Test coverage of all the modules: JaCoCo report and 80% threshold |
 | `powerj-dist` | Distribution: jlink runtime + jpackage launcher / installer |
 | `examples/greet` | Example third-party module, not shipped: a template for your own cmdlets |
 
@@ -318,7 +319,9 @@ The complete example lives in [`examples/greet`](examples/greet) (also built by 
 ./mvnw verify
 ```
 
-Unit and integration tests use JUnit 5 and AssertJ: lexer, parser, option binding, Java interop, pipeline, completion, native commands, module loading, and the REPL driven through a scripted terminal. Tests force English messages so that they do not depend on the machine. The CI additionally runs a smoke test against the packaged launcher. Each development step has a manual acceptance checklist in [`docs/recettes/`](docs/recettes/).
+Unit and integration tests use JUnit 5 and AssertJ: lexer, parser, option binding, Java interop, pipeline, completion, native commands, module loading, the built-in cmdlets, and the REPL driven through a scripted terminal. Tests force English messages so that they do not depend on the machine, and pass on Linux and on Windows. The CI additionally runs a smoke test against the packaged launcher. Each development step has a manual acceptance checklist in [`docs/recettes/`](docs/recettes/).
+
+**Coverage.** `./mvnw verify` measures the coverage with JaCoCo and fails below **80% of the lines and of the branches**, for PowerJ as a whole and for the built-in cmdlets (`io.powerj.cmdlets`). The tests of every module count for every module. The report is in `powerj-coverage/target/site/jacoco-aggregate/index.html` (the CI publishes it as the `coverage-report` artifact); `-Djacoco.skip=true` skips the measure.
 
 ## Status and roadmap
 

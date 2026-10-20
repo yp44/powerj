@@ -1404,6 +1404,7 @@ powerj/                         (parent POM, packaging pom)
 │                               native execution
 ├── powerj-cmdlets/             Built-in cmdlets (ls, grep, where, map, collect, env)
 ├── powerj-shell/               JLine REPL, completion, highlighting, main
+├── powerj-coverage/            Test coverage of all the modules (JaCoCo report and threshold, NFR-05)
 ├── powerj-sample-module/       Sample third-party module (greet)
 └── powerj-dist/                jlink + jpackage → powerj.exe
 ```
@@ -1475,7 +1476,7 @@ Java's new features are used **where they bring a concrete benefit**:
 ## 7. Build and distribution
 
 - **Maven 3.9**; `maven-enforcer-plugin` enforces Java 25 and Maven ≥ 3.9; `maven.compiler.release=25`.
-- `mvn verify`: compilation, tests, coverage (JaCoCo).
+- `mvn verify`: compilation, tests, coverage (JaCoCo): each module records its tests, and `powerj-coverage` merges them, writes the report (`powerj-coverage/target/site/jacoco-aggregate/`) and fails the build below the NFR-05 threshold; `-Djacoco.skip=true` turns it off.
 - `powerj-dist` module:
   1. **jlink**: Java runtime containing **all the `java.se` modules** (required so that the whole standard API can be called, §3.13), without the development tools (`--strip-debug --no-header-files --no-man-pages`);
   2. **jpackage `--type app-image`** then **`--type exe`** (WiX Toolset): `powerj.exe` + installer with icon, addition to the `PATH`, Start menu entry, console mode (`--win-console`).
@@ -1518,7 +1519,7 @@ Environment variables read by PowerJ:
 | NFR-02 | Imperceptible typing latency; completion < 50 ms. |
 | NFR-03 | Windows 10/11 x64 first; UTF-8 end to end (console in code page 65001). |
 | NFR-04 | `ls -r` on 100,000 files without running out of memory (streaming). |
-| NFR-05 | Test coverage ≥ 80% on `powerj-core`. |
+| NFR-05 | Test coverage ≥ 80% of the lines and of the branches, for PowerJ as a whole and for the built-in cmdlets (`io.powerj.cmdlets`), on Linux and on Windows; checked by `mvn verify` (JaCoCo, `powerj-coverage` module). |
 | NFR-06 | No raw Java exception displayed to the user outside debug mode. |
 | NFR-07 | First call of a Java method < 50 ms; subsequent calls (cached) < 1 ms. |
 
@@ -1535,6 +1536,7 @@ Environment variables read by PowerJ:
 - **Modules**: loading of `powerj-sample-module`, handling of name collisions, module classes not accessible in Java expressions.
 - **Default imports**: automated test verifying that no simple name is duplicated across the default-imported packages (protects against classes being added in a future JDK version).
 - **Languages**: the Maven tests force English (`-Dpowerj.language=en` in the Surefire configuration) so that they do not depend on the machine or on `POWERJ_LANG`; resolution of the language and French texts are tested explicitly (FR-61).
+- **Coverage**: the tests of every module count for every module (a test of `powerj-shell` that runs `ls` covers `Ls`); the build fails below 80% of the lines or of the branches (NFR-05). The tests pass on Linux and on Windows; a test that depends on the system (`sh`, permissions, symbolic links) is skipped where it cannot run, with a counterpart for the other system when the behaviour differs.
 - **Manual acceptance test**: one checklist per step (§11), executed by the PM on the exe produced by the CI.
 
 ---

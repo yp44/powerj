@@ -25,6 +25,14 @@ jobs:
       - name: Build, tests et image applicative
         run: ./mvnw -B -Pdist verify
 
+      - name: Rapport de couverture des tests
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: coverage-report
+          path: powerj-coverage/target/site/jacoco-aggregate/
+          if-no-files-found: ignore
+
       - name: Test de fumée du lanceur
         run: |
           cat > smoke.txt <<'EOF'
