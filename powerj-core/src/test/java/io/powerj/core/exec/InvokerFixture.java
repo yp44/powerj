@@ -1,7 +1,15 @@
 package io.powerj.core.exec;
 
-/** Public overloads for {@link JavaInvokerTest}: ties broken by the most specific overload. */
+/** Public members for the tests of Java calls: overloads, a field, a failing getter. */
 public final class InvokerFixture {
+
+    /** Public field, read as a property. */
+    public int count = 3;
+
+    /** Getter that fails. */
+    public String getBroken() {
+        throw new IllegalStateException("broken");
+    }
 
     public String join(String... words) {
         return "all:" + String.join(",", words);
