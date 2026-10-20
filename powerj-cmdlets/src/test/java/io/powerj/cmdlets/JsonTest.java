@@ -144,6 +144,36 @@ class JsonTest {
         assertError("[".repeat(JsonParser.MAX_NESTING + 1), 1, JsonParser.MAX_NESTING + 1, "nested deeper than 1000 levels");
     }
 
+    @Test
+    void emptyObjectsWhitespaceAndAllEscapes() {
+        assertThat(JsonParser.parse("{ }")).isEqualTo(Row.of(Map.of()));
+        assertThat(JsonParser.parse("\t\r\n 1")).isEqualTo(1L);
+        assertThat(JsonParser.parse("\"\\b\\f\\r\\t\"")).isEqualTo("\b\f\r\t");
+        assertThat(JsonParser.parse("-12")).isEqualTo(-12L);
+        assertThat(JsonParser.parse("1e+5")).isEqualTo(100000.0);
+    }
+
+    @Test
+    void truncatedObjectsAndArrays() {
+        assertError("{", 1, 2, "unexpected end of the JSON text");
+        assertError("{\"a\"", 1, 5, "unexpected end of the JSON text");
+        assertError("{\"a\":1", 1, 7, "unexpected end of the JSON text");
+        assertError("{\"a\":1 x", 1, 8, "expected ',' or '}' in an object");
+        assertError("[1", 1, 3, "unexpected end of the JSON text");
+    }
+
+    @Test
+    void invalidEscapesAndNumbers() {
+        assertError("\"\\u12\"", 1, 2, "invalid escape: \\u must be followed by 4 hexadecimal digits");
+        assertError("\"\\uZZZZ\"", 1, 2, "invalid escape: \\u must be followed by 4 hexadecimal digits");
+        assertError("\"\\x\"", 1, 2, "invalid escape: \\x");
+        assertError("\"abc\\", 1, 1, "string not closed");
+        assertError("-", 1, 2, "invalid number: -");
+        assertError("1.", 1, 3, "invalid number: 1.");
+        assertError("1e", 1, 3, "invalid number: 1e");
+        assertError("@", 1, 1, "unexpected text: @");
+    }
+
     private static void assertError(String text, int line, int column, String message) {
         assertThatThrownBy(() -> JsonParser.parse(text)).isInstanceOfSatisfying(JsonParser.JsonException.class, e -> {
             assertThat(e.getMessage()).isEqualTo(message);

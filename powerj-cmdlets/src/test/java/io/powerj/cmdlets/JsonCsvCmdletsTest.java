@@ -202,4 +202,12 @@ class JsonCsvCmdletsTest {
         assertThat(rows).extracting(o -> ((Row) o).get("name")).containsExactly("a.txt", "b.txt");
         assertThat(rows).extracting(o -> ((Row) o).get("size")).containsExactly(10L, 20L);
     }
+
+    @Test
+    void fromCsvNeedsAnInput() {
+        var context = new TestContext<Row>(Path.of("."));
+        assertThatThrownBy(() -> new FromCsv().begin(new FromCsv.Params(null, false, null), context))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("CSV text expected: ... | from-csv (for example cat data.csv | from-csv)");
+    }
 }

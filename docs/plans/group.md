@@ -86,7 +86,7 @@ public record Group(Object key, long count, List<Object> items) { }
 - `CompletionsTest`: `ls | group ext | where { $_.` proposes `key`, `count` and `items`.
 
 ## Verification
-- `./mvnw verify` (locally `-Djava.release=25`; CI uses JDK 27).
+- `./mvnw verify` (JDK 25).
 - Manual:
   - `ls -r | group ext | sort count -d | first 5`
   - `ls -r | group ext dir`

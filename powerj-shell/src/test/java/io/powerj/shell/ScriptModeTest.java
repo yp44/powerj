@@ -95,4 +95,22 @@ class ScriptModeTest {
         assertThat(run(Optional.of(lines), "where { $_.endsWith(\".txt\") }")).isZero();
         assertThat(output()).isEqualTo("a.txt\nc.txt\n");
     }
+
+    @Test
+    void moduleWarningsGoToTheErrorOutput() throws Exception {
+        var modules = java.nio.file.Files.createDirectories(tmp.resolve("modules"));
+        java.nio.file.Files.writeString(modules.resolve("broken.jar"), "not a jar");
+        var session = new Session(tmp, tmp, System.getenv());
+        var script = new ScriptMode(session, CmdletRegistry.discover(), new PrintWriter(out, true), errors::add, 120,
+                Optional.empty());
+        script.loadModules(modules);
+        assertThat(errors).singleElement().asString().contains("broken.jar");
+    }
+
+    @Test
+    void aNonBlockingErrorEndsWithOneButTheScriptGoesOn() {
+        assertThat(run(Optional.empty(), "ls nope", "\"after\"")).isZero();
+        assertThat(run(Optional.empty(), "\"before\"", "ls nope")).isEqualTo(1);
+        assertThat(errors).hasSize(2);
+    }
 }

@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.powerj</groupId>
+        <artifactId>powerj-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>powerj-coverage</artifactId>
+    <packaging>pom</packaging>
+    <name>PowerJ Coverage</name>
+    <description>
+        Test coverage of PowerJ (NFR-05): the tests of every module count for every module. Report in
+        target/site/jacoco-aggregate/; the build fails below 80% of lines or branches, for PowerJ as a whole
+        and for the built-in cmdlets.
+    </description>
+
+    <properties>
+        <coverage.minimum>0.80</coverage.minimum>
+        <coverage.data>${project.build.directory}/coverage/jacoco.exec</coverage.data>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.powerj</groupId>
+            <artifactId>powerj-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.powerj</groupId>
+            <artifactId>powerj-fs</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.powerj</groupId>
+            <artifactId>powerj-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.powerj</groupId>
+            <artifactId>powerj-cmdlets</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.powerj</groupId>
+            <artifactId>powerj-shell</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- jacoco:check only reads the classes of the current module: the PowerJ classes are copied here.
+                 They are the very bytes the tests ran, so JaCoCo matches them with the execution data. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>unpack-classes</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>unpack-dependencies</goal>
+                        </goals>
+                        <configuration>
+                            <includeGroupIds>io.powerj</includeGroupIds>
+                            <includes>**/*.class</includes>
+                            <excludes>module-info.class</excludes>
+                            <outputDirectory>${project.build.outputDirectory}</outputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>merge</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>merge</goal>
+                        </goals>
+                        <configuration>
+                            <fileSets>
+                                <fileSet>
+                                    <directory>${project.basedir}/..</directory>
+                                    <includes>
+                                        <include>powerj-*/target/jacoco.exec</include>
+                                    </includes>
+                                </fileSet>
+                            </fileSets>
+                            <destFile>${coverage.data}</destFile>
+                        </configuration>
+                    </execution>
+                    <!-- Before the check, so that the report is there when the threshold is not reached. -->
+                    <execution>
+                        <id>report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report-aggregate</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <dataFile>${coverage.data}</dataFile>
+                            <rules>
+                                <!-- PowerJ as a whole. -->
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>${coverage.minimum}</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>BRANCH</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>${coverage.minimum}</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                                <!-- The built-in cmdlets. -->
+                                <rule>
+                                    <element>PACKAGE</element>
+                                    <includes>
+                                        <include>io.powerj.cmdlets</include>
+                                    </includes>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>${coverage.minimum}</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>BRANCH</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>${coverage.minimum}</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

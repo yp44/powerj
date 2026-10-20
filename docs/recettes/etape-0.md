@@ -16,7 +16,7 @@
 | # | Action | Expected result |
 |---|---|---|
 | 1 | Run the installer, accept the proposed choices (installation for the current user). | Installation completes without administrator rights. |
-| 2 | Open **PowerJ** from the Start menu (*PowerJ* folder) or the desktop shortcut. | A console opens with the banner `PowerJ 0.1.0-SNAPSHOT (Java 27)` followed by the prompt `PJ C:\…> `. |
+| 2 | Open **PowerJ** from the Start menu (*PowerJ* folder) or the desktop shortcut. | A console opens with the banner `PowerJ 0.1.0-SNAPSHOT (Java 25)` followed by the prompt `PJ C:\…> `. |
 | 3 | Type `bonjour` then Enter. | Message `unknown command: bonjour`, then a new prompt. |
 | 4 | Press Enter on an empty line. | A new prompt, with no message. |
 | 5 | Type `exit trois`. | Message `exit: invalid exit code 'trois'`. |

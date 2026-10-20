@@ -130,7 +130,7 @@ Parallel errors follow the sequential walk:
 - `rm -r -n -p 8` lists the same entries as without `-p` (as a set), with the folder last, and removes nothing.
 
 ## Verification
-- `./mvnw -Djava.release=25 verify`
+- `./mvnw verify`
 - Manually, with the 4-level test tree (8,421 folders, about 421,000 files):
 ```text
 Stream.iterate(List.of("t"), { l -> l.stream().flatMap({ p -> IntStream.range(0, 20).mapToObj({ i -> p + "/d" + i }) }).toList() }).limit(4).flatMap({ l -> l.stream() }) | mkdir -p | count

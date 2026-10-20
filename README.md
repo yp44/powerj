@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/yp44/powerj/actions/workflows/ci.yml/badge.svg)](https://github.com/yp44/powerj/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-![Java 27](https://img.shields.io/badge/Java-27-orange.svg)
+![Java 25](https://img.shields.io/badge/Java-25-orange.svg)
 
-**An interactive, object-oriented shell written in Java 27.** Commands return **Java objects** instead of text, you filter them on their properties in a pipeline, native programs work as in any shell, and **the whole Java API of the JRE** is available right at the prompt.
+**An interactive, object-oriented shell written in Java 25.** Commands return **Java objects** instead of text, you filter them on their properties in a pipeline, native programs work as in any shell, and **the whole Java API of the JRE** is available right at the prompt.
 
 ```text
 PJ ~/dev/powerj> ls -r --filter *.java | where { $_.size > 10kb }
@@ -149,13 +149,12 @@ Messages, help, completion and errors in **English or French**; commands and opt
 
 ### Prerequisites
 
-- **JDK 27**. Maven is not needed: the `mvnw` wrapper downloads Maven 3.9.11.
-- Without JDK 27 at hand, you can check the build with an older JDK that supports the features used: `./mvnw -Djava.release=25 verify`.
+- **JDK 25** or newer. Maven is not needed: the `mvnw` wrapper downloads Maven 3.9.11.
 
 ### Build
 
 ```bash
-./mvnw verify                 # compile + tests
+./mvnw verify                 # compile + tests + coverage (80% of lines and branches)
 ./mvnw -Pdist verify          # + standalone application image (jlink runtime + jpackage launcher)
 ```
 
@@ -229,6 +228,7 @@ All modules are JPMS modules (`module-info.java`); the only runtime dependency i
 | `powerj-core` | Lexer, parser, interpreter, pipeline, option binding, Java interoperability, completion engine, output formatting, native execution |
 | `powerj-cmdlets` | Built-in cmdlets (`ls`, `grep`, `cat`, `where`, `map`, `sort`, `first`, `last`, `range`, `select`, `count`, `measure`, `group`, `mkdir`, `touch`, `cp`, `mv`, `rm`, `collect`, `env`) |
 | `powerj-shell` | Entry point (`Main`), JLine REPL, profile, script mode, history expansion |
+| `powerj-coverage` | Test coverage of all the modules: JaCoCo report and 80% threshold |
 | `powerj-dist` | Distribution: jlink runtime + jpackage launcher / installer |
 | `examples/greet` | Example third-party module, not shipped: a template for your own cmdlets |
 
@@ -319,7 +319,9 @@ The complete example lives in [`examples/greet`](examples/greet) (also built by 
 ./mvnw verify
 ```
 
-Unit and integration tests use JUnit 5 and AssertJ: lexer, parser, option binding, Java interop, pipeline, completion, native commands, module loading, and the REPL driven through a scripted terminal. Tests force English messages so that they do not depend on the machine. The CI additionally runs a smoke test against the packaged launcher. Each development step has a manual acceptance checklist in [`docs/recettes/`](docs/recettes/).
+Unit and integration tests use JUnit 5 and AssertJ: lexer, parser, option binding, Java interop, pipeline, completion, native commands, module loading, the built-in cmdlets, and the REPL driven through a scripted terminal. Tests force English messages so that they do not depend on the machine, and pass on Linux and on Windows. The CI additionally runs a smoke test against the packaged launcher. Each development step has a manual acceptance checklist in [`docs/recettes/`](docs/recettes/).
+
+**Coverage.** `./mvnw verify` measures the coverage with JaCoCo and fails below **80% of the lines and of the branches**, for PowerJ as a whole and for the built-in cmdlets (`io.powerj.cmdlets`). The tests of every module count for every module. The report is in `powerj-coverage/target/site/jacoco-aggregate/index.html` (the CI publishes it as the `coverage-report` artifact); `-Djacoco.skip=true` skips the measure.
 
 ## Status and roadmap
 

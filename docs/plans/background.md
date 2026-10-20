@@ -78,7 +78,7 @@ public record Job(int id, long pid, String command, Instant start, boolean runni
 - `PreviewTest`: `sleep 1 &` turns the preview off.
 
 ## Verification
-- `./mvnw -Djava.release=25 verify`
+- `./mvnw verify`
 - Manually (Linux with X, or Windows):
 ```text
 xeyes &                 # [1] 12345, prompt at once

@@ -147,7 +147,7 @@ Docs:
   - `List.of(…) | range --from { $_ == "BEGIN" } --to { $_ == "END" } --repeat --exclude`.
 
 ## Verification
-- `./mvnw verify` (locally `-Djava.release=25`; CI uses JDK 27).
+- `./mvnw verify` (JDK 25).
 - Manual:
   - `ls -r / | first 3` (instant);
   - `cat big.log | range --to 10`;

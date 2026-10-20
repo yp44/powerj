@@ -16,8 +16,8 @@ class BuildInfoTest {
 
     @Test
     void bannerShowsPowerJAndJavaFeatureVersion() {
-        var info = new BuildInfo("1.2.3", Runtime.Version.parse("27.0.1"));
+        var info = new BuildInfo("1.2.3", Runtime.Version.parse("25.0.1"));
 
-        assertThat(info.banner()).isEqualTo("PowerJ 1.2.3 (Java 27)");
+        assertThat(info.banner()).isEqualTo("PowerJ 1.2.3 (Java 25)");
     }
 }

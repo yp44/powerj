@@ -172,4 +172,14 @@ class MeasureTest {
         count.end(params, empty);
         assertThat(empty.emitted).containsExactly(0L);
     }
+
+    @Test
+    void decimalsOfEveryClassAreSummedExactly() {
+        Row row = measure(null, new java.math.BigDecimal("0.1"), 0.2f, new java.math.BigInteger("3"), (short) 1,
+                (byte) 1);
+        assertThat(row.get("count")).isEqualTo(5L);
+        assertThat(row.get("min")).isEqualTo(new java.math.BigDecimal("0.1"));
+        assertThat(row.get("max")).isEqualTo(new java.math.BigInteger("3"));
+        assertThat(((Number) row.get("sum")).doubleValue()).isCloseTo(5.3, org.assertj.core.data.Offset.offset(1e-9));
+    }
 }

@@ -177,7 +177,7 @@ Implemented as `JsonTest` (writer, parser, splitter), `CsvTest` (writer, reader)
 - `BuiltinCmdletsTest`: the four cmdlets are registered.
 
 ## Verification
-- `./mvnw -Djava.release=25 verify`
+- `./mvnw verify`
 - Manually:
 ```text
 ls | select name size | to-json

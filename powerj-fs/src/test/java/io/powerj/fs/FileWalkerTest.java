@@ -190,4 +190,39 @@ class FileWalkerTest {
         assertThat(Globs.isPattern("src/*.java")).isTrue();
         assertThat(Globs.isPattern("src/A.java")).isFalse();
     }
+
+    @Test
+    void aBrokenLinkIsDescribedByItself() throws Exception {
+        try {
+            Files.createSymbolicLink(tmp.resolve("broken"), tmp.resolve("missing"));
+        } catch (UnsupportedOperationException | IOException _) {
+            return; // no symbolic links on this system (Windows without privilege)
+        }
+        List<Boolean> links = new ArrayList<>();
+        FileWalker.builder().maxDepth(1).build().walk(tmp,
+                (path, attributes) -> path.getFileName().toString().equals("broken") ? attributes.isSymbolicLink() : null,
+                links::add, errors::add);
+        assertThat(links).containsExactly(true);
+        assertThat(errors).isEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {1, 4})
+    void anErrorOfTheVisitorStopsTheWalk(int parallelism) {
+        var walker = FileWalker.builder().parallelism(parallelism).build();
+        assertThatThrownBy(() -> walker.<String>walk(tmp, (path, attributes) -> {
+            throw new StackOverflowError("deep");
+        }, results::add, errors::add)).isInstanceOf(StackOverflowError.class).hasMessage("deep");
+    }
+
+    @Test
+    void errorsAreClassified() {
+        Path path = tmp.resolve("x");
+        assertThat(WalkError.of(path, new java.nio.file.NoSuchFileException("x")).kind()).isEqualTo(WalkError.Kind.NOT_FOUND);
+        assertThat(WalkError.of(path, new java.nio.file.AccessDeniedException("x")).kind())
+                .isEqualTo(WalkError.Kind.ACCESS_DENIED);
+        var other = WalkError.of(path, new IOException((String) null));
+        assertThat(other.kind()).isEqualTo(WalkError.Kind.IO);
+        assertThat(other.message()).isEmpty();
+    }
 }

@@ -5,7 +5,7 @@
 | **Document version** | 0.10 (`~` = `HOME` directory in every argument) |
 | **Status** | Pending approval |
 | **Target platform** | Windows 10/11 x64 (`powerj.exe`), Linux/macOS as a bonus |
-| **Technical foundation** | Java 27, Maven 3.9, JLine 3 |
+| **Technical foundation** | Java 25, Maven 3.9, JLine 3 |
 
 ---
 
@@ -62,7 +62,7 @@ FRIDAY
 | OBJ-3 | Pipeline of typed Java objects (preferably records, but any object) with attribute access (`$_.size`). |
 | OBJ-4 | Seamless mixing of cmdlets ↔ native commands. |
 | OBJ-5 | Extensibility: a third-party developer adds cmdlets by dropping in a `.jar`. |
-| OBJ-6 | Exemplary codebase in modern Java (Java 27). |
+| OBJ-6 | Exemplary codebase in modern Java (Java 25). |
 | OBJ-7 | Direct access to the entire public Java API of the JRE (static methods, constructors, instance methods). |
 
 ### 1.2 Non-goals of v1
@@ -101,7 +101,7 @@ Each requirement has an identifier `FR-xx` and one or more verifiable **acceptan
 
 ### 3.1 REPL
 
-**FR-01 — Prompt.** On startup, PowerJ displays a banner (`PowerJ 0.x — Java 27`) then the prompt `PJ <répertoire courant>> ` (`<current directory>`).
+**FR-01 — Prompt.** On startup, PowerJ displays a banner (`PowerJ 0.x — Java 25`) then the prompt `PJ <répertoire courant>> ` (`<current directory>`).
 - CA: launching `powerj.exe` from `C:\Users\yves` displays `PJ C:\Users\yves> `.
 
 **FR-02 — Multi-line input.** If a line ends with `|`, `&&` or `||`, or if a brace, parenthesis or quote is left open (no continuation with `\`, so that `cd C:\` remains valid), the shell displays a continuation prompt `>> ` and waits for the rest.
@@ -1404,6 +1404,7 @@ powerj/                         (parent POM, packaging pom)
 │                               native execution
 ├── powerj-cmdlets/             Built-in cmdlets (ls, grep, where, map, collect, env)
 ├── powerj-shell/               JLine REPL, completion, highlighting, main
+├── powerj-coverage/            Test coverage of all the modules (JaCoCo report and threshold, NFR-05)
 ├── powerj-sample-module/       Sample third-party module (greet)
 └── powerj-dist/                jlink + jpackage → powerj.exe
 ```
@@ -1466,16 +1467,16 @@ Java's new features are used **where they bring a concrete benefit**:
 | **Reflection, `Proxy`, `ClassValue`** | Java interoperability: method/constructor calls with per-type cache, conversion of `{ }` blocks into functional interfaces (`MethodHandles`: possible optimization later). |
 | **`ClassValue`** | Cache of member metadata per type, without classloader leaks (third-party modules). |
 | **Module import declarations, flexible constructors** | Code readability. |
-| **Primitive patterns** | In the evaluator for numeric comparisons, if finalized in JDK 27. |
+| **Primitive patterns** | In the evaluator for numeric comparisons, once finalized (still in preview in JDK 25). |
 
-**Rule:** a feature still in *preview* in JDK 27 is enabled (`--enable-preview`) only after PM approval. The list above is rechecked against the JEPs actually delivered in JDK 27 at the start of step 0.
+**Rule:** a feature still in *preview* in JDK 25 is enabled (`--enable-preview`) only after PM approval. The list above is rechecked against the JEPs actually delivered in JDK 25 at the start of step 0.
 
 ---
 
 ## 7. Build and distribution
 
-- **Maven 3.9**; `maven-enforcer-plugin` enforces Java 27 and Maven ≥ 3.9; `maven.compiler.release=27`.
-- `mvn verify`: compilation, tests, coverage (JaCoCo).
+- **Maven 3.9**; `maven-enforcer-plugin` enforces Java 25 and Maven ≥ 3.9; `maven.compiler.release=25`.
+- `mvn verify`: compilation, tests, coverage (JaCoCo): each module records its tests, and `powerj-coverage` merges them, writes the report (`powerj-coverage/target/site/jacoco-aggregate/`) and fails the build below the NFR-05 threshold; `-Djacoco.skip=true` turns it off.
 - `powerj-dist` module:
   1. **jlink**: Java runtime containing **all the `java.se` modules** (required so that the whole standard API can be called, §3.13), without the development tools (`--strip-debug --no-header-files --no-man-pages`);
   2. **jpackage `--type app-image`** then **`--type exe`** (WiX Toolset): `powerj.exe` + installer with icon, addition to the `PATH`, Start menu entry, console mode (`--win-console`).
@@ -1518,7 +1519,7 @@ Environment variables read by PowerJ:
 | NFR-02 | Imperceptible typing latency; completion < 50 ms. |
 | NFR-03 | Windows 10/11 x64 first; UTF-8 end to end (console in code page 65001). |
 | NFR-04 | `ls -r` on 100,000 files without running out of memory (streaming). |
-| NFR-05 | Test coverage ≥ 80% on `powerj-core`. |
+| NFR-05 | Test coverage ≥ 80% of the lines and of the branches, for PowerJ as a whole and for the built-in cmdlets (`io.powerj.cmdlets`), on Linux and on Windows; checked by `mvn verify` (JaCoCo, `powerj-coverage` module). |
 | NFR-06 | No raw Java exception displayed to the user outside debug mode. |
 | NFR-07 | First call of a Java method < 50 ms; subsequent calls (cached) < 1 ms. |
 
@@ -1535,6 +1536,7 @@ Environment variables read by PowerJ:
 - **Modules**: loading of `powerj-sample-module`, handling of name collisions, module classes not accessible in Java expressions.
 - **Default imports**: automated test verifying that no simple name is duplicated across the default-imported packages (protects against classes being added in a future JDK version).
 - **Languages**: the Maven tests force English (`-Dpowerj.language=en` in the Surefire configuration) so that they do not depend on the machine or on `POWERJ_LANG`; resolution of the language and French texts are tested explicitly (FR-61).
+- **Coverage**: the tests of every module count for every module (a test of `powerj-shell` that runs `ls` covers `Ls`); the build fails below 80% of the lines or of the branches (NFR-05). The tests pass on Linux and on Windows; a test that depends on the system (`sh`, permissions, symbolic links) is skipped where it cannot run, with a counterpart for the other system when the behaviour differs.
 - **Manual acceptance test**: one checklist per step (§11), executed by the PM on the exe produced by the CI.
 
 ---
@@ -1548,7 +1550,7 @@ Each step:
 
 ### Step 0 — Skeleton and exe
 
-**Content:** Maven multi-module structure, JPMS, enforcer Java 27 / Maven 3.9, jlink + jpackage, CI on Linux + Windows. The REPL is minimal (simple reading, `exit`).
+**Content:** Maven multi-module structure, JPMS, enforcer Java 25 / Maven 3.9, jlink + jpackage, CI on Linux + Windows. The REPL is minimal (simple reading, `exit`).
 
 **Acceptance test:**
 1. Download the CI artifact, install `powerj.exe`.

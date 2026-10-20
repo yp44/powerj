@@ -122,7 +122,7 @@ Docs:
 - `BuiltinCmdletsTest`: `ps | where { $_.pid == … }` in the shell, and `help kill`.
 
 ## Verification
-- `./mvnw -Djava.release=25 verify`
+- `./mvnw verify`
 - Manually:
 ```text
 ps | first 5

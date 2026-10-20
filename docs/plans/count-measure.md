@@ -81,7 +81,7 @@ measure [<key>]
   - `List.of(1, 2, 3) | measure`.
 
 ## Verification
-- `./mvnw verify` (locally `-Djava.release=25`; CI uses JDK 27).
+- `./mvnw verify` (JDK 25).
 - Manual:
   - `ls -r | count`
   - `ls -r | measure size`
