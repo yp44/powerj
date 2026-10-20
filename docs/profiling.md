@@ -34,7 +34,54 @@ output, with the objects read and produced and the time to the first value (FR-7
 - The stages of a pipeline run at the same time, so their durations overlap: look at the statement figure for the cost
   of the pipeline, and at `first` to spot a stage that waits for its whole input (`sort`, `group`).
 - These are **wall-clock times**: time spent blocked (waiting for a slow disk, for a slower downstream stage) counts.
-  For CPU time or memory, use the JVM tools below.
+
+### Automatic Flight Recorder analysis, command by command
+
+In perf mode every line is also recorded by the JVM's Flight Recorder, **in the shell's own process** (nothing to attach,
+no option to give), and analysed as soon as it has run (FR-78). Under the wall-clock report you get the CPU, the
+allocation, the garbage collections and the waiting of that command, then one line per stage with its three hottest
+methods:
+
+```text
+jfr · cpu 143 ms (79 %) · alloc 48.2 MB · gc 2× 7.1 ms · wait 31 ms
+  where        cpu  98 ms · alloc 31.0 MB · wait 2 ms  hot Foo.test:41 41 %, Baz.size:88 18 %
+  sort         cpu  45 ms · alloc 17.2 MB · wait 29 ms  hot Arrays.sort:12 63 %
+recording ~/.powerj/perf/perf-1792507896426.jfr
+```
+
+How to read it:
+
+- **cpu** is `samples × 5 ms` (the Java threads are sampled every 5 ms): an estimate, good when there are many samples.
+  With fewer than 20 (a command of ~100 ms or less) the summary says so; run the line a few times, or on more data.
+- **wait** is time spent parked, sleeping, blocked on a monitor or in file I/O (events of 1 ms or more). A stage that waits
+  for its upstream stage shows a large `wait` and almost no `cpu`: that is the pipeline working, not a problem. A stage
+  with a high `cpu` and a hot method is where to optimise.
+- **alloc** is sampled, and counts what was allocated, not what stays alive (for the live set use `GC.class_histogram`
+  below). `gc` counts the collections that happened *during the line*.
+- The hot-method line numbers are exact thanks to `-XX:+DebugNonSafepoints`, set in the packaged launcher.
+
+The detail is available as objects, which a pipeline can filter and sort:
+
+```text
+PJ⏱ > perf --stages | sort cpu
+PJ⏱ > perf | where percent > 20          # dominant methods
+PJ⏱ > perf --allocations                 # where the objects are created
+PJ⏱ > perf --waits                       # park / sleep / monitor / file, by stage
+PJ⏱ > perf --gc
+PJ⏱ > perf --file                        # path of the recording
+```
+
+**Keeping the recordings.** The `.jfr` file of each line goes to `~/.powerj/perf/`; the session variable
+`POWERJ_PERF_KEEP` says how many to keep, read at every line: unset or `0` deletes the file once analysed, `1` keeps only
+the last, `N` keeps the last N. Being a session variable, it can be set from the profile:
+
+```text
+# ~/.powerj/profile.pj
+env --set POWERJ_PERF_KEEP=5
+```
+
+A kept file opens in JDK Mission Control or with `jfr print` / `jfr view`, like any recording below. Without the
+`jdk.jfr` module (a slimmed image), perf mode says so once and keeps giving the plan and the wall-clock report.
 
 ## Preparing the runtime
 

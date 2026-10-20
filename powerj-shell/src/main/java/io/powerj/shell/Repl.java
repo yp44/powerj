@@ -23,6 +23,9 @@ import io.powerj.core.exec.Completions;
 import io.powerj.core.exec.ConsoleInput;
 import io.powerj.core.exec.Interpreter;
 import io.powerj.core.exec.Outcome;
+import io.powerj.core.exec.PerfFiles;
+import io.powerj.core.exec.PerfProfile;
+import io.powerj.core.exec.PerfProfiler;
 import io.powerj.core.exec.PerfRecorder;
 import io.powerj.core.exec.PerfReport;
 import io.powerj.core.exec.PjException;
@@ -48,7 +51,10 @@ public final class Repl {
     /** Perf mode (FR-76), or {@code null} if the line reader cannot display it. */
     private final PerfMode perf;
     private final boolean colors;
+    /** What the Flight Recorder saw during the last line run in perf mode (FR-78), for the {@code perf} command. */
+    private volatile PerfProfile lastProfile;
     private List<String> moduleWarnings = List.of();
+    private boolean flightNoted;
     private Path profile;
     private boolean runProfile;
     /** Prefix of the error lines ({@code profile.pj:3: }) while the profile runs, otherwise {@code null}. */
@@ -64,7 +70,7 @@ public final class Repl {
         this.colors = interactive && colors(terminal);
         var io = new ShellIo(out, this::printError, interactive, () -> terminal.getWidth(), consoleInput(terminal),
                 colors);
-        this.interpreter = new Interpreter(session, io, Map.of("history", this::history), registry);
+        this.interpreter = new Interpreter(session, io, Map.of("history", this::history, "perf", this::perfCommand), registry);
         // Completion (Tab) and input highlighting (FR-08, FR-21 to FR-26).
         var completions = new Completions(interpreter);
         completions.warmUp();
@@ -143,6 +149,7 @@ public final class Repl {
                 }
             }
             PerfRecorder recorder = perf == null || line.isBlank() ? null : perf.recorder();
+            PerfProfiler.Recording flight = recorder == null ? null : startFlightRecorder();
             interpreter.record(recorder);
             Outcome outcome;
             try {
@@ -159,6 +166,7 @@ public final class Repl {
             }
             if (recorder != null) {
                 printPerf(recorder.report());
+                printProfile(flight);
             }
             out.flush();
         }
@@ -234,6 +242,83 @@ public final class Repl {
                 terminal.resume();
             }
         };
+    }
+
+    /** Starts the Flight Recorder for the line about to run; {@code null} (and a note) if it cannot. */
+    private PerfProfiler.Recording startFlightRecorder() {
+        try {
+            PerfProfiler.Recording recording = PerfProfiler.start();
+            if (recording == null && !flightNoted) {
+                flightNoted = true;
+                printNote(Messages.get("perf.profile.noJfr"));
+            }
+            return recording;
+        } catch (RuntimeException | LinkageError e) {
+            printNote(Messages.get("perf.profile.unavailable", e));
+            return null;
+        }
+    }
+
+    /** Stops the recording, analyses it, and shows the summary under the report; never fails the line. */
+    private void printProfile(PerfProfiler.Recording flight) {
+        if (flight == null) {
+            return;
+        }
+        try {
+            Path dir = session.configDirectory().orElse(Path.of(System.getProperty("java.io.tmpdir"), "powerj"))
+                    .resolve("perf");
+            PerfProfile profile = flight.finish(dir, PerfFiles.keep(session.environment()));
+            lastProfile = profile;
+            synchronized (out) {
+                perf.profile(profile).forEach(line -> out.println(colors ? line.toAnsi(terminal) : line.toString()));
+                out.flush();
+            }
+        } catch (IOException | RuntimeException | LinkageError e) {
+            printNote(Messages.get("perf.profile.unavailable", e));
+        } finally {
+            flight.close();
+        }
+    }
+
+    private void printNote(String message) {
+        synchronized (out) {
+            out.println(new AttributedString(message, AttributedStyle.DEFAULT.faint()).toAnsi(terminal));
+            out.flush();
+        }
+    }
+
+    /**
+     * {@code perf}: what the Flight Recorder saw during the last line run in perf mode, as objects — hot methods
+     * by default, {@code --stages}, {@code --allocations}, {@code --waits}, {@code --gc}, {@code --file}.
+     */
+    private List<Object> perfCommand(List<Object> args, Session ignored) {
+        PerfProfile profile = lastProfile;
+        if (profile == null) {
+            throw new PjException(Messages.get("perf.none"));
+        }
+        String option = args.isEmpty() ? "" : Values.text(args.getFirst());
+        if (args.size() > 1) {
+            throw new PjException(Messages.get("perf.unknownOption", Values.text(args.get(1))));
+        }
+        List<Object> rows = new ArrayList<>();
+        switch (option) {
+            case "" -> profile.stages().forEach(stage -> rows.addAll(stage.hot()));
+            case "--stages" -> profile.stages().forEach(stage -> rows.add(new PerfProfile.StageRow(stage.number(),
+                    stage.command(), stage.kind(), stage.wall(), stage.cpu(), stage.samples(), stage.allocated(),
+                    stage.waited())));
+            case "--allocations" -> profile.stages().forEach(stage -> rows.addAll(stage.sites()));
+            case "--waits" -> profile.stages().forEach(stage -> rows.addAll(stage.waits()));
+            case "--gc" -> rows.add(new PerfProfile.GcRow(profile.gc().count(), profile.gc().pause(),
+                    profile.gc().before(), profile.gc().after()));
+            case "--file" -> {
+                if (profile.file() == null) {
+                    throw new PjException(Messages.get("perf.noFile", PerfFiles.VARIABLE));
+                }
+                rows.add(profile.file());
+            }
+            default -> throw new PjException(Messages.get("perf.unknownOption", option));
+        }
+        return rows;
     }
 
     /** Figures of the line that has just run (perf mode, FR-76). */

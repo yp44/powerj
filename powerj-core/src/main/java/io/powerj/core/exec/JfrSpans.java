@@ -31,6 +31,12 @@ final class JfrSpans {
     @Description("A stage of a pipeline, from its start to its end; the stages of a pipeline overlap")
     @StackTrace(false)
     public static final class StageEvent extends Event {
+        @Label("Statement")
+        @Description("Number of the statement in the line, from 1")
+        public int statement;
+        @Label("Position")
+        @Description("Position of the stage in its pipeline, from 1")
+        public int position;
         @Label("Command")
         public String command;
         @Label("Kind")
@@ -60,13 +66,15 @@ final class JfrSpans {
         };
     }
 
-    static Profiling.Span stage(String command, String kind) {
+    static Profiling.Span stage(String command, String kind, int statement, int position) {
         var event = new StageEvent();
         if (!event.isEnabled()) {
             return (_, _) -> { };
         }
         event.begin();
         return (in, out) -> {
+            event.statement = statement;
+            event.position = position;
             event.command = command;
             event.kind = kind;
             event.in = in;

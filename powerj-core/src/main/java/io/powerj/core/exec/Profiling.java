@@ -34,8 +34,13 @@ final class Profiling {
         return AVAILABLE ? JfrSpans.command(commands, statements) : NONE;
     }
 
-    /** A stage being run; {@code in} / {@code out} given at the end are {@code -1} if unknown. */
-    static Span stage(String command, String kind) {
-        return AVAILABLE ? JfrSpans.stage(command, kind) : NONE;
+    /**
+     * A stage being run; {@code in} / {@code out} given at the end are {@code -1} if unknown.
+     *
+     * @param statement number of the statement in the line, from 1
+     * @param position  position of the stage in its pipeline, from 1
+     */
+    static Span stage(String command, String kind, int statement, int position) {
+        return AVAILABLE ? JfrSpans.stage(command, kind, statement, position) : NONE;
     }
 }

@@ -37,6 +37,7 @@ class PerfModeTest {
     private LineReader reader;
     private CompletableFuture<Integer> code;
     private Path cwd;
+    private Path perfDir;
 
     @BeforeEach
     void start() throws Exception {
@@ -44,7 +45,10 @@ class PerfModeTest {
         var home = new PowerJHome(tmp.resolve("home")).createDirectories();
         terminal = TestTerminal.interactive();
         reader = ShellReader.create(terminal.terminal(), home, ShellConfig.defaults());
-        var repl = new Repl(reader, new Supervisor(), new Session(tmp, cwd, System.getenv()), CmdletRegistry.discover());
+        var session = new Session(tmp, cwd, System.getenv());
+        session.configDirectory(home.dir());
+        perfDir = home.dir().resolve("perf");
+        var repl = new Repl(reader, new Supervisor(), session, CmdletRegistry.discover());
         terminal.startTyping();
         code = new CompletableFuture<>();
         Thread.ofVirtual().start(() -> code.complete(repl.run(new BuildInfo("0.1.0", Runtime.Version.parse("25")))));
@@ -103,6 +107,66 @@ class PerfModeTest {
         Thread.sleep(300);
         terminal.type(ALT_V);
         awaitUntil(() -> terminal.screen().lastIndexOf('?') > terminal.screen().lastIndexOf('⏱'));
+        exit();
+    }
+
+    private long recordings() throws Exception {
+        if (!Files.exists(perfDir)) {
+            return 0;
+        }
+        try (var files = Files.list(perfDir)) {
+            return files.count();
+        }
+    }
+
+    private void run(String line, String expected) throws Exception {
+        int before = terminal.screen().length();
+        terminal.type(line + ENTER);
+        awaitUntil(() -> terminal.screen().substring(before).contains(expected));
+        awaitUntil(() -> reader.isReading() && reader.getBuffer().length() == 0);
+    }
+
+    @Test
+    void theFlightRecorderSummaryFollowsTheReportAndPerfGivesTheDetail() throws Exception {
+        terminal.type(ALT_P);
+        awaitUntil(() -> terminal.screen().contains("PJ⏱ " + cwd + "> "));
+        Files.writeString(cwd.resolve("hello.txt"), "hello");
+        run("ls | where size > 0 | count", "jfr · cpu");
+        assertThat(terminal.screen()).contains("Perf · total", "alloc", "gc ", "wait ");
+
+        run("perf --stages", "ls");
+        assertThat(terminal.screen()).contains("samples", "allocated");
+        run("perf --gc", "pause");
+        run("perf --bogus", "unknown option '--bogus'");
+        exit();
+    }
+
+    @Test
+    void theNumberOfRecordingsKeptFollowsTheEnvironmentVariable() throws Exception {
+        terminal.type(ALT_P);
+        awaitUntil(() -> terminal.screen().contains("PJ⏱ " + cwd + "> "));
+        run("\"a\".length()", "jfr · cpu");
+        assertThat(recordings()).isZero(); // POWERJ_PERF_KEEP unset: deleted after the analysis
+
+        run("env --set POWERJ_PERF_KEEP=2", "jfr · cpu");
+        assertThat(recordings()).isEqualTo(1);
+        Thread.sleep(5);
+        run("\"b\".length()", "jfr · cpu");
+        Thread.sleep(5);
+        run("\"c\".length()", "jfr · cpu");
+        assertThat(recordings()).isEqualTo(2);
+
+        run("env --set POWERJ_PERF_KEEP=0", "jfr · cpu");
+        assertThat(recordings()).isZero();
+        exit();
+    }
+
+    @Test
+    void noRecordingOutsidePerfMode() throws Exception {
+        run("\"abc\".length()", "3");
+        assertThat(recordings()).isZero();
+        assertThat(terminal.screen()).doesNotContain("jfr · cpu");
+        run("perf", "no profile yet");
         exit();
     }
 

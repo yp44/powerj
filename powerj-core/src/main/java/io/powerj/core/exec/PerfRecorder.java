@@ -17,6 +17,7 @@ public final class PerfRecorder {
     private final List<PerfReport.Statement> statements = new CopyOnWriteArrayList<>();
     /** {@code false} for the recorder that only feeds the Flight Recorder events: nothing is kept. */
     private final boolean retain;
+    private final java.util.concurrent.atomic.AtomicInteger statementCount = new java.util.concurrent.atomic.AtomicInteger();
 
     public PerfRecorder() {
         this(true);
@@ -34,11 +35,12 @@ public final class PerfRecorder {
     /** Figures of one statement being executed. */
     final class StatementTimer {
         private final long begin = System.nanoTime();
+        private final int number = statementCount.incrementAndGet();
         private final List<StageTimer> stages = new ArrayList<>();
 
         /** Adds a stage; call before the pipeline starts. */
         StageTimer stage(PerfPlan.Stage plan) {
-            var stage = new StageTimer(plan);
+            var stage = new StageTimer(plan, number, stages.size() + 1);
             stages.add(stage);
             return stage;
         }
@@ -56,6 +58,8 @@ public final class PerfRecorder {
     /** Figures of one stage; updated from the stage's own thread. */
     static final class StageTimer {
         private final PerfPlan.Stage plan;
+        private final int statement;
+        private final int position;
         private volatile long begin;
         private volatile long end;
         private volatile long first;
@@ -64,13 +68,16 @@ public final class PerfRecorder {
         private volatile boolean reads;
         private volatile Profiling.Span span = (_, _) -> { };
 
-        StageTimer(PerfPlan.Stage plan) {
+        StageTimer(PerfPlan.Stage plan, int statement, int position) {
             this.plan = plan;
+            this.statement = statement;
+            this.position = position;
         }
 
         void started() {
             begin = System.nanoTime();
-            span = Profiling.stage(plan.text().split(" ", 2)[0], plan.kind().name().toLowerCase(java.util.Locale.ROOT));
+            span = Profiling.stage(plan.text().split(" ", 2)[0], plan.kind().name().toLowerCase(java.util.Locale.ROOT),
+                    statement, position);
         }
 
         void ended() {

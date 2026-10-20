@@ -39,8 +39,12 @@
             lines. Slim image (no debug attributes): see docs/profiling.md
         -->
         <dist.jlink.options>--no-header-files --no-man-pages</dist.jlink.options>
-        <!-- Extra jpackage arguments, e.g. JVM options (see docs/profiling.md) -->
-        <dist.extra.args></dist.extra.args>
+        <!--
+            Extra jpackage arguments, e.g. more JVM options (see docs/profiling.md). DebugNonSafepoints is a diagnostic
+            flag that cannot be switched on at run time: perf mode's Flight Recorder (FR-78) needs it to attribute the
+            CPU samples to the right line. It does not change the generated code.
+        -->
+        <dist.extra.args>--java-options -XX:+UnlockDiagnosticVMOptions --java-options -XX:+DebugNonSafepoints</dist.extra.args>
     </properties>
 
     <dependencies>

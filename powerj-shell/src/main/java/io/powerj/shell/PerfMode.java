@@ -16,6 +16,7 @@ import org.jline.utils.AttributedStyle;
 import io.powerj.core.exec.Interpreter;
 import io.powerj.core.exec.PerfPlan;
 import io.powerj.core.exec.PerfRecorder;
+import io.powerj.core.exec.PerfProfile;
 import io.powerj.core.exec.PerfReport;
 import io.powerj.core.lang.Connector;
 
@@ -184,6 +185,53 @@ final class PerfMode {
         }
         lines.add(new AttributedString(Messages.get("perf.report.note"), BANNER));
         return lines;
+    }
+
+    /** The Flight Recorder summary of a line (FR-78): the whole line, then one line per stage. */
+    List<AttributedString> profile(PerfProfile profile) {
+        List<AttributedString> lines = new ArrayList<>();
+        long wall = Math.max(1, profile.wall().toNanos());
+        String gc = profile.gc().count() == 0 ? Messages.get("perf.profile.noGc")
+                : Messages.get("perf.profile.gc", profile.gc().count(), duration(profile.gc().pause()));
+        lines.add(new AttributedString(Messages.get("perf.profile.header", duration(profile.cpu()),
+                Math.round(100.0 * profile.cpu().toNanos() / wall), bytes(profile.allocated()), gc,
+                duration(profile.waited())), DIM));
+        for (var stage : profile.stages()) {
+            String hot = stage.hot().isEmpty() ? "" : Messages.get("perf.profile.hot", String.join(", ",
+                    stage.hot().stream().map(method -> shortMethod(method.method()) + ":" + method.line() + " "
+                            + Math.round(method.percent()) + " %").toList()));
+            lines.add(new AttributedString("  " + Messages.get("perf.profile.stage", pad(stage.command(), 12),
+                    duration(stage.cpu()), bytes(stage.allocated()), duration(stage.waited()), hot)));
+        }
+        if (profile.low()) {
+            lines.add(new AttributedString(Messages.get("perf.profile.low", profile.samples()), BANNER));
+        }
+        if (profile.file() != null) {
+            lines.add(new AttributedString(Messages.get("perf.profile.file", profile.file()), BANNER));
+        }
+        return lines;
+    }
+
+    /** {@code PerfProfileTest$Spin.begin} from {@code io.powerj.core.exec.PerfProfileTest$Spin.begin}. */
+    static String shortMethod(String method) {
+        int dot = method.lastIndexOf('.');
+        int previous = dot < 0 ? -1 : method.lastIndexOf('.', dot - 1);
+        return method.substring(previous + 1);
+    }
+
+    /** {@code 512 B}, {@code 48.2 MB}. */
+    static String bytes(long bytes) {
+        if (bytes < 1024) {
+            return bytes + " B";
+        }
+        double value = bytes;
+        String[] units = {"KB", "MB", "GB", "TB"};
+        int unit = -1;
+        while (value >= 1024 && unit < units.length - 1) {
+            value /= 1024;
+            unit++;
+        }
+        return "%.1f %s".formatted(value, units[unit]);
     }
 
     private static String stageReport(PerfReport.Stage stage) {

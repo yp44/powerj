@@ -238,7 +238,7 @@ stages run at the same time: their durations overlap
 
 - **Figures are wall-clock times** (`System.nanoTime`): total for the line (parsing included), for each statement that ran (a statement skipped by `&&` / `||` is absent; a failed one is marked `✗ failed`), and for each stage, from the moment the stage starts to the moment it ends. Because the stages of a pipeline run at the same time, their durations **overlap and are not added up**: the statement figure is the cost of the pipeline.
 - **`in` / `out`** count the objects a stage read from the previous one (`-` for the first) and the values it produced (a collection or a stream emitted as a value counts for what the stage emits to the next one). Between two native commands the data travels as bytes and is not counted. **`first`** is the time to the first value: a stage that waits for its whole input before producing anything (`sort`, `group`) shows a `first` close to its duration.
-- **Not CPU, not memory.** Perf mode answers "where does the time go in this line". CPU and allocation figures come from the JVM tools of FR-77.
+- **Wall-clock only.** This report answers "where does the time go in this line". CPU, allocation, GC and waiting come from the Flight Recorder summary that follows it (FR-78).
 - Only the interactive editor has perf mode; `-c` and script files do not print a report.
 - CA:
   - Alt+P displays `PJ⏱ C:\dev> `; Alt+P again displays `PJ C:\dev> `; Alt+V while in perf mode switches to `PJ? …`;
@@ -247,7 +247,31 @@ stages run at the same time: their durations overlap
   - `ls | sh -c "touch x"` in perf mode shows a plan (the file is not created before Enter);
   - outside perf mode no report is printed.
 
-**FR-76b — Flight Recorder events.** The shell publishes two JFR events (category *PowerJ*), whatever the mode: `powerj.Command` (a line executed: names of its commands joined by ` | `, number of statements) and `powerj.Stage` (a pipeline stage: command name, `kind`, objects read and produced, duration). They carry **command names only, never arguments**, because recordings are shared. They cost one boolean test when no recording asks for them, and nothing at all if the runtime has no `jdk.jfr` module. They are read with `jfr print --events powerj.Stage recording.jfr` or in JDK Mission Control, next to the CPU samples, allocations and GC events of the JVM.
+**FR-76b — Flight Recorder events.** The shell publishes two JFR events (category *PowerJ*), whatever the mode: `powerj.Command` (a line executed: names of its commands joined by ` | `, number of statements) and `powerj.Stage` (a pipeline stage: statement and position in the line, command name, `kind`, objects read and produced, duration). They carry **command names only, never arguments**, because recordings are shared. They cost one boolean test when no recording asks for them, and nothing at all if the runtime has no `jdk.jfr` module. They are read with `jfr print --events powerj.Stage recording.jfr` or in JDK Mission Control, next to the CPU samples, allocations and GC events of the JVM.
+
+**FR-78 — Flight Recorder in perf mode.** In perf mode every line is also **recorded by the JVM's Flight Recorder**, in the shell's own process (no attach, no option to give: `jdk.jfr.Recording`), and the recording is **analysed as soon as the line has run**, so that the figures are those of that command only. A runtime without the `jdk.jfr` module says so once (`jfr: Flight Recorder is not part of this runtime, nothing recorded`) and everything else still works; an analysis that fails never fails the line.
+
+- **Summary** under the wall-clock report: for the line, the CPU time (samples × 5 ms, and its share of the wall time), the bytes allocated, the garbage collections (count and total pause) and the time spent waiting; then one line per stage with its CPU, allocation, waiting and its **three hottest methods** (`Class.method:line` and share of the stage's samples):
+
+```text
+jfr · cpu 143 ms (79 %) · alloc 48.2 MB · gc 2× 7.1 ms · wait 31 ms
+  where        cpu  98 ms · alloc 31.0 MB · wait 2 ms  hot Foo.test:41 41 %, Baz.size:88 18 %
+  sort         cpu  45 ms · alloc 17.2 MB · wait 29 ms  hot Arrays.sort:12 63 %
+recording ~/.powerj/perf/perf-1792507896426.jfr
+```
+
+- **Attribution to stages.** Each stage records a `powerj.Stage` event (FR-76b) from the thread that runs it; samples, allocations and waits are attributed to the stage whose thread and time window contain them. Stages in virtual threads (every stage but the last) are attributed like the others. A sample outside any stage (parsing, display) counts in the line only.
+- **What is recorded:** execution samples of the Java threads every 5 ms; allocation samples; garbage collections and heap size before/after; thread parking, sleeping, monitor waits and file reads/writes of 1 ms or more (the *waiting* figure: a stage waiting for its upstream stage or for the disk is not using the CPU); virtual-thread pinning.
+- **Reading the figures.** The CPU time is a *statistical estimate*: with fewer than 20 samples (a command of about 100 ms or less) the summary says `only n sample(s): the figures are indicative`. Waiting is not CPU, so the CPU of a pipeline can be well under its wall time. The allocation figure is sampled. `-XX:+DebugNonSafepoints` (set in the packaged launcher) makes the line numbers exact.
+- **The recording file** `perf-<date>.jfr` goes to `<config folder>/perf/` (`~/.powerj/perf/`, §8). The **`POWERJ_PERF_KEEP`** environment variable of the session says how many to keep, read at every line: unset, `0` or not a number: deleted once analysed; `1`: only the last one; `N`: the last N. It is a session variable, so `env --set POWERJ_PERF_KEEP=5` works at the prompt and in `profile.pj` (FR-63). A kept file opens in JDK Mission Control (`docs/profiling.md`).
+- **`perf` command** (built-in): the detail of the last line run in perf mode, as objects that a pipeline can filter and sort. `perf`: the hot methods of every stage (`stage`, `method`, `line`, `samples`, `percent`); `perf --stages`: one row per stage (wall, cpu, samples, allocated, waited); `perf --allocations`: top allocation sites (`stage`, `site`, `bytes`, `percent`); `perf --waits`: waiting time by cause (`park`, `sleep`, `monitor`, `file`); `perf --gc`: collections; `perf --file`: path of the recording. Before any profile: `perf: no profile yet; run a line in perf mode (Alt+P)`.
+- Outside perf mode nothing is recorded and nothing is paid.
+- CA:
+  - in perf mode, `ls -r | where size > 1kb | sort size` is followed by the wall-clock report, then `jfr · cpu …` and one line per stage;
+  - `perf --stages | sort cpu` lists the stages, most expensive CPU last; `perf | where percent > 20` lists the dominant methods;
+  - with `POWERJ_PERF_KEEP` unset, no file stays in `~/.powerj/perf/`; after `env --set POWERJ_PERF_KEEP=2` and three lines, exactly two files;
+  - a stage that sleeps shows `wait` and almost no `cpu`; a stage that only computes shows `cpu` close to its wall time;
+  - without perf mode `perf` answers `no profile yet`.
 
 ### 3.3 History
 
@@ -1557,6 +1581,7 @@ Environment variables read by PowerJ:
 | `POWERJ_HOME` | Location of the configuration folder (default `~/.powerj`). |
 | `POWERJ_NATIVE_ENCODING` | Encoding of native commands (FR-40b). |
 | `POWERJ_NATIVE_ENCODING_<NOM>` | Encoding for a specific executable (FR-40b). |
+| `POWERJ_PERF_KEEP` | Perf mode (FR-78): number of Flight Recorder files kept in `<config folder>/perf/`; unset or `0`: deleted after the analysis. Read at every line. |
 | `POWERJ_LANG` | Language of the messages, `en` or `fr` (FR-61); takes precedence over the `language` key of `config.properties`, and is overridden by the system property `-Dpowerj.language`. |
 
 ---
@@ -1760,6 +1785,7 @@ The backlog cmdlets (§12.3) are added **one per mini-iteration**, each with a s
 | 24 | Background execution `&`, `jobs` | FR-75 | `docs/recettes/background.md` |
 | 25 | Perf mode (Alt+P), Flight Recorder events | FR-76, FR-76b | `docs/recettes/perf.md` |
 | 26 | Profiling and benchmarking readiness | FR-77 | `docs/recettes/profiling.md` |
+| 27 | Flight Recorder in perf mode, `perf` | FR-78 | `docs/recettes/perf-jfr.md` |
 
 Version 2 will introduce scripting (`if`, `foreach`, functions, `.pj` files).
 
