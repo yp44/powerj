@@ -14,7 +14,7 @@ import io.powerj.api.Option;
  * {@code first}: the first {@code n} objects of the pipeline (specification FR-68). Once they are emitted, the previous
  * stage is stopped ({@link CmdletContext#stopInput()}): {@code ls -r / | first 3} answers at once.
  */
-@CmdletInfo(name = "first", preview = true, category = "Filters", summary = "Keeps the first objects of the pipeline",
+@CmdletInfo(name = "first", preview = true, passThrough = true, category = "Filters", summary = "Keeps the first objects of the pipeline",
         examples = {"ls | first", "ls -r | first 5", "ls | sort size -d | first 3", "git log --oneline | first 10"})
 public final class First implements Cmdlet<First.Params, Object, Object> {
 

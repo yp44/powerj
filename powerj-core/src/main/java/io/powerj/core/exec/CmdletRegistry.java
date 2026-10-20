@@ -72,6 +72,16 @@ public final class CmdletRegistry {
             return info.preview();
         }
 
+        /** {@code true} if the cmdlet takes the short form {@code property operator value} (FR-36). */
+        public boolean comparison() {
+            return info.comparison();
+        }
+
+        /** {@code true} if the cmdlet emits the objects it receives, unchanged. */
+        public boolean passThrough() {
+            return info.passThrough();
+        }
+
         /** Qualified name, always usable: {@code greet:greet} (FR-17). */
         public String qualifiedName() {
             return alias(module) + ":" + name();

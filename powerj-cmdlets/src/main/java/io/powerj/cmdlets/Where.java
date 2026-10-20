@@ -21,7 +21,8 @@ import io.powerj.api.ScriptBlock;
  * where size > 1mb                      # short form, equivalent to where { $_.size > 1mb }
  * </pre>
  */
-@CmdletInfo(name = "where", preview = true, category = "Filters", summary = "Filters pipeline objects by a condition",
+@CmdletInfo(name = "where", preview = true, comparison = true, passThrough = true, category = "Filters",
+        summary = "Filters pipeline objects by a condition",
         examples = {"ls -r | where { $_.size > 1mb }", "ls | where { $_.name.endsWith(\".java\") && !$_.dir }",
                 "ls | where { f -> f.size > 1mb && !f.dir }", "ls | where size > 10kb", "git status --porcelain | where { $_.startsWith(\" M \") }",
                 "env | where { $_.name.startsWith(\"JAVA\") }"})

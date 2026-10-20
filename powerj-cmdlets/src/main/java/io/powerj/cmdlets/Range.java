@@ -23,7 +23,7 @@ import io.powerj.api.ScriptBlock;
  * </pre>
  * Without {@code --repeat}, the previous stage is stopped once the range is closed.
  */
-@CmdletInfo(name = "range", preview = true, category = "Filters", summary = "Keeps the objects between two bounds",
+@CmdletInfo(name = "range", preview = true, passThrough = true, category = "Filters", summary = "Keeps the objects between two bounds",
         examples = {"cat a.log | range --from 5 --to 10", "ls | range --from 3",
                 "env | range --from JAVA --to PATH --property name -i",
                 "ls | range --from ^a --to ^d --property name --exclude",

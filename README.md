@@ -307,6 +307,8 @@ public final class Greet implements Cmdlet<GreetParams, Void, Greeting> {
 }
 ```
 
+`@CmdletInfo` also carries what the shell needs to know about the cmdlet, exactly as for the built-in ones: `preview = true` (it changes nothing, so it runs in preview mode), `comparison = true` (it takes the short form `property operator value`, like `where size > 1mb`) and `passThrough = true` (it emits its input unchanged, so completion looks through it); a cmdlet that emits `Row`s overrides `columns(arguments)` to have its columns completed downstream.
+
 A `CmdletProvider` lists the module's cmdlets (and may provide translations through `messages(Locale)`), declared in `module-info.java` with `provides io.powerj.api.CmdletProvider with …`. Build the jar and drop it into `~/.powerj/modules/`, or load it without restarting with `mod-load path/to/greet.jar`; `mod-list` shows what is loaded. Each module gets its own `ModuleLayer`, so dependencies of different modules do not clash; if two modules declare the same name, the second one is reachable as `module:name`.
 
 The complete example lives in [`examples/greet`](examples/greet) (also built by the CI as the `greet-module` artifact); the contract is detailed in [§4 of the specification](docs/SPECIFICATION.md#4-extension-api-third-party-cmdlets).

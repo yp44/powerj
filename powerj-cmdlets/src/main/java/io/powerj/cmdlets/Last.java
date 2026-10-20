@@ -14,7 +14,7 @@ import io.powerj.api.Option;
  * {@code last}: the last {@code n} objects of the pipeline, in their order, emitted when the input ends
  * (specification FR-68). At most {@code n} objects are kept in memory.
  */
-@CmdletInfo(name = "last", preview = true, category = "Filters", summary = "Keeps the last objects of the pipeline",
+@CmdletInfo(name = "last", preview = true, passThrough = true, category = "Filters", summary = "Keeps the last objects of the pipeline",
         examples = {"ls | last", "ls | sort size | last 3", "cat app.log | last 20"})
 public final class Last implements Cmdlet<Last.Params, Object, Object> {
 

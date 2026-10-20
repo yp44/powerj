@@ -18,6 +18,7 @@ import io.powerj.core.lang.Ast.Argument;
 import io.powerj.core.lang.Ast.Statement;
 import io.powerj.core.lang.ExpressionParser;
 import io.powerj.core.lang.Parser;
+import io.powerj.core.lang.Syntax;
 import io.powerj.core.lang.SyntaxException;
 import io.powerj.core.lang.Token;
 
@@ -130,6 +131,16 @@ public final class Interpreter {
         return java.util.Collections.unmodifiableSet(builtins.keySet());
     }
 
+    /** Java static names, and the commands whose cmdlet declares the short form {@code where size > 1mb}. */
+    private Syntax syntax() {
+        return new Syntax(session.java()::isStaticReference, this::acceptsComparison);
+    }
+
+    /** {@code @CmdletInfo(comparison = true)} on the cmdlet the name runs (FR-13: a built-in command comes first). */
+    private boolean acceptsComparison(String name) {
+        return !builtins.containsKey(name) && registry.find(name).map(CmdletRegistry.Registered::comparison).orElse(false);
+    }
+
     /** Resolves a command name as execution would (FR-13), without launching anything. */
     public CommandKind commandKind(String name) {
         boolean forceNative = name.startsWith("^");
@@ -160,7 +171,7 @@ public final class Interpreter {
      */
     public void execute(String line) throws InterruptedException {
         blockingError = false;
-        Ast.Script script = Parser.parse(line, session.java()::isStaticReference);
+        Ast.Script script = Parser.parse(line, syntax());
         boolean succeeded = true;
         for (Ast.Step step : script.steps()) {
             if (session.exitRequest().isPresent()) {
@@ -256,7 +267,7 @@ public final class Interpreter {
         }
         Ast.Script script;
         try {
-            script = Parser.parse(line, session.java()::isStaticReference);
+            script = Parser.parse(line, syntax());
         } catch (SyntaxException e) {
             return new PreviewResult.Incomplete(e.getMessage());
         }
@@ -604,7 +615,7 @@ public final class Interpreter {
     /** Compiles the text of a block for a cmdlet ({@code CmdletContext.compile}). */
     private io.powerj.api.ScriptBlock compile(String source) {
         try {
-            var function = ExpressionParser.function(source, session.java()::isStaticReference);
+            var function = ExpressionParser.function(source, syntax());
             return (io.powerj.api.ScriptBlock) evaluator.evaluate(function);
         } catch (SyntaxException e) {
             throw new IllegalArgumentException(e.getMessage(), e);

@@ -95,6 +95,59 @@ public final class Select implements Cmdlet<Select.Params, Object, Row> {
         states.remove(context);
     }
 
+    /** Column names of the arguments, by the naming rules of {@link #columns(List, CmdletContext)}, for completion. */
+    @Override
+    public List<String> columns(String arguments) {
+        List<String> tokens = new ArrayList<>(); // words, and "{" for a block
+        int i = 0;
+        while (i < arguments.length()) {
+            char c = arguments.charAt(i);
+            if (Character.isWhitespace(c)) {
+                i++;
+            } else if (c == '{') {
+                int depth = 0;
+                while (i < arguments.length()) {
+                    char d = arguments.charAt(i++);
+                    if (d == '{') {
+                        depth++;
+                    } else if (d == '}' && --depth == 0) {
+                        break;
+                    }
+                }
+                tokens.add("{");
+            } else {
+                int start = i;
+                while (i < arguments.length() && !Character.isWhitespace(arguments.charAt(i)) && arguments.charAt(i) != '{') {
+                    i++;
+                }
+                tokens.add(arguments.substring(start, i));
+            }
+        }
+        List<String> names = new ArrayList<>();
+        int unnamed = 0;
+        for (int k = 0; k < tokens.size(); k++) {
+            String token = tokens.get(k);
+            if (token.equals("{")) {
+                names.add("column" + ++unnamed);
+            } else if (token.startsWith("-")) {
+                if (token.equals("--on-error")) {
+                    k++; // its value
+                }
+            } else if (token.endsWith("=")) {
+                names.add(token.substring(0, token.length() - 1));
+                if (k + 1 < tokens.size() && tokens.get(k + 1).equals("{")) {
+                    k++;
+                }
+            } else if (token.contains("=")) {
+                names.add(token.substring(0, token.indexOf('=')));
+            } else {
+                names.add(token.substring(token.lastIndexOf('.') + 1));
+            }
+        }
+        names.removeIf(String::isEmpty);
+        return names;
+    }
+
     /** Columns described by the arguments, in order. */
     static List<Column> columns(List<Object> arguments, CmdletContext<?> context) {
         if (arguments == null || arguments.isEmpty()) {
