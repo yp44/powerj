@@ -176,7 +176,9 @@ final class Operators {
                 default -> x % y;
             };
         } catch (ArithmeticException e) {
-            throw new PjException(PjError.of(Messages.get("operator.arithmeticFailed", e.getMessage()), e));
+            // Once the division is compiled, the JVM may throw a preallocated exception without message.
+            String reason = e.getMessage() == null ? "/ by zero" : e.getMessage();
+            throw new PjException(PjError.of(Messages.get("operator.arithmeticFailed", reason), e));
         }
     }
 

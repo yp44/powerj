@@ -138,6 +138,14 @@ class OperatorsTest {
     }
 
     @Test
+    void divisionByZeroIsNamedEvenOnceCompiled() {
+        // Many divisions by zero let the JIT replace the exception by a preallocated one, without message.
+        for (int i = 0; i < 100_000; i++) {
+            assertThatThrownBy(() -> binary(Operator.DIV, 1, 0)).hasMessage("calculation failed: / by zero");
+        }
+    }
+
+    @Test
     void logicalOperatorsAreNotBinaryValues() {
         assertThatThrownBy(() -> binary(Operator.AND, true, true)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> Operators.unary(Operator.ADD, 1)).isInstanceOf(IllegalArgumentException.class);
