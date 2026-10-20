@@ -23,6 +23,8 @@ import io.powerj.core.exec.Completions;
 import io.powerj.core.exec.ConsoleInput;
 import io.powerj.core.exec.Interpreter;
 import io.powerj.core.exec.Outcome;
+import io.powerj.core.exec.PerfRecorder;
+import io.powerj.core.exec.PerfReport;
 import io.powerj.core.exec.PjException;
 import io.powerj.core.exec.Session;
 import io.powerj.core.exec.ShellIo;
@@ -43,6 +45,8 @@ public final class Repl {
     private final PrintWriter out;
     /** Preview mode (FR-66), or {@code null} if the line reader cannot display it. */
     private final Previewer previewer;
+    /** Perf mode (FR-76), or {@code null} if the line reader cannot display it. */
+    private final PerfMode perf;
     private final boolean colors;
     private List<String> moduleWarnings = List.of();
     private Path profile;
@@ -65,6 +69,7 @@ public final class Repl {
         var completions = new Completions(interpreter);
         completions.warmUp();
         Previewer preview = null;
+        PerfMode perfMode = null;
         if (reader instanceof LineReaderImpl impl) {
             impl.setParser(new ShellParser(completions));
             impl.setCompleter(ShellCompletion.completer());
@@ -73,8 +78,13 @@ public final class Repl {
         if (reader instanceof PreviewLineReader previewReader && interactive) {
             preview = new Previewer(previewReader, interpreter, completions, terminal::getWidth, colors);
             preview.bind(this::prompt);
+            perfMode = new PerfMode(previewReader, interpreter, terminal::getWidth);
+            perfMode.bind(this::prompt);
+            preview.onEnable(perfMode::off);
+            perfMode.onEnable(preview::off);
         }
         this.previewer = preview;
+        this.perf = perfMode;
         // Ctrl+C during execution cancels the command without exiting the shell (FR-03);
         // during input, JLine throws UserInterruptException.
         terminal.handle(Terminal.Signal.INT, _ -> supervisor.cancel());
@@ -128,13 +138,27 @@ public final class Repl {
                 if (previewer != null) {
                     previewer.reset(); // stops the evaluation of the line being previewed (FR-66)
                 }
+                if (perf != null) {
+                    perf.reset();
+                }
             }
-            switch (supervisor.run(line, () -> execute(line))) {
+            PerfRecorder recorder = perf == null || line.isBlank() ? null : perf.recorder();
+            interpreter.record(recorder);
+            Outcome outcome;
+            try {
+                outcome = supervisor.run(line, () -> execute(line));
+            } finally {
+                interpreter.record(null);
+            }
+            switch (outcome) {
                 case Outcome.Success _ -> { }
                 case Outcome.Failure(var error) -> printError(error.message());
                 case Outcome.Cancelled() -> printError("^C");
                 case Outcome.Abandoned(var commandLine) ->
                         printError(Messages.get("command.abandoned", commandLine));
+            }
+            if (recorder != null) {
+                printPerf(recorder.report());
             }
             out.flush();
         }
@@ -212,10 +236,21 @@ public final class Repl {
         };
     }
 
-    /** {@code PJ <dir>> }, or {@code PJ? <dir>> } in preview mode (FR-66). */
+    /** Figures of the line that has just run (perf mode, FR-76). */
+    private void printPerf(PerfReport report) {
+        synchronized (out) {
+            perf.report(report).forEach(line -> out.println(colors ? line.toAnsi(terminal) : line.toString()));
+            out.flush();
+        }
+    }
+
+    /** {@code PJ <dir>> }, {@code PJ? <dir>> } in preview mode (FR-66), {@code PJ⏱ <dir>> } in perf mode (FR-76). */
     String prompt() {
         String mode = "PJ ";
-        if (previewer != null && previewer.on()) {
+        if (perf != null && perf.on()) {
+            mode = colors ? new AttributedString("PJ⏱", AttributedStyle.DEFAULT.foreground(AttributedStyle.YELLOW))
+                    .toAnsi(terminal) + " " : "PJ⏱ ";
+        } else if (previewer != null && previewer.on()) {
             mode = colors ? new AttributedString("PJ?", AttributedStyle.DEFAULT.foreground(AttributedStyle.CYAN))
                     .toAnsi(terminal) + " " : "PJ? ";
         }

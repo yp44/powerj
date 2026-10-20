@@ -27,6 +27,20 @@
         <!-- Platform-specific options for the application image. -->
         <dist.platform.args></dist.platform.args>
         <dist.platform>linux-x64</dist.platform>
+        <!--
+            Modules of the runtime image. The last six make the image observable: jdk.jfr (Flight Recorder),
+            jdk.management(.jfr/.agent) (JMX, -XX:StartFlightRecording from jcmd), jdk.jcmd and jdk.attach
+            (attach profilers such as async-profiler to a running shell). See docs/profiling.md.
+            Override to slim the image: -Ddist.add.modules=java.se,jdk.unsupported
+        -->
+        <dist.add.modules>java.se,jdk.unsupported,jdk.jfr,jdk.management,jdk.management.jfr,jdk.management.agent,jdk.jcmd,jdk.attach</dist.add.modules>
+        <!--
+            Java debug attributes (line numbers, local variables) are kept so that profiles and stack traces point at
+            lines. Slim image (no debug attributes): see docs/profiling.md
+        -->
+        <dist.jlink.options>--no-header-files --no-man-pages</dist.jlink.options>
+        <!-- Extra jpackage arguments, e.g. JVM options (see docs/profiling.md) -->
+        <dist.extra.args></dist.extra.args>
     </properties>
 
     <dependencies>
@@ -128,12 +142,13 @@
                                             <!-- The whole Java SE library can be called from the shell (spec FR-52). -->
                                             <arg value="--add-modules"/>
                                             <!-- jdk.unsupported: Ctrl+C interception by JLine (sun.misc.Signal). -->
-                                            <arg value="java.se,jdk.unsupported"/>
+                                            <arg value="${dist.add.modules}"/>
                                             <!-- JLine accesses the native console (FFM / native library). -->
                                             <arg value="--java-options"/>
                                             <arg value="--enable-native-access=org.jline.terminal.ffm,org.jline.nativ,io.powerj.core"/>
+                                            <arg line="${dist.extra.args}"/>
                                             <arg value="--jlink-options"/>
-                                            <arg value="--strip-java-debug-attributes --no-header-files --no-man-pages"/>
+                                            <arg value="${dist.jlink.options}"/>
                                             <arg value="--dest"/>
                                             <arg value="${dist.jpackage}"/>
                                             <arg line="${dist.platform.args}"/>

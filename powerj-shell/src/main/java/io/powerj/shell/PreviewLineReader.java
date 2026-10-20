@@ -17,7 +17,7 @@ final class PreviewLineReader extends org.jline.reader.impl.LineReaderImpl {
 
     private volatile AttributedString preview;
     /** Told of the line and the cursor at each redisplay: after each key, cursor moves included. */
-    private volatile BiConsumer<String, Integer> lineListener;
+    private final java.util.List<BiConsumer<String, Integer>> lineListeners = new java.util.concurrent.CopyOnWriteArrayList<>();
     /** The line is being accepted or abandoned: the preview is cleared from the screen. */
     private volatile boolean leaving;
     private final Supplier<AttributedString> previewPost = () -> {
@@ -30,7 +30,7 @@ final class PreviewLineReader extends org.jline.reader.impl.LineReaderImpl {
     }
 
     void onLine(BiConsumer<String, Integer> listener) {
-        this.lineListener = listener;
+        lineListeners.add(listener);
     }
 
     /** Text shown below the line, or {@code null} for none; displayed at the next redisplay. */
@@ -46,9 +46,10 @@ final class PreviewLineReader extends org.jline.reader.impl.LineReaderImpl {
 
     @Override
     protected void redisplay(boolean flush) {
-        BiConsumer<String, Integer> listener = lineListener;
-        if (listener != null && !leaving) {
-            listener.accept(buf.toString(), buf.cursor());
+        if (!leaving) {
+            String line = buf.toString();
+            int cursor = buf.cursor();
+            lineListeners.forEach(listener -> listener.accept(line, cursor));
         }
         if (post == null || post == previewPost) {
             post = preview == null || leaving ? null : previewPost;

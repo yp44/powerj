@@ -207,6 +207,48 @@ Interpreter.java
   - `ls | where { f -> Files.deleteIfExists(f.path) }`: `⏸ preview off: Java call outside the preview set: Files.deleteIfExists`, no file deleted;
   - Tab after `c` in preview mode offers `cat` and `collect`, not `cd`; after `Files.` offers `exists(`, not `delete(`.
 
+**FR-76 — Perf mode.** A third mode of the line editor, next to normal and preview (FR-66): **Alt+P** ("Perf") switches it on and off, keeping the line being typed; it stays from one command to the next. The **prompt** is `PJ⏱ <directory>> ` (`PJ⏱` in yellow on a terminal with colors). Perf mode and preview mode exclude each other: switching one on switches the other off, because they share the area below the line. Under macOS, Alt+P needs the terminal's option "Use Option as Meta key".
+
+While the line is typed, the **runtime plan of the whole line** is shown below it. It is worked out **without running or evaluating anything** (commands are resolved by name, as for highlighting), so it is shown on every key and is safe on any line, a native command or an assignment included:
+
+```text
+PJ⏱ C:\dev> ls -r | where { f -> f.size > 10kb } | sort size; echo done█
+── Plan · 4 stage(s) ────────────────────────────────────────────────────────
+; 
+  ls -r                        cmdlet         own thread
+  where …                      cmdlet         own thread
+  sort size                    cmdlet         calling thread
+; 
+  echo done                    built-in       calling thread
+```
+
+- **Statements** are listed in order, with how they are chained (`;`, `&&`, `||`) and, when they apply, `in the background`, `assigned to $x`, `n redirection(s)`.
+- **Stages** show the command as typed (computed arguments are shown as `…`), what it **resolves to** (`built-in`, `cmdlet`, `program`, `expression`, `unknown`), and **where it runs**: `own thread` (a stage that is not the last of its pipeline runs in its own virtual thread `powerj-stage-N`), `calling thread` (the last stage, or a lone stage) or `process` (a lone native command started directly). Consecutive native commands form one stage.
+- A syntax error while typing gives a gray banner `… <message>`; an empty line shows nothing. At most 12 lines are shown.
+- **Enter** runs the line normally. Once it has finished (also after an error or Ctrl+C), a **report** follows its output:
+
+```text
+── Perf · total 182.4 ms ────────────────────────────────────────────────────
+statement 1 · 181.9 ms
+  ls -r                        cmdlet         151.2 ms in      - out   5003 first   0.9 ms
+  where …                      cmdlet         160.7 ms in   5003 out     87 first   3.1 ms
+  sort size                    cmdlet         181.8 ms in     87 out     87 first 181.7 ms
+stages run at the same time: their durations overlap
+```
+
+- **Figures are wall-clock times** (`System.nanoTime`): total for the line (parsing included), for each statement that ran (a statement skipped by `&&` / `||` is absent; a failed one is marked `✗ failed`), and for each stage, from the moment the stage starts to the moment it ends. Because the stages of a pipeline run at the same time, their durations **overlap and are not added up**: the statement figure is the cost of the pipeline.
+- **`in` / `out`** count the objects a stage read from the previous one (`-` for the first) and the values it produced (a collection or a stream emitted as a value counts for what the stage emits to the next one). Between two native commands the data travels as bytes and is not counted. **`first`** is the time to the first value: a stage that waits for its whole input before producing anything (`sort`, `group`) shows a `first` close to its duration.
+- **Not CPU, not memory.** Perf mode answers "where does the time go in this line". CPU and allocation figures come from the JVM tools of FR-77.
+- Only the interactive editor has perf mode; `-c` and script files do not print a report.
+- CA:
+  - Alt+P displays `PJ⏱ C:\dev> `; Alt+P again displays `PJ C:\dev> `; Alt+V while in perf mode switches to `PJ? …`;
+  - `ls | where size > 0 | sort name` shows `── Plan · 3 stage(s)` with `cmdlet`, `own thread`, `calling thread` before Enter, and nothing has run;
+  - after Enter, `── Perf · total …` follows the output, with `statement 1` and one line per stage whose `in` of a stage equals the `out` of the previous one;
+  - `ls | sh -c "touch x"` in perf mode shows a plan (the file is not created before Enter);
+  - outside perf mode no report is printed.
+
+**FR-76b — Flight Recorder events.** The shell publishes two JFR events (category *PowerJ*), whatever the mode: `powerj.Command` (a line executed: names of its commands joined by ` | `, number of statements) and `powerj.Stage` (a pipeline stage: command name, `kind`, objects read and produced, duration). They carry **command names only, never arguments**, because recordings are shared. They cost one boolean test when no recording asks for them, and nothing at all if the runtime has no `jdk.jfr` module. They are read with `jfr print --events powerj.Stage recording.jfr` or in JDK Mission Control, next to the CPU samples, allocations and GC events of the JVM.
+
 ### 3.3 History
 
 **FR-09 — Persistence.** The history is saved in `~/.powerj/history` (UTF-8) after each command and reloaded on startup.
@@ -996,6 +1038,13 @@ accessible via `$last`; `$exit` is `$last.exitCode`; `$?` is `true` if the code 
 - **Exit of the shell**: the background jobs keep running.
 - CA: on Linux with X, `xeyes &` displays `[1] <pid>` and the prompt comes back at once; `sleep 60 &` then `sleep 100` and Ctrl+C stops only `sleep 100`, and `jobs` still shows `sleep 60` running; `jobs | kill` then Enter displays `[2] done sleep 60 (exit 143)`; `ls &` gives the error above.
 
+**FR-77 — Observable runtime.** The shell can be examined with the standard Java tools (Flight Recorder, JDK Mission Control, async-profiler, `jcmd`, JMH). The guide is `docs/profiling.md`. To make it possible:
+- the runtime image contains `jdk.jfr`, `jdk.management`, `jdk.management.jfr`, `jdk.management.agent`, `jdk.jcmd` and `jdk.attach`, and keeps the Java debug attributes (line numbers); a slimmer image is a build property away (§7);
+- the threads have stable, English names: `powerj-command` (the line being executed), `powerj-stage-N` (pipeline stage N, virtual), `powerj-preview` / `powerj-preview-deadline` (preview mode), `powerj-walk-N` (parallel file walk), `powerj-stdin` / `powerj-pump` (native command streams), `powerj-index-java` (class index), `powerj-shutdown`;
+- JVM options can be given to the packaged launcher (`dist.extra.args`, `JAVA_TOOL_OPTIONS`, `powerj.cfg`);
+- the `powerj-bench` module (built with `-Pbench`) holds JMH micro-benchmarks of the lexer, the parser, the planner and whole pipelines.
+- CA: `JAVA_TOOL_OPTIONS=-XX:StartFlightRecording=filename=pj.jfr,dumponexit=true powerj -c 'ls -r | count'` produces a recording that contains `powerj.Stage` events, and whose CPU samples show source line numbers.
+
 **FR-40b — Native command encoding.** Text exchanged with native commands (stdout/stderr decoded into `String`, objects written to stdin) uses the encoding defined by the **`POWERJ_NATIVE_ENCODING` environment variable**:
 
 | Value | Effect |
@@ -1480,6 +1529,7 @@ Java's new features are used **where they bring a concrete benefit**:
 - `powerj-dist` module:
   1. **jlink**: Java runtime containing **all the `java.se` modules** (required so that the whole standard API can be called, §3.13), without the development tools (`--strip-debug --no-header-files --no-man-pages`);
   2. **jpackage `--type app-image`** then **`--type exe`** (WiX Toolset): `powerj.exe` + installer with icon, addition to the `PATH`, Start menu entry, console mode (`--win-console`).
+- **Observable image** (FR-77): the runtime also contains `jdk.jfr`, `jdk.management(.jfr, .agent)`, `jdk.jcmd` and `jdk.attach`, and keeps the Java debug attributes. Build properties of `powerj-dist`: `dist.add.modules` (modules of the image), `dist.jlink.options` (add the debug-stripping option for the slimmest image), `dist.extra.args` (extra jpackage arguments, e.g. JVM options). `mvn -Pbench -DskipTests package` also builds `powerj-bench/target/benchmarks.jar` (JMH); that module is outside the default build and the coverage.
 - **GitHub Actions CI**:
   - `build` job (Linux): `mvn verify` on every push and PR;
   - `package-windows` job (`windows-latest`): produces the installer and the portable `powerj/` folder as **downloadable artifacts** on every push to a release branch.
@@ -1522,6 +1572,7 @@ Environment variables read by PowerJ:
 | NFR-05 | Test coverage ≥ 80% of the lines and of the branches, for PowerJ as a whole and for the built-in cmdlets (`io.powerj.cmdlets`), on Linux and on Windows; checked by `mvn verify` (JaCoCo, `powerj-coverage` module). |
 | NFR-06 | No raw Java exception displayed to the user outside debug mode. |
 | NFR-07 | First call of a Java method < 50 ms; subsequent calls (cached) < 1 ms. |
+| NFR-08 | Observability: the packaged runtime can be recorded and profiled with the standard JDK tools (FR-77); instrumentation costs one boolean test per stage when nothing is recording. |
 
 ---
 
@@ -1707,6 +1758,8 @@ The backlog cmdlets (§12.3) are added **one per mini-iteration**, each with a s
 | 22 | `to-json`, `from-json`, `to-csv`, `from-csv` | FR-73 | `docs/recettes/json-csv.md` |
 | 23 | `ps`, `kill` | FR-74 | `docs/recettes/ps-kill.md` |
 | 24 | Background execution `&`, `jobs` | FR-75 | `docs/recettes/background.md` |
+| 25 | Perf mode (Alt+P), Flight Recorder events | FR-76, FR-76b | `docs/recettes/perf.md` |
+| 26 | Profiling and benchmarking readiness | FR-77 | `docs/recettes/profiling.md` |
 
 Version 2 will introduce scripting (`if`, `foreach`, functions, `.pj` files).
 

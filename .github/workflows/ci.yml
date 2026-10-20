@@ -122,6 +122,18 @@ jobs:
           grep -q 'Bonjour Yves !' lang.txt
           grep -q 'syntaxe : expression incomplète' lang.txt
 
+      - name: Test de fumée du profilage (JFR)
+        run: |
+          pj=$PWD/powerj-dist/target/jpackage/powerj/bin/powerj
+          powerj-dist/target/jpackage/powerj/lib/runtime/bin/java --list-modules | tee modules.txt
+          grep -q '^jdk.jfr@' modules.txt
+          grep -q '^jdk.attach@' modules.txt
+          JAVA_TOOL_OPTIONS="-XX:StartFlightRecording=filename=$RUNNER_TEMP/pj.jfr,dumponexit=true" \
+            $pj -c 'ls -r | where { f -> f.size > 0 } | count'
+          jfr print --events powerj.Command,powerj.Stage $RUNNER_TEMP/pj.jfr | tee jfr.txt
+          grep -q 'powerj.Stage' jfr.txt
+          grep -q 'powerj.Command' jfr.txt
+
       - name: Test de fumée du tilde (~ = HOME)
         run: |
           pj=$PWD/powerj-dist/target/jpackage/powerj/bin/powerj
