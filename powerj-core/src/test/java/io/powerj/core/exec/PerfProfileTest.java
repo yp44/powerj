@@ -89,7 +89,11 @@ class PerfProfileTest {
     }
 
     private PerfProfile record(String line, int keep) throws Exception {
-        PerfProfiler.Recording recording = PerfProfiler.start();
+        return record(line, keep, 5);
+    }
+
+    private PerfProfile record(String line, int keep, int periodMillis) throws Exception {
+        PerfProfiler.Recording recording = PerfProfiler.start(java.time.Duration.ofMillis(periodMillis));
         assertThat(recording).isNotNull();
         try {
             interpreter.execute(line);
@@ -131,7 +135,7 @@ class PerfProfileTest {
 
     @Test
     void garbageCollectionsAreCounted() throws Exception {
-        PerfProfiler.Recording recording = PerfProfiler.start();
+        PerfProfiler.Recording recording = PerfProfiler.start(java.time.Duration.ofMillis(5));
         PerfProfile profile;
         try {
             interpreter.execute("spin -n 10 | churn -n 4");
@@ -180,5 +184,58 @@ class PerfProfileTest {
         assertThat(PerfProfiler.keep(Map.of(PerfFiles.VARIABLE, " 7 "))).isEqualTo(7);
         assertThat(PerfProfiler.keep(Map.of(PerfFiles.VARIABLE, "many"))).isZero();
         assertThat(PerfProfiler.keep(Map.of(PerfFiles.VARIABLE, "-2"))).isZero();
+    }
+
+    @Test
+    void thePeriodComesFromTheEnvironmentAndIsKeptWithinLimits() {
+        var period = (java.util.function.Function<String, Long>) value -> PerfProfiler.period(
+                value == null ? Map.of() : Map.of(PerfProfiler.PERIOD_VARIABLE, value)).toMillis();
+        assertThat(period.apply(null)).isEqualTo(1L);
+        assertThat(period.apply("1")).isEqualTo(1L);
+        assertThat(period.apply("20")).isEqualTo(20L);
+        assertThat(period.apply(" 7 ")).isEqualTo(7L);
+        assertThat(period.apply("0")).isEqualTo(1L);
+        assertThat(period.apply("-3")).isEqualTo(1L);
+        assertThat(period.apply("abc")).isEqualTo(1L);
+        assertThat(period.apply("5000")).isEqualTo(1000L);
+    }
+
+    @Test
+    void aShorterPeriodGivesMoreSamplesForTheSameCpuEstimate() throws Exception {
+        PerfProfile fine = record("spin -n 300", 0, 1);
+        PerfProfile coarse = record("spin -n 300", 0, 25);
+
+        assertThat(fine.period()).isEqualTo(java.time.Duration.ofMillis(1));
+        assertThat(coarse.period()).isEqualTo(java.time.Duration.ofMillis(25));
+        assertThat(fine.samples()).isGreaterThan(coarse.samples() * 3);
+        // both estimate about the 300 ms burned (generous tolerance: it is statistical, and the machine is shared)
+        assertThat(fine.cpu().toMillis()).isBetween(150L, 600L);
+        assertThat(coarse.cpu().toMillis()).isBetween(75L, 700L);
+    }
+
+    @Test
+    void theWaitingOfThreadsThatRunNoStageIsKeptApart() throws Exception {
+        PerfProfile profile = record("spin -n 20 | nap -n 120", 0, 1);
+
+        long stages = profile.stages().stream().mapToLong(stage -> stage.waited().toNanos()).sum();
+        assertThat(profile.waited().toNanos()).isEqualTo(stages);
+        assertThat(profile.waited()).isGreaterThan(java.time.Duration.ofMillis(50));
+        // the shell's own thread is parked while the stages run: it shows apart, under "(other)"
+        assertThat(profile.otherWaits()).allSatisfy(wait -> assertThat(wait.stage()).isEqualTo("(other)"));
+    }
+
+    @Test
+    void aStageWithFewSamplesIsMarkedSoItsPercentagesAreNotTrusted() throws Exception {
+        PerfProfile profile = record("spin -n 30 | nap -n 5", 0, 5);
+        assertThat(profile.stages().getFirst().low()).isTrue();
+        assertThat(profile.stages().getFirst().samples()).isLessThan(PerfProfile.LOW_SAMPLES);
+    }
+
+    @Test
+    void classesGeneratedByTheJvmAreRecognised() {
+        assertThat(JfrProfiler.generated("0x000000003c44c000")).isTrue();
+        assertThat(JfrProfiler.generated("io.powerj.Foo$$Lambda/0x00007f3a1c012345")).isTrue();
+        assertThat(JfrProfiler.generated("io.powerj.core.exec.Where")).isFalse();
+        assertThat(JfrProfiler.generated("java.lang.String")).isFalse();
     }
 }

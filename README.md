@@ -143,7 +143,7 @@ Parser.java       12.4 KB   2026-10-12 09:41  false
 
 ### Perf mode
 
-Press **Alt+P**: the prompt becomes `PJ⏱` and the **runtime plan** of the whole line appears below it while you type — what each stage resolves to (built-in, cmdlet, program) and which thread runs it — without running anything. After Enter, the line runs as usual and a **report** follows its output: wall-clock time of the line, of each statement and of each stage, with the objects read and produced and the time to the first value. Perf mode and preview mode exclude each other. Each line is also **recorded by the JVM's Flight Recorder and analysed at once**: a summary of CPU, allocation, GC and waiting follows the report, with the hottest methods of each stage, and the `perf` command returns the detail as objects (`perf --stages \| sort cpu`). `env --set POWERJ_PERF_KEEP=5` (e.g. in `profile.pj`) keeps the last 5 recordings for JDK Mission Control. Details: FR-76 and FR-78 in the specification, checklists [perf](docs/recettes/perf.md) and [perf-jfr](docs/recettes/perf-jfr.md); for CPU and memory, see [Profiling](#profiling-and-benchmarking).
+Press **Alt+P**: the prompt becomes `PJ⏱` and the **runtime plan** of the whole line appears below it while you type — what each stage resolves to (built-in, cmdlet, program) and which thread runs it — without running anything. After Enter, the line runs as usual and a **report** follows its output: wall-clock time of the line, of each statement and of each stage, with the objects read and produced and the time to the first value. Perf mode and preview mode exclude each other. Each line is also **recorded by the JVM's Flight Recorder and analysed at once**: a summary of CPU, allocation, GC and waiting follows the report, with the hottest methods of each stage, and the `perf` command returns the detail as objects (`perf --stages \| sort cpu`). `env --set POWERJ_PERF_KEEP=5` (e.g. in `profile.pj`) keeps the last 5 recordings for JDK Mission Control, and `env --set POWERJ_PERF_PERIOD=1` sets the sampling period in milliseconds (default 1; raise it for long commands). Details: FR-76 and FR-78 in the specification, checklists [perf](docs/recettes/perf.md) and [perf-jfr](docs/recettes/perf-jfr.md); for CPU and memory, see [Profiling](#profiling-and-benchmarking).
 
 ```text
 ── Perf · total 182.4 ms ──────────────────────────────────────────────
@@ -152,7 +152,7 @@ statement 1 · 181.9 ms
   where …                cmdlet     160.7 ms in   5003 out     87 first   3.1 ms
   sort size              cmdlet     181.8 ms in     87 out     87 first 181.7 ms
 jfr · cpu 143 ms (79 %) · alloc 48.2 MB · gc 2× 7.1 ms · wait 31 ms
-  where        cpu  98 ms · alloc 31.0 MB · wait 2 ms  hot Foo.test:41 41 %
+  where        cpu  98 ms · alloc 31.0 MB · wait 2 ms · hot Foo.test:41 41 %
 ```
 
 ### Languages

@@ -162,6 +162,19 @@ class PerfModeTest {
     }
 
     @Test
+    void theSummaryKeepsItsColumnsApartAndTheSamplingPeriodComesFromTheEnvironment() throws Exception {
+        terminal.type(ALT_P);
+        awaitUntil(() -> terminal.screen().contains("PJ⏱ " + cwd + "> "));
+        run("env --set POWERJ_PERF_PERIOD=20", "jfr · cpu");
+        run("\"a\".length()", "at 20.0 ms");
+        run("env --set POWERJ_PERF_PERIOD=oops", "jfr · cpu");
+        run("\"a\".length()", "at 1.0 ms");
+        // a stage line never runs its figures into the hot methods
+        assertThat(terminal.screen()).doesNotContainPattern("(µs|ms|B|KB|MB)(hot|chaud)");
+        exit();
+    }
+
+    @Test
     void noRecordingOutsidePerfMode() throws Exception {
         run("\"abc\".length()", "3");
         assertThat(recordings()).isZero();

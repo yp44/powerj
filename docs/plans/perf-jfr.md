@@ -11,7 +11,7 @@ No attach is needed: the Flight Recorder is driven in-process (`jdk.jfr.Recordin
 
 ## Design
 - `powerj-core`:
-  - `PerfProfiler` (facade without any `jdk.jfr` type: loads without the module) → `JfrProfiler` (recording + analysis). Events enabled in code, no `.jfc`: `ExecutionSample` (5 ms), `ObjectAllocationSample`, `GarbageCollection`, `GCHeapSummary`, `ThreadPark`, `ThreadSleep`, `JavaMonitorEnter/Wait`, `FileRead/Write` (≥ 1 ms), `VirtualThreadPinned`, `powerj.Command`, `powerj.Stage`.
+  - `PerfProfiler` (facade without any `jdk.jfr` type: loads without the module) → `JfrProfiler` (recording + analysis). Events enabled in code, no `.jfc`: `ExecutionSample` (period `POWERJ_PERF_PERIOD`, default 1 ms), `ObjectAllocationSample`, `GarbageCollection`, `GCHeapSummary`, `ThreadPark`, `ThreadSleep`, `JavaMonitorEnter/Wait`, `FileRead/Write` (≥ 1 ms), `VirtualThreadPinned`, `powerj.Command`, `powerj.Stage`.
   - Attribution: each `powerj.Stage` event carries its thread (and now its statement number and position, so the stages come out in pipeline order, not start order); any other event is attributed to the stage with the same thread whose window contains it. **Checked by `PerfProfileTest`: virtual-thread stages are attributed correctly** (the risk identified when planning).
   - `PerfProfile` records (`@Display` columns) for the line, the stages, the hot methods, allocation sites, waits, GC.
   - `PerfFiles`: file names that sort by date, retention, parsing of `POWERJ_PERF_KEEP`.
@@ -19,7 +19,8 @@ No attach is needed: the Flight Recorder is driven in-process (`jdk.jfr.Recordin
 - Dist: `-XX:+DebugNonSafepoints` in the default `dist.extra.args`.
 
 ## Limits
-- CPU is a statistical estimate (5 ms period), flagged when fewer than 20 samples. Allocation is sampled.
+- CPU is a statistical estimate (samples × period; period from `POWERJ_PERF_PERIOD`, default 1 ms), flagged when fewer than 20 samples, per line and per stage. Allocation is sampled.
+- Added after the first real runs: hidden JVM classes are skipped in hot-method frames; the line's waiting counts only the stages' threads (the others are the `(other)` row of `perf --waits`); the stage line no longer loses the separator before the hot methods (a `.properties` value loses its leading spaces).
 - A line is recorded, then analysed, before the next prompt: ~50–200 ms of extra latency in perf mode only.
 - Samples outside any stage (parsing, display) count in the line only.
 

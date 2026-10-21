@@ -20,8 +20,6 @@ import jdk.jfr.consumer.RecordingFile;
 /** {@link PerfProfiler} on the Flight Recorder; only loaded when {@code jdk.jfr} is present. */
 final class JfrProfiler implements PerfProfiler.Recording {
 
-    /** Sampling period of the Java threads. */
-    static final Duration PERIOD = Duration.ofMillis(5);
     private static final Duration THRESHOLD = Duration.ofMillis(1);
     private static final int HOT_METHODS = 3;
 
@@ -31,18 +29,20 @@ final class JfrProfiler implements PerfProfiler.Recording {
             "powerj.Stage");
 
     private final Recording recording;
+    private final Duration period;
     private final long started = System.currentTimeMillis();
     private boolean closed;
 
-    private JfrProfiler(Recording recording) {
+    private JfrProfiler(Recording recording, Duration period) {
         this.recording = recording;
+        this.period = period;
     }
 
-    static PerfProfiler.Recording start() {
+    static PerfProfiler.Recording start(Duration period) {
         var recording = new Recording();
         try {
             recording.setName("powerj-perf");
-            recording.enable("jdk.ExecutionSample").withPeriod(PERIOD).withStackTrace();
+            recording.enable("jdk.ExecutionSample").withPeriod(period).withStackTrace();
             recording.enable("jdk.ObjectAllocationSample").with("throttle", "5000/s").withStackTrace();
             recording.enable("jdk.GarbageCollection");
             recording.enable("jdk.GCHeapSummary");
@@ -53,7 +53,7 @@ final class JfrProfiler implements PerfProfiler.Recording {
             recording.enable("powerj.Command");
             recording.enable("powerj.Stage");
             recording.start();
-            return new JfrProfiler(recording);
+            return new JfrProfiler(recording, period);
         } catch (RuntimeException e) {
             recording.close();
             throw e;
@@ -76,7 +76,7 @@ final class JfrProfiler implements PerfProfiler.Recording {
         }
         PerfProfile profile;
         try {
-            profile = analyse(file);
+            profile = analyse(file, period);
         } finally {
             // the file is kept only if the retention says so, whatever the analysis did
             List<Path> kept = PerfFiles.retain(dir, keep);
@@ -85,7 +85,7 @@ final class JfrProfiler implements PerfProfiler.Recording {
             }
         }
         return new PerfProfile(Files.exists(file) ? file : null, profile.wall(), profile.cpu(), profile.samples(),
-                profile.allocated(), profile.waited(), profile.gc(), profile.stages());
+                profile.allocated(), profile.waited(), profile.gc(), profile.stages(), period, profile.otherWaits());
     }
 
     @Override
@@ -127,7 +127,7 @@ final class JfrProfiler implements PerfProfiler.Recording {
         }
     }
 
-    static PerfProfile analyse(Path file) throws IOException {
+    static PerfProfile analyse(Path file, Duration period) throws IOException {
         List<RecordedEvent> events = RecordingFile.readAllEvents(file);
         List<Stage> stages = new ArrayList<>();
         Duration wall = Duration.ZERO;
@@ -146,7 +146,7 @@ final class JfrProfiler implements PerfProfiler.Recording {
         }
         int samples = 0;
         long allocated = 0;
-        long waitNanos = 0;
+        Map<String, long[]> otherWaits = new java.util.TreeMap<>(); // cause -> {nanos, count}, outside any stage
         int gcCount = 0;
         Duration pause = Duration.ZERO;
         long before = -1;
@@ -184,13 +184,15 @@ final class JfrProfiler implements PerfProfiler.Recording {
                 case "jdk.ThreadPark", "jdk.ThreadSleep", "jdk.JavaMonitorEnter", "jdk.JavaMonitorWait", "jdk.FileRead",
                      "jdk.FileWrite" -> {
                     long nanos = event.getDuration().toNanos();
+                    // the waiting of a thread that runs no stage (the shell's own thread, parked while the stages
+                    // run; the file-walk workers) overlaps the stages: kept apart, not added to the line
+                    long[] total = (stage != null ? stage.waits : otherWaits)
+                            .computeIfAbsent(cause(name), _ -> new long[2]);
+                    total[0] += nanos;
+                    total[1]++;
                     if (stage != null) {
                         stage.waitNanos += nanos;
-                        long[] total = stage.waits.computeIfAbsent(cause(name), _ -> new long[2]);
-                        total[0] += nanos;
-                        total[1]++;
                     }
-                    waitNanos += nanos;
                 }
                 case "jdk.VirtualThreadPinned" -> {
                     if (stage != null) {
@@ -201,17 +203,22 @@ final class JfrProfiler implements PerfProfiler.Recording {
             }
         }
         List<PerfProfile.StageProfile> profiles = new ArrayList<>();
+        long waitNanos = 0;
         for (Stage stage : stages) {
-            profiles.add(profile(stage));
+            profiles.add(profile(stage, period));
+            waitNanos += stage.waitNanos;
         }
+        List<PerfProfile.Wait> others = otherWaits.entrySet().stream()
+                .map(entry -> new PerfProfile.Wait("(other)", entry.getKey(), Duration.ofNanos(entry.getValue()[0]),
+                        (int) entry.getValue()[1])).toList();
         if (wall.isZero() && !events.isEmpty()) {
             wall = Duration.between(events.getFirst().getStartTime(), events.getLast().getEndTime());
         }
-        return new PerfProfile(file, wall, cpu(samples), samples, allocated, Duration.ofNanos(waitNanos),
-                new PerfProfile.Gc(gcCount, pause, before, after), profiles);
+        return new PerfProfile(file, wall, cpu(samples, period), samples, allocated, Duration.ofNanos(waitNanos),
+                new PerfProfile.Gc(gcCount, pause, before, after), profiles, period, others);
     }
 
-    private static PerfProfile.StageProfile profile(Stage stage) {
+    private static PerfProfile.StageProfile profile(Stage stage, Duration period) {
         List<PerfProfile.HotMethod> hot = stage.methods.entrySet().stream()
                 .sorted(Map.Entry.<String, Integer>comparingByValue().reversed().thenComparing(Map.Entry.comparingByKey()))
                 .limit(HOT_METHODS)
@@ -231,12 +238,12 @@ final class JfrProfiler implements PerfProfiler.Recording {
                 .map(entry -> new PerfProfile.Wait(stage.command(), entry.getKey(),
                         Duration.ofNanos(entry.getValue()[0]), (int) entry.getValue()[1])).toList();
         return new PerfProfile.StageProfile(stage.number, stage.command(), stage.event.getString("kind"),
-                stage.event.getDuration(), cpu(stage.samples), stage.samples, stage.allocated,
+                stage.event.getDuration(), cpu(stage.samples, period), stage.samples, stage.allocated,
                 Duration.ofNanos(stage.waitNanos), stage.pinned, hot, sites, waits);
     }
 
-    private static Duration cpu(int samples) {
-        return PERIOD.multipliedBy(samples);
+    private static Duration cpu(int samples, Duration period) {
+        return period.multipliedBy(samples);
     }
 
     private static Stage stageOf(List<Stage> stages, RecordedEvent event) {
@@ -263,16 +270,30 @@ final class JfrProfiler implements PerfProfiler.Recording {
         };
     }
 
-    /** {@code Class.method:line} of the top frame. */
+    /**
+     * {@code Class.method:line} of the top frame that means something to a reader: frames of hidden classes (what the
+     * JVM generates for a pattern-matching {@code switch}, a lambda or a method handle) are skipped in favour of the
+     * code that called them. The line is 0 when unknown.
+     */
     private static String top(RecordedStackTrace trace) {
-        if (trace == null || trace.getFrames().isEmpty()) {
+        if (trace == null) {
             return "unknown:0";
         }
-        RecordedFrame frame = trace.getFrames().getFirst();
-        return frame.getMethod().getType().getName() + "." + frame.getMethod().getName() + ":" + frame.getLineNumber();
+        for (RecordedFrame frame : trace.getFrames()) {
+            String type = frame.getMethod().getType().getName();
+            if (frame.isJavaFrame() && !frame.getMethod().isHidden() && !generated(type)) {
+                return type + "." + frame.getMethod().getName() + ":" + Math.max(0, frame.getLineNumber());
+            }
+        }
+        return "unknown:0";
     }
 
-    /** The first frame of the stack that is not the allocator's own plumbing. */
+    /** {@code true} for the name of a class generated by the JVM: {@code 0x000000003c44c000}, {@code Foo/0x…}. */
+    static boolean generated(String type) {
+        return type.startsWith("0x") || type.contains("/0x");
+    }
+
+    /** The first visible frame of the allocating stack. */
     private static String site(RecordedStackTrace trace) {
         return top(trace);
     }

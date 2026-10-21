@@ -197,19 +197,31 @@ final class PerfMode {
                 Math.round(100.0 * profile.cpu().toNanos() / wall), bytes(profile.allocated()), gc,
                 duration(profile.waited())), DIM));
         for (var stage : profile.stages()) {
-            String hot = stage.hot().isEmpty() ? "" : Messages.get("perf.profile.hot", String.join(", ",
-                    stage.hot().stream().map(method -> shortMethod(method.method()) + ":" + method.line() + " "
-                            + Math.round(method.percent()) + " %").toList()));
-            lines.add(new AttributedString("  " + Messages.get("perf.profile.stage", pad(stage.command(), 12),
-                    duration(stage.cpu()), bytes(stage.allocated()), duration(stage.waited()), hot)));
+            String line = "  " + Messages.get("perf.profile.stage", pad(stage.command(), 12), duration(stage.cpu()),
+                    bytes(stage.allocated()), duration(stage.waited()));
+            if (!stage.hot().isEmpty()) {
+                line += " · " + Messages.get("perf.profile.hot", String.join(", ", stage.hot().stream()
+                        .map(method -> hotMethod(method, stage.low(), stage.samples())).toList()));
+            }
+            lines.add(new AttributedString(line));
         }
         if (profile.low()) {
-            lines.add(new AttributedString(Messages.get("perf.profile.low", profile.samples()), BANNER));
+            lines.add(new AttributedString(Messages.get("perf.profile.low", profile.samples(),
+                    duration(profile.period())), BANNER));
         }
         if (profile.file() != null) {
             lines.add(new AttributedString(Messages.get("perf.profile.file", profile.file()), BANNER));
         }
         return lines;
+    }
+
+    /**
+     * {@code Foo.test:41 41 %}; with few samples the share would mislead (one sample among 12 is "8 %"), so the count
+     * is shown instead: {@code Foo.test:41 1/12}. The line is left out when unknown.
+     */
+    static String hotMethod(PerfProfile.HotMethod method, boolean few, int samples) {
+        String where = shortMethod(method.method()) + (method.line() > 0 ? ":" + method.line() : "");
+        return where + " " + (few ? method.samples() + "/" + samples : Math.round(method.percent()) + " %");
     }
 
     /** {@code PerfProfileTest$Spin.begin} from {@code io.powerj.core.exec.PerfProfileTest$Spin.begin}. */

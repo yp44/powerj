@@ -44,16 +44,20 @@ methods:
 
 ```text
 jfr · cpu 143 ms (79 %) · alloc 48.2 MB · gc 2× 7.1 ms · wait 31 ms
-  where        cpu  98 ms · alloc 31.0 MB · wait 2 ms  hot Foo.test:41 41 %, Baz.size:88 18 %
-  sort         cpu  45 ms · alloc 17.2 MB · wait 29 ms  hot Arrays.sort:12 63 %
+  where        cpu  98 ms · alloc 31.0 MB · wait 2 ms · hot Foo.test:41 41 %, Baz.size:88 18 %
+  sort         cpu  45 ms · alloc 17.2 MB · wait 29 ms · hot Arrays.sort:12 63 %
 recording ~/.powerj/perf/perf-1792507896426.jfr
 ```
 
 How to read it:
 
-- **cpu** is `samples × 5 ms` (the Java threads are sampled every 5 ms): an estimate, good when there are many samples.
-  With fewer than 20 (a command of ~100 ms or less) the summary says so; run the line a few times, or on more data.
-- **wait** is time spent parked, sleeping, blocked on a monitor or in file I/O (events of 1 ms or more). A stage that waits
+- **cpu** is `samples × period`: an estimate, good when there are many samples. With fewer than 20 the summary says
+  so (`only 4 sample(s) at 1.0 ms`); a stage with fewer than 20 samples shows the *counts* of its hot methods
+  (`Foo.test:41 1/12`) rather than percentages, because one sample among twelve is "8 %". Run the line a few times, or on
+  more data.
+- **wait** is time the stages' threads spent parked, sleeping, blocked on a monitor or in file I/O (events of 1 ms or
+  more). Threads that run no stage (the shell's own thread, parked while the pipeline runs; the file-walk workers) are
+  not counted — they overlap the stages — and appear as `(other)` in `perf --waits`. A stage that waits
   for its upstream stage shows a large `wait` and almost no `cpu`: that is the pipeline working, not a problem. A stage
   with a high `cpu` and a hot method is where to optimise.
 - **alloc** is sampled, and counts what was allocated, not what stays alive (for the live set use `GC.class_histogram`
@@ -70,6 +74,19 @@ PJ⏱ > perf --waits                       # park / sleep / monitor / file, by s
 PJ⏱ > perf --gc
 PJ⏱ > perf --file                        # path of the recording
 ```
+
+**Sampling period.** The Java threads are sampled every `POWERJ_PERF_PERIOD` milliseconds (default `1`, from 1 to 1000;
+a missing, non-numeric or smaller value gives the default). It is a session variable read at every line, set with `env`:
+
+```text
+PJ⏱ > env --set POWERJ_PERF_PERIOD=20      # fewer samples, less overhead, for a long command
+PJ⏱ > env --set POWERJ_PERF_PERIOD=1       # many samples, for a command of 20-200 ms
+```
+
+Choose by the length of the command: it takes about 20 samples for the figures to mean anything, so at 1 ms a command of
+a few tens of ms starts to be readable, while at 20 ms you need a command of several seconds. A shorter period costs a
+little more CPU while recording (the Flight Recorder cannot go below 1 ms; for finer sampling use async-profiler,
+below). The CPU estimate stays comparable across periods, only its precision changes.
 
 **Keeping the recordings.** The `.jfr` file of each line goes to `~/.powerj/perf/`; the session variable
 `POWERJ_PERF_KEEP` says how many to keep, read at every line: unset or `0` deletes the file once analysed, `1` keeps only

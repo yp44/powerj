@@ -26,9 +26,11 @@ In a folder with many files (e.g. a source tree of a few thousand files), `cd` i
 | 12 | Open a kept file: `jfr view hot-methods <file>` or JDK Mission Control | The same hot methods as the summary; `jfr print --events powerj.Stage <file>` shows the stages with `statement` and `position`. |
 | 13 | Run `sh -c "sleep 2"` then Ctrl+C during it | `^C`, the report, and a summary (the recording is stopped and analysed in this case too). |
 | 14 | Alt+P to leave the mode, run a line | No report, no summary, no file written; `perf` still answers with the last profile. |
-| 15 | Start with a runtime without `jdk.jfr` (slim image, see `docs/profiling.md`) | One note `jfr: Flight Recorder is not part of this runtime, nothing recorded`; the plan and the wall-clock report still work. |
+| 15 | `env --set POWERJ_PERF_PERIOD=50`, run the same line of step 1, then `env --set POWERJ_PERF_PERIOD=1` and run it again | The low-samples note (when shown) says `at 50.0 ms` then `at 1.0 ms`; at 1 ms there are clearly more samples and the `cpu` figures are of the same order. A value such as `oops` or `0` behaves like `1`. |
+| 16 | In the summary, look at a stage line with hot methods | The figures and `· hot …` are separated (no `µshot`); a stage with fewer than 20 samples shows `1/12`-style counts instead of percentages; no `0x…` class names; `wait` of the line never exceeds what the stages show. |
+| 17 | Start with a runtime without `jdk.jfr` (slim image, see `docs/profiling.md`) | One note `jfr: Flight Recorder is not part of this runtime, nothing recorded`; the plan and the wall-clock report still work. |
 
 ## Notes
 
-- Short commands have few samples (one every 5 ms): repeat them or use more data. The line and column of a hot method are exact only with `-XX:+DebugNonSafepoints`, set in the packaged launcher.
+- Short commands have few samples (one per `POWERJ_PERF_PERIOD` ms, 1 by default): repeat them, use more data, or lower the period. The line and column of a hot method are exact only with `-XX:+DebugNonSafepoints`, set in the packaged launcher.
 - The recording and analysis add some tens to a few hundred milliseconds before the next prompt, in perf mode only.

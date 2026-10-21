@@ -15,16 +15,20 @@ import io.powerj.api.Display;
  * @param cpu        CPU time of the Java threads: samples × sampling period (a statistical estimate)
  * @param samples    execution samples taken; below {@link #LOW_SAMPLES} the figures are only indicative
  * @param allocated  bytes allocated (sampled estimate)
- * @param waited     time threads spent parked, waiting for a monitor or in file I/O
+ * @param waited     time the threads of the stages spent parked, sleeping, waiting for a monitor or in file I/O;
+ *                   the waiting of the other threads (the shell's own thread parked while the stages run, file-walk
+ *                   workers…) is in {@code otherWaits}, not here, because it overlaps the stages
+ * @param period     sampling period the CPU figures come from
  */
 public record PerfProfile(Path file, Duration wall, Duration cpu, int samples, long allocated, Duration waited,
-                          Gc gc, List<StageProfile> stages) {
+                          Gc gc, List<StageProfile> stages, Duration period, List<Wait> otherWaits) {
 
     /** Fewer samples than this: the figures are indicative (short command). */
     public static final int LOW_SAMPLES = 20;
 
     public PerfProfile {
         stages = List.copyOf(stages);
+        otherWaits = List.copyOf(otherWaits);
     }
 
     public boolean low() {
@@ -48,9 +52,14 @@ public record PerfProfile(Path file, Duration wall, Duration cpu, int samples, l
             sites = List.copyOf(sites);
             waits = List.copyOf(waits);
         }
+
+        /** Too few samples for the percentages of its hot methods to mean much. */
+        public boolean low() {
+            return samples < LOW_SAMPLES;
+        }
     }
 
-    /** A Java method seen at the top of the stack in the samples of a stage. */
+    /** A Java method seen at the top of the stack in the samples of a stage; {@code line} is 0 when unknown. */
     @Display(columns = {"stage", "method", "line", "samples", "percent"})
     public record HotMethod(String stage, String method, int line, int samples, double percent) { }
 

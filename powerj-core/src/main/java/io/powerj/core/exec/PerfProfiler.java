@@ -29,6 +29,13 @@ public final class PerfProfiler {
         void close();
     }
 
+    /** Default sampling period of the Java threads, in milliseconds. */
+    public static final int DEFAULT_PERIOD_MILLIS = 1;
+    /** The Flight Recorder does not sample faster than once per millisecond. */
+    static final int MIN_PERIOD_MILLIS = 1;
+    static final int MAX_PERIOD_MILLIS = 1000;
+    public static final String PERIOD_VARIABLE = "POWERJ_PERF_PERIOD";
+
     private static final boolean AVAILABLE = ModuleLayer.boot().findModule("jdk.jfr").isPresent();
 
     private PerfProfiler() {
@@ -38,9 +45,34 @@ public final class PerfProfiler {
         return AVAILABLE;
     }
 
-    /** Starts recording; {@code null} if the runtime has no Flight Recorder. */
-    public static Recording start() {
-        return AVAILABLE ? JfrProfiler.start() : null;
+    /**
+     * Starts recording; {@code null} if the runtime has no Flight Recorder.
+     *
+     * @param period sampling period of the Java threads, see {@link #period}
+     */
+    public static Recording start(java.time.Duration period) {
+        return AVAILABLE ? JfrProfiler.start(period) : null;
+    }
+
+    /**
+     * Sampling period from the session environment: {@value #PERIOD_VARIABLE} in whole milliseconds, between
+     * {@value #MIN_PERIOD_MILLIS} and {@value #MAX_PERIOD_MILLIS}; unset, not a number or below the minimum gives the
+     * default ({@value #DEFAULT_PERIOD_MILLIS} ms). Read at every line, so {@code env --set} takes effect at once.
+     */
+    public static java.time.Duration period(Map<String, String> environment) {
+        String value = environment.get(PERIOD_VARIABLE);
+        long millis = DEFAULT_PERIOD_MILLIS;
+        if (value != null) {
+            try {
+                long parsed = Long.parseLong(value.strip());
+                if (parsed >= MIN_PERIOD_MILLIS) {
+                    millis = Math.min(parsed, MAX_PERIOD_MILLIS);
+                }
+            } catch (NumberFormatException _) {
+                // not a number: the default
+            }
+        }
+        return java.time.Duration.ofMillis(millis);
     }
 
     /** Number of files to keep from the session environment. */

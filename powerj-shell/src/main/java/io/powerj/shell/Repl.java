@@ -247,7 +247,7 @@ public final class Repl {
     /** Starts the Flight Recorder for the line about to run; {@code null} (and a note) if it cannot. */
     private PerfProfiler.Recording startFlightRecorder() {
         try {
-            PerfProfiler.Recording recording = PerfProfiler.start();
+            PerfProfiler.Recording recording = PerfProfiler.start(PerfProfiler.period(session.environment()));
             if (recording == null && !flightNoted) {
                 flightNoted = true;
                 printNote(Messages.get("perf.profile.noJfr"));
@@ -307,7 +307,10 @@ public final class Repl {
                     stage.command(), stage.kind(), stage.wall(), stage.cpu(), stage.samples(), stage.allocated(),
                     stage.waited())));
             case "--allocations" -> profile.stages().forEach(stage -> rows.addAll(stage.sites()));
-            case "--waits" -> profile.stages().forEach(stage -> rows.addAll(stage.waits()));
+            case "--waits" -> {
+                profile.stages().forEach(stage -> rows.addAll(stage.waits()));
+                rows.addAll(profile.otherWaits());
+            }
             case "--gc" -> rows.add(new PerfProfile.GcRow(profile.gc().count(), profile.gc().pause(),
                     profile.gc().before(), profile.gc().after()));
             case "--file" -> {
