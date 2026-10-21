@@ -205,7 +205,7 @@ class PipelineTest {
         runner.join();
         assertThat(failure.get()).isInstanceOfAny(InterruptedException.class, CancellationException.class);
         Thread.sleep(100);
-        assertThat(Thread.getAllStackTraces().keySet()).noneMatch(t -> t.getName().startsWith("powerj-etape"));
+        assertThat(Thread.getAllStackTraces().keySet()).noneMatch(t -> t.getName().startsWith("powerj-stage"));
     }
 
     // --- Native commands (Linux / macOS) ---

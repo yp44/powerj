@@ -192,4 +192,14 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- JMH micro-benchmarks (docs/profiling.md): ./mvnw -Pbench -DskipTests package -->
+        <profile>
+            <id>bench</id>
+            <modules>
+                <module>powerj-bench</module>
+            </modules>
+        </profile>
+    </profiles>
 </project>

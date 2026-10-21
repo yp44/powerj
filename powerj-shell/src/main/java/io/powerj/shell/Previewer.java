@@ -46,6 +46,7 @@ final class Previewer {
     private final boolean colors;
 
     private volatile boolean on;
+    private volatile Runnable onEnable = () -> { };
 
     private final Object lock = new Object();
     /** Text to evaluate, and its number: each change of the line gives a new one. */
@@ -73,6 +74,18 @@ final class Previewer {
         return on;
     }
 
+    /** Action run when the mode is switched on (perf mode is switched off: both use the area below the line). */
+    void onEnable(Runnable action) {
+        this.onEnable = action;
+    }
+
+    /** Switches the mode off if it is on (perf mode was switched on). */
+    void off() {
+        if (on) {
+            toggle();
+        }
+    }
+
     /** Binds Alt+V; {@code prompt} gives the prompt to show after the switch. */
     void bind(Supplier<String> prompt) {
         reader.getWidgets().put(TOGGLE_WIDGET, () -> {
@@ -89,7 +102,9 @@ final class Previewer {
     void toggle() {
         on = !on;
         completions.previewMode(on);
-        if (!on) {
+        if (on) {
+            onEnable.run();
+        } else {
             request(null);
             clear();
         }
@@ -137,7 +152,7 @@ final class Previewer {
                 worker.interrupt(); // the running evaluation is out of date
             }
             if (text != null && worker == null) {
-                worker = Thread.ofPlatform().name("powerj-apercu").daemon().stackSize(STACK_SIZE).start(this::work);
+                worker = Thread.ofPlatform().name("powerj-preview").daemon().stackSize(STACK_SIZE).start(this::work);
             }
             lock.notifyAll();
         }
@@ -170,7 +185,7 @@ final class Previewer {
             }
             PreviewResult result;
             Thread self = Thread.currentThread();
-            Thread deadline = Thread.ofVirtual().start(() -> {
+            Thread deadline = Thread.ofVirtual().name("powerj-preview-deadline").start(() -> {
                 try {
                     Thread.sleep(DEADLINE_MILLIS);
                     synchronized (lock) {

@@ -284,7 +284,7 @@ public final class FileTrees {
         private final Semaphore permits;
         /** Tasks submitted and not finished; the last one to finish signals the end. */
         private final AtomicInteger pending = new AtomicInteger();
-        private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
+        private final ExecutorService executor = Executors.newThreadPerTaskExecutor(Thread.ofVirtual().name("powerj-walk-", 0).factory());
         private volatile boolean stopped;
 
         Work(int parallelism) {

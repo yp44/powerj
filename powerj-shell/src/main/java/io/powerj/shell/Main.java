@@ -147,7 +147,7 @@ public final class Main {
             return 1;
         }
         // The terminal is restored (raw mode disabled) even on an abrupt shutdown (FR-59).
-        Runtime.getRuntime().addShutdownHook(Thread.ofPlatform().unstarted(() -> close(terminal)));
+        Runtime.getRuntime().addShutdownHook(Thread.ofPlatform().name("powerj-shutdown").unstarted(() -> close(terminal)));
         // System.out.println(…) called from a Java expression goes through the JLine terminal (FR-58).
         System.setOut(terminalStream(terminal));
         System.setErr(terminalStream(terminal));

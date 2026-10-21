@@ -51,6 +51,10 @@ public final class Interpreter {
     /** A blocking error occurred during the last line (non-interactive mode: the script stops). */
     private volatile boolean blockingError;
 
+    /** Figures of the line being executed (perf mode, FR-76), or {@code null}. */
+    private volatile PerfRecorder perf;
+    private volatile PerfRecorder.StatementTimer statementTimer;
+
     /**
      * @param extraBuiltins built-in commands provided by the shell (e.g. {@code history})
      */
@@ -172,6 +176,21 @@ public final class Interpreter {
     public void execute(String line) throws InterruptedException {
         blockingError = false;
         Ast.Script script = Parser.parse(line, syntax());
+        Profiling.Span span = Profiling.command(commandNames(script), script.steps().size());
+        try {
+            run(script);
+        } finally {
+            span.end(-1, -1);
+        }
+    }
+
+    /** Names of the commands of the line, without arguments (the Flight Recorder events never carry those). */
+    private static String commandNames(Ast.Script script) {
+        return script.steps().stream().flatMap(step -> step.statement().pipeline().stages().stream())
+                .map(stage -> stageText(stage).split(" ", 2)[0]).collect(java.util.stream.Collectors.joining(" | "));
+    }
+
+    private void run(Ast.Script script) throws InterruptedException {
         boolean succeeded = true;
         for (Ast.Step step : script.steps()) {
             if (session.exitRequest().isPresent()) {
@@ -183,7 +202,18 @@ public final class Interpreter {
                 case IF_FAILURE -> !succeeded;
             };
             if (run) {
-                succeeded = statement(step.statement());
+                PerfRecorder recorder = perf != null ? perf : Profiling.enabled() ? PerfRecorder.profiling() : null;
+                PerfRecorder.StatementTimer timer = recorder == null ? null : recorder.statement();
+                statementTimer = timer;
+                succeeded = false;
+                try {
+                    succeeded = statement(step.statement());
+                } finally {
+                    statementTimer = null;
+                    if (timer != null) {
+                        timer.finish(statementText(step.statement()), succeeded);
+                    }
+                }
                 session.recordSuccess(succeeded);
             }
         }
@@ -408,19 +438,34 @@ public final class Interpreter {
     private boolean pipeline(Ast.Pipeline pipeline, Consumer<Object> sink, boolean capture,
                              Optional<NativeRunner.FileTarget> outTarget, Optional<NativeRunner.FileTarget> errTarget)
             throws InterruptedException {
+        PerfRecorder.StatementTimer timer = statementTimer;
+        statementTimer = null; // only the statement's own pipeline is timed, not those nested in an argument
         List<Segment> segments = segments(pipeline.stages());
+        List<PerfRecorder.StageTimer> timers = timer == null || PreviewGuard.active() ? null
+                : stageTimers(timer, pipeline, segments.size());
         Consumer<String> errors = synchronizedErrors(errorSink(errTarget));
         if (segments.size() == 1 && segments.getFirst() instanceof NativeSegment(var commands) && commands.size() == 1) {
             NativeRunner.Command command = commands.getFirst();
-            var result = nativeRunner.run(command.executable(), command.args(), session, io, capture, outTarget,
-                    errTarget, command.errorsToOutput(), inheritsInput());
-            session.recordNative(result.run());
-            result.capturedLines().forEach(sink);
-            return result.run().succeeded();
+            PerfRecorder.StageTimer stageTimer = timers == null ? null : timers.getFirst();
+            if (stageTimer != null) {
+                stageTimer.started();
+            }
+            try {
+                var result = nativeRunner.run(command.executable(), command.args(), session, io, capture, outTarget,
+                        errTarget, command.errorsToOutput(), inheritsInput());
+                session.recordNative(result.run());
+                result.capturedLines().forEach(stageTimer == null ? sink : stageTimer.counting(sink));
+                return result.run().succeeded();
+            } finally {
+                if (stageTimer != null) {
+                    stageTimer.ended();
+                }
+            }
         }
         Optional<NativeRunner.FileTarget> sharedErrors = shared(errTarget);
         if (segments.size() == 1) {
-            return segment(segments.getFirst(), standardInput, null, sink, capture, outTarget, sharedErrors, errors);
+            return segment(segments.getFirst(), standardInput, null, sink, capture, outTarget, sharedErrors, errors,
+                    timers == null ? null : timers.getFirst());
         }
 
         int n = segments.size();
@@ -434,10 +479,11 @@ public final class Interpreter {
             Segment segment = segments.get(i);
             Source input = i == 0 ? standardInput : pipes.get(i - 1);
             Pipe output = pipes.get(i);
-            threads.add(Thread.ofVirtual().name("powerj-etape-" + (i + 1)).unstarted(PreviewGuard.propagate(() -> {
+            PerfRecorder.StageTimer stageTimer = timers == null ? null : timers.get(i);
+            threads.add(Thread.ofVirtual().name("powerj-stage-" + (i + 1)).unstarted(PreviewGuard.propagate(() -> {
                 output.onAbort(Thread.currentThread()::interrupt);
                 try {
-                    segment(segment, input, output, null, false, Optional.empty(), sharedErrors, errors);
+                    segment(segment, input, output, null, false, Optional.empty(), sharedErrors, errors, stageTimer);
                     output.close();
                 } catch (InterruptedException | java.util.concurrent.CancellationException e) {
                     closeQuietly(output);
@@ -462,7 +508,8 @@ public final class Interpreter {
         Pipe lastInput = pipes.getLast();
         boolean succeeded;
         try {
-            succeeded = segment(segments.getLast(), lastInput, null, sink, capture, outTarget, sharedErrors, errors);
+            succeeded = segment(segments.getLast(), lastInput, null, sink, capture, outTarget, sharedErrors, errors,
+                    timers == null ? null : timers.getLast());
         } finally {
             lastInput.abort();
             joinAll(threads);
@@ -473,33 +520,152 @@ public final class Interpreter {
         return succeeded && !blockingErrors.get();
     }
 
-    /** Runs a segment; {@code output} is the queue to the next stage, or {@code null} at the end of the pipeline. */
+    /**
+     * Runs a segment; {@code output} is the queue to the next stage, or {@code null} at the end of the pipeline.
+     *
+     * @param timer figures of the stage in perf mode, or {@code null}
+     */
     private boolean segment(Segment segment, Source input, Pipe output, Consumer<Object> sink, boolean capture,
                             Optional<NativeRunner.FileTarget> outTarget, Optional<NativeRunner.FileTarget> errTarget,
-                            Consumer<String> errors) throws InterruptedException {
-        return switch (segment) {
-            case ObjectSegment(var stage) -> {
-                try {
-                    yield stage.run(input, output != null ? output::putUnrolled : sink, errors);
-                } catch (InterruptedException | RuntimeException e) {
-                    throw e;
-                } catch (Exception e) {
-                    throw new PjException(PjError.of(e.toString(), e));
+                            Consumer<String> errors, PerfRecorder.StageTimer timer) throws InterruptedException {
+        if (timer != null) {
+            timer.started();
+        }
+        try {
+            return switch (segment) {
+                case ObjectSegment(var stage) -> {
+                    Consumer<Object> destination = output != null ? output::putUnrolled : sink;
+                    try {
+                        yield timer == null ? stage.run(input, destination, errors)
+                                : stage.run(timer.counting(input), timer.counting(destination), errors);
+                    } catch (InterruptedException | RuntimeException e) {
+                        throw e;
+                    } catch (Exception e) {
+                        throw new PjException(PjError.of(e.toString(), e));
+                    }
                 }
+                case NativeSegment(var commands) -> {
+                    // between two native stages the values travel as bytes: only the last sink can be counted
+                    List<NativeRun> runs = nativeRunner.runGroup(commands, session, io, input, inheritsInput(), output,
+                            timer == null || sink == null ? sink : timer.counting(sink), capture, outTarget, errTarget,
+                            errors);
+                    if (output != null && output.aborted()) {
+                        // FR-68b: stopped by the next stage (first, range…): not a failure, $exit is left as it is.
+                        yield true;
+                    }
+                    synchronized (session) {
+                        session.recordNative(runs.getLast());
+                    }
+                    yield runs.getLast().succeeded();
+                }
+            };
+        } finally {
+            if (timer != null) {
+                timer.ended();
             }
-            case NativeSegment(var commands) -> {
-                List<NativeRun> runs = nativeRunner.runGroup(commands, session, io, input, inheritsInput(), output,
-                        sink, capture, outTarget, errTarget, errors);
-                if (output != null && output.aborted()) {
-                    // FR-68b: stopped by the next stage (first, range…): not a failure, $exit is left as it is.
-                    yield true;
+        }
+    }
+
+    /** Stage figures for the segments of a pipeline; {@code null} if the plan and the segments disagree. */
+    private List<PerfRecorder.StageTimer> stageTimers(PerfRecorder.StatementTimer timer, Ast.Pipeline pipeline,
+                                                      int segments) {
+        List<PerfPlan.Stage> stages = planStages(pipeline);
+        if (stages.size() != segments) {
+            return null;
+        }
+        return stages.stream().map(timer::stage).toList();
+    }
+
+    /** The stages of the pipeline as {@link #segments} groups them, resolved by name only (nothing is evaluated). */
+    private List<PerfPlan.Stage> planStages(Ast.Pipeline pipeline) {
+        List<Ast.Stage> stages = pipeline.stages();
+        List<PerfPlan.Stage> plan = new ArrayList<>();
+        List<String> natives = new ArrayList<>();
+        for (int i = 0; i < stages.size(); i++) {
+            PerfPlan.Kind kind = stageKind(stages.get(i));
+            String text = stageText(stages.get(i));
+            if (kind == PerfPlan.Kind.NATIVE) {
+                natives.add(text);
+                if (i < stages.size() - 1 && stageKind(stages.get(i + 1)) == PerfPlan.Kind.NATIVE) {
+                    continue;
                 }
-                synchronized (session) {
-                    session.recordNative(runs.getLast());
-                }
-                yield runs.getLast().succeeded();
+                plan.add(new PerfPlan.Stage(String.join(" | ", natives), kind, placement(stages.size(),
+                        i, natives.size() == stages.size())));
+                natives.clear();
+            } else {
+                plan.add(new PerfPlan.Stage(text, kind, placement(stages.size(), i, false)));
             }
+        }
+        return plan;
+    }
+
+    /** A lone native command starts directly; otherwise the last stage runs in the caller, the others in a thread. */
+    private static PerfPlan.Placement placement(int stageCount, int lastStage, boolean lone) {
+        if (lone && stageCount == 1) {
+            return PerfPlan.Placement.PROCESS;
+        }
+        return lastStage == stageCount - 1 ? PerfPlan.Placement.CALLER : PerfPlan.Placement.THREAD;
+    }
+
+    private PerfPlan.Kind stageKind(Ast.Stage stage) {
+        if (!(stage.body() instanceof Ast.Command command)) {
+            return PerfPlan.Kind.EXPRESSION;
+        }
+        String name = command.forceNative() ? "^" + command.name() : command.name();
+        return switch (commandKind(name)) {
+            case BUILTIN -> PerfPlan.Kind.BUILTIN;
+            case CMDLET -> PerfPlan.Kind.CMDLET;
+            case NATIVE -> PerfPlan.Kind.NATIVE;
+            case UNKNOWN -> PerfPlan.Kind.UNKNOWN;
         };
+    }
+
+    /** The stage as typed, as far as the syntax tree allows: computed arguments are shown as {@code …}. */
+    private static String stageText(Ast.Stage stage) {
+        if (!(stage.body() instanceof Ast.Command command)) {
+            return "{expression}";
+        }
+        List<String> words = new ArrayList<>();
+        words.add((command.forceNative() ? "^" : "") + command.name());
+        for (Argument argument : command.arguments()) {
+            words.add(argument instanceof Ast.WordArgument(var text) ? text : "…");
+        }
+        return String.join(" ", words);
+    }
+
+    private static String statementText(Statement statement) {
+        return String.join(" | ", statement.pipeline().stages().stream().map(Interpreter::stageText).toList());
+    }
+
+    /**
+     * Perf mode (FR-76): how the line will run, worked out without running or evaluating anything — commands are
+     * resolved by name as {@link #commandKind} does.
+     */
+    public PerfPlan plan(String line) {
+        if (line.isBlank()) {
+            return new PerfPlan.Empty();
+        }
+        Ast.Script script;
+        try {
+            script = Parser.parse(line, syntax());
+        } catch (SyntaxException e) {
+            return new PerfPlan.Incomplete(e.getMessage());
+        }
+        if (script.steps().isEmpty()) {
+            return new PerfPlan.Empty();
+        }
+        List<PerfPlan.Statement> statements = new ArrayList<>();
+        for (Ast.Step step : script.steps()) {
+            Statement statement = step.statement();
+            statements.add(new PerfPlan.Statement(step.connector(), statement.assignTo().orElse(null),
+                    statement.background(), statement.pipeline().redirects().size(), planStages(statement.pipeline())));
+        }
+        return new PerfPlan.Statements(statements);
+    }
+
+    /** Installs the recorder of the line about to be executed, or {@code null} to stop recording. */
+    public void record(PerfRecorder recorder) {
+        this.perf = recorder;
     }
 
     /** Resolves the stages and groups consecutive native commands. */

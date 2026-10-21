@@ -42,7 +42,7 @@ public final class Supervisor {
      */
     public Outcome run(String commandLine, Task task) {
         var outcome = new CompletableFuture<Outcome>();
-        Thread worker = Thread.ofPlatform().name("powerj-commande").daemon().stackSize(STACK_SIZE).unstarted(() -> {
+        Thread worker = Thread.ofPlatform().name("powerj-command").daemon().stackSize(STACK_SIZE).unstarted(() -> {
             Outcome result;
             try {
                 result = new Outcome.Success(task.execute());
