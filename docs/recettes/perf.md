@@ -46,7 +46,10 @@ A folder with a few hundred files, for example the PowerJ sources: `cd C:\dev\po
 | 28 | `env --set POWERJ_PERF_JFR_SAMPLEPERIOD=1ms`, then a CPU-bound line (`ls -r / \| where { $_.name.length() > 3 } \| count`) and `(perf --view hot \| measure samples).sum` | Several times more samples than with the default 10 ms (run the line once before to compare). |
 | 29 | `env --set POWERJ_PERF_JFR_SAMPLEPERIOD=often`, then a measured line | One message `POWERJ_PERF_JFR_SAMPLEPERIOD=often is not a duration …`, not repeated by the next line; the profiler keeps sampling every 10 ms. `100us` gives a message too, and samples every 1 ms. |
 | 30 | Put `env --set POWERJ_PERF_JFR_SAMPLEPERIOD=2ms` in `profile.pj`, restart | The setting applies from the first measured line. |
-| 31 | `help perf` | The synopsis, the options (`--view`, `--all`, `--save`) and the examples. |
+| 31 | `env --set POWERJ_PERF_JFR_ALLOCTHROTTLE=1/s`, then an allocating line (`ls -r / \| where { $_.name.length() > 3 } \| count`), `perf --save %TEMP%\a.jfr` and `jfr summary` on it | A handful of `jdk.ObjectAllocationSample` events. |
+| 32 | `env --set POWERJ_PERF_JFR_ALLOCTHROTTLE=off`, the same line again and `jfr summary` | Thousands of `jdk.ObjectAllocationSample` events. |
+| 33 | `env --set POWERJ_PERF_JFR_ALLOCTHROTTLE=lots`, then a measured line | One message `POWERJ_PERF_JFR_ALLOCTHROTTLE=lots is not a rate …`, not repeated by the next line. |
+| 34 | `help perf` | The synopsis, the options (`--view`, `--all`, `--save`) and the examples. |
 
 ## Known limitations
 

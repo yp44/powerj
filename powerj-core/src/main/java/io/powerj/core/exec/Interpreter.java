@@ -248,11 +248,34 @@ public final class Interpreter {
             return null;
         }
         Path file = recordingFile();
-        return file == null ? null : JfrCapture.start(file, samplePeriod());
+        return file == null ? null : JfrCapture.start(file, samplePeriod(), allocThrottle());
     }
 
-    /** Value of the variable the warning was last given for: one warning per value, not one per line. */
+    /** Value of each variable the warning was last given for: one warning per value, not one per line. */
     private String warnedPeriod;
+    private String warnedThrottle;
+
+    /**
+     * Limit of the profiler's allocation samples, from {@code POWERJ_PERF_JFR_ALLOCTHROTTLE} in the session environment
+     * ({@code 100/s}, {@code off}), or {@code null} for the profiler's default. A value that is not a rate is
+     * reported, and the default is used.
+     */
+    private String allocThrottle() {
+        String value = session.environment().get(PerfJfr.ALLOC_THROTTLE_VARIABLE);
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        boolean warn = !value.equals(warnedThrottle);
+        warnedThrottle = value;
+        try {
+            return PerfJfr.parseAllocThrottle(value);
+        } catch (IllegalArgumentException _) {
+            if (warn) {
+                io.errors().accept(Messages.get("perf.allocThrottle.invalid", PerfJfr.ALLOC_THROTTLE_VARIABLE, value));
+            }
+            return null;
+        }
+    }
 
     /**
      * Sampling period of the profiler, from {@code POWERJ_PERF_JFR_SAMPLEPERIOD} in the session environment, so that

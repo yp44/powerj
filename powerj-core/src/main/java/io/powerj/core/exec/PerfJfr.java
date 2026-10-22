@@ -14,11 +14,19 @@ final class PerfJfr {
 
     /** Variable of the session environment ({@code env --set} in {@code profile.pj}) that gives the sampling period. */
     static final String SAMPLE_PERIOD_VARIABLE = "POWERJ_PERF_JFR_SAMPLEPERIOD";
+    /**
+     * Variable of the session environment that limits how many allocations the profiler samples: {@code 100/s},
+     * {@code 5/ms}, {@code 600/m}, or {@code off} for no limit. Without it, the profiler's own default applies.
+     */
+    static final String ALLOC_THROTTLE_VARIABLE = "POWERJ_PERF_JFR_ALLOCTHROTTLE";
     static final Duration DEFAULT_SAMPLE_PERIOD = Duration.ofMillis(10);
     /** The profiler does not sample more often than that: it silently raises a shorter period to it. */
     static final Duration MINIMUM_SAMPLE_PERIOD = Duration.ofMillis(1);
 
     private static final Pattern PERIOD = Pattern.compile("(\\d+(?:\\.\\d+)?)\\s*(ns|us|µs|ms|s)?");
+
+    /** The profiler reads anything else as "no limit", and prints a warning on the console. */
+    private static final Pattern THROTTLE = Pattern.compile("(\\d+)\\s*/\\s*(ns|us|ms|s|m|h|d)");
 
     private PerfJfr() {
     }
@@ -49,5 +57,25 @@ final class PerfJfr {
             throw new IllegalArgumentException(text);
         }
         return Duration.ofNanos(nanos);
+    }
+
+    /**
+     * Reads a limit of allocation samples: a count per unit of time, {@code 100/s} ({@code ns}, {@code us}, {@code ms},
+     * {@code s}, {@code m}, {@code h} or {@code d}), or {@code off}. The profiler does not check what it is given:
+     * a wrong value would silently remove the limit, so it is checked here.
+     *
+     * @return the value in the form the profiler reads, without spaces
+     * @throws IllegalArgumentException if the text is not a rate, or the count is zero
+     */
+    static String parseAllocThrottle(String text) {
+        String value = text.strip().toLowerCase(Locale.ROOT);
+        if (value.equals("off")) {
+            return value;
+        }
+        Matcher matcher = THROTTLE.matcher(value);
+        if (!matcher.matches() || matcher.group(1).length() > 9 || Long.parseLong(matcher.group(1)) == 0) {
+            throw new IllegalArgumentException(text);
+        }
+        return Long.parseLong(matcher.group(1)) + "/" + matcher.group(2);
     }
 }

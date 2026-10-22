@@ -50,7 +50,7 @@ final class JfrCapture {
 
     /** The first recording of the JVM initializes the recorder, and the first read loads the parser: pay it once. */
     static void warmUp(Path file) {
-        JfrCapture capture = start(file, PerfJfr.DEFAULT_SAMPLE_PERIOD);
+        JfrCapture capture = start(file, PerfJfr.DEFAULT_SAMPLE_PERIOD, null);
         if (capture != null) {
             capture.finish(0, List.of());
             try {
@@ -62,10 +62,11 @@ final class JfrCapture {
     }
 
     /**
-     * Starts recording into {@code file}, sampling the execution every {@code samplePeriod}; {@code null} if the
-     * profiler cannot start (the line is measured without it).
+     * Starts recording into {@code file}, sampling the execution every {@code samplePeriod} and the allocations at
+     * most at {@code allocThrottle} ({@code 100/s}, {@code off}; {@code null}: the profiler's default); {@code null} if
+     * the profiler cannot start (the line is measured without it).
      */
-    static JfrCapture start(Path file, Duration samplePeriod) {
+    static JfrCapture start(Path file, Duration samplePeriod, String allocThrottle) {
         Recording recording = null;
         try {
             recording = new Recording();
@@ -73,7 +74,10 @@ final class JfrCapture {
             recording.setDestination(file);
             recording.enable("jdk.ExecutionSample").withPeriod(samplePeriod).withStackTrace();
             recording.enable("jdk.GarbageCollection");
-            recording.enable("jdk.ObjectAllocationSample");
+            var allocations = recording.enable("jdk.ObjectAllocationSample");
+            if (allocThrottle != null) {
+                allocations.with("throttle", allocThrottle);
+            }
             recording.start();
             return new JfrCapture(recording, file);
         } catch (IOException | RuntimeException | LinkageError e) {

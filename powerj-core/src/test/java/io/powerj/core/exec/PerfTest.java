@@ -513,4 +513,66 @@ class PerfTest {
         run("numbers 2 | work -c 100 | count");
         assertThat(errors).isEmpty();
     }
+
+    // --- allocation limit: POWERJ_PERF_JFR_ALLOCTHROTTLE ---
+
+    private long allocationEvents() throws Exception {
+        long count = 0;
+        try (var events = new jdk.jfr.consumer.RecordingFile(last().recording())) {
+            while (events.hasMoreEvents()) {
+                if (events.readEvent().getEventType().getName().equals("jdk.ObjectAllocationSample")) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    @Test
+    void theAllocationLimitIsReadFromTheSessionEnvironment() throws Exception {
+        session.environment().put("POWERJ_PERF_JFR_ALLOCTHROTTLE", "1/s");
+        run("numbers 2 | work -a 60000 | count");
+        long limited = allocationEvents();
+        session.environment().put("POWERJ_PERF_JFR_ALLOCTHROTTLE", "off");
+        run("numbers 2 | work -a 60000 | count");
+        long unlimited = allocationEvents();
+        assertThat(limited).isLessThan(10);
+        assertThat(unlimited).isGreaterThan(5 * Math.max(1, limited));
+        assertThat(errors).isEmpty();
+    }
+
+    @Test
+    void ratesAreCheckedAndWrittenTheWayTheProfilerReadsThem() {
+        assertThat(PerfJfr.parseAllocThrottle("100/s")).isEqualTo("100/s");
+        assertThat(PerfJfr.parseAllocThrottle(" 5 / MS ")).isEqualTo("5/ms");
+        assertThat(PerfJfr.parseAllocThrottle("600/m")).isEqualTo("600/m");
+        assertThat(PerfJfr.parseAllocThrottle("36000/h")).isEqualTo("36000/h");
+        assertThat(PerfJfr.parseAllocThrottle("007/s")).isEqualTo("7/s");
+        assertThat(PerfJfr.parseAllocThrottle("OFF")).isEqualTo("off");
+        // the profiler reads these as "no limit" and warns on the console: refused here
+        for (String bad : List.of("", "abc", "100", "/s", "0/s", "-1/s", "10/min", "1.5/s", "5/", "99999999999/s",
+                "100/s/s", "unlimited")) {
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> PerfJfr.parseAllocThrottle(bad))
+                    .as(bad).isInstanceOf(IllegalArgumentException.class);
+        }
+    }
+
+    @Test
+    void anInvalidAllocationLimitIsReportedOnceAndTheDefaultIsUsed() throws Exception {
+        session.environment().put("POWERJ_PERF_JFR_ALLOCTHROTTLE", "lots");
+        run("numbers 2 | work -a 1000 | count");
+        assertThat(errors).hasSize(1);
+        assertThat(errors.getFirst()).contains("POWERJ_PERF_JFR_ALLOCTHROTTLE=lots").contains("100/s");
+        assertThat(last().recording()).isNotNull();
+        run("numbers 2 | count");
+        assertThat(errors).isEmpty();
+    }
+
+    @Test
+    void thePeriodAndTheAllocationLimitAreIndependent() throws Exception {
+        session.environment().put("POWERJ_PERF_JFR_SAMPLEPERIOD", "bad");
+        session.environment().put("POWERJ_PERF_JFR_ALLOCTHROTTLE", "50/s");
+        run("numbers 2 | count");
+        assertThat(errors).hasSize(1).first().asString().contains("POWERJ_PERF_JFR_SAMPLEPERIOD");
+    }
 }
