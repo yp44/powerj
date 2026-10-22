@@ -1,6 +1,7 @@
 package io.powerj.core.exec;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -39,6 +40,10 @@ final class StageProbe {
     private Pipe output;
     private volatile long startNanos;
     private volatile long endNanos;
+    /** When the stage ran, to find the profiler's samples of the calling thread (which also runs the shell). */
+    private volatile Instant startTime = Instant.EPOCH;
+    private volatile Instant endTime = Instant.EPOCH;
+    private volatile boolean onCallingThread;
     private volatile long sunk;
     private volatile long displayNanos;
     private final Map<String, BlockCalls> blocks = new LinkedHashMap<>();
@@ -54,6 +59,24 @@ final class StageProbe {
         return index;
     }
 
+    /** Name of the thread of a stage that runs apart from the calling thread; the profiler attributes samples by it. */
+    static String threadName(int index) {
+        return "powerj-etape-" + index;
+    }
+
+    /** The last stage of a pipeline runs in the thread that runs the shell, the others in their own thread. */
+    boolean onCallingThread() {
+        return onCallingThread;
+    }
+
+    Instant startTime() {
+        return startTime;
+    }
+
+    Instant endTime() {
+        return endTime;
+    }
+
     void input(Pipe pipe) {
         this.input = pipe;
     }
@@ -64,11 +87,14 @@ final class StageProbe {
 
     /** Runs the stage with this probe bound to the thread, so that the blocks it evaluates are attributed to it. */
     boolean run(Body body) throws InterruptedException {
+        onCallingThread = !Thread.currentThread().isVirtual();
+        startTime = Instant.now();
         startNanos = System.nanoTime();
         try {
             return java.lang.ScopedValue.where(PerfRecorder.STAGE, this).call(body::run);
         } finally {
             endNanos = System.nanoTime();
+            endTime = Instant.now();
         }
     }
 

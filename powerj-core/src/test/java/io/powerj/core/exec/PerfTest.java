@@ -58,6 +58,47 @@ class PerfTest {
         }
     }
 
+    /** Works for each object: burns the CPU for {@code -c} ms, allocates {@code -a} arrays of 10 KB, collects with {@code -g}. */
+    @CmdletInfo(name = "work", category = "Test", summary = "Works", examples = "numbers 2 | work -c 100", passThrough = true)
+    static final class Work implements Cmdlet<Work.Params, Object, Object> {
+
+        record Params(@Option(shortName = 'c') Integer cpu, @Option(shortName = 'a') Integer alloc,
+                      @Option(shortName = 'g') boolean gc) { }
+
+        static volatile Object kept;
+
+        static long spin(long millis) {
+            long end = System.nanoTime() + millis * 1_000_000;
+            long x = 0;
+            while (System.nanoTime() < end) {
+                for (int i = 0; i < 100_000; i++) {
+                    x += i ^ (x >>> 3);
+                }
+            }
+            return x;
+        }
+
+        @Override
+        public void process(Params params, Object input, CmdletContext<Object> context) {
+            if (params.cpu() != null) {
+                kept = spin(params.cpu());
+            }
+            if (params.alloc() != null) {
+                for (int i = 0; i < params.alloc(); i++) {
+                    kept = new byte[10_000];
+                }
+            }
+            context.emit(input);
+        }
+
+        @Override
+        public void end(Params params, CmdletContext<Object> context) {
+            if (params.gc()) {
+                System.gc();
+            }
+        }
+    }
+
     @TempDir
     Path tmp;
 
@@ -72,6 +113,7 @@ class PerfTest {
         List<Cmdlet<?, ?, ?>> cmdlets = new ArrayList<>(FakeCmdlets.all());
         cmdlets.add(new Numbers());
         cmdlets.add(new Slow());
+        cmdlets.add(new Work());
         interpreter = new Interpreter(session, new ShellIo(new PrintWriter(out, true), errors::add, false), Map.of(),
                 CmdletRegistry.of(cmdlets));
         interpreter.perfMode(true);
@@ -306,5 +348,302 @@ class PerfTest {
         assertThat(Values.text(Duration.ofNanos(412))).isEqualTo("412 ns");
         assertThat(Values.text(Duration.ofNanos(1_400))).isEqualTo("1.4 µs");
         assertThat(Values.text(Duration.ofMillis(12))).isEqualTo("0.012 s");
+    }
+
+    // --- the profiler (part B) ---
+
+    @Test
+    void aBusyStageIsFoundHotInItsOwnThread() throws Exception {
+        run("numbers 2 | work -c 150 | count");
+        PerfReport report = last();
+        var hot = report.hot().stream().filter(h -> h.stage() == 2).toList();
+        assertThat(hot).isNotEmpty();
+        assertThat(hot.getFirst().method()).endsWith("Work.spin");
+        assertThat(hot.getFirst().percent()).isGreaterThan(50.0);
+        assertThat(hot.getFirst().samples()).isGreaterThan(5);
+        // count does next to nothing: a stray sample (the display of its result) must not matter
+        long idle = report.hot().stream().filter(h -> h.stage() == 3).mapToLong(h -> h.samples()).sum();
+        long busy = hot.stream().mapToLong(h -> h.samples()).sum();
+        assertThat(idle).isLessThan(busy / 5);
+    }
+
+    @Test
+    void theLastStageRunsInTheCallingThreadAndIsFoundByTime() throws Exception {
+        run("numbers 2 | work -c 150");
+        var hot = last().hot().stream().filter(h -> h.stage() == 2).toList();
+        assertThat(hot).isNotEmpty();
+        assertThat(hot.getFirst().method()).endsWith("Work.spin");
+    }
+
+    @Test
+    void theFooterNamesTheHotMethodsOfTheBottleneck() throws Exception {
+        String text = run("numbers 2 | work -c 150 | count");
+        assertThat(text).contains("hot (work -c 150):").contains("Work.spin");
+    }
+
+    @Test
+    void allocationsAreCountedPerStageAndType() throws Exception {
+        run("numbers 3 | work -a 20000 | count");
+        var alloc = last().alloc().stream().filter(a -> a.stage() == 2).toList();
+        assertThat(alloc).isNotEmpty();
+        assertThat(alloc.getFirst().type()).isEqualTo("byte[]");
+        assertThat(alloc.getFirst().bytes()).isPositive();
+    }
+
+    @Test
+    void garbageCollectionsAreListed() throws Exception {
+        run("numbers 1 | work -g | count");
+        assertThat(last().gc()).isNotEmpty();
+        assertThat(last().gc().getFirst().cause()).contains("System.gc()");
+        assertThat(last().gc().getFirst().pause()).isPositive();
+    }
+
+    @Test
+    void theRecordingOfTheLineIsKeptAsAFlightRecorderFile() throws Exception {
+        run("numbers 2 | count");
+        Path file = last().recording();
+        assertThat(file).isNotNull().isRegularFile();
+        try (var events = new jdk.jfr.consumer.RecordingFile(file)) {
+            assertThat(events.hasMoreEvents() || java.nio.file.Files.size(file) > 0).isTrue();
+        }
+    }
+
+    @Test
+    void profilingDoesNotCountInTheLine() throws Exception {
+        run("numbers 2 | count");
+        // starting and reading the recording takes longer than this tiny line
+        assertThat(last().total()).isLessThan(Duration.ofMillis(100));
+        assertThat(last().stages()).hasSize(2);
+    }
+
+    @Test
+    void withoutTheProfilerTheLineIsMeasuredWithTheCountersOnly() throws Exception {
+        interpreter.perfProfiler(false);
+        String text = run("numbers 2 | work -c 100 | count");
+        assertThat(last().recording()).isNull();
+        assertThat(last().hot()).isEmpty();
+        assertThat(last().gc()).isEmpty();
+        assertThat(last().alloc()).isEmpty();
+        assertThat(text).doesNotContain("hot (");
+        assertThat(last().stages()).hasSize(3);
+    }
+
+    @Test
+    void theProfilerIsThereInThisRuntime() {
+        assertThat(PerfJfr.available()).isTrue();
+    }
+
+    @Test
+    void arrayTypesAreReadable() {
+        assertThat(JfrCapture.typeName("[B")).isEqualTo("byte[]");
+        assertThat(JfrCapture.typeName("[[I")).isEqualTo("int[][]");
+        assertThat(JfrCapture.typeName("[Ljava.lang.Object;")).isEqualTo("java.lang.Object[]");
+        assertThat(JfrCapture.typeName("java.lang.String")).isEqualTo("java.lang.String");
+        assertThat(PerfFooter.shortMethod("java.util.ArrayList.add")).isEqualTo("ArrayList.add");
+        assertThat(PerfFooter.shortMethod("Main.run")).isEqualTo("Main.run");
+    }
+
+    @Test
+    void aRecordingIsDeletedWhenItsReportIsNoLongerKept() throws Exception {
+        var first = java.nio.file.Files.createTempFile(tmp, "line-", ".jfr");
+        var jvm = new io.powerj.api.JvmStat(1, 0, Duration.ZERO, 0, 0, Duration.ZERO);
+        for (int i = 1; i <= Session.MAX_PERF_REPORTS + 1; i++) {
+            session.addPerfReport(new PerfReport(i, "l", Duration.ZERO, false, List.of(), List.of(), List.of(), List.of(),
+                    jvm, List.of(), List.of(), List.of(), i == 1 ? first : null));
+        }
+        assertThat(first).doesNotExist();
+        assertThat(session.perfReports()).hasSize(Session.MAX_PERF_REPORTS);
+    }
+
+    // --- sampling period: POWERJ_PERF_JFR_SAMPLEPERIOD ---
+
+    private long hotSamples() {
+        return last().hot().stream().filter(h -> h.stage() == 2).mapToLong(h -> h.samples()).sum();
+    }
+
+    @Test
+    void theSamplingPeriodIsReadFromTheSessionEnvironment() throws Exception {
+        run("numbers 2 | work -c 300 | count");
+        long coarse = hotSamples();
+        session.environment().put("POWERJ_PERF_JFR_SAMPLEPERIOD", "1ms"); // as `env --set` in profile.pj does
+        run("numbers 2 | work -c 300 | count");
+        long fine = hotSamples();
+        assertThat(coarse).isBetween(10L, 80L); // about 60 ms of work every 10 ms
+        assertThat(fine).isGreaterThan(2 * coarse);
+        assertThat(errors).isEmpty();
+    }
+
+    @Test
+    void periodsAreReadWithAnOptionalUnit() {
+        assertThat(PerfJfr.parseSamplePeriod("2ms")).isEqualTo(Duration.ofMillis(2));
+        assertThat(PerfJfr.parseSamplePeriod("5")).isEqualTo(Duration.ofMillis(5));
+        assertThat(PerfJfr.parseSamplePeriod(" 3 ms ")).isEqualTo(Duration.ofMillis(3));
+        assertThat(PerfJfr.parseSamplePeriod("500us")).isEqualTo(Duration.ofNanos(500_000));
+        assertThat(PerfJfr.parseSamplePeriod("0.5s")).isEqualTo(Duration.ofMillis(500));
+        assertThat(PerfJfr.parseSamplePeriod("1.5MS")).isEqualTo(Duration.ofNanos(1_500_000));
+        for (String bad : List.of("", "abc", "ms", "0", "0ms", "-1ms", "1.5.2ms", "2 minutes")) {
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> PerfJfr.parseSamplePeriod(bad))
+                    .as(bad).isInstanceOf(IllegalArgumentException.class);
+        }
+    }
+
+    @Test
+    void anInvalidPeriodIsReportedOnceAndTheDefaultIsUsed() throws Exception {
+        session.environment().put("POWERJ_PERF_JFR_SAMPLEPERIOD", "often");
+        run("numbers 2 | work -c 150 | count");
+        assertThat(errors).hasSize(1);
+        assertThat(errors.getFirst()).contains("POWERJ_PERF_JFR_SAMPLEPERIOD=often").contains("10 ms");
+        assertThat(hotSamples()).isPositive(); // the profiler ran, with the default period
+        run("numbers 2 | count");
+        assertThat(errors).isEmpty(); // not repeated for the same value
+        session.environment().put("POWERJ_PERF_JFR_SAMPLEPERIOD", "sometimes");
+        run("numbers 2 | count");
+        assertThat(errors).hasSize(1); // another value: reported again
+    }
+
+    @Test
+    void aPeriodUnderTheProfilersMinimumBecomesOneMillisecond() throws Exception {
+        session.environment().put("POWERJ_PERF_JFR_SAMPLEPERIOD", "100us");
+        run("numbers 2 | work -c 150 | count");
+        assertThat(errors).hasSize(1);
+        assertThat(errors.getFirst()).contains("POWERJ_PERF_JFR_SAMPLEPERIOD=100us").contains("1 ms");
+        assertThat(hotSamples()).isGreaterThan(40);
+    }
+
+    @Test
+    void anEmptyPeriodMeansTheDefault() throws Exception {
+        session.environment().put("POWERJ_PERF_JFR_SAMPLEPERIOD", "  ");
+        run("numbers 2 | work -c 100 | count");
+        assertThat(errors).isEmpty();
+    }
+
+    // --- allocation limit: POWERJ_PERF_JFR_ALLOCTHROTTLE ---
+
+    private long allocationEvents() throws Exception {
+        long count = 0;
+        try (var events = new jdk.jfr.consumer.RecordingFile(last().recording())) {
+            while (events.hasMoreEvents()) {
+                if (events.readEvent().getEventType().getName().equals("jdk.ObjectAllocationSample")) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    @Test
+    void theAllocationLimitIsReadFromTheSessionEnvironment() throws Exception {
+        session.environment().put("POWERJ_PERF_JFR_ALLOCTHROTTLE", "1/s");
+        run("numbers 2 | work -a 60000 | count");
+        long limited = allocationEvents();
+        session.environment().put("POWERJ_PERF_JFR_ALLOCTHROTTLE", "off");
+        run("numbers 2 | work -a 60000 | count");
+        long unlimited = allocationEvents();
+        assertThat(limited).isLessThan(10);
+        assertThat(unlimited).isGreaterThan(5 * Math.max(1, limited));
+        assertThat(errors).isEmpty();
+    }
+
+    @Test
+    void ratesAreCheckedAndWrittenTheWayTheProfilerReadsThem() {
+        assertThat(PerfJfr.parseAllocThrottle("100/s")).isEqualTo("100/s");
+        assertThat(PerfJfr.parseAllocThrottle(" 5 / MS ")).isEqualTo("5/ms");
+        assertThat(PerfJfr.parseAllocThrottle("600/m")).isEqualTo("600/m");
+        assertThat(PerfJfr.parseAllocThrottle("36000/h")).isEqualTo("36000/h");
+        assertThat(PerfJfr.parseAllocThrottle("007/s")).isEqualTo("7/s");
+        assertThat(PerfJfr.parseAllocThrottle("OFF")).isEqualTo("off");
+        // the profiler reads these as "no limit" and warns on the console: refused here
+        for (String bad : List.of("", "abc", "100", "/s", "0/s", "-1/s", "10/min", "1.5/s", "5/", "99999999999/s",
+                "100/s/s", "unlimited")) {
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> PerfJfr.parseAllocThrottle(bad))
+                    .as(bad).isInstanceOf(IllegalArgumentException.class);
+        }
+    }
+
+    @Test
+    void anInvalidAllocationLimitIsReportedOnceAndTheDefaultIsUsed() throws Exception {
+        session.environment().put("POWERJ_PERF_JFR_ALLOCTHROTTLE", "lots");
+        run("numbers 2 | work -a 1000 | count");
+        assertThat(errors).hasSize(1);
+        assertThat(errors.getFirst()).contains("POWERJ_PERF_JFR_ALLOCTHROTTLE=lots").contains("100/s");
+        assertThat(last().recording()).isNotNull();
+        run("numbers 2 | count");
+        assertThat(errors).isEmpty();
+    }
+
+    @Test
+    void thePeriodAndTheAllocationLimitAreIndependent() throws Exception {
+        session.environment().put("POWERJ_PERF_JFR_SAMPLEPERIOD", "bad");
+        session.environment().put("POWERJ_PERF_JFR_ALLOCTHROTTLE", "50/s");
+        run("numbers 2 | count");
+        assertThat(errors).hasSize(1).first().asString().contains("POWERJ_PERF_JFR_SAMPLEPERIOD");
+    }
+
+    // --- POWERJ_PERF_AUTOEXIT ---
+
+    @Test
+    void theModeEndsAfterTheNextMeasuredLineWhenAutoExitIsOne() throws Exception {
+        session.environment().put("POWERJ_PERF_AUTOEXIT", "1");
+        String text = run("items -n 2");
+        assertThat(text).contains("── perf ·"); // the summary of that line is printed
+        assertThat(interpreter.perfMode()).isFalse();
+        assertThat(session.perfReports()).hasSize(1);
+        assertThat(run("items -n 2")).doesNotContain("── perf ·");
+        assertThat(session.perfReports()).hasSize(1);
+        interpreter.perfMode(true); // Alt+P again: measures one more line
+        run("items -n 2");
+        assertThat(session.perfReports()).hasSize(2);
+        assertThat(interpreter.perfMode()).isFalse();
+    }
+
+    @Test
+    void theModeStaysOnForAnyOtherValue() throws Exception {
+        for (String value : List.of("0", "", "yes", "11", "true", "1.0")) {
+            session.environment().put("POWERJ_PERF_AUTOEXIT", value);
+            run("items -n 1");
+            assertThat(interpreter.perfMode()).as("value '%s'", value).isTrue();
+        }
+        session.environment().remove("POWERJ_PERF_AUTOEXIT");
+        run("items -n 1");
+        assertThat(interpreter.perfMode()).isTrue();
+    }
+
+    @Test
+    void spacesAroundTheOneAreIgnored() throws Exception {
+        session.environment().put("POWERJ_PERF_AUTOEXIT", " 1 ");
+        run("items -n 1");
+        assertThat(interpreter.perfMode()).isFalse();
+    }
+
+    @Test
+    void linesThatAreNotMeasuredDoNotUseUpTheMode() throws Exception {
+        session.environment().put("POWERJ_PERF_AUTOEXIT", "1");
+        run("");
+        run("perf");
+        assertThat(interpreter.perfMode()).isTrue();
+        assertThat(session.perfReports()).isEmpty();
+    }
+
+    @Test
+    void aCancelledLineAlsoEndsTheMode() throws Exception {
+        session.environment().put("POWERJ_PERF_AUTOEXIT", "1");
+        Thread runner = Thread.currentThread();
+        var timer = new java.util.Timer(true);
+        timer.schedule(new java.util.TimerTask() {
+            @Override
+            public void run() {
+                runner.interrupt();
+            }
+        }, 150);
+        try {
+            interpreter.execute("infinite | count");
+        } catch (InterruptedException | java.util.concurrent.CancellationException expected) {
+            // cancelled, as with Ctrl+C
+        } finally {
+            timer.cancel();
+            Thread.interrupted();
+        }
+        assertThat(last().cancelled()).isTrue();
+        assertThat(interpreter.perfMode()).isFalse();
     }
 }

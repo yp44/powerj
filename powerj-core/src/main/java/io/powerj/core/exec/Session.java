@@ -200,7 +200,14 @@ public final class Session {
     synchronized void addPerfReport(io.powerj.api.PerfReport report) {
         perfReports.addFirst(report);
         while (perfReports.size() > MAX_PERF_REPORTS) {
-            perfReports.removeLast();
+            var dropped = perfReports.removeLast();
+            if (dropped.recording() != null) {
+                try {
+                    Files.deleteIfExists(dropped.recording());
+                } catch (java.io.IOException _) {
+                    // a temporary file: removed at exit
+                }
+            }
         }
     }
 

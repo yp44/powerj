@@ -96,7 +96,7 @@ Out of scope for v1: control structures (`if`, `foreach`, functions — planned 
 | `mkdir`, `touch`, `cp`, `mv`, `rm` | File operations, also from the pipeline (`ls --filter *.tmp \| rm -v`); `-n` dry run, `-f` to overwrite, `-r` for folders, `-p <n>` to copy or remove a tree in virtual threads (`cp`, `rm`); `rm` and `mv` refuse the protected paths listed in `~/.powerj/protected-paths` | [fileops](docs/recettes/fileops.md) |
 | `to-json`, `from-json`, `to-csv`, `from-csv` | JSON and CSV: `ls \| select name size \| to-json > files.json`, `cat files.json \| from-json \| where { $_.size > 1kb }`, `cat data.csv \| from-csv -d ";"`; always an array, JSON Lines with `-l`, CSV values as strings, objects as `Row`s | [json-csv](docs/recettes/json-csv.md) |
 | `ps`, `kill` | Processes as objects: `ps java \| sort cpu --desc \| first 3`, `ps notepad \| kill -n`, then `ps notepad \| kill -w`; `-f` forcible stop, `-v` shows what was stopped | [ps-kill](docs/recettes/ps-kill.md) |
-| `perf` | What perf mode (Alt+P) measured, as records: `perf \| sort active -d \| first 1`, `perf --view blocks`, `perf --view lines --all`; views `stages`, `blocks`, `natives`, `phases`, `jvm`, `lines` | [perf](docs/recettes/perf.md) |
+| `perf` | What perf mode (Alt+P) measured, as records: `perf \| sort active -d \| first 1`, `perf --view blocks`, `perf --view hot`, `perf --save f.jfr`; views `stages`, `blocks`, `natives`, `phases`, `jvm`, `lines`, `hot`, `gc`, `alloc` | [perf](docs/recettes/perf.md) |
 | `collect` | Gathers a pipeline into one list: `(ls -r \| collect).size()` | [etape-8](docs/recettes/etape-8-collect.md) |
 | `env` | Reads and sets environment variables (`env --set MAVEN_OPTS=-Xmx2g`) | [etape-3](docs/recettes/etape-3.md) |
 
@@ -144,7 +144,7 @@ Parser.java       12.4 KB   2026-10-12 09:41  false
 
 ### Perf mode
 
-Press **Alt+P**: the prompt becomes `PJ%` and each line you run is measured. A gray summary follows the output: the time of every stage of the pipeline split into **active** (its own work), **starved** (waiting for the previous stage) and **blocked** (waiting for the next one), the objects in and out, the time spent displaying, and what the JVM did. The **bottleneck** is the stage with the most active time. Alt+P again leaves the mode; perf and preview modes exclude each other. Afterwards, the `perf` cmdlet gives the details as records that a pipeline can process. Details: FR-76 in the specification, checklist [perf](docs/recettes/perf.md).
+Press **Alt+P**: the prompt becomes `PJ%` and each line you run is measured. A gray summary follows the output: the time of every stage of the pipeline split into **active** (its own work), **starved** (waiting for the previous stage) and **blocked** (waiting for the next one), the objects in and out, the time spent displaying, and what the JVM did. The **bottleneck** is the stage with the most active time. Alt+P again leaves the mode; perf and preview modes exclude each other. The Java Flight Recorder profiles each measured line, so the summary also names the hottest methods of the bottleneck. Afterwards, the `perf` cmdlet gives the details as records that a pipeline can process, and `perf --save f.jfr` keeps the recording of a line for JDK Mission Control. Details: FR-76 in the specification, checklist [perf](docs/recettes/perf.md).
 
 ```text
 PJ% ~/dev> ls -r / | where { $_.size > 1mb } | sort size -d | first 5
@@ -157,6 +157,7 @@ sort size -d  1.2k   1.2k   0.010 s  2.800 s  -
 first 5       1.2k   5      0.001 s  2.800 s  -
 display                     0.020 s
 JVM: GC 3 (0.041 s) · heap peak 210.0 MB · classes +112 · JIT 0.310 s
+hot (ls -r /): Files.walkFileTree 38% · UnixFileAttributes.get 17% · String.hashCode 6%
 PJ% ~/dev> perf --view blocks | sort total -d
 ```
 
@@ -224,6 +225,9 @@ PowerJ keeps its files in `~/.powerj/` (`%USERPROFILE%\.powerj\` on Windows, or 
 |---|---|
 | `POWERJ_HOME` | Location of the configuration folder |
 | `POWERJ_LANG` | `en` or `fr` |
+| `POWERJ_PERF_AUTOEXIT` | `1`: perf mode ends by itself after the next measured line, so each Alt+P measures one line; set it in `profile.pj` with `env --set` |
+| `POWERJ_PERF_JFR_SAMPLEPERIOD` | Sampling period of the profiler in perf mode (default `10ms`; `2ms`, `500us`; minimum `1ms`); set it in `profile.pj` with `env --set` |
+| `POWERJ_PERF_JFR_ALLOCTHROTTLE` | Limit of the allocations the profiler samples in perf mode: `100/s`, `5/ms`, `600/m`, or `off`; set it in `profile.pj` with `env --set` |
 | `POWERJ_NATIVE_ENCODING`, `POWERJ_NATIVE_ENCODING_<NAME>` | Encoding of the output of native commands, globally or for one program |
 | `NO_COLOR` | Disables colors |
 

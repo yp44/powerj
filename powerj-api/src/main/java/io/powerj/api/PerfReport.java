@@ -1,5 +1,6 @@
 package io.powerj.api;
 
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
@@ -17,10 +18,16 @@ import java.util.Objects;
  * @param blocks    one measure per block evaluated
  * @param natives   one measure per native process
  * @param jvm       garbage collections, heap, classes, JIT
+ * @param hot       methods found running, per stage (profiler; empty without a recording)
+ * @param gc        garbage collections of the line (profiler)
+ * @param alloc     allocations per stage and type (profiler)
+ * @param recording Java Flight Recorder file of the line, to open in JDK Mission Control, or {@code null} when the
+ *                  runtime has no profiler; deleted when the report is no longer kept
  */
 @Display(columns = {"line", "text", "total"})
 public record PerfReport(int line, String text, Duration total, boolean cancelled, List<PhaseStat> phases,
-                         List<StageStat> stages, List<BlockStat> blocks, List<NativeStat> natives, JvmStat jvm) {
+                         List<StageStat> stages, List<BlockStat> blocks, List<NativeStat> natives, JvmStat jvm,
+                         List<HotMethod> hot, List<GcStat> gc, List<AllocStat> alloc, Path recording) {
 
     public PerfReport {
         Objects.requireNonNull(text, "text");
@@ -30,6 +37,9 @@ public record PerfReport(int line, String text, Duration total, boolean cancelle
         blocks = List.copyOf(blocks);
         natives = List.copyOf(natives);
         Objects.requireNonNull(jvm, "jvm");
+        hot = List.copyOf(hot);
+        gc = List.copyOf(gc);
+        alloc = List.copyOf(alloc);
     }
 
     /** The summary of the line. */

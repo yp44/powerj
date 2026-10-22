@@ -75,6 +75,15 @@ jobs:
           grep -q 'reference : A' out.txt
           grep -q 'collect : 1' out.txt
 
+      - name: Profileur du mode perf dans le lanceur
+        run: |
+          app=powerj-dist/target/jpackage/powerj
+          java=$(find "$app" -path '*runtime/bin/java' | head -1)
+          "$java" --list-modules | grep -q '^jdk.jfr@'
+          "$java" --list-modules | grep -q '^jdk.management@'
+          # The profiler is only resolved when asked: without this option the perf mode has no recording.
+          grep -q -- '--add-modules=jdk.jfr' "$(find "$app" -name powerj.cfg | head -1)"
+
       - name: Test de fumée du mode non interactif
         run: |
           pj=powerj-dist/target/jpackage/powerj/bin/powerj
@@ -205,6 +214,18 @@ jobs:
           }
           # The expected exit code 3 of powerj.exe must not become the step's exit code.
           exit 0
+
+      - name: Profileur du mode perf dans le lanceur
+        shell: pwsh
+        run: |
+          $app = "powerj-dist\target\jpackage\powerj"
+          $java = Get-ChildItem $app -Recurse -Filter java.exe | Where-Object { $_.FullName -like '*runtime*bin*' } | Select-Object -First 1
+          $modules = & $java.FullName --list-modules
+          if (-not ($modules -match '^jdk\.jfr@')) { throw "jdk.jfr absent de l'image" }
+          if (-not ($modules -match '^jdk\.management@')) { throw "jdk.management absent de l'image" }
+          # The profiler is only resolved when asked: without this option the perf mode has no recording.
+          $cfg = Get-ChildItem $app -Recurse -Filter powerj.cfg | Select-Object -First 1
+          if (-not (Select-String -Path $cfg.FullName -SimpleMatch '--add-modules=jdk.jfr' -Quiet)) { throw "option --add-modules=jdk.jfr absente de powerj.cfg" }
 
       - name: Test de fumée du mode non interactif
         shell: pwsh
