@@ -950,6 +950,27 @@ CA:
 - a process started for the test: `ps <nom> | kill -n` lists it and leaves it alive; `ps <nom> | kill -w -v` stops it and displays it;
 - `kill 999999`: `kill: no process 999999`; `kill (ProcessHandle.current().pid())`: `kill: cannot stop PowerJ itself (use exit)`.
 
+#### FR-76 — Perf mode and `perf`: where a pipeline spends its time
+
+**Perf mode.** **Alt+P** switches the line editor between normal and perf mode, keeping the line being typed, as Alt+V does for the preview (FR-66); the two modes are exclusive. The prompt shows it: `PJ% <directory>> `. In perf mode, each executed line is measured, and a gray footer is printed on the console after its output (never captured by a redirection or an assignment): total time, then one row per stage with `in`, `out`, `active`, `starved` and `blocked`, a `display` row, and one JVM line (garbage collections, heap peak, classes loaded, JIT time). Nothing is measured, and nothing costs anything, when the mode is off.
+
+For each stage (the stages run in parallel, so their wall times overlap):
+- `starved`: time waiting for input; `blocked`: time waiting for the next stage (backpressure); `active`: the rest of its wall time (its own work, `{ }` blocks, its own I/O);
+- the **bottleneck** is the stage with the largest `active`, marked in the footer;
+- `in` and `out`: objects received and emitted; a native stage has a wall time only.
+
+A cancelled line (Ctrl+C) prints the report of what ran, marked `cancelled`. Not measured: the preview, background commands (`&`), lines starting with `perf`, and the non-interactive modes.
+
+**`perf [<n>] [--view stages|blocks|natives|phases|jvm|lines] [-a|--all]`** emits the reports kept by the session (the last 50 measured lines) as records, to be processed in a pipeline: `perf | sort active -d | first 1`. `<n>` is the n-th measured line back (default 1); `--all` takes every kept line, each row carrying its `line` number. The views are `StageStat`, `BlockStat` (calls, total, average, maximum and first call of each `{ }` block), `NativeStat`, `PhaseStat` (`parse`, `resolve`, `execute`, `display`), `JvmStat` and `LineStat`. Durations are `Duration`s (`perf | where { $_.active > 500ms }`). `$perf` holds the last report. With no measured line, a message says to press Alt+P and run a line. `perf` has no side effect (allowed in preview mode, FR-66).
+
+Acceptance criteria (CA):
+- Alt+P changes the prompt to `PJ%` and back; Alt+V then Alt+P leaves only perf mode on.
+- After `ls -r | where { $_.size > 1mb } | first 5` the footer lists three stages; `where` has `in` greater than `out`; `first` has `out` 5.
+- With a slow consumer, the stage before it shows a large `blocked`; with a slow producer, the stage after it shows a large `starved`.
+- `ls > files.txt` in perf mode leaves `files.txt` free of the footer.
+- `perf` right after a line does not replace that line's report; `perf --view blocks` lists the block of `where` with its call count.
+- Ctrl+C on a long line prints a footer marked `cancelled`.
+
 ### 3.10 Native commands
 
 **FR-37 — Principle: streams stay streams.** A native command is **not** wrapped in an object: its standard output and its error output are handled as streams, the way a classic shell does.
@@ -1707,6 +1728,7 @@ The backlog cmdlets (§12.3) are added **one per mini-iteration**, each with a s
 | 22 | `to-json`, `from-json`, `to-csv`, `from-csv` | FR-73 | `docs/recettes/json-csv.md` |
 | 23 | `ps`, `kill` | FR-74 | `docs/recettes/ps-kill.md` |
 | 24 | Background execution `&`, `jobs` | FR-75 | `docs/recettes/background.md` |
+| 25 | Perf mode (Alt+P), `perf` | FR-76 | `docs/recettes/perf.md` |
 
 Version 2 will introduce scripting (`if`, `foreach`, functions, `.pj` files).
 
