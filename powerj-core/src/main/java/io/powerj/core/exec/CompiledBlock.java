@@ -52,12 +52,18 @@ record CompiledBlock(String source, List<String> parameters, Expression body, Ev
         if (Thread.currentThread().isInterrupted()) {
             throw new CancellationException();
         }
+        StageProbe probe = PerfRecorder.STAGE.isBound() ? PerfRecorder.STAGE.get() : null;
+        long start = probe == null ? 0 : System.nanoTime();
         try {
             return ScopedValue.where(Evaluator.CURRENT, current).where(Evaluator.LOCALS, locals)
                     .call(() -> evaluator.evaluate(body));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new CancellationException();
+        } finally {
+            if (probe != null) {
+                probe.block(source, System.nanoTime() - start); // perf mode (FR-76)
+            }
         }
     }
 

@@ -192,5 +192,10 @@ final class CmdletRunner {
         public Optional<Path> configDirectory() {
             return session.configDirectory();
         }
+
+        @Override
+        public List<io.powerj.api.PerfReport> perfReports() {
+            return session.perfReports();
+        }
     }
 }

@@ -96,6 +96,7 @@ Out of scope for v1: control structures (`if`, `foreach`, functions — planned 
 | `mkdir`, `touch`, `cp`, `mv`, `rm` | File operations, also from the pipeline (`ls --filter *.tmp \| rm -v`); `-n` dry run, `-f` to overwrite, `-r` for folders, `-p <n>` to copy or remove a tree in virtual threads (`cp`, `rm`); `rm` and `mv` refuse the protected paths listed in `~/.powerj/protected-paths` | [fileops](docs/recettes/fileops.md) |
 | `to-json`, `from-json`, `to-csv`, `from-csv` | JSON and CSV: `ls \| select name size \| to-json > files.json`, `cat files.json \| from-json \| where { $_.size > 1kb }`, `cat data.csv \| from-csv -d ";"`; always an array, JSON Lines with `-l`, CSV values as strings, objects as `Row`s | [json-csv](docs/recettes/json-csv.md) |
 | `ps`, `kill` | Processes as objects: `ps java \| sort cpu --desc \| first 3`, `ps notepad \| kill -n`, then `ps notepad \| kill -w`; `-f` forcible stop, `-v` shows what was stopped | [ps-kill](docs/recettes/ps-kill.md) |
+| `perf` | What perf mode (Alt+P) measured, as records: `perf \| sort active -d \| first 1`, `perf --view blocks`, `perf --view lines --all`; views `stages`, `blocks`, `natives`, `phases`, `jvm`, `lines` | [perf](docs/recettes/perf.md) |
 | `collect` | Gathers a pipeline into one list: `(ls -r \| collect).size()` | [etape-8](docs/recettes/etape-8-collect.md) |
 | `env` | Reads and sets environment variables (`env --set MAVEN_OPTS=-Xmx2g`) | [etape-3](docs/recettes/etape-3.md) |
 
@@ -139,6 +140,24 @@ PJ? C:\dev> ls -r --filter *.java | where { f -> f.size > 10kb }█
 name              size      modified          dir
 Parser.java       12.4 KB   2026-10-12 09:41  false
 …
+```
+
+### Perf mode
+
+Press **Alt+P**: the prompt becomes `PJ%` and each line you run is measured. A gray summary follows the output: the time of every stage of the pipeline split into **active** (its own work), **starved** (waiting for the previous stage) and **blocked** (waiting for the next one), the objects in and out, the time spent displaying, and what the JVM did. The **bottleneck** is the stage with the most active time. Alt+P again leaves the mode; perf and preview modes exclude each other. Afterwards, the `perf` cmdlet gives the details as records that a pipeline can process. Details: FR-76 in the specification, checklist [perf](docs/recettes/perf.md).
+
+```text
+PJ% ~/dev> ls -r / | where { $_.size > 1mb } | sort size -d | first 5
+…the five files…
+── perf · 2.841 s ───────────────────────────────────────────
+stage         in     out    active   starved  blocked
+ls -r /       -      412k   1.912 s  -        0.801 s  ← bottleneck
+where {…}     412k   1.2k   0.601 s  1.900 s  -
+sort size -d  1.2k   1.2k   0.010 s  2.800 s  -
+first 5       1.2k   5      0.001 s  2.800 s  -
+display                     0.020 s
+JVM: GC 3 (0.041 s) · heap peak 210.0 MB · classes +112 · JIT 0.310 s
+PJ% ~/dev> perf --view blocks | sort total -d
 ```
 
 ### Languages
@@ -328,12 +347,13 @@ Unit and integration tests use JUnit 5 and AssertJ: lexer, parser, option bindin
 PowerJ is in active development (version `0.1.0-SNAPSHOT`). Implemented so far:
 
 - REPL with line editing, persistent history and Ctrl+R; native commands, `cd`, chaining, background commands (`&`, `jobs`), variables, redirections; non-interactive mode;
-- object pipeline with the `ls`, `where`, `map`, `sort`, `first`, `last`, `range`, `select`, `count`, `measure`, `group`, `mkdir`, `touch`, `cp`, `mv`, `rm`, `to-json`, `from-json`, `to-csv`, `from-csv`, `ps`, `kill`, `collect`, `env`, `grep` and `cat` cmdlets, and a parallel file walker;
+- object pipeline with the `ls`, `where`, `map`, `sort`, `first`, `last`, `range`, `select`, `count`, `measure`, `group`, `mkdir`, `touch`, `cp`, `mv`, `rm`, `to-json`, `from-json`, `to-csv`, `from-csv`, `ps`, `kill`, `collect`, `env`, `grep`, `cat` and `perf` cmdlets, and a parallel file walker;
 - direct access to the JRE's Java API, Java-style lambdas and method references;
 - Tab completion and syntax highlighting;
 - third-party modules loaded from jars;
 - English / French interface, `~` expansion, startup profile;
-- preview mode (Alt+V): results shown while typing.
+- preview mode (Alt+V): results shown while typing;
+- perf mode (Alt+P) and the `perf` cmdlet: where a pipeline spends its time.
 
 The v1 cmdlet roadmap is done ([roadmap](docs/plans/cmdlet-roadmap.md), end-to-end check in [pipeline-v1](docs/recettes/pipeline-v1.md)). Still in the backlog ([§12.3](docs/SPECIFICATION.md#123-cmdlet-backlog-outside-the-current-scope)): `uniq`, `find`, `tee`, `table`/`tree`, `http`/`ping`, `open`. Next: a scripting language with control structures in v2. The step-by-step plan is in [§11 of the specification](docs/SPECIFICATION.md#11-iterative-development-plan).
 

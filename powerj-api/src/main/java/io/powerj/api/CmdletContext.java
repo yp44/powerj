@@ -1,6 +1,7 @@
 package io.powerj.api;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -62,5 +63,12 @@ public interface CmdletContext<O> {
      */
     default Optional<Path> configDirectory() {
         return Optional.empty();
+    }
+
+    /**
+     * The lines measured in perf mode (specification FR-76), most recent first; empty when none was measured.
+     */
+    default List<PerfReport> perfReports() {
+        return List.of();
     }
 }

@@ -50,6 +50,10 @@ public final class Interpreter {
     private boolean inheritStandardInput;
     /** A blocking error occurred during the last line (non-interactive mode: the script stops). */
     private volatile boolean blockingError;
+    /** Perf mode (FR-76): each line executed is measured, and a summary is printed after it. */
+    private volatile boolean perfMode;
+    /** Measure of the line being executed, or {@code null}. */
+    private volatile PerfRecorder recorder;
 
     /**
      * @param extraBuiltins built-in commands provided by the shell (e.g. {@code history})
@@ -171,20 +175,77 @@ public final class Interpreter {
      */
     public void execute(String line) throws InterruptedException {
         blockingError = false;
+        long begin = System.nanoTime();
         Ast.Script script = Parser.parse(line, syntax());
-        boolean succeeded = true;
-        for (Ast.Step step : script.steps()) {
-            if (session.exitRequest().isPresent()) {
-                return;
+        PerfRecorder perf = perfMode && measurable(script) ? new PerfRecorder(line, begin, System.nanoTime() - begin)
+                : null;
+        recorder = perf;
+        boolean cancelled = false;
+        try {
+            boolean succeeded = true;
+            for (Ast.Step step : script.steps()) {
+                if (session.exitRequest().isPresent()) {
+                    return;
+                }
+                boolean run = switch (step.connector()) {
+                    case ALWAYS -> true;
+                    case IF_SUCCESS -> succeeded;
+                    case IF_FAILURE -> !succeeded;
+                };
+                if (run) {
+                    succeeded = statement(step.statement());
+                    session.recordSuccess(succeeded);
+                }
             }
-            boolean run = switch (step.connector()) {
-                case ALWAYS -> true;
-                case IF_SUCCESS -> succeeded;
-                case IF_FAILURE -> !succeeded;
-            };
-            if (run) {
-                succeeded = statement(step.statement());
-                session.recordSuccess(succeeded);
+        } catch (InterruptedException | java.util.concurrent.CancellationException e) {
+            cancelled = true;
+            throw e;
+        } finally {
+            recorder = null;
+            if (perf != null) {
+                printPerf(perf, cancelled);
+            }
+        }
+    }
+
+    /** Perf mode (FR-76): {@code true} while the lines executed are measured. */
+    public boolean perfMode() {
+        return perfMode;
+    }
+
+    public void perfMode(boolean on) {
+        if (on) {
+            PerfRecorder.warmUp();
+        }
+        perfMode = on;
+    }
+
+    /** A line is measured unless it is empty, runs in the background, or starts with {@code perf}. */
+    private static boolean measurable(Ast.Script script) {
+        if (script.steps().isEmpty()) {
+            return false;
+        }
+        for (Ast.Step step : script.steps()) {
+            if (step.statement().background()) {
+                return false;
+            }
+        }
+        List<Ast.Stage> first = script.steps().getFirst().statement().pipeline().stages();
+        return first.isEmpty() || !(first.getFirst().body() instanceof Ast.Command(var name, var forceNative, _)
+                && !forceNative && name.equals("perf"));
+    }
+
+    /** Keeps the report of the line and prints its summary, even for a cancelled line. */
+    private void printPerf(PerfRecorder perf, boolean cancelled) {
+        boolean interrupted = Thread.interrupted(); // a cancelled line must still print: keep the flag for later
+        try {
+            var report = perf.finish(session.nextPerfLine(), cancelled);
+            session.addPerfReport(report);
+            PerfFooter.lines(report, io.colors()).forEach(io.out()::println);
+            io.out().flush();
+        } finally {
+            if (interrupted) {
+                Thread.currentThread().interrupt();
             }
         }
     }
@@ -373,7 +434,7 @@ public final class Interpreter {
     private sealed interface Prepared { }
 
     /** Stage that produces objects (value, built-in command, cmdlet). */
-    private record ObjectStep(ObjectStage stage) implements Prepared { }
+    private record ObjectStep(ObjectStage stage, String label) implements Prepared { }
 
     /** Native stage. */
     private record NativeStep(NativeRunner.Command command) implements Prepared { }
@@ -392,7 +453,7 @@ public final class Interpreter {
     /** Sequence of stages run by the same thread: an object stage, or consecutive native ones. */
     private sealed interface Segment { }
 
-    private record ObjectSegment(ObjectStage stage) implements Segment { }
+    private record ObjectSegment(ObjectStage stage, String label) implements Segment { }
 
     private record NativeSegment(List<NativeRunner.Command> commands) implements Segment { }
 
@@ -408,25 +469,69 @@ public final class Interpreter {
     private boolean pipeline(Ast.Pipeline pipeline, Consumer<Object> sink, boolean capture,
                              Optional<NativeRunner.FileTarget> outTarget, Optional<NativeRunner.FileTarget> errTarget)
             throws InterruptedException {
-        List<Segment> segments = segments(pipeline.stages());
+        // Perf mode (FR-76): only the outermost pipeline of the line is measured; the others count as "resolve".
+        PerfRecorder current = recorder;
+        PerfRecorder perf = current != null && !PreviewGuard.active() && current.enterPipeline() ? current : null;
+        try {
+            long resolveStart = System.nanoTime();
+            List<Segment> segments = segments(pipeline.stages());
+            if (perf != null) {
+                perf.addResolve(System.nanoTime() - resolveStart);
+            }
+            return run(segments, sink, capture, outTarget, errTarget, perf);
+        } finally {
+            if (perf != null) {
+                perf.exitPipeline();
+            }
+        }
+    }
+
+    private boolean run(List<Segment> segments, Consumer<Object> sink, boolean capture,
+                        Optional<NativeRunner.FileTarget> outTarget, Optional<NativeRunner.FileTarget> errTarget,
+                        PerfRecorder perf) throws InterruptedException {
         Consumer<String> errors = synchronizedErrors(errorSink(errTarget));
-        if (segments.size() == 1 && segments.getFirst() instanceof NativeSegment(var commands) && commands.size() == 1) {
+        int n = segments.size();
+        List<StageProbe> probes = new ArrayList<>(n);
+        for (Segment segment : segments) {
+            probes.add(perf == null ? null : perf.newStage(label(segment), segment instanceof NativeSegment));
+        }
+        if (perf != null) {
+            // The last stage hands its objects to the display, or to the variable that captures them.
+            sink = probes.getLast().sink(sink, !capture);
+        }
+        if (n == 1 && segments.getFirst() instanceof NativeSegment(var commands) && commands.size() == 1) {
             NativeRunner.Command command = commands.getFirst();
-            var result = nativeRunner.run(command.executable(), command.args(), session, io, capture, outTarget,
-                    errTarget, command.errorsToOutput(), inheritsInput());
+            StageProbe probe = probes.getFirst();
+            long start = System.nanoTime();
+            NativeRunner.Result result;
+            try {
+                result = nativeRunner.run(command.executable(), command.args(), session, io, capture, outTarget,
+                        errTarget, command.errorsToOutput(), inheritsInput());
+            } finally {
+                if (probe != null) {
+                    probe.measured(System.nanoTime() - start);
+                }
+            }
+            if (probe != null) {
+                probe.natives(List.of(result.run()));
+            }
             session.recordNative(result.run());
             result.capturedLines().forEach(sink);
             return result.run().succeeded();
         }
         Optional<NativeRunner.FileTarget> sharedErrors = shared(errTarget);
-        if (segments.size() == 1) {
-            return segment(segments.getFirst(), standardInput, null, sink, capture, outTarget, sharedErrors, errors);
+        if (n == 1) {
+            return segment(segments.getFirst(), standardInput, null, sink, capture, outTarget, sharedErrors, errors,
+                    probes.getFirst());
         }
 
-        int n = segments.size();
         List<Pipe> pipes = new ArrayList<>(n - 1);
         for (int i = 0; i < n - 1; i++) {
-            pipes.add(new Pipe());
+            pipes.add(new Pipe(perf != null));
+            if (perf != null) {
+                probes.get(i).output(pipes.get(i));
+                probes.get(i + 1).input(pipes.get(i));
+            }
         }
         var blockingErrors = new java.util.concurrent.atomic.AtomicBoolean();
         List<Thread> threads = new ArrayList<>(n - 1);
@@ -434,10 +539,11 @@ public final class Interpreter {
             Segment segment = segments.get(i);
             Source input = i == 0 ? standardInput : pipes.get(i - 1);
             Pipe output = pipes.get(i);
+            StageProbe probe = probes.get(i);
             threads.add(Thread.ofVirtual().name("powerj-etape-" + (i + 1)).unstarted(PreviewGuard.propagate(() -> {
                 output.onAbort(Thread.currentThread()::interrupt);
                 try {
-                    segment(segment, input, output, null, false, Optional.empty(), sharedErrors, errors);
+                    segment(segment, input, output, null, false, Optional.empty(), sharedErrors, errors, probe);
                     output.close();
                 } catch (InterruptedException | java.util.concurrent.CancellationException e) {
                     closeQuietly(output);
@@ -462,7 +568,8 @@ public final class Interpreter {
         Pipe lastInput = pipes.getLast();
         boolean succeeded;
         try {
-            succeeded = segment(segments.getLast(), lastInput, null, sink, capture, outTarget, sharedErrors, errors);
+            succeeded = segment(segments.getLast(), lastInput, null, sink, capture, outTarget, sharedErrors, errors,
+                    probes.getLast());
         } finally {
             lastInput.abort();
             joinAll(threads);
@@ -476,9 +583,20 @@ public final class Interpreter {
     /** Runs a segment; {@code output} is the queue to the next stage, or {@code null} at the end of the pipeline. */
     private boolean segment(Segment segment, Source input, Pipe output, Consumer<Object> sink, boolean capture,
                             Optional<NativeRunner.FileTarget> outTarget, Optional<NativeRunner.FileTarget> errTarget,
-                            Consumer<String> errors) throws InterruptedException {
+                            Consumer<String> errors, StageProbe probe) throws InterruptedException {
+        if (probe != null) {
+            return probe.run(() -> runSegment(segment, input, output, sink, capture, outTarget, errTarget, errors,
+                    probe));
+        }
+        return runSegment(segment, input, output, sink, capture, outTarget, errTarget, errors, null);
+    }
+
+    /** @param measuring probe that receives the native processes of the stage, or {@code null} */
+    private boolean runSegment(Segment segment, Source input, Pipe output, Consumer<Object> sink, boolean capture,
+                               Optional<NativeRunner.FileTarget> outTarget, Optional<NativeRunner.FileTarget> errTarget,
+                               Consumer<String> errors, StageProbe measuring) throws InterruptedException {
         return switch (segment) {
-            case ObjectSegment(var stage) -> {
+            case ObjectSegment(var stage, _) -> {
                 try {
                     yield stage.run(input, output != null ? output::putUnrolled : sink, errors);
                 } catch (InterruptedException | RuntimeException e) {
@@ -490,6 +608,9 @@ public final class Interpreter {
             case NativeSegment(var commands) -> {
                 List<NativeRun> runs = nativeRunner.runGroup(commands, session, io, input, inheritsInput(), output,
                         sink, capture, outTarget, errTarget, errors);
+                if (measuring != null) {
+                    measuring.natives(runs);
+                }
                 if (output != null && output.aborted()) {
                     // FR-68b: stopped by the next stage (first, range…): not a failure, $exit is left as it is.
                     yield true;
@@ -500,6 +621,28 @@ public final class Interpreter {
                 yield runs.getLast().succeeded();
             }
         };
+    }
+
+    /** Name of a stage in the perf summary: the command and its arguments, shortened. */
+    private static String label(Segment segment) {
+        return switch (segment) {
+            case ObjectSegment(_, var label) -> label;
+            case NativeSegment(var commands) -> shorten(String.join(" | ", commands.stream()
+                    .map(Interpreter::commandText).toList()));
+        };
+    }
+
+    private static String label(String name, List<Object> args) {
+        var text = new StringBuilder(name);
+        for (Object arg : args) {
+            text.append(' ').append(arg instanceof io.powerj.api.ScriptBlock ? "{…}" : Values.text(arg));
+        }
+        return shorten(text.toString());
+    }
+
+    private static String shorten(String text) {
+        String line = text.replaceAll("\\s+", " ").strip();
+        return line.length() > 30 ? line.substring(0, 29) + "…" : line;
     }
 
     /** Resolves the stages and groups consecutive native commands. */
@@ -516,7 +659,8 @@ public final class Interpreter {
                 segments.add(new NativeSegment(List.copyOf(natives)));
                 natives.clear();
             }
-            segments.add(new ObjectSegment(((ObjectStep) prepared).stage()));
+            var step = (ObjectStep) prepared;
+            segments.add(new ObjectSegment(step.stage(), step.label()));
         }
         if (!natives.isEmpty()) {
             segments.add(new NativeSegment(List.copyOf(natives)));
@@ -543,7 +687,7 @@ public final class Interpreter {
                     output.accept(value);
                 }
                 return !(value instanceof Boolean b) || b;
-            });
+            }, "expression");
         }
         var command = (Ast.Command) stage.body();
         List<Object> args = arguments(command.arguments());
@@ -557,7 +701,7 @@ public final class Interpreter {
                 return new ObjectStep((_, output, _) -> {
                     invokeBuiltin(command.name(), builtin, args).forEach(output);
                     return true;
-                });
+                }, label(command.name(), args));
             }
             var found = registry.find(command.name());
             if (found.isPresent()) {
@@ -566,7 +710,7 @@ public final class Interpreter {
                     return new ObjectStep((_, output, _) -> {
                         Help.cmdlet(cmdlet).forEach(output);
                         return true;
-                    });
+                    }, label(command.name(), args));
                 }
                 if (index > 0 && !cmdlet.readsInput()) {
                     throw new PjException(Messages.get("pipeline.noInput", command.name()));
@@ -576,7 +720,8 @@ public final class Interpreter {
                 }
                 return new ObjectStep((input, output, errors) -> runCmdlet(cmdlet, args,
                         cmdlet.readsInput() ? input : null, output,
-                        stage.errorsToOutput() ? message -> output.accept(message) : errors));
+                        stage.errorsToOutput() ? message -> output.accept(message) : errors),
+                        label(command.name(), args));
             }
         }
         Path executable = resolver.resolve(command.name(), session).orElseThrow(() -> unknownCommand(command));
@@ -868,13 +1013,21 @@ public final class Interpreter {
 
         @Override
         public void close() {
-            if (formatter != null) {
-                formatter.close();
-            }
-            if (file != null) {
-                file.close();
-                if (file.checkError()) {
-                    throw new PjException(Messages.get("file.writeFailed.noReason", target.orElseThrow().file()));
+            PerfRecorder perf = recorder;
+            long start = perf == null ? 0 : System.nanoTime();
+            try {
+                if (formatter != null) {
+                    formatter.close();
+                }
+                if (file != null) {
+                    file.close();
+                    if (file.checkError()) {
+                        throw new PjException(Messages.get("file.writeFailed.noReason", target.orElseThrow().file()));
+                    }
+                }
+            } finally {
+                if (perf != null) {
+                    perf.addDisplay(System.nanoTime() - start);
                 }
             }
         }

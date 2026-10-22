@@ -21,6 +21,11 @@ public final class Values {
         if (d.toMinutes() > 0) {
             return Messages.get("duration.minutes", d.toMinutes(), "%02d".formatted(d.toSecondsPart()));
         }
+        if (d.compareTo(Duration.ofMillis(1)) < 0) { // perf (FR-76): a block lasts a few microseconds
+            long nanos = d.toNanos();
+            return nanos < 1000 ? Messages.get("duration.nanos", nanos)
+                    : Messages.get("duration.micros", String.format(Locale.ROOT, "%.1f", nanos / 1e3));
+        }
         return Messages.get("duration.seconds", String.format(Locale.ROOT, "%.3f", d.toNanos() / 1e9));
     }
 }

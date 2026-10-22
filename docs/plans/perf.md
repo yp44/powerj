@@ -72,7 +72,8 @@ perf [<n>] [--view stages|blocks|natives|phases|jvm|lines] [-a|--all]
   - The six records above and `PerfReport(line, text, total, cancelled, phases, stages, blocks, natives, jvm)`, with `Objects.requireNonNull` in compact constructors.
   - `CmdletContext.perfReports()`: `default List<PerfReport>`, empty. Compatible with third-party cmdlets.
 - **`powerj-core`**
-  - `PerfRecorder`: one per measured line; owns the stage probes and the phase timers, and builds the `PerfReport`. `Session` keeps a ring of the last 50 reports and exposes them (`perfReports()`).
+  - `PerfRecorder`: one per measured line; owns the stage probes and the phase timers, and builds the `PerfReport`. `StageProbe` measures one stage. `Session` keeps a ring of the last 50 reports and exposes them (`perfReports()`).
+  - `PerfFooter`: renders the summary as plain aligned text (gray with ANSI when the terminal has colors). It lives in the core, so the mode is testable without a terminal: `Interpreter.perfMode(boolean)` switches it, and the summary is printed on `ShellIo.out()` after the line.
   - `Pipe`: when a probe is attached, `put` and `next` try `offer`/`poll` first and time only the call that has to block; they also count objects. Without a probe the code is unchanged.
   - `Interpreter`: times `parse`, `resolve` (`segments()`, arguments and subexpressions included), `execute`; wraps the sink of the last stage to time the `display`; creates one probe per segment and takes the wall time of each (`segment()`); covers the single-stage fast path (no pipes: wall time, objects out through the sink). Native groups: one `NativeStat` per process from `NativeRun`.
   - Blocks: `CompiledBlock` counts calls and times them when a probe is bound. The probe of the current stage is carried by a `ScopedValue` propagated to the stage threads, like `PreviewGuard.propagate`.
@@ -81,12 +82,13 @@ perf [<n>] [--view stages|blocks|natives|phases|jvm|lines] [-a|--all]
   - `Supervisor`/`Outcome`: unchanged. `Cancelled` still returns the report built so far.
 - **`powerj-cmdlets`**: `Perf.java` (`@CmdletInfo(name = "perf", category = "System", preview = true)`), registered in `BuiltinCmdlets`; messages `perf.summary`, `perf.option.*`, `perf.none` in `messages_en`/`_fr`.
 - **`powerj-shell`**
-  - `Perfer` (like `Previewer`): Alt+P widget, state, footer rendering with `OutputFormatter` from `Row`s.
-  - `Repl.prompt()`: `PJ%` in perf mode; the footer is printed after the output, before the prompt.
+  - `Perfer` (like `Previewer`): the Alt+P widget; it switches `Interpreter.perfMode`. JLine reads `%` as a pattern in `setPrompt`, so the widget escapes it.
+  - `Repl.prompt()`: `PJ%` in perf mode.
   - Alt+P is bound by JLine's emacs keymap to `history-search-backward` (to check): it is rebound, as ↑/↓ already are in `ShellReader`. A test pins the binding.
   - Alt+V and Alt+P switch each other off.
-- **Completion**: `--view` values, and `perf` rows' properties after the `perf` stage (the records are known types).
-- Docs and README in the implementation commits: FR-76 (this commit), `docs/recettes/perf.md`, §11 row 25, scope sentence (~l.408), README (feature section after Preview mode, cmdlets table).
+- **Completion**: `--view` values come from the enum option. The properties of the rows after a `perf` stage are not proposed (the cmdlet emits several record types).
+- **`Values.duration`**: durations under a millisecond are shown in microseconds or nanoseconds (`1.4 µs`), so the blocks are readable; the other durations are unchanged.
+- Docs and README in the implementation commits: FR-76 (the first commit), `docs/recettes/perf.md`, §11 row 25, scope sentence (~l.408), README (feature section after Preview mode, cmdlets table).
 
 ## Part B — JFR
 Counters say *which* stage is slow; Java Flight Recorder says *why* (hot methods, allocations, GC pauses), for about 1–2% overhead.
