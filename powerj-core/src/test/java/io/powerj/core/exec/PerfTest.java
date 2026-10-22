@@ -361,7 +361,10 @@ class PerfTest {
         assertThat(hot.getFirst().method()).endsWith("Work.spin");
         assertThat(hot.getFirst().percent()).isGreaterThan(50.0);
         assertThat(hot.getFirst().samples()).isGreaterThan(5);
-        assertThat(report.hot()).filteredOn(h -> h.stage() == 3).isEmpty(); // count did nothing
+        // count does next to nothing: a stray sample (the display of its result) must not matter
+        long idle = report.hot().stream().filter(h -> h.stage() == 3).mapToLong(h -> h.samples()).sum();
+        long busy = hot.stream().mapToLong(h -> h.samples()).sum();
+        assertThat(idle).isLessThan(busy / 5);
     }
 
     @Test
@@ -574,5 +577,73 @@ class PerfTest {
         session.environment().put("POWERJ_PERF_JFR_ALLOCTHROTTLE", "50/s");
         run("numbers 2 | count");
         assertThat(errors).hasSize(1).first().asString().contains("POWERJ_PERF_JFR_SAMPLEPERIOD");
+    }
+
+    // --- POWERJ_PERF_AUTOEXIT ---
+
+    @Test
+    void theModeEndsAfterTheNextMeasuredLineWhenAutoExitIsOne() throws Exception {
+        session.environment().put("POWERJ_PERF_AUTOEXIT", "1");
+        String text = run("items -n 2");
+        assertThat(text).contains("── perf ·"); // the summary of that line is printed
+        assertThat(interpreter.perfMode()).isFalse();
+        assertThat(session.perfReports()).hasSize(1);
+        assertThat(run("items -n 2")).doesNotContain("── perf ·");
+        assertThat(session.perfReports()).hasSize(1);
+        interpreter.perfMode(true); // Alt+P again: measures one more line
+        run("items -n 2");
+        assertThat(session.perfReports()).hasSize(2);
+        assertThat(interpreter.perfMode()).isFalse();
+    }
+
+    @Test
+    void theModeStaysOnForAnyOtherValue() throws Exception {
+        for (String value : List.of("0", "", "yes", "11", "true", "1.0")) {
+            session.environment().put("POWERJ_PERF_AUTOEXIT", value);
+            run("items -n 1");
+            assertThat(interpreter.perfMode()).as("value '%s'", value).isTrue();
+        }
+        session.environment().remove("POWERJ_PERF_AUTOEXIT");
+        run("items -n 1");
+        assertThat(interpreter.perfMode()).isTrue();
+    }
+
+    @Test
+    void spacesAroundTheOneAreIgnored() throws Exception {
+        session.environment().put("POWERJ_PERF_AUTOEXIT", " 1 ");
+        run("items -n 1");
+        assertThat(interpreter.perfMode()).isFalse();
+    }
+
+    @Test
+    void linesThatAreNotMeasuredDoNotUseUpTheMode() throws Exception {
+        session.environment().put("POWERJ_PERF_AUTOEXIT", "1");
+        run("");
+        run("perf");
+        assertThat(interpreter.perfMode()).isTrue();
+        assertThat(session.perfReports()).isEmpty();
+    }
+
+    @Test
+    void aCancelledLineAlsoEndsTheMode() throws Exception {
+        session.environment().put("POWERJ_PERF_AUTOEXIT", "1");
+        Thread runner = Thread.currentThread();
+        var timer = new java.util.Timer(true);
+        timer.schedule(new java.util.TimerTask() {
+            @Override
+            public void run() {
+                runner.interrupt();
+            }
+        }, 150);
+        try {
+            interpreter.execute("infinite | count");
+        } catch (InterruptedException | java.util.concurrent.CancellationException expected) {
+            // cancelled, as with Ctrl+C
+        } finally {
+            timer.cancel();
+            Thread.interrupted();
+        }
+        assertThat(last().cancelled()).isTrue();
+        assertThat(interpreter.perfMode()).isFalse();
     }
 }

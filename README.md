@@ -225,6 +225,7 @@ PowerJ keeps its files in `~/.powerj/` (`%USERPROFILE%\.powerj\` on Windows, or 
 |---|---|
 | `POWERJ_HOME` | Location of the configuration folder |
 | `POWERJ_LANG` | `en` or `fr` |
+| `POWERJ_PERF_AUTOEXIT` | `1`: perf mode ends by itself after the next measured line, so each Alt+P measures one line; set it in `profile.pj` with `env --set` |
 | `POWERJ_PERF_JFR_SAMPLEPERIOD` | Sampling period of the profiler in perf mode (default `10ms`; `2ms`, `500us`; minimum `1ms`); set it in `profile.pj` with `env --set` |
 | `POWERJ_PERF_JFR_ALLOCTHROTTLE` | Limit of the allocations the profiler samples in perf mode: `100/s`, `5/ms`, `600/m`, or `off`; set it in `profile.pj` with `env --set` |
 | `POWERJ_NATIVE_ENCODING`, `POWERJ_NATIVE_ENCODING_<NAME>` | Encoding of the output of native commands, globally or for one program |

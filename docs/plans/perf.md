@@ -24,6 +24,7 @@ The **bottleneck** is the stage with the largest `active`: the stages before it 
 Also counted: objects **in** (taken from the pipe) and **out** (put in the next pipe, or sent to the display). `where` in 412k, out 1.2k is its selectivity.
 
 ## Behaviour of the mode
+- **Auto-exit**: the variable `POWERJ_PERF_AUTOEXIT` of the session environment, when it is `1`, ends the mode after the next measured line (`Interpreter.printPerf`, once the summary is printed; the shell prompt shows the mode at each read, so it goes back to `PJ`). Any other value leaves the mode on. Asked by the user, after proposing five names; kept `POWERJ_PERF_AUTOEXIT`. Lines that are not measured do not use it up; a cancelled line does.
 - **Alt+P** switches between normal and perf mode, keeping the line being typed (same mechanism as Alt+V, FR-66). The prompt shows it: `PJ% <dir>> `.
 - Modes are exclusive, as in vi: Alt+P in preview mode goes to perf mode, and the other way round.
 - In perf mode, each executed line is measured. After its output, a footer is printed to the console (gray, never captured by a redirection or an assignment):

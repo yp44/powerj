@@ -126,6 +126,22 @@ class PerfModeTest {
         exit();
     }
 
+    @Test
+    void autoExitEndsTheModeAfterOneLine() throws Exception {
+        line("env --set POWERJ_PERF_AUTOEXIT=1"); // in normal mode: not measured
+        awaitUntil(() -> reader.isReading() && terminal.screen().endsWith("PJ " + cwd + "> "));
+        terminal.type(ALT_P);
+        awaitUntil(() -> terminal.screen().contains("PJ%"));
+        line("ls | count");
+        awaitUntil(() -> session.perfReports().size() == 1);
+        awaitUntil(() -> terminal.screen().endsWith("PJ " + cwd + "> ")); // the prompt is the normal one again
+        line("ls | count");
+        awaitUntil(() -> terminal.screen().lastIndexOf("PJ " + cwd + "> ") > terminal.screen().indexOf("── perf ·") + 20
+                && reader.isReading());
+        assertThat(session.perfReports()).hasSize(1); // not measured: the mode had ended
+        exit();
+    }
+
     private void awaitUntil(BooleanSupplier condition) throws InterruptedException {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
         while (!condition.getAsBoolean()) {

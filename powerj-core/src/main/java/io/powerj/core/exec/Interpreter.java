@@ -51,6 +51,12 @@ public final class Interpreter {
     private boolean inheritStandardInput;
     /** A blocking error occurred during the last line (non-interactive mode: the script stops). */
     private volatile boolean blockingError;
+    /**
+     * Variable of the session environment ({@code env --set} in {@code profile.pj}): when it is {@code 1}, the perf mode
+     * ends by itself after the next measured line (FR-76).
+     */
+    static final String PERF_AUTOEXIT_VARIABLE = "POWERJ_PERF_AUTOEXIT";
+
     /** Perf mode (FR-76): each line executed is measured, and a summary is printed after it. */
     private volatile boolean perfMode;
     /** Measure of the line being executed, or {@code null}. */
@@ -350,6 +356,9 @@ public final class Interpreter {
             PerfFooter.lines(report, io.colors()).forEach(io.out()::println);
             io.out().flush();
         } finally {
+            if ("1".equals(session.environment().getOrDefault(PERF_AUTOEXIT_VARIABLE, "").strip())) {
+                perfMode = false; // the summary is printed: the mode ends, the next prompt shows it
+            }
             if (interrupted) {
                 Thread.currentThread().interrupt();
             }
