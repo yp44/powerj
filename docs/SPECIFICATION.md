@@ -963,6 +963,8 @@ A cancelled line (Ctrl+C) prints the report of what ran, marked `cancelled`. Not
 
 **`perf [<n>] [--view stages|blocks|natives|phases|jvm|lines] [-a|--all]`** emits the reports kept by the session (the last 50 measured lines) as records, to be processed in a pipeline: `perf | sort active -d | first 1`. `<n>` is the n-th measured line back (default 1); `--all` takes every kept line, each row carrying its `line` number. The views are `StageStat`, `BlockStat` (calls, total, average, maximum and first call of each `{ }` block), `NativeStat`, `PhaseStat` (`parse`, `resolve`, `execute`, `display`), `JvmStat` and `LineStat`. Durations are `Duration`s (`perf | where { $_.active > 500ms }`). `$perf` holds the last report. With no measured line, a message says to press Alt+P and run a line. `perf` has no side effect (allowed in preview mode, FR-66).
 
+**JFR (perf, part B).** While perf mode is on, a Java Flight Recorder recording runs in memory (about 1–2% overhead); it stops when the mode is left. The stage threads are named after their command, so samples are grouped per stage. `perf` gains three views, built from the events of the measured line: `hot` (`HotMethod`: sampled methods per stage, with their share), `gc` (`GcStat`: collections and pauses) and `alloc` (`AllocStat`: bytes allocated per type). `perf --save [<file>]` writes the events of the line as a `.jfr` file (default folder `~/.powerj/perf/`), to open in JDK Mission Control. The footer then adds the three hottest methods of the bottleneck stage. The application image embeds the modules `jdk.jfr` and `jdk.management`; where `jdk.jfr` is absent, the mode and the other views work, and the JFR views give a non-blocking message.
+
 Acceptance criteria (CA):
 - Alt+P changes the prompt to `PJ%` and back; Alt+V then Alt+P leaves only perf mode on.
 - After `ls -r | where { $_.size > 1mb } | first 5` the footer lists three stages; `where` has `in` greater than `out`; `first` has `out` 5.
@@ -970,6 +972,8 @@ Acceptance criteria (CA):
 - `ls > files.txt` in perf mode leaves `files.txt` free of the footer.
 - `perf` right after a line does not replace that line's report; `perf --view blocks` lists the block of `where` with its call count.
 - Ctrl+C on a long line prints a footer marked `cancelled`.
+- `perf --view hot` after a CPU-bound line lists methods with their share, grouped by stage; `perf --save` produces a file that `jfr summary` (or JDK Mission Control) opens.
+- `bin/java --list-modules` of the application image lists `jdk.jfr`.
 
 ### 3.10 Native commands
 
