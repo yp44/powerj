@@ -225,6 +225,7 @@ PowerJ keeps its files in `~/.powerj/` (`%USERPROFILE%\.powerj\` on Windows, or 
 |---|---|
 | `POWERJ_HOME` | Location of the configuration folder |
 | `POWERJ_LANG` | `en` or `fr` |
+| `POWERJ_PERF_JFR_SAMPLEPERIOD` | Sampling period of the profiler in perf mode (default `10ms`; `2ms`, `500us`; minimum `1ms`); set it in `profile.pj` with `env --set` |
 | `POWERJ_NATIVE_ENCODING`, `POWERJ_NATIVE_ENCODING_<NAME>` | Encoding of the output of native commands, globally or for one program |
 | `NO_COLOR` | Disables colors |
 

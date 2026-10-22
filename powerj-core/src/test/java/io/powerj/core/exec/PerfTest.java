@@ -451,4 +451,66 @@ class PerfTest {
         assertThat(first).doesNotExist();
         assertThat(session.perfReports()).hasSize(Session.MAX_PERF_REPORTS);
     }
+
+    // --- sampling period: POWERJ_PERF_JFR_SAMPLEPERIOD ---
+
+    private long hotSamples() {
+        return last().hot().stream().filter(h -> h.stage() == 2).mapToLong(h -> h.samples()).sum();
+    }
+
+    @Test
+    void theSamplingPeriodIsReadFromTheSessionEnvironment() throws Exception {
+        run("numbers 2 | work -c 300 | count");
+        long coarse = hotSamples();
+        session.environment().put("POWERJ_PERF_JFR_SAMPLEPERIOD", "1ms"); // as `env --set` in profile.pj does
+        run("numbers 2 | work -c 300 | count");
+        long fine = hotSamples();
+        assertThat(coarse).isBetween(10L, 80L); // about 60 ms of work every 10 ms
+        assertThat(fine).isGreaterThan(2 * coarse);
+        assertThat(errors).isEmpty();
+    }
+
+    @Test
+    void periodsAreReadWithAnOptionalUnit() {
+        assertThat(PerfJfr.parseSamplePeriod("2ms")).isEqualTo(Duration.ofMillis(2));
+        assertThat(PerfJfr.parseSamplePeriod("5")).isEqualTo(Duration.ofMillis(5));
+        assertThat(PerfJfr.parseSamplePeriod(" 3 ms ")).isEqualTo(Duration.ofMillis(3));
+        assertThat(PerfJfr.parseSamplePeriod("500us")).isEqualTo(Duration.ofNanos(500_000));
+        assertThat(PerfJfr.parseSamplePeriod("0.5s")).isEqualTo(Duration.ofMillis(500));
+        assertThat(PerfJfr.parseSamplePeriod("1.5MS")).isEqualTo(Duration.ofNanos(1_500_000));
+        for (String bad : List.of("", "abc", "ms", "0", "0ms", "-1ms", "1.5.2ms", "2 minutes")) {
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> PerfJfr.parseSamplePeriod(bad))
+                    .as(bad).isInstanceOf(IllegalArgumentException.class);
+        }
+    }
+
+    @Test
+    void anInvalidPeriodIsReportedOnceAndTheDefaultIsUsed() throws Exception {
+        session.environment().put("POWERJ_PERF_JFR_SAMPLEPERIOD", "often");
+        run("numbers 2 | work -c 150 | count");
+        assertThat(errors).hasSize(1);
+        assertThat(errors.getFirst()).contains("POWERJ_PERF_JFR_SAMPLEPERIOD=often").contains("10 ms");
+        assertThat(hotSamples()).isPositive(); // the profiler ran, with the default period
+        run("numbers 2 | count");
+        assertThat(errors).isEmpty(); // not repeated for the same value
+        session.environment().put("POWERJ_PERF_JFR_SAMPLEPERIOD", "sometimes");
+        run("numbers 2 | count");
+        assertThat(errors).hasSize(1); // another value: reported again
+    }
+
+    @Test
+    void aPeriodUnderTheProfilersMinimumBecomesOneMillisecond() throws Exception {
+        session.environment().put("POWERJ_PERF_JFR_SAMPLEPERIOD", "100us");
+        run("numbers 2 | work -c 150 | count");
+        assertThat(errors).hasSize(1);
+        assertThat(errors.getFirst()).contains("POWERJ_PERF_JFR_SAMPLEPERIOD=100us").contains("1 ms");
+        assertThat(hotSamples()).isGreaterThan(40);
+    }
+
+    @Test
+    void anEmptyPeriodMeansTheDefault() throws Exception {
+        session.environment().put("POWERJ_PERF_JFR_SAMPLEPERIOD", "  ");
+        run("numbers 2 | work -c 100 | count");
+        assertThat(errors).isEmpty();
+    }
 }

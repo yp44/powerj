@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -247,7 +248,39 @@ public final class Interpreter {
             return null;
         }
         Path file = recordingFile();
-        return file == null ? null : JfrCapture.start(file);
+        return file == null ? null : JfrCapture.start(file, samplePeriod());
+    }
+
+    /** Value of the variable the warning was last given for: one warning per value, not one per line. */
+    private String warnedPeriod;
+
+    /**
+     * Sampling period of the profiler, from {@code POWERJ_PERF_JFR_SAMPLEPERIOD} in the session environment, so that
+     * {@code env --set} (in {@code profile.pj} too) changes it from the next line. A value that is not a duration is
+     * reported, and the default is used; a period under 1 ms, which the profiler cannot do, becomes 1 ms.
+     */
+    private Duration samplePeriod() {
+        String value = session.environment().get(PerfJfr.SAMPLE_PERIOD_VARIABLE);
+        if (value == null || value.isBlank()) {
+            return PerfJfr.DEFAULT_SAMPLE_PERIOD;
+        }
+        boolean warn = !value.equals(warnedPeriod);
+        warnedPeriod = value;
+        try {
+            Duration period = PerfJfr.parseSamplePeriod(value);
+            if (period.compareTo(PerfJfr.MINIMUM_SAMPLE_PERIOD) < 0) {
+                if (warn) {
+                    io.errors().accept(Messages.get("perf.samplePeriod.floor", PerfJfr.SAMPLE_PERIOD_VARIABLE, value));
+                }
+                return PerfJfr.MINIMUM_SAMPLE_PERIOD;
+            }
+            return period;
+        } catch (IllegalArgumentException _) {
+            if (warn) {
+                io.errors().accept(Messages.get("perf.samplePeriod.invalid", PerfJfr.SAMPLE_PERIOD_VARIABLE, value));
+            }
+            return PerfJfr.DEFAULT_SAMPLE_PERIOD;
+        }
     }
 
     /** A new file for a recording, in a folder that goes away with the shell. */

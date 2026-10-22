@@ -36,8 +36,6 @@ final class JfrCapture {
 
     /** The stage threads are named by {@link StageProbe#threadName}. */
     private static final Pattern STAGE_THREAD = Pattern.compile("powerj-etape-(\\d+)");
-    /** Execution sample period: fine enough for a line of a few tenths of a second. */
-    private static final Duration SAMPLE_PERIOD = Duration.ofMillis(10);
     /** Rows kept per stage. */
     private static final int TOP = 20;
 
@@ -52,7 +50,7 @@ final class JfrCapture {
 
     /** The first recording of the JVM initializes the recorder, and the first read loads the parser: pay it once. */
     static void warmUp(Path file) {
-        JfrCapture capture = start(file);
+        JfrCapture capture = start(file, PerfJfr.DEFAULT_SAMPLE_PERIOD);
         if (capture != null) {
             capture.finish(0, List.of());
             try {
@@ -63,14 +61,17 @@ final class JfrCapture {
         }
     }
 
-    /** Starts recording into {@code file}; {@code null} if the profiler cannot start (the line is measured without it). */
-    static JfrCapture start(Path file) {
+    /**
+     * Starts recording into {@code file}, sampling the execution every {@code samplePeriod}; {@code null} if the
+     * profiler cannot start (the line is measured without it).
+     */
+    static JfrCapture start(Path file, Duration samplePeriod) {
         Recording recording = null;
         try {
             recording = new Recording();
             recording.setName("powerj-perf");
             recording.setDestination(file);
-            recording.enable("jdk.ExecutionSample").withPeriod(SAMPLE_PERIOD).withStackTrace();
+            recording.enable("jdk.ExecutionSample").withPeriod(samplePeriod).withStackTrace();
             recording.enable("jdk.GarbageCollection");
             recording.enable("jdk.ObjectAllocationSample");
             recording.start();
