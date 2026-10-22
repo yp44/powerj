@@ -52,7 +52,36 @@ final class PerfFooter {
         lines.add(Messages.get("perf.footer.jvm", jvm.gcCount(), jvm.gcTime().isZero() ? "0" : Values.text(jvm.gcTime()),
                 OutputFormatter.humanBytes(jvm.heapPeak()), jvm.classesLoaded(),
                 jvm.jitTime().isZero() ? "0" : Values.text(jvm.jitTime())));
+        String hot = hot(report);
+        if (hot != null) {
+            lines.add(hot);
+        }
         return colors ? lines.stream().map(line -> GRAY + line + RESET).toList() : lines;
+    }
+
+    /** The methods most found running in the bottleneck stage (else in the stage with the most samples), or {@code null}. */
+    private static String hot(PerfReport report) {
+        int stage = report.stages().stream().filter(StageStat::bottleneck).mapToInt(StageStat::index).findFirst()
+                .orElseGet(() -> report.hot().stream().filter(h -> h.stage() > 0)
+                        .collect(java.util.stream.Collectors.groupingBy(io.powerj.api.HotMethod::stage,
+                                java.util.stream.Collectors.summingLong(io.powerj.api.HotMethod::samples)))
+                        .entrySet().stream().max(java.util.Map.Entry.comparingByValue())
+                        .map(java.util.Map.Entry::getKey).orElse(0));
+        List<String> methods = report.hot().stream().filter(h -> h.stage() == stage).limit(3)
+                .map(h -> shortMethod(h.method()) + " " + Math.round(h.percent()) + "%").toList();
+        if (methods.isEmpty()) {
+            return null;
+        }
+        String name = report.stages().stream().filter(st -> st.index() == stage).map(StageStat::command).findFirst()
+                .orElse(Integer.toString(stage));
+        return Messages.get("perf.footer.hot", name, String.join(" · ", methods));
+    }
+
+    /** {@code java.util.ArrayList.add} → {@code ArrayList.add}. */
+    static String shortMethod(String method) {
+        int last = method.lastIndexOf('.');
+        int before = last > 0 ? method.lastIndexOf('.', last - 1) : -1;
+        return method.substring(before + 1);
     }
 
     private static String pad(String text, int width) {

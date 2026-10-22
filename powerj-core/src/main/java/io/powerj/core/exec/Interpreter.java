@@ -54,6 +54,10 @@ public final class Interpreter {
     private volatile boolean perfMode;
     /** Measure of the line being executed, or {@code null}. */
     private volatile PerfRecorder recorder;
+    /** The profiler records each measured line (FR-76, part B); only a test or a runtime without it turns it off. */
+    private volatile boolean perfProfiler = true;
+    /** Folder of the profiler's recordings, created at the first one. */
+    private Path recordings;
 
     /**
      * @param extraBuiltins built-in commands provided by the shell (e.g. {@code history})
@@ -177,8 +181,15 @@ public final class Interpreter {
         blockingError = false;
         long begin = System.nanoTime();
         Ast.Script script = Parser.parse(line, syntax());
-        PerfRecorder perf = perfMode && measurable(script) ? new PerfRecorder(line, begin, System.nanoTime() - begin)
-                : null;
+        long parsed = System.nanoTime() - begin;
+        PerfRecorder perf = null;
+        JfrCapture capture = null;
+        if (perfMode && measurable(script)) {
+            long started = System.nanoTime();
+            capture = startProfiler();
+            // Starting the profiler is not part of the line.
+            perf = new PerfRecorder(line, begin + (System.nanoTime() - started), parsed);
+        }
         recorder = perf;
         boolean cancelled = false;
         try {
@@ -203,7 +214,7 @@ public final class Interpreter {
         } finally {
             recorder = null;
             if (perf != null) {
-                printPerf(perf, cancelled);
+                printPerf(perf, capture, cancelled);
             }
         }
     }
@@ -216,8 +227,44 @@ public final class Interpreter {
     public void perfMode(boolean on) {
         if (on) {
             PerfRecorder.warmUp();
+            if (perfProfiler && PerfJfr.available()) {
+                Path file = recordingFile();
+                if (file != null) {
+                    JfrCapture.warmUp(file);
+                }
+            }
         }
         perfMode = on;
+    }
+
+    /** Without the profiler, a line is measured with the counters only. */
+    void perfProfiler(boolean on) {
+        perfProfiler = on;
+    }
+
+    private JfrCapture startProfiler() {
+        if (!perfProfiler || !PerfJfr.available()) {
+            return null;
+        }
+        Path file = recordingFile();
+        return file == null ? null : JfrCapture.start(file);
+    }
+
+    /** A new file for a recording, in a folder that goes away with the shell. */
+    private synchronized Path recordingFile() {
+        try {
+            if (recordings == null) {
+                recordings = Files.createTempDirectory("powerj-perf-");
+                recordings.toFile().deleteOnExit();
+            }
+            Path file = Files.createTempFile(recordings, "line-", ".jfr");
+            file.toFile().deleteOnExit();
+            return file;
+        } catch (IOException | RuntimeException e) {
+            java.util.logging.Logger.getLogger(Interpreter.class.getName())
+                    .log(java.util.logging.Level.WARNING, "No file for the profiler's recording", e);
+            return null;
+        }
     }
 
     /** A line is measured unless it is empty, runs in the background, or starts with {@code perf}. */
@@ -236,10 +283,13 @@ public final class Interpreter {
     }
 
     /** Keeps the report of the line and prints its summary, even for a cancelled line. */
-    private void printPerf(PerfRecorder perf, boolean cancelled) {
+    private void printPerf(PerfRecorder perf, JfrCapture capture, boolean cancelled) {
         boolean interrupted = Thread.interrupted(); // a cancelled line must still print: keep the flag for later
         try {
-            var report = perf.finish(session.nextPerfLine(), cancelled);
+            perf.stop(); // before reading the recording: that work is not the line's
+            int number = session.nextPerfLine();
+            var report = capture == null ? perf.finish(number, cancelled)
+                    : perf.finish(number, cancelled, capture.finish(number, perf.probes()), capture.file());
             session.addPerfReport(report);
             PerfFooter.lines(report, io.colors()).forEach(io.out()::println);
             io.out().flush();
@@ -540,7 +590,8 @@ public final class Interpreter {
             Source input = i == 0 ? standardInput : pipes.get(i - 1);
             Pipe output = pipes.get(i);
             StageProbe probe = probes.get(i);
-            threads.add(Thread.ofVirtual().name("powerj-etape-" + (i + 1)).unstarted(PreviewGuard.propagate(() -> {
+            String threadName = StageProbe.threadName(probe == null ? i + 1 : probe.index());
+            threads.add(Thread.ofVirtual().name(threadName).unstarted(PreviewGuard.propagate(() -> {
                 output.onAbort(Thread.currentThread()::interrupt);
                 try {
                     segment(segment, input, output, null, false, Optional.empty(), sharedErrors, errors, probe);

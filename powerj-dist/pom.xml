@@ -127,11 +127,15 @@
                                             <arg value="${dist.main}"/>
                                             <!-- The whole Java SE library can be called from the shell (spec FR-52). -->
                                             <arg value="--add-modules"/>
-                                            <!-- jdk.unsupported: Ctrl+C interception by JLine (sun.misc.Signal). -->
-                                            <arg value="java.se,jdk.unsupported"/>
+                                            <!-- jdk.unsupported: Ctrl+C interception by JLine (sun.misc.Signal).
+                                                 jdk.jfr, jdk.management: the profiler of the perf mode (FR-76). -->
+                                            <arg value="java.se,jdk.unsupported,jdk.jfr,jdk.management"/>
                                             <!-- JLine accesses the native console (FFM / native library). -->
                                             <arg value="--java-options"/>
                                             <arg value="--enable-native-access=org.jline.terminal.ffm,org.jline.nativ,io.powerj.core"/>
+                                            <!-- The profiler is an optional dependency of powerj-core: it is only resolved when asked. -->
+                                            <arg value="--java-options"/>
+                                            <arg value="--add-modules=jdk.jfr,jdk.management"/>
                                             <arg value="--jlink-options"/>
                                             <arg value="--strip-java-debug-attributes --no-header-files --no-man-pages"/>
                                             <arg value="--dest"/>

@@ -53,6 +53,9 @@ final class PerfRecorder {
     private final List<StageProbe> stages = new ArrayList<>();
     private volatile long resolveNanos;
     private volatile long closeNanos;
+    private long endNanos;
+    private JvmCounters jvmAfter;
+    private long heapPeak;
 
     /**
      * @param beginNanos {@code System.nanoTime()} when the line started to be parsed
@@ -100,13 +103,33 @@ final class PerfRecorder {
         return probe;
     }
 
-    /** The report of the line, whether it ended or was cancelled. */
-    PerfReport finish(int line, boolean cancelled) {
-        long total = System.nanoTime() - beginNanos;
-        List<StageProbe> probes;
-        synchronized (this) {
-            probes = List.copyOf(stages);
+    /**
+     * The line is over: takes the time and what the JVM did, before anything else (the profiler's own work, reading its
+     * recording, must not count).
+     */
+    void stop() {
+        if (jvmAfter == null) {
+            endNanos = System.nanoTime();
+            jvmAfter = JvmCounters.now();
+            heapPeak = ManagementFactory.getMemoryPoolMXBeans().stream().filter(pool -> pool.getType() == MemoryType.HEAP)
+                    .mapToLong(pool -> pool.getPeakUsage().getUsed()).sum();
         }
+    }
+
+    synchronized List<StageProbe> probes() {
+        return List.copyOf(stages);
+    }
+
+    /** The report of the line, whether it ended or was cancelled; {@link #stop} is called if it was not. */
+    PerfReport finish(int line, boolean cancelled) {
+        return finish(line, cancelled, JfrData.EMPTY, null);
+    }
+
+    /** @param recording file of the profiler's recording, or {@code null} */
+    PerfReport finish(int line, boolean cancelled, JfrData profile, java.nio.file.Path recording) {
+        stop();
+        long total = endNanos - beginNanos;
+        List<StageProbe> probes = probes();
         long display = closeNanos + probes.stream().mapToLong(StageProbe::displayNanos).sum();
         long execute = Math.max(0, total - parseNanos - resolveNanos - display);
         List<PhaseStat> phases = List.of(
@@ -126,15 +149,13 @@ final class PerfRecorder {
             natives.addAll(probe.nativeStats(line));
         }
         return new PerfReport(line, text, Duration.ofNanos(total), cancelled, phases, stats, blocks, natives,
-                jvm(line));
+                jvm(line), profile.hot(), profile.gc(), profile.alloc(), recording);
     }
 
     private JvmStat jvm(int line) {
-        JvmCounters after = JvmCounters.now();
-        long peak = ManagementFactory.getMemoryPoolMXBeans().stream().filter(pool -> pool.getType() == MemoryType.HEAP)
-                .mapToLong(pool -> pool.getPeakUsage().getUsed()).sum();
-        return new JvmStat(line, after.gcCount() - jvmBefore.gcCount(),
-                Duration.ofMillis(after.gcMillis() - jvmBefore.gcMillis()), peak,
-                after.classes() - jvmBefore.classes(), Duration.ofMillis(after.jitMillis() - jvmBefore.jitMillis()));
+        return new JvmStat(line, jvmAfter.gcCount() - jvmBefore.gcCount(),
+                Duration.ofMillis(jvmAfter.gcMillis() - jvmBefore.gcMillis()), heapPeak,
+                jvmAfter.classes() - jvmBefore.classes(),
+                Duration.ofMillis(jvmAfter.jitMillis() - jvmBefore.jitMillis()));
     }
 }

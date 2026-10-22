@@ -39,11 +39,17 @@ A folder with a few hundred files, for example the PowerJ sources: `cd C:\dev\po
 | 21 | Alt+V | The prompt becomes `PJ? <dir>> `: the preview mode replaced the perf mode. Alt+P goes back to `PJ%`. |
 | 22 | Alt+P, then a few lines, then `history` | The history holds your lines, never the summaries. |
 | 23 | `powerj -c "ls \| count"` from a shell | No summary: the non-interactive modes are never measured. |
-| 24 | `help perf` | The synopsis, the options (`--view`, `--all`) and the examples. |
+| 24 | Look at the summary of 4 again | A last line `hot (<stage>): Class.method NN% · …`: the three methods most found running in the bottleneck stage. |
+| 25 | `perf --view hot` | One row per method and stage (`stage`, `method`, `samples`, `percent`), most sampled first; `where { $_.stage == 2 }` and `sort samples -d` work. |
+| 26 | `perf --view gc`, `perf --view alloc` | The collections (`name`, `cause`, `pause`), and the allocations per stage and type (`bytes` readable, `byte[]`, `java.lang.String`…). |
+| 27 | `perf --save %TEMP%\slow.jfr` (then `perf 2 --save %TEMP%` for the line before) | The path written; with a folder, `perf-<line>.jfr`. `jfr summary <file>` (or JDK Mission Control) opens it and lists `jdk.ExecutionSample`, `jdk.ObjectAllocationSample`. `perf --save f --view hot` is refused. |
+| 28 | `help perf` | The synopsis, the options (`--view`, `--all`, `--save`) and the examples. |
 
 ## Known limitations
 
 - The stages of a pipeline that run in virtual threads started by a cmdlet itself (`ls -p`) are counted in the stage that started them, but their blocks are not timed.
 - `heapPeak` is the sum of the peaks of the heap memory pools: an upper bound.
 - `perf` emits objects of several types, so Tab completion does not propose the properties of its rows in the next stage.
-- Not yet: CPU time and memory per stage, JFR recording (planned in part B of the plan).
+- The profiler samples every 10 ms: a line of a few milliseconds has few or no samples, and `hot` is then empty or noisy. The allocations are sampled estimates.
+- A runtime without `jdk.jfr` (a custom image) measures with the counters only; `hot`, `gc`, `alloc` and `--save` then say so.
+- Not yet: CPU time per stage, CPU and memory of native processes.

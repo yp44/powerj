@@ -58,6 +58,47 @@ class PerfTest {
         }
     }
 
+    /** Works for each object: burns the CPU for {@code -c} ms, allocates {@code -a} arrays of 10 KB, collects with {@code -g}. */
+    @CmdletInfo(name = "work", category = "Test", summary = "Works", examples = "numbers 2 | work -c 100", passThrough = true)
+    static final class Work implements Cmdlet<Work.Params, Object, Object> {
+
+        record Params(@Option(shortName = 'c') Integer cpu, @Option(shortName = 'a') Integer alloc,
+                      @Option(shortName = 'g') boolean gc) { }
+
+        static volatile Object kept;
+
+        static long spin(long millis) {
+            long end = System.nanoTime() + millis * 1_000_000;
+            long x = 0;
+            while (System.nanoTime() < end) {
+                for (int i = 0; i < 100_000; i++) {
+                    x += i ^ (x >>> 3);
+                }
+            }
+            return x;
+        }
+
+        @Override
+        public void process(Params params, Object input, CmdletContext<Object> context) {
+            if (params.cpu() != null) {
+                kept = spin(params.cpu());
+            }
+            if (params.alloc() != null) {
+                for (int i = 0; i < params.alloc(); i++) {
+                    kept = new byte[10_000];
+                }
+            }
+            context.emit(input);
+        }
+
+        @Override
+        public void end(Params params, CmdletContext<Object> context) {
+            if (params.gc()) {
+                System.gc();
+            }
+        }
+    }
+
     @TempDir
     Path tmp;
 
@@ -72,6 +113,7 @@ class PerfTest {
         List<Cmdlet<?, ?, ?>> cmdlets = new ArrayList<>(FakeCmdlets.all());
         cmdlets.add(new Numbers());
         cmdlets.add(new Slow());
+        cmdlets.add(new Work());
         interpreter = new Interpreter(session, new ShellIo(new PrintWriter(out, true), errors::add, false), Map.of(),
                 CmdletRegistry.of(cmdlets));
         interpreter.perfMode(true);
@@ -306,5 +348,107 @@ class PerfTest {
         assertThat(Values.text(Duration.ofNanos(412))).isEqualTo("412 ns");
         assertThat(Values.text(Duration.ofNanos(1_400))).isEqualTo("1.4 µs");
         assertThat(Values.text(Duration.ofMillis(12))).isEqualTo("0.012 s");
+    }
+
+    // --- the profiler (part B) ---
+
+    @Test
+    void aBusyStageIsFoundHotInItsOwnThread() throws Exception {
+        run("numbers 2 | work -c 150 | count");
+        PerfReport report = last();
+        var hot = report.hot().stream().filter(h -> h.stage() == 2).toList();
+        assertThat(hot).isNotEmpty();
+        assertThat(hot.getFirst().method()).endsWith("Work.spin");
+        assertThat(hot.getFirst().percent()).isGreaterThan(50.0);
+        assertThat(hot.getFirst().samples()).isGreaterThan(5);
+        assertThat(report.hot()).filteredOn(h -> h.stage() == 3).isEmpty(); // count did nothing
+    }
+
+    @Test
+    void theLastStageRunsInTheCallingThreadAndIsFoundByTime() throws Exception {
+        run("numbers 2 | work -c 150");
+        var hot = last().hot().stream().filter(h -> h.stage() == 2).toList();
+        assertThat(hot).isNotEmpty();
+        assertThat(hot.getFirst().method()).endsWith("Work.spin");
+    }
+
+    @Test
+    void theFooterNamesTheHotMethodsOfTheBottleneck() throws Exception {
+        String text = run("numbers 2 | work -c 150 | count");
+        assertThat(text).contains("hot (work -c 150):").contains("Work.spin");
+    }
+
+    @Test
+    void allocationsAreCountedPerStageAndType() throws Exception {
+        run("numbers 3 | work -a 20000 | count");
+        var alloc = last().alloc().stream().filter(a -> a.stage() == 2).toList();
+        assertThat(alloc).isNotEmpty();
+        assertThat(alloc.getFirst().type()).isEqualTo("byte[]");
+        assertThat(alloc.getFirst().bytes()).isPositive();
+    }
+
+    @Test
+    void garbageCollectionsAreListed() throws Exception {
+        run("numbers 1 | work -g | count");
+        assertThat(last().gc()).isNotEmpty();
+        assertThat(last().gc().getFirst().cause()).contains("System.gc()");
+        assertThat(last().gc().getFirst().pause()).isPositive();
+    }
+
+    @Test
+    void theRecordingOfTheLineIsKeptAsAFlightRecorderFile() throws Exception {
+        run("numbers 2 | count");
+        Path file = last().recording();
+        assertThat(file).isNotNull().isRegularFile();
+        try (var events = new jdk.jfr.consumer.RecordingFile(file)) {
+            assertThat(events.hasMoreEvents() || java.nio.file.Files.size(file) > 0).isTrue();
+        }
+    }
+
+    @Test
+    void profilingDoesNotCountInTheLine() throws Exception {
+        run("numbers 2 | count");
+        // starting and reading the recording takes longer than this tiny line
+        assertThat(last().total()).isLessThan(Duration.ofMillis(100));
+        assertThat(last().stages()).hasSize(2);
+    }
+
+    @Test
+    void withoutTheProfilerTheLineIsMeasuredWithTheCountersOnly() throws Exception {
+        interpreter.perfProfiler(false);
+        String text = run("numbers 2 | work -c 100 | count");
+        assertThat(last().recording()).isNull();
+        assertThat(last().hot()).isEmpty();
+        assertThat(last().gc()).isEmpty();
+        assertThat(last().alloc()).isEmpty();
+        assertThat(text).doesNotContain("hot (");
+        assertThat(last().stages()).hasSize(3);
+    }
+
+    @Test
+    void theProfilerIsThereInThisRuntime() {
+        assertThat(PerfJfr.available()).isTrue();
+    }
+
+    @Test
+    void arrayTypesAreReadable() {
+        assertThat(JfrCapture.typeName("[B")).isEqualTo("byte[]");
+        assertThat(JfrCapture.typeName("[[I")).isEqualTo("int[][]");
+        assertThat(JfrCapture.typeName("[Ljava.lang.Object;")).isEqualTo("java.lang.Object[]");
+        assertThat(JfrCapture.typeName("java.lang.String")).isEqualTo("java.lang.String");
+        assertThat(PerfFooter.shortMethod("java.util.ArrayList.add")).isEqualTo("ArrayList.add");
+        assertThat(PerfFooter.shortMethod("Main.run")).isEqualTo("Main.run");
+    }
+
+    @Test
+    void aRecordingIsDeletedWhenItsReportIsNoLongerKept() throws Exception {
+        var first = java.nio.file.Files.createTempFile(tmp, "line-", ".jfr");
+        var jvm = new io.powerj.api.JvmStat(1, 0, Duration.ZERO, 0, 0, Duration.ZERO);
+        for (int i = 1; i <= Session.MAX_PERF_REPORTS + 1; i++) {
+            session.addPerfReport(new PerfReport(i, "l", Duration.ZERO, false, List.of(), List.of(), List.of(), List.of(),
+                    jvm, List.of(), List.of(), List.of(), i == 1 ? first : null));
+        }
+        assertThat(first).doesNotExist();
+        assertThat(session.perfReports()).hasSize(Session.MAX_PERF_REPORTS);
     }
 }
