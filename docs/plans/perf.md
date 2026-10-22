@@ -50,7 +50,7 @@ JVM: GC 3 (41 ms) · heap peak 210 MB · classes +112 · JIT 310 ms
 perf [<n>] [--view stages|blocks|natives|phases|jvm|lines] [-a|--all]
 ```
 - Reads the reports kept by the session (the last 50 measured lines). It produces objects and reads none.
-- `<n>`: the n-th measured line back, `1` by default. `--all`: every kept line; each row carries its `line` number.
+- `<n>`: the number of a measured line, as in the `line` column of the rows (`perf 1` is the first line measured, as long as it is kept); the last line by default. It was first planned as "n-th back" (1 = last), which surprised the user: `perf 1` did not show line 1 of `perf --view lines`. `--all`: every kept line; each row carries its `line` number.
 - `--view` chooses the record:
 
 | View | Record | One row per |

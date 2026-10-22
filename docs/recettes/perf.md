@@ -31,7 +31,8 @@ A folder with a few hundred files, for example the PowerJ sources: `cd C:\dev\po
 | 13 | `perf --view phases`, `perf --view jvm`, `perf --view natives` | The phases (`parse`, `resolve`, `execute`, `display`), the JVM row (`gcCount`, `gcTime`, `heapPeak` as a size, `classesLoaded`, `jitTime`), the native processes. |
 | 14 | `perf --view lines` | One row per measured line since Alt+P, oldest first, with the `bottleneck` of each. |
 | 15 | `perf --all \| group command \| sort count -d` | Stages grouped over all the kept lines. |
-| 16 | `perf 2`, then `perf 99` | The stages of the line before the last; then `line 99: only N measured line(s) are kept`. |
+| 16 | `perf --view lines`, then `perf 1` and `perf <the last number>` | The stages of the line with that number in the `line` column (the first line measured, then the last). `perf 0` is refused. |
+| 16b | `perf 9999` | `line 9999 is not kept: the kept lines are A to B` (the numbers shown by `perf --view lines`). |
 | 17 | `perf 0`, then `perf 1 --all` | Two blocking errors (`expects a line number of at least 1`, `a line number and --all cannot be used together`). |
 | 18 | `ls -r / \| count`, press Ctrl+C after a second | `^C`, then a summary marked `cancelled` for what ran. |
 | 19 | `sleep 2 &` (Unix) | No summary: background commands are not measured. |
@@ -42,7 +43,7 @@ A folder with a few hundred files, for example the PowerJ sources: `cd C:\dev\po
 | 24 | Look at the summary of 4 again | A last line `hot (<stage>): Class.method NN% · …`: the three methods most found running in the bottleneck stage. |
 | 25 | `perf --view hot` | One row per method and stage (`stage`, `method`, `samples`, `percent`), most sampled first; `where { $_.stage == 2 }` and `sort samples -d` work. |
 | 26 | `perf --view gc`, `perf --view alloc` | The collections (`name`, `cause`, `pause`), and the allocations per stage and type (`bytes` readable, `byte[]`, `java.lang.String`…). |
-| 27 | `perf --save %TEMP%\slow.jfr` (then `perf 2 --save %TEMP%` for the line before) | The path written; with a folder, `perf-<line>.jfr`. `jfr summary <file>` (or JDK Mission Control) opens it and lists `jdk.ExecutionSample`, `jdk.ObjectAllocationSample`. `perf --save f --view hot` is refused. |
+| 27 | `perf --save %TEMP%\slow.jfr` (then `perf 1 --save %TEMP%` for the line numbered 1) | The path written; with a folder, `perf-<line>.jfr`. `jfr summary <file>` (or JDK Mission Control) opens it and lists `jdk.ExecutionSample`, `jdk.ObjectAllocationSample`. `perf --save f --view hot` is refused. |
 | 28 | `env --set POWERJ_PERF_JFR_SAMPLEPERIOD=1ms`, then a CPU-bound line (`ls -r / \| where { $_.name.length() > 3 } \| count`) and `(perf --view hot \| measure samples).sum` | Several times more samples than with the default 10 ms (run the line once before to compare). |
 | 29 | `env --set POWERJ_PERF_JFR_SAMPLEPERIOD=often`, then a measured line | One message `POWERJ_PERF_JFR_SAMPLEPERIOD=often is not a duration …`, not repeated by the next line; the profiler keeps sampling every 10 ms. `100us` gives a message too, and samples every 1 ms. |
 | 30 | Put `env --set POWERJ_PERF_JFR_SAMPLEPERIOD=2ms` in `profile.pj`, restart | The setting applies from the first measured line. |

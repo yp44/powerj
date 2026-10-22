@@ -26,7 +26,7 @@ public final class Perf implements Cmdlet<Perf.Params, Void, Object> {
 
     /** Parameters of {@code perf}. */
     public record Params(
-            @Option(position = 0, description = "Line to show: 1 is the last measured line (default: 1)")
+            @Option(position = 0, description = "Number of the line to show, as in the line column (default: the last measured line)")
             Integer line,
             @Option(longName = "view", description = "Records listed: stages (default), blocks, natives, phases, jvm, lines, hot, gc, alloc")
             View view,
@@ -64,12 +64,14 @@ public final class Perf implements Cmdlet<Perf.Params, Void, Object> {
             selected = new ArrayList<>(kept);
             java.util.Collections.reverse(selected);
         } else {
-            int n = p.line() == null ? 1 : p.line();
-            if (n > kept.size()) {
-                context.error(Messages.get("perf.line.missing", n, kept.size()));
+            // The number of a line is the one of the line column: it does not go back when old lines are dropped.
+            int n = p.line() == null ? kept.getFirst().line() : p.line();
+            var found = kept.stream().filter(report -> report.line() == n).findFirst();
+            if (found.isEmpty()) {
+                context.error(Messages.get("perf.line.missing", n, kept.getLast().line(), kept.getFirst().line()));
                 return;
             }
-            selected = List.of(kept.get(n - 1));
+            selected = List.of(found.get());
         }
         if (p.save() != null) {
             save(selected.getFirst(), p.save(), context);

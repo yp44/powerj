@@ -66,10 +66,31 @@ class PerfTest {
     }
 
     @Test
-    void aLineNumberCountsBackFromTheLast() throws Exception {
+    void aLineNumberIsTheOneOfTheLineColumn() throws Exception {
         keep(3);
-        run(new Perf.Params(2, null, false, null));
-        assertThat(context.emitted).extracting(o -> ((StageStat) o).line()).containsOnly(2);
+        run(new Perf.Params(1, null, false, null));
+        assertThat(context.emitted).extracting(o -> ((StageStat) o).line()).containsOnly(1); // the first, not the last
+        context.emitted.clear();
+        run(new Perf.Params(3, null, false, null));
+        assertThat(context.emitted).extracting(o -> ((StageStat) o).line()).containsOnly(3);
+    }
+
+    @Test
+    void numbersDoNotGoBackWhenOldLinesAreDropped() throws Exception {
+        var reports = new java.util.ArrayList<PerfReport>();
+        for (int i = 60; i >= 11; i--) { // 50 lines kept out of 60 measured
+            reports.add(report(i, "line " + i));
+        }
+        context.perfReports = reports;
+        run(new Perf.Params(null, null, false, null));
+        assertThat(context.emitted).extracting(o -> ((StageStat) o).line()).containsOnly(60);
+        context.emitted.clear();
+        run(new Perf.Params(11, null, false, null));
+        assertThat(context.emitted).extracting(o -> ((StageStat) o).line()).containsOnly(11);
+        context.emitted.clear();
+        run(new Perf.Params(1, null, false, null)); // dropped
+        assertThat(context.emitted).isEmpty();
+        assertThat(context.errors).hasSize(1).first().asString().contains("line 1 is not kept").contains("11").contains("60");
     }
 
     @Test
@@ -135,7 +156,7 @@ class PerfTest {
         keep(2);
         run(new Perf.Params(5, null, false, null));
         assertThat(context.emitted).isEmpty();
-        assertThat(context.errors).hasSize(1).first().asString().contains("5").contains("2");
+        assertThat(context.errors).hasSize(1).first().asString().contains("line 5").contains("1 to 2");
     }
 
     @Test
