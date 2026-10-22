@@ -16,7 +16,7 @@ public final class BuiltinCmdlets implements CmdletProvider {
                 new Last(), new Range(), new Select(), new Count(),
                 new Measure(), new GroupCmdlet(), new MakeDirectory(),
                 new Touch(), new Copy(), new Move(), new Remove(), new ToJson(), new FromJson(), new ToCsv(),
-                new FromCsv(), new Ps(), new Kill(), new Collect(), new Env());
+                new FromCsv(), new Ps(), new Kill(), new Collect(), new Env(), new Perf());
     }
 
     @Override

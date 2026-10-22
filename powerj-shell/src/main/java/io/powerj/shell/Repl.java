@@ -43,6 +43,8 @@ public final class Repl {
     private final PrintWriter out;
     /** Preview mode (FR-66), or {@code null} if the line reader cannot display it. */
     private final Previewer previewer;
+    /** Perf mode (FR-76), or {@code null} without a terminal. */
+    private final Perfer perfer;
     private final boolean colors;
     private List<String> moduleWarnings = List.of();
     private Path profile;
@@ -75,6 +77,15 @@ public final class Repl {
             preview.bind(this::prompt);
         }
         this.previewer = preview;
+        Perfer perf = null;
+        if (interactive && reader instanceof LineReaderImpl impl) {
+            perf = new Perfer(interpreter, preview);
+            perf.bind(impl, this::prompt);
+            if (preview != null) {
+                preview.onEnter(perf::off);
+            }
+        }
+        this.perfer = perf;
         // Ctrl+C during execution cancels the command without exiting the shell (FR-03);
         // during input, JLine throws UserInterruptException.
         terminal.handle(Terminal.Signal.INT, _ -> supervisor.cancel());
@@ -212,14 +223,20 @@ public final class Repl {
         };
     }
 
-    /** {@code PJ <dir>> }, or {@code PJ? <dir>> } in preview mode (FR-66). */
+    /** {@code PJ <dir>> }, {@code PJ? <dir>> } in preview mode (FR-66), {@code PJ% <dir>> } in perf mode (FR-76). */
     String prompt() {
         String mode = "PJ ";
         if (previewer != null && previewer.on()) {
-            mode = colors ? new AttributedString("PJ?", AttributedStyle.DEFAULT.foreground(AttributedStyle.CYAN))
-                    .toAnsi(terminal) + " " : "PJ? ";
+            mode = marker("PJ?", AttributedStyle.CYAN);
+        } else if (perfer != null && perfer.on()) {
+            mode = marker("PJ%", AttributedStyle.YELLOW);
         }
         return mode + session.currentDirectory() + "> ";
+    }
+
+    private String marker(String text, int color) {
+        return colors ? new AttributedString(text, AttributedStyle.DEFAULT.foreground(color)).toAnsi(terminal) + " "
+                : text + " ";
     }
 
     private List<Object> execute(String line) throws InterruptedException {

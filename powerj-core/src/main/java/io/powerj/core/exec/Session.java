@@ -36,6 +36,10 @@ public final class Session {
     /** Recent Java exceptions, most recent first ({@code $errors}, FR-53). */
     private final Deque<Throwable> errors = new ArrayDeque<>();
     private static final int MAX_ERRORS = 20;
+    /** Lines measured in perf mode, most recent first (FR-76). */
+    private final Deque<io.powerj.api.PerfReport> perfReports = new ArrayDeque<>();
+    private int perfLines;
+    static final int MAX_PERF_REPORTS = 50;
 
     /**
      * @param home             user home directory, used for {@code ~} when the environment has neither
@@ -147,7 +151,7 @@ public final class Session {
     /** Names of the defined and automatic variables, sorted (completion). */
     public java.util.SortedSet<String> variableNames() {
         var names = new java.util.TreeSet<>(variables.keySet());
-        names.addAll(List.of("?", "exit", "last", "pwd", "home", "errors"));
+        names.addAll(List.of("?", "exit", "last", "pwd", "home", "errors", "perf"));
         return names;
     }
 
@@ -160,6 +164,7 @@ public final class Session {
             case "pwd" -> currentDirectory;
             case "home" -> home;
             case "errors" -> recentErrors();
+            case "perf" -> perfReports().stream().findFirst().orElse(null);
             default -> {
                 if (!variables.containsKey(name)) {
                     throw new PjException(Messages.get("variable.unknown", name));
@@ -184,6 +189,24 @@ public final class Session {
 
     public synchronized List<Throwable> recentErrors() {
         return List.copyOf(errors);
+    }
+
+    /** Number of the next line measured in perf mode. */
+    synchronized int nextPerfLine() {
+        return ++perfLines;
+    }
+
+    /** Keeps the report of a measured line, for {@code perf} and {@code $perf} (FR-76). */
+    synchronized void addPerfReport(io.powerj.api.PerfReport report) {
+        perfReports.addFirst(report);
+        while (perfReports.size() > MAX_PERF_REPORTS) {
+            perfReports.removeLast();
+        }
+    }
+
+    /** The lines measured in perf mode, most recent first. */
+    public synchronized List<io.powerj.api.PerfReport> perfReports() {
+        return List.copyOf(perfReports);
     }
 
     /** {@code $debug}: show the Java stack trace of errors (FR-43). */

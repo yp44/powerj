@@ -24,8 +24,41 @@ final class Pipe implements Source {
     private static final int CAPACITY = 256;
 
     private final BlockingQueue<Object> queue = new ArrayBlockingQueue<>(CAPACITY);
+    /** Count the objects and the time spent blocked (perf mode, FR-76); each counter has a single writer. */
+    private final boolean measured;
+    private volatile long puts;
+    private volatile long takes;
+    private volatile long putBlockedNanos;
+    private volatile long takeBlockedNanos;
     private volatile boolean aborted;
     private final List<Runnable> onAbort = new CopyOnWriteArrayList<>();
+
+    Pipe() {
+        this(false);
+    }
+
+    /** @param measured count the objects and the time the writer and the reader spend blocked */
+    Pipe(boolean measured) {
+        this.measured = measured;
+    }
+
+    long putCount() {
+        return puts;
+    }
+
+    long takeCount() {
+        return takes;
+    }
+
+    /** Time the writer waited for space: the next stage was slower. */
+    long putBlockedNanos() {
+        return putBlockedNanos;
+    }
+
+    /** Time the reader waited for an object: the previous stage was slower. */
+    long takeBlockedNanos() {
+        return takeBlockedNanos;
+    }
 
     /** Action run when the reader gives up: stop the writer (thread interrupted, processes stopped). */
     void onAbort(Runnable action) {
@@ -49,7 +82,22 @@ final class Pipe implements Source {
             throw new CancellationException("pipeline closed by the next stage");
         }
         try {
-            queue.put(value == null ? NULL : value);
+            Object item = value == null ? NULL : value;
+            if (!measured) {
+                queue.put(item);
+                return;
+            }
+            if (!queue.offer(item)) {
+                long start = System.nanoTime();
+                try {
+                    queue.put(item);
+                } finally {
+                    putBlockedNanos += System.nanoTime() - start;
+                }
+            }
+            if (value != Source.END) {
+                puts++;
+            }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new CancellationException("pipeline interrupted");
@@ -70,7 +118,23 @@ final class Pipe implements Source {
 
     @Override
     public Object next() throws InterruptedException {
-        Object value = queue.take();
+        Object value;
+        if (!measured) {
+            value = queue.take();
+        } else {
+            value = queue.poll();
+            if (value == null) {
+                long start = System.nanoTime();
+                try {
+                    value = queue.take();
+                } finally {
+                    takeBlockedNanos += System.nanoTime() - start;
+                }
+            }
+            if (value != Source.END) {
+                takes++;
+            }
+        }
         return value == NULL ? null : value;
     }
 

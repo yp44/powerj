@@ -69,6 +69,14 @@ final class TestContext<O> implements CmdletContext<O> {
         return Optional.ofNullable(configDirectory);
     }
 
+    /** Lines measured in perf mode, most recent first. */
+    List<io.powerj.api.PerfReport> perfReports = List.of();
+
+    @Override
+    public List<io.powerj.api.PerfReport> perfReports() {
+        return perfReports;
+    }
+
     /** Number of calls to {@link #stopInput()}. */
     int stopInputCalls;
 

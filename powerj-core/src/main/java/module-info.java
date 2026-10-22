@@ -4,6 +4,7 @@
 module io.powerj.core {
     requires transitive io.powerj.api;
     requires java.logging;
+    requires java.management;
 
     exports io.powerj.core;
     exports io.powerj.core.exec;

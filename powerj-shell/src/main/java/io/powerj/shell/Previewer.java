@@ -46,6 +46,8 @@ final class Previewer {
     private final boolean colors;
 
     private volatile boolean on;
+    /** Run when the mode is entered: the perf mode is left (FR-76). */
+    private Runnable onEnter = () -> { };
 
     private final Object lock = new Object();
     /** Text to evaluate, and its number: each change of the line gives a new one. */
@@ -85,9 +87,16 @@ final class Previewer {
         reader.onLine(this::changed);
     }
 
+    void onEnter(Runnable action) {
+        this.onEnter = action;
+    }
+
     /** Switches the mode; the line typed is kept. */
     void toggle() {
         on = !on;
+        if (on) {
+            onEnter.run();
+        }
         completions.previewMode(on);
         if (!on) {
             request(null);

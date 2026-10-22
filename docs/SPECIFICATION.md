@@ -405,7 +405,7 @@ Short rule: **`$_` for one-line filters typed at the keyboard, a named lambda as
 
 ### 3.9 Cmdlets in the current scope
 
-Only **four cmdlets** are in the scope of the first steps: `ls`, `where`, `map` and `env`; the mini-iterations add `collect` (FR-36d), `grep` (FR-64), `cat` (FR-65), `sort` (FR-67), `first`, `last` and `range` (FR-68), `select` (FR-69), `count` and `measure` (FR-70), `group` (FR-71), and the file operations `mkdir`, `touch`, `cp`, `mv`, `rm` (FR-72), the conversions `to-json`, `from-json`, `to-csv`, `from-csv` (FR-73), and the processes `ps`, `kill` (FR-74). The first two alone cover the core mechanisms: producing record objects, attribute access, the pipeline, expressions, and mixing with native commands.
+Only **four cmdlets** are in the scope of the first steps: `ls`, `where`, `map` and `env`; the mini-iterations add `collect` (FR-36d), `grep` (FR-64), `cat` (FR-65), `sort` (FR-67), `first`, `last` and `range` (FR-68), `select` (FR-69), `count` and `measure` (FR-70), `group` (FR-71), and the file operations `mkdir`, `touch`, `cp`, `mv`, `rm` (FR-72), the conversions `to-json`, `from-json`, `to-csv`, `from-csv` (FR-73), and the processes `ps`, `kill` (FR-74), and `perf` (FR-76). The first two alone cover the core mechanisms: producing record objects, attribute access, the pipeline, expressions, and mixing with native commands.
 
 #### FR-35 — `ls`: list files
 
@@ -949,6 +949,31 @@ CA:
 - `ps java | sort cpu --desc | first 3`;
 - a process started for the test: `ps <nom> | kill -n` lists it and leaves it alive; `ps <nom> | kill -w -v` stops it and displays it;
 - `kill 999999`: `kill: no process 999999`; `kill (ProcessHandle.current().pid())`: `kill: cannot stop PowerJ itself (use exit)`.
+
+#### FR-76 — Perf mode and `perf`: where a pipeline spends its time
+
+**Perf mode.** **Alt+P** switches the line editor between normal and perf mode, keeping the line being typed, as Alt+V does for the preview (FR-66); the two modes are exclusive. The prompt shows it: `PJ% <directory>> `. In perf mode, each executed line is measured, and a gray footer is printed on the console after its output (never captured by a redirection or an assignment): total time, then one row per stage with `in`, `out`, `active`, `starved` and `blocked`, a `display` row, and one JVM line (garbage collections, heap peak, classes loaded, JIT time). Nothing is measured, and nothing costs anything, when the mode is off.
+
+For each stage (the stages run in parallel, so their wall times overlap):
+- `starved`: time waiting for input; `blocked`: time waiting for the next stage (backpressure); `active`: the rest of its wall time (its own work, `{ }` blocks, its own I/O);
+- the **bottleneck** is the stage with the largest `active`, marked in the footer;
+- `in` and `out`: objects received and emitted; a native stage has a wall time only.
+
+A cancelled line (Ctrl+C) prints the report of what ran, marked `cancelled`. Not measured: the preview, background commands (`&`), lines starting with `perf`, and the non-interactive modes.
+
+**`perf [<n>] [--view stages|blocks|natives|phases|jvm|lines] [-a|--all]`** emits the reports kept by the session (the last 50 measured lines) as records, to be processed in a pipeline: `perf | sort active -d | first 1`. `<n>` is the n-th measured line back (default 1); `--all` takes every kept line, oldest first, each row carrying its `line` number; the `lines` view lists every kept line unless `<n>` is given. The views are `StageStat`, `BlockStat` (calls, total, average, maximum and first call of each `{ }` block), `NativeStat`, `PhaseStat` (`parse`, `resolve`, `execute`, `display`), `JvmStat` and `LineStat`. Durations are `Duration`s (`perf | where { $_.active > 500ms }`). `$perf` holds the last report. With no measured line, a message says to press Alt+P and run a line. `perf` has no side effect (allowed in preview mode, FR-66).
+
+**JFR (perf, part B).** While perf mode is on, a Java Flight Recorder recording runs in memory (about 1–2% overhead); it stops when the mode is left. The stage threads are named after their command, so samples are grouped per stage. `perf` gains three views, built from the events of the measured line: `hot` (`HotMethod`: sampled methods per stage, with their share), `gc` (`GcStat`: collections and pauses) and `alloc` (`AllocStat`: bytes allocated per type). `perf --save [<file>]` writes the events of the line as a `.jfr` file (default folder `~/.powerj/perf/`), to open in JDK Mission Control. The footer then adds the three hottest methods of the bottleneck stage. The application image embeds the modules `jdk.jfr` and `jdk.management`; where `jdk.jfr` is absent, the mode and the other views work, and the JFR views give a non-blocking message.
+
+Acceptance criteria (CA):
+- Alt+P changes the prompt to `PJ%` and back; Alt+V then Alt+P leaves only perf mode on.
+- After `ls -r | where { $_.size > 1mb } | first 5` the footer lists three stages; `where` has `in` greater than `out`; `first` has `out` 5.
+- With a slow consumer, the stage before it shows a large `blocked`; with a slow producer, the stage after it shows a large `starved`.
+- `ls > files.txt` in perf mode leaves `files.txt` free of the footer.
+- `perf` right after a line does not replace that line's report; `perf --view blocks` lists the block of `where` with its call count.
+- Ctrl+C on a long line prints a footer marked `cancelled`.
+- `perf --view hot` after a CPU-bound line lists methods with their share, grouped by stage; `perf --save` produces a file that `jfr summary` (or JDK Mission Control) opens.
+- `bin/java --list-modules` of the application image lists `jdk.jfr`.
 
 ### 3.10 Native commands
 
@@ -1707,6 +1732,7 @@ The backlog cmdlets (§12.3) are added **one per mini-iteration**, each with a s
 | 22 | `to-json`, `from-json`, `to-csv`, `from-csv` | FR-73 | `docs/recettes/json-csv.md` |
 | 23 | `ps`, `kill` | FR-74 | `docs/recettes/ps-kill.md` |
 | 24 | Background execution `&`, `jobs` | FR-75 | `docs/recettes/background.md` |
+| 25 | Perf mode (Alt+P), `perf` | FR-76 | `docs/recettes/perf.md` |
 
 Version 2 will introduce scripting (`if`, `foreach`, functions, `.pj` files).
 
