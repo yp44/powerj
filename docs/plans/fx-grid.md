@@ -169,7 +169,7 @@ PJ ~> echo | grid                     # empty input: an empty table, not an erro
   - `=text` → equals; `!text` → does not contain;
   - `/regex/` → regular expression (invalid regex → the field turns red, the table keeps its last good filter);
   - on numeric, size and date columns: `>10kb`, `>=3`, `<2026-01-01`, `a..b` (size suffixes `kb`, `mb`, `gb` as in PowerJ).
-- The filter is applied to the **displayed text and to the raw value** (the size column answers to both `>10kb` and `KB`).
+- A column of numbers, sizes or dates is **typed**: what is typed is a number or a date, compared with the value of the cell, never with its text (see the decisions of phase 4). Text columns and `/regex/` look at the text as shown.
 - `view`: a filter row under the headers, a global search box (Ctrl+F focuses it), a "clear filters" button, status bar "n / total rows" (e.g. `127 / 4 312`).
 - The filter is debounced (200 ms) so typing stays smooth on large tables.
 - Unit tests: every operator, case-insensitivity, invalid input, a size/date column, combination of several columns, empty filter = everything, the debounce logic (with an injected clock/scheduler).
@@ -180,7 +180,7 @@ PJ ~> echo | grid                     # empty input: an empty table, not an erro
 - `FilterParser` (pure) turns an expression into a `Parsed` (the condition, whether it is negated, or the reason it is invalid); `FilterEditor` keeps what is typed and the **last good filter of each field**; `FilterSpec` is the predicate; `GridTable` is now `source → FilteredList → SortedList`; `Debouncer` takes a `Scheduler` (the toolkit's `PauseTransition` in the window, a fake clock in the tests).
 - A date names a **period** (`2026`, `2026-10`, `2026-10-05`, with a time down to the second), so `>2026-10` means after October and a range includes its last period; dates are typed in the zone of the table.
 - An operator alone (`>`, `!`, `..`) filters nothing, so that typing it does not empty the table; `=` alone finds the empty cells.
-- Text conditions look at the text shown **and** the value, so `KB` and `14520` both find `14.2 KB`.
+- **A typed column is not searched as text** (found by the first user test: `228` on a size column also kept 2.2 KB, 12.0 KB, 3.2 KB, whose byte counts contain the digits 228). On a number, a size or a date, a plain `x` or `=x` means *equal to* `x`, `!x` *not equal*, with the operators `> >= < <=` and the ranges; something that is not a number or a date is an error (pink field), not a text search. A size typed with a unit above the byte and at most one decimal (`2.2kb`) is read as the table shows it (2.15 to 2.25 KB); more decimals or bytes are exact. The text conditions (`abc`, `=abc`, `!abc`, `/regex/`) and the search box look at the **text as shown** only, never at the raw value.
 - The search box is the same grammar with the text rules, applied to every column; `!x` there means no column has `x`.
 - The filter fields live in the **headers** (the graphic of each column), so they follow the columns when the table scrolls sideways; a click in a field does not sort. Esc empties the field that has the focus, then closes the window.
 - Checked with real clicks, keys and pasted text under Xvfb (`java.awt.Robot`).

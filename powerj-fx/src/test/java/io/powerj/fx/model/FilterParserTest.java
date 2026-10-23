@@ -60,13 +60,13 @@ class FilterParserTest {
     }
 
     @Test
-    void theTextShownAndTheValueAreBothLookedAt() {
-        // 14520 bytes is shown 14.2 KB.
-        assertThat(size("kb").keeps(14_520L)).isTrue();
-        assertThat(size("14.2").keeps(14_520L)).isTrue();
-        assertThat(size("14520").keeps(14_520L)).isTrue();
-        assertThat(size("mb").keeps(14_520L)).isFalse();
-        assertThat(text("1").keeps(100)).isTrue();
+    void aTextConditionLooksAtTheTextShownAndNotAtTheValue() {
+        // The search box reads every column as text: a size is looked for as it is shown.
+        assertThat(utc.parse("kb", ColumnKind.TEXT, ColumnKind.SIZE).keeps(14_520L)).isTrue();
+        assertThat(utc.parse("14.2", ColumnKind.TEXT, ColumnKind.SIZE).keeps(14_520L)).isTrue();
+        assertThat(utc.parse("14520", ColumnKind.TEXT, ColumnKind.SIZE).keeps(14_520L)).isFalse();
+        assertThat(utc.parse("mb", ColumnKind.TEXT, ColumnKind.SIZE).keeps(14_520L)).isFalse();
+        assertThat(text("1").keeps(100)).isTrue(); // a text column that holds a number: its text is "100"
     }
 
     @Test
@@ -119,9 +119,10 @@ class FilterParserTest {
     }
 
     @Test
-    void aRegexLooksAtTheTextShownAndTheValue() {
+    void aRegexLooksAtTheTextShownEvenOnATypedColumn() {
         assertThat(size("/kb$/").keeps(14_520L)).isTrue();
-        assertThat(size("/^14520$/").keeps(14_520L)).isTrue();
+        assertThat(size("/^14\\.2/").keeps(14_520L)).isTrue();
+        assertThat(size("/^14520$/").keeps(14_520L)).isFalse();
         assertThat(size("/mb$/").keeps(14_520L)).isFalse();
     }
 
@@ -198,9 +199,26 @@ class FilterParserTest {
     }
 
     @Test
-    void aNumberWithoutOperatorIsText() {
-        assertThat(number("10").keeps(100)).isTrue();
+    void aNumberWithoutOperatorMeansEqual() {
+        assertThat(number("10").keeps(10)).isTrue();
+        assertThat(number("10").keeps(10.0)).isTrue();
+        assertThat(number("10").keeps(10L)).isTrue();
+        assertThat(number("10").keeps(100)).isFalse();
         assertThat(number("10").keeps(25)).isFalse();
+        assertThat(number("10").keeps("10")).isFalse();
+        assertThat(number("10").keeps(null)).isFalse();
+        assertThat(number("0.1").keeps(0.1)).isTrue();
+        assertThat(number("=0.1").keeps(0.1f)).isTrue();
+    }
+
+    @Test
+    void aNumberIsNeverLookedForInTheDigitsOfOthers() {
+        // 228 bytes: not 2280, 12288 or 3280, which only contain the digits.
+        assertThat(size("228").keeps(228L)).isTrue();
+        assertThat(size("228").keeps(2_280L)).isFalse();
+        assertThat(size("228").keeps(12_288L)).isFalse();
+        assertThat(size("228").keeps(3_280L)).isFalse();
+        assertThat(number("228").keeps(1_228)).isFalse();
     }
 
     @Test
@@ -210,12 +228,29 @@ class FilterParserTest {
         assertThat(parsed.error()).isEqualTo("not a number: abc");
         assertThat(number("1..x").error()).isEqualTo("not a number: x");
         assertThat(number("x..2").error()).isEqualTo("not a number: x");
+        assertThat(number("abc").error()).isEqualTo("not a number: abc");
+        assertThat(number("=abc").error()).isEqualTo("not a number: abc");
+        assertThat(number("!abc").error()).isEqualTo("not a number: abc");
     }
 
     @Test
-    void equalsOnANumberFallsBackToText() {
-        assertThat(number("=abc").isValid()).isTrue();
-        assertThat(number("=abc").keeps("ABC")).isTrue();
+    void equalsAloneFindsTheEmptyCellsOfATypedColumnToo() {
+        assertThat(number("=").keeps(null)).isTrue();
+        assertThat(number("=").keeps(5)).isFalse();
+        assertThat(date("=").keeps(null)).isTrue();
+        assertThat(size("=").keeps(0L)).isFalse();
+    }
+
+    @Test
+    void notOnATypedColumnMeansNotEqual() {
+        assertThat(number("!5").keeps(5)).isFalse();
+        assertThat(number("!5").keeps(6)).isTrue();
+        assertThat(number("!5").keeps(null)).isTrue();
+        assertThat(number("!5").negated()).isTrue();
+        assertThat(size("!1kb").keeps(1_024L)).isFalse();
+        assertThat(size("!1kb").keeps(5_000L)).isTrue();
+        assertThat(date("!2026").keeps(at("2025-06-01T00:00:00Z"))).isTrue();
+        assertThat(date("!2026").keeps(at("2026-06-01T00:00:00Z"))).isFalse();
     }
 
     @Test
@@ -242,7 +277,41 @@ class FilterParserTest {
         assertThat(size(">100").keeps(101L)).isTrue();
         assertThat(size(">100b").keeps(100L)).isFalse();
         assertThat(size("=1kb").keeps(1_024L)).isTrue();
-        assertThat(size("=1kb").keeps(1_025L)).isFalse();
+    }
+
+    @Test
+    void aSizeTypedAsItIsShownFindsWhatIsShownLikeThat() {
+        // 2.2 KB is what is shown for 2.15 to 2.25 KB, that is 2201.6 to 2304 bytes.
+        assertThat(size("=2.2kb").keeps(2_202L)).isTrue();
+        assertThat(size("2.2kb").keeps(2_252L)).isTrue();
+        assertThat(size("2.2kb").keeps(2_303L)).isTrue();
+        assertThat(size("2.2kb").keeps(2_201L)).isFalse();
+        assertThat(size("2.2kb").keeps(2_304L)).isFalse();
+        assertThat(size("2.2 KB").keeps(2_252L)).isTrue();
+        assertThat(size("2,2kb").keeps(2_252L)).isTrue();
+        assertThat(size("12kb").keeps(12_288L)).isTrue();
+        assertThat(size("1kb").keeps(1_025L)).isTrue();   // shown 1.0 KB
+        assertThat(size("1kb").keeps(1_100L)).isFalse();  // shown 1.1 KB
+        assertThat(size("!2.2kb").keeps(2_252L)).isFalse();
+        assertThat(size("!2.2kb").keeps(9_000L)).isTrue();
+    }
+
+    @Test
+    void moreDecimalsOrBytesAreExact() {
+        assertThat(size("2.25kb").keeps(2_304L)).isTrue();
+        assertThat(size("2.25kb").keeps(2_303L)).isFalse();
+        assertThat(size("228b").keeps(228L)).isTrue();
+        assertThat(size("228b").keeps(229L)).isFalse();
+        assertThat(size("=228").keeps(228L)).isTrue();
+    }
+
+    @Test
+    void whatIsShownIsAlwaysFoundByTypingIt() {
+        for (long bytes = 1_024; bytes < 3_000_000_000L; bytes += bytes < 5_000_000 ? 997 : 7_654_321) {
+            String shown = CellFormatter.text(bytes, ColumnKind.SIZE);            // e.g. "14.2 KB"
+            String typed = shown.replace(" ", "").toLowerCase(java.util.Locale.ROOT);
+            assertThat(size(typed).keeps(bytes)).as(bytes + " shown " + shown).isTrue();
+        }
     }
 
     @Test
@@ -258,6 +327,8 @@ class FilterParserTest {
     void aBadSizeIsReported() {
         assertThat(size(">10xb").error()).isEqualTo("not a size (4096, 10kb, 1.5mb, 2gb…): 10xb");
         assertThat(size(">kb").isValid()).isFalse();
+        assertThat(size("kb").error()).isEqualTo("not a size (4096, 10kb, 1.5mb, 2gb…): kb");
+        assertThat(size("=abc").isValid()).isFalse();
     }
 
     // --- dates ---
@@ -339,15 +410,19 @@ class FilterParserTest {
     }
 
     @Test
-    void equalsOnADateFallsBackToText() {
-        assertThat(date("=hello").isValid()).isTrue();
-        assertThat(date("=").keeps(null)).isTrue();
+    void aBadEqualDateIsReported() {
+        assertThat(date("=hello").error()).isEqualTo("not a date (2026, 2026-10, 2026-10-05, 2026-10-05 18:12): hello");
+        assertThat(date("hello").isValid()).isFalse();
+        assertThat(date("2026-10-05 18").isValid()).isFalse();
     }
 
     @Test
-    void aDateWithoutOperatorIsText() {
-        // The text of the cell is a local date and time ("2026-10-05 18:12").
+    void aDateWithoutOperatorNamesAPeriod() {
         assertThat(date("2026").keeps(at("2026-10-05T18:12:30Z"))).isTrue();
-        assertThat(date("1999").keeps(at("2026-10-05T18:12:30Z"))).isFalse();
+        assertThat(date("2026").keeps(at("2025-10-05T18:12:30Z"))).isFalse();
+        assertThat(date("2026-10-05").keeps(at("2026-10-05T01:00:00Z"))).isTrue();
+        assertThat(date("2026-10-05").keeps(at("2026-10-06T01:00:00Z"))).isFalse();
+        assertThat(date("2026-10-05").keeps(null)).isFalse();
     }
+
 }

@@ -107,7 +107,10 @@ With `ls -r --filter *.java | grid`. Under each header there is a `filter` field
 | 52 | In `size`, type `>10xb` | Pink, tooltip `not a size (4096, 10kb, 1.5mb, 2gb…): 10xb`. |
 | 53 | In `name`, type `>` or `!` alone, or `..` in `size` | Nothing is filtered (an operator alone is ignored), no pink. |
 | 54 | In `modified`, type `>=2026-10-23 14:00` | The files modified from 14:00 on. Also try `2026`, `2026-10`, `=2026-10-23`, `2026-10-01..2026-10-23`, `<2026-10-23`: a date stands for the **whole** period it names, so `>2026-10` means after October and `..2026-10-23` includes that whole day. |
-| 55 | In `size`, type `KB`, then `14520` (exact bytes of a file of 14.2 KB) | The filter looks at the text shown **and** at the value: both find that file. |
+| 55 | Files of 228, 2280, 12288 and 3280 bytes; `ls \| select name size path \| grid`; in `size`, type `228` | **Only** the file of 228 bytes. A column of numbers, sizes or dates is typed: `228` means equal to 228, it does not look for the digits in the other values. |
+| 55b | In `size`, type `2.2kb`, then `12kb`, then `=2.2kb`, `!2.2kb` | A size typed as it is shown finds what is shown like that (`2.2 KB`: the files from 2.15 to 2.25 KB); `!` is the opposite. With more decimals (`2.25kb`) or in bytes (`228b`) the match is exact. |
+| 55c | In `size`, type `KB` or `abc` | Pink field with `not a size (4096, 10kb, 1.5mb, 2gb…): KB`; the table keeps the last good filter. A column of numbers says `not a number: …`, a column of dates `not a date (…)`. |
+| 55d | In `size`, type `/^2\.2/` | A regular expression looks at the text **as shown** (`2.2 KB`); the search box also looks at the text as shown, in every column (`kb` finds the sizes, `14520` does not). |
 | 56 | In a column with empty cells, type `=` | Only the rows whose cell is empty. |
 | 57 | Press Ctrl+F, type `Table` in the search box | The focus goes to the search box; the rows that have `table` in **any** column (`2 / 50 rows`); `!sort` there gives the rows where no column has it, `/regex/` works too. The column filters and the search combine. |
 | 58 | Press Esc while a field has text | The field is emptied (and the table refiltered); a second Esc, with the focus elsewhere or the field empty, closes the window. |

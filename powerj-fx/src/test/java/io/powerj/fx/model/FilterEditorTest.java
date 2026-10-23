@@ -25,8 +25,8 @@ class FilterEditorTest {
     private final List<GridRow> rows = List.of(
             row("Parser.java", 14_520, "2026-10-05T18:12:00Z", "ada"),
             row("ParserTest.java", 9_216, "2026-10-06T08:00:00Z", "alan"),
-            row("README.md", 400, "2025-01-01T00:00:00Z", "ada"),
-            row("notes.txt", 12_288, "2026-03-01T00:00:00Z", null));
+            row("README.md", 400, "2025-06-15T12:00:00Z", "ada"),
+            row("notes.txt", 12_288, "2026-03-01T12:00:00Z", null));
 
     private GridRow row(String name, long size, String modified, String owner) {
         return reader.read(new File(name, size, Instant.parse(modified), owner)).row();
@@ -72,6 +72,33 @@ class FilterEditorTest {
         assertThat(shown()).containsExactly("Parser.java", "ParserTest.java");
         editor.setColumn("modified", "2026-03..2026-10-05");
         assertThat(shown()).containsExactly("Parser.java", "notes.txt");
+    }
+
+    @Test
+    void aTypedColumnIsNotSearchedAsText() {
+        editor.setColumn("size", "400");
+        assertThat(shown()).containsExactly("README.md");
+        editor.setColumn("size", "4");          // 4 bytes, not the digits of 400, 14520…
+        assertThat(shown()).isEmpty();
+        editor.setColumn("size", "9kb");        // shown as 9.0 KB
+        assertThat(shown()).containsExactly("ParserTest.java");
+        editor.setColumn("size", "KB");         // not a size: the last good filter stays
+        assertThat(editor.error("size")).isPresent();
+        assertThat(shown()).containsExactly("ParserTest.java");
+    }
+
+    @Test
+    void anIntegerColumnFindsTheValueAndNotItsDigits() {
+        var sizes = new FilterEditor(List.of(new ColumnSpec("n", ColumnKind.NUMBER)));
+        List<GridRow> numbers = new java.util.ArrayList<>();
+        for (long n : new long[] {228, 2_280, 12_288, 3_280, 1_228, 5}) {
+            numbers.add(reader.read(Map.of("n", n)).row());
+        }
+        sizes.setColumn("n", "228");
+        assertThat(numbers.stream().filter(sizes.spec().predicate()).map(r -> r.get("n"))).containsExactly(228L);
+        sizes.setColumn("n", ">=2000");
+        assertThat(numbers.stream().filter(sizes.spec().predicate()).map(r -> r.get("n")))
+                .containsExactly(2_280L, 12_288L, 3_280L);
     }
 
     @Test
