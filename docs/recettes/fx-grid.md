@@ -1,6 +1,6 @@
 # Acceptance test — Mini-iteration 26: `powerj-fx` module and `grid` cmdlet
 
-**Goal:** verify that the optional JavaFX module installs by unpacking a zip into `~/.powerj/modules/`, that its `grid` cmdlet opens a window from a pipeline, and that nothing breaks when there is no display. The checklist grows with each phase of `docs/plans/fx-grid.md`; this version covers **phase 1** (the window only says how many objects it received).
+**Goal:** verify that the optional JavaFX module installs by unpacking a zip into `~/.powerj/modules/` (after the question of consent), that its `grid` cmdlet shows the objects of a pipeline in a window (table, sort, filter, progressive loading, copy, `--pass-thru`), and that nothing breaks when there is no display. The checklist is in the order of the development phases (1 to 7); the rows are numbered once for the whole file.
 
 > Messages are shown in the system language; set `language=en` in config.properties (or `POWERJ_LANG=en`) to get the English texts quoted here.
 > Needs a graphical session. On a machine without a screen, use `xvfb-run -a powerj` (and `import -window root shot.png` to look at the result).
@@ -69,10 +69,8 @@ In a folder with a few files and a sub-folder (`cd ~/dev/powerj`, say), with the
 | 30 | `ls \| where { $_.size > 1tb } \| grid` | `No result` in the middle of the table, `0 rows`. |
 | 31 | `cat pom.xml \| grid` then widen the window | The columns of `cat` (path, line, text…); a very long line is cut with `…` and its full text shows in a tooltip when the mouse stays on the cell. |
 | 32 | Press Esc in the window | The window closes; the shell and the other windows are not affected. |
-| 33 | `ls -r ~ \| grid` (a large tree) | The window opens at the first object and fills while `ls` goes on (see phase 5); scrolling the rows is smooth. |
+| 33 | `ls -r ~ \| grid` (a large tree) | The window opens at the first object and fills while `ls` goes on (see rows 69 to 79); scrolling the rows is smooth. |
 | 34 | A record whose property raises an error (none among the built-in cmdlets: only a test covers it) | One message `cannot read the property x: …` per column, the cell stays empty, the other cells are shown. |
-
-Not done yet (later phases): copying, column menu, selection given back to the pipeline.
 
 ## Phase 3 — sorting
 
@@ -181,7 +179,7 @@ Top bar: search box, `Columns ▾`, `Details`, `Clear filters`. With `ls | selec
 | 95 | Close a window, then open another | The new window opens where the last one was, with its size; the file is `~/.powerj/fx-grid.properties` (`x`, `y`, `width`, `height`). A file that is damaged, or too small, is ignored; a position that is no longer on the screen (another monitor) is brought back. |
 | 96 | `help grid` | `--title`, `--columns`, `--wait`, `--max-rows`, in French too. |
 
-Not done (see the plan): `--no-focus` (JavaFX has no reliable way to open a window without taking the focus; to be decided).
+
 
 ## Phase 7 — `--pass-thru`: the ticked rows go back into the pipeline
 
@@ -201,3 +199,15 @@ With `ls | grid --pass-thru | map { $_.name }` in a folder of files `f1228.bin`,
 | 106 | `ls -r ~ \| grid --pass-thru --max-rows 500`, tick a row, `OK` | The table is truncated at 500 rows; what is ticked among them goes on. Closing the window while it loads stops the reading and gives nothing. |
 | 107 | Ctrl+C in the terminal while the window is open | The window closes and nothing goes on. |
 | 108 | `help grid` | `--pass-thru` and `--single`, in French too. |
+
+## Where this checklist was run, and what it does not cover
+
+- **Linux** (Ubuntu, JDK 25, JavaFX 25.0.5, under Xvfb without a window manager): every row was run with the real launcher and real mouse and key events (`java.awt.Robot`); the clipboard was read back.
+- **Windows** and **macOS**: not run by the development session. On Windows the CI builds the module, loads it and checks `help grid` (it does **not** open a window); the rows that need a window are to be run by hand there. macOS is best effort.
+- Without a window manager the **title** of the window (`--title`) cannot be seen, and the focus does not move.
+- **Not implemented:** `--no-focus` (JavaFX has no reliable way to show a window without taking the focus). **Not automated:** the checks that need a real window (they are in this checklist, not in the tests); the unit tests cover the model, the cmdlet and the runtime, and `powerj-coverage` keeps them above 90 % (the `view` package is the only code outside the threshold).
+- Not measured: the memory of a window that stays open for hours, and twenty windows opened in a row (row 79).
+
+## Automated part (CI)
+
+On Linux, the CI unpacks the zip, then checks with the real launcher: the consent message with no answer, the refusal, the loading (`mod-list`), `help grid`, a window that opens under `xvfb-run` without any message, and the message without a display. On Windows: the consent message, the loading and `help grid`. Both jobs keep the zip of the module as an artifact (`powerj-fx-linux-x64`, `powerj-fx-windows-x64`).

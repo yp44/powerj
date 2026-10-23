@@ -97,6 +97,7 @@ Out of scope for v1: control structures (`if`, `foreach`, functions — planned 
 | `to-json`, `from-json`, `to-csv`, `from-csv` | JSON and CSV: `ls \| select name size \| to-json > files.json`, `cat files.json \| from-json \| where { $_.size > 1kb }`, `cat data.csv \| from-csv -d ";"`; always an array, JSON Lines with `-l`, CSV values as strings, objects as `Row`s | [json-csv](docs/recettes/json-csv.md) |
 | `ps`, `kill` | Processes as objects: `ps java \| sort cpu --desc \| first 3`, `ps notepad \| kill -n`, then `ps notepad \| kill -w`; `-f` forcible stop, `-v` shows what was stopped | [ps-kill](docs/recettes/ps-kill.md) |
 | `perf` | What perf mode (Alt+P) measured, as records: `perf \| sort active -d \| first 1`, `perf --view blocks`, `perf --view hot`, `perf --save f.jfr`; views `stages`, `blocks`, `natives`, `phases`, `jvm`, `lines`, `hot`, `gc`, `alloc` | [perf](docs/recettes/perf.md) |
+| `grid` | **Optional module** `powerj-fx`: shows the objects in a JavaFX window, with sorting and filtering by column, loading while the pipeline runs, copy, and `--pass-thru` to send the ticked rows on: `ls -r \| grid`, `ps \| grid --columns pid,name`, `ls -r \| grid --pass-thru \| rm` | [fx-grid](docs/recettes/fx-grid.md) |
 | `collect` | Gathers a pipeline into one list: `(ls -r \| collect).size()` | [etape-8](docs/recettes/etape-8-collect.md) |
 | `env` | Reads and sets environment variables (`env --set MAVEN_OPTS=-Xmx2g`) | [etape-3](docs/recettes/etape-3.md) |
 
@@ -161,6 +162,31 @@ hot (ls -r /): Files.walkFileTree 38% · UnixFileAttributes.get 17% · String.ha
 PJ% ~/dev> perf --view blocks | sort total -d
 ```
 
+### Graphical table (optional module)
+
+`grid` opens the objects of a pipeline in a window, like PowerShell's `Out-GridView`. It lives in the separate module **`powerj-fx`** (JavaFX 25), which is **not in the distribution**: it adds about 8 MB to a download and 32 MB once installed, and needs a graphical session (GTK 3 on Linux).
+
+```bash
+./mvnw -pl powerj-fx -am package                      # → powerj-fx/target/powerj-fx-<version>-<platform>.zip
+unzip powerj-fx/target/powerj-fx-*-linux.zip -d ~/.powerj/modules/     # creates ~/.powerj/modules/fx/ (Windows: Expand-Archive)
+```
+
+At the first load PowerJ asks once whether the module may use native code (JavaFX does) and records the answer in `config.properties` (`modules.nativeAccess.io.powerj.fx=true`); without a terminal (`powerj -c`, a script) the module is not loaded until the answer is there. `mod-load ~/.powerj/modules/fx` loads it without a restart.
+
+```text
+PJ ~/dev> ls -r --filter *.java | grid                 # the window opens at once; the prompt comes back
+PJ ~/dev> ps | grid --title Processes --columns pid,name,cpu --wait
+PJ ~/dev> ls -r | grid --pass-thru | where { $_.size > 1mb } | rm -n     # tick files, OK: they go on in the pipeline
+```
+
+- **Sort** by clicking a header (ascending, descending, none; Shift adds a column); the values are compared, not their texts (9 KB before 10 KB).
+- **Filter** in the field under each header and in the search box (Ctrl+F). Text columns: `abc`, `=abc`, `!abc`, `/regex/`. Numbers, sizes and dates are typed: `228` means *equal to 228*, `>=2kb`, `1kb..1mb`, `>2026-10`; a drop-down `== < > <= >=` goes before the field of numeric columns.
+- **Loading** while the pipeline runs (`loading…`), at most `--max-rows` (100 000) rows, a **Pause** button, Ctrl+C or closing the window stops the pipeline.
+- **Copy** selected rows with Ctrl+C (tab-separated) or Ctrl+Shift+C (JSON); right click for the cell, the rows, `Fit to content`, `Hide column`; F3 shows every property of a row; the position and size of the window are remembered.
+- **`--pass-thru`**: a check box column, `Select all` / `Unselect all` on the rows the filter shows, `OK` sends every ticked row on (the filtered-out ones too), `Cancel` sends nothing; `--single` allows one row.
+
+Details: [FR-77](docs/SPECIFICATION.md), plan [fx-grid](docs/plans/fx-grid.md).
+
 ### Languages
 
 Messages, help, completion and errors in **English or French**; commands and options are the same in both. See [Configuration](#configuration).
@@ -177,6 +203,8 @@ Messages, help, completion and errors in **English or French**; commands and opt
 ./mvnw verify                 # compile + tests + coverage (80% of lines and branches)
 ./mvnw -Pdist verify          # + standalone application image (jlink runtime + jpackage launcher)
 ```
+
+`powerj-fx` is built too (its zip is in `powerj-fx/target/`), but it is not part of the application image.
 
 The image is produced in `powerj-dist/target/jpackage/powerj/` (launcher `bin/powerj` on Linux/macOS, `powerj.exe` on Windows), with a zip archive in `powerj-dist/target/`. It embeds its own Java runtime containing all the `java.se` modules: nothing else needs to be installed on the target machine.
 
@@ -215,10 +243,11 @@ PowerJ keeps its files in `~/.powerj/` (`%USERPROFILE%\.powerj\` on Windows, or 
 | File / folder | Role |
 |---|---|
 | `history` | Command history (UTF-8), reloaded at startup |
-| `config.properties` | `history.size=10000`, `language=en` (or `fr`) |
+| `config.properties` | `history.size=10000`, `language=en` (or `fr`), `modules.nativeAccess.<module>=true` (consent to load a module that uses native code, asked once) |
 | `profile.pj` | Commands run when the interactive shell starts: `$proj = Path.of("/home/me/dev")`, `import java.time.*`, `env --set MAVEN_OPTS=-Xmx2g` — errors show their line and never prevent startup ([profile](docs/recettes/profile.md)) |
 | `protected-paths` | Paths that `rm` and `mv` refuse to remove (one per line, `~` for the home folder); written with the defaults of the platform on first launch, then yours to edit ([fileops](docs/recettes/fileops.md)) |
-| `modules/` | Third-party module jars, loaded at startup |
+| `modules/` | Third-party module jars, or folders (a module and its dependencies), loaded at startup |
+| `fx-grid.properties` | Position and size of the window of `grid`, written when it is closed |
 | `logs/` | Diagnostic log, always in English |
 
 | Environment variable | Role |
@@ -242,7 +271,7 @@ set POWERJ_LANG=en                      # Windows (cmd.exe), before launching po
 
 ### Modules
 
-All modules are JPMS modules (`module-info.java`); the only runtime dependency is [JLine 3](https://github.com/jline/jline3).
+All modules are JPMS modules (`module-info.java`); the only runtime dependency is [JLine 3](https://github.com/jline/jline3) (the optional `powerj-fx` module also needs JavaFX).
 
 | Module | Role |
 |---|---|
@@ -251,6 +280,7 @@ All modules are JPMS modules (`module-info.java`); the only runtime dependency i
 | `powerj-core` | Lexer, parser, interpreter, pipeline, option binding, Java interoperability, completion engine, output formatting, native execution |
 | `powerj-cmdlets` | Built-in cmdlets (`ls`, `grep`, `cat`, `where`, `map`, `sort`, `first`, `last`, `range`, `select`, `count`, `measure`, `group`, `mkdir`, `touch`, `cp`, `mv`, `rm`, `collect`, `env`) |
 | `powerj-shell` | Entry point (`Main`), JLine REPL, profile, script mode, history expansion |
+| `powerj-fx` | Optional module, not in the distribution: the JavaFX cmdlets (`grid`); a template for a real third-party module (dependencies, messages, settings) |
 | `powerj-coverage` | Test coverage of all the modules: JaCoCo report and 80% threshold |
 | `powerj-dist` | Distribution: jlink runtime + jpackage launcher / installer |
 | `examples/greet` | Example third-party module, not shipped: a template for your own cmdlets |
@@ -357,7 +387,8 @@ PowerJ is in active development (version `0.1.0-SNAPSHOT`). Implemented so far:
 - third-party modules loaded from jars;
 - English / French interface, `~` expansion, startup profile;
 - preview mode (Alt+V): results shown while typing;
-- perf mode (Alt+P) and the `perf` cmdlet: where a pipeline spends its time.
+- perf mode (Alt+P) and the `perf` cmdlet: where a pipeline spends its time;
+- the optional JavaFX module `powerj-fx` and its `grid` cmdlet: a window with a sortable, filterable table, progressive loading, copy and `--pass-thru`.
 
 The v1 cmdlet roadmap is done ([roadmap](docs/plans/cmdlet-roadmap.md), end-to-end check in [pipeline-v1](docs/recettes/pipeline-v1.md)). Still in the backlog ([§12.3](docs/SPECIFICATION.md#123-cmdlet-backlog-outside-the-current-scope)): `uniq`, `find`, `tee`, `table`/`tree`, `http`/`ping`, `open`. Next: a scripting language with control structures in v2. The step-by-step plan is in [§11 of the specification](docs/SPECIFICATION.md#11-iterative-development-plan).
 
@@ -366,6 +397,7 @@ The v1 cmdlet roadmap is done ([roadmap](docs/plans/cmdlet-roadmap.md), end-to-e
 - [Specification](docs/SPECIFICATION.md): functional requirements, grammar, extension API, architecture.
 - [Acceptance checklists](docs/recettes/) for each development step, and [plans](docs/plans/) of the latest iterations.
 - [Example module `greet`](examples/greet/README.md).
+- [Module `powerj-fx` and `grid`](docs/plans/fx-grid.md): plan, decisions and [acceptance checklist](docs/recettes/fx-grid.md).
 
 Coming from PowerShell? A few equivalences (full table in [§12.4](docs/SPECIFICATION.md#124-powershell--powerj-mapping)):
 

@@ -255,7 +255,7 @@ PJ ~> echo | grid                     # empty input: an empty table, not an erro
 - Checked with the real launcher under Xvfb: ticking by click, filter + `Select all` / `Unselect all` (`2 selected`, `4 selected`, `1 selected`), `OK` printing the four objects including the hidden one, `--single`, `Cancel` and Esc giving nothing, the error of `--single`.
 - Coverage: `io.powerj.fx.model` and `grid` above 90 %; 261 tests in the module.
 
-### Phase 8 — Documentation, CI and wrap-up
+### Phase 8 — Documentation, CI and wrap-up — **done** (except the Windows run)
 - `docs/SPECIFICATION.md`: new **FR-77 — Graphical cmdlets (module `fx`), `grid`** (syntax, options, records, acceptance criteria), §4.4 (a module with dependencies, example `fx`), §5.1 module list, §11 row 26, §12.3.
 - `docs/recettes/fx-grid.md`: the manual checklists of phases 1-7 merged, in the format of `grep.md`.
 - `README.md`: "Optional graphical module" section (what it is, why it is not in the distribution, how to install it, the cost: ~8-9 MB zip / ~32 MB installed) and the cmdlet in the table.
@@ -264,13 +264,21 @@ PJ ~> echo | grid                     # empty input: an empty table, not an erro
 - `powerj-coverage`: dependency on `powerj-fx`, the new package rule and the documented `view` exclusion (or Monocle coverage).
 - Final check: `./mvnw verify` with the coverage report, and the complete manual checklist on **Windows and Linux**.
 
+**What was done, and what was decided:**
+- **Specification:** FR-77 (the module, `grid`, its options, columns, sort, filter, progressive loading, use of the table, `--pass-thru`, acceptance criteria), §4.4 (a module with dependencies), §5.1 (module list), §7 (the zip), §8 (`fx-grid.properties`), §11 (row 26), §12.3 (`grid` done) and §12.4 (`Out-GridView`).
+- **README:** the cmdlet in the table, a section "Graphical table (optional module)" with the installation, the cost (about 8 MB to download, 32 MB installed), the main behaviours; the module list, the configuration table, the status and the documentation links.
+- **Checklist** `docs/recettes/fx-grid.md`: rows 1 to 108 in the order of the phases, with a closing section on where it was run and what it does not cover.
+- **CI** (`.github/workflows/ci.yml`): on Linux, a smoke test under `xvfb-run` (consent message with no answer, refusal, loading, `help grid`, a window that opens without any message, the message without a display) and the zip kept as an artifact; on Windows, consent, loading and `help grid` only (a window is not opened there: it was not possible to check what the Windows runner allows), and the zip kept as an artifact. The Linux script was run locally as it stands.
+- **Coverage:** the rule of `powerj-coverage` (90 % of lines and branches for `io.powerj.fx`, `io.powerj.fx.grid`, `io.powerj.fx.model`, `io.powerj.fx.runtime`) holds, with the `view` package excluded and listed in the report.
+- **Not done:** the profile `fx-ui` of UI tests (Monocle does not exist for JavaFX 25, and the real-window checks were done by hand under Xvfb, with a script that is not part of the repository); `--no-focus`; a run on Windows and macOS.
+
 ## Order and dependencies
 Phase 1 first (it can invalidate the approach through R1-R3). Then 2 → 3 → 4 are sequential (each builds on the model of the previous one). Phase 5 can go before or after 6; phase 7 needs 2-4 only. Phase 8 closes the iteration. A first usable version is already available after **phase 4**.
 
-## Open questions for the user
-1. **Cmdlet name:** `grid` (proposed), or `out-grid` / `ogv` aliases for PowerShell users?
-2. **Default of `--wait`:** non-blocking (proposed: the prompt comes back, like `xeyes &`), or blocking as `Out-GridView` does?
-3. **JavaFX version:** 25 (LTS, requires JDK 23+; fits Java 25 of the project) — fine?
-4. ~~**R3:** native access for third-party modules~~ — settled: consent asked once and recorded in `config.properties`, see the results of phase 1.
-5. **Platforms** to guarantee: Windows and Linux (proposed); macOS best effort.
-6. **Coverage fallback:** if Monocle is unusable, accept the documented exclusion of `view` from the JaCoCo threshold (with a ≥ 90 % rule on `model` and `grid` instead)?
+## Open questions for the user — answered
+1. **Cmdlet name:** `grid`, no alias for now.
+2. **`--wait`:** not the default: the prompt comes back at once (`--wait`, and `--pass-thru` which implies it, block).
+3. **JavaFX:** 25.0.5 (LTS, JDK 23+).
+4. **Native access:** the user is asked once, the answer is kept in `config.properties` (`modules.nativeAccess.<module>`); without a terminal the module is not loaded.
+5. **Platforms:** Linux checked; Windows used by the user, not run by the session; macOS best effort.
+6. **Coverage fallback:** the `view` package is excluded from the threshold (explicit exclusion in `powerj-coverage`); 90 % for `model`, `grid`, `runtime`.

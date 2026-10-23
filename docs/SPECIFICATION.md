@@ -979,6 +979,49 @@ Acceptance criteria (CA):
 - With `env --set POWERJ_PERF_JFR_ALLOCTHROTTLE=1/s`, the file saved by `perf --save` after an allocating line holds a handful of `jdk.ObjectAllocationSample` events (`jfr summary`), and thousands with `off`; `lots` gives a message once and keeps the default.
 - `bin/java --list-modules` of the application image lists `jdk.jfr` and `jdk.management`, and the launcher configuration holds `--add-modules=jdk.jfr,jdk.management`.
 
+#### FR-77 — Graphical cmdlets: the optional `powerj-fx` module, and `grid`
+
+**The module.** `powerj-fx` is a third-party module (§4.4) written with JavaFX 25; the first graphical cmdlet it provides is `grid`. It is **not part of the distribution**: JavaFX adds about 8 MB to an archive and 32 MB to the installed folder, and it needs a graphical session (GTK 3 on Linux). It is built with `./mvnw -pl powerj-fx -am package` (the JavaFX jars of the platform are chosen by the build; `-Djavafx.platform=win` builds for another one) into `powerj-fx/target/powerj-fx-<version>-<platform>.zip`, which holds the folder `fx/` (`powerj-fx.jar` and the JavaFX jars; `powerj-api` is not in it, the shell provides it). It is installed by unpacking the zip into `~/.powerj/modules/`, or by `mod-load ~/.powerj/modules/fx`. Its manifest has `Enable-Native-Access: true`, so the user is asked once before it is loaded (§4.4: `modules.nativeAccess.io.powerj.fx`). JavaFX is started at the first window, once for the JVM, and kept: closing the last window does not stop it. Without a display `grid` says `the graphical toolkit cannot start (no graphical display?)` and the shell goes on; a start that failed is not tried again in that session. The launcher of the distribution lists `jdk.unsupported` among its root modules, which `javafx.graphics` requires.
+
+**`grid [--max-rows <n>] [--title <text>] [--columns <a,b,…>] [--wait] [--pass-thru [--single]]`** shows the objects it receives from the pipeline in a window, as a table. It must receive objects (`ls | grid`), is never run by the preview (FR-66), and emits nothing, except with `--pass-thru`.
+
+| Option | Effect |
+|---|---|
+| `--max-rows <n>` | Most rows read, 100 000 by default, at least 1. One more object than the limit stops the reading (`stopInput`, FR-68b) and the status bar says `truncated at n rows`. |
+| `--title <text>` | Title of the window (`PowerJ grid`). |
+| `--columns a,b,c` | Columns shown first, in this order; the others are hidden and are in the `Columns` menu. Names are matched without regard to case; a name that never arrives is reported once at the end (`no such column: x`, non-blocking); a list without a name is an error. |
+| `--wait` | Does not give the prompt back until the window is closed; Ctrl+C closes the window and ends the command. |
+| `--pass-thru` | The user ticks rows; OK gives them back (below). It waits for the window as `--wait`. |
+| `--single` | With `--pass-thru`: one row at a time. Without it, an error. |
+
+**Columns and cells.** The columns are those of the terminal table (FR-30): the components of a record (those of `@Display`, in its order, if there is one), the keys of a `Row` or a `Map`, one column `value` for a scalar (text, number, date, path…), the getters (`getX`, `isX`) of any other object. Objects of several kinds share the table: the columns are the union, in order of first appearance, and a row lacks the cells of the columns of the other kinds. A column has a kind: text, number, size (`@Bytes`), date. The values are read with the same property access as `$_.name`, so the records of any third-party module can be shown. A cell shows what the terminal shows (`14.2 KB`, local dates, one line, a text longer than 300 characters cut with `…`; the whole text is in a tooltip). Numbers and sizes are aligned to the right.
+
+**Sort.** A click on a header sorts ascending, a second click descending, a third removes the sort; Shift+click adds a column to the sort. The values are compared, not their texts: numbers by value (a size by its bytes), dates by time, texts without regard to case, `false` before `true`, empty cells always last; a column with several kinds shows numbers, dates, booleans, then texts. Rows that are equal for the sort keep the order they arrived in, whatever the sorts made before.
+
+**Filter.** Under each header there is a field; above the table, a search box (Ctrl+F) and `Clear filters`; the status bar says `shown / total rows`. The filter is applied 200 ms after the last key; the filters of the columns and the search are combined (AND); an invalid expression turns its field pink, says why in a tooltip and keeps the last good filter; an operator alone filters nothing.
+- **Text column:** `abc` (contains, without regard to case), `=abc` (equals), `!abc` (does not contain), `/regex/` (regular expression, without regard to case), `=` (empty cell). They look at the text **as shown**.
+- **Number, size and date columns are typed:** what is typed is a number or a date, compared with the value of the cell, never with its text. `228` or `=228` is *equal to* 228 (it does not find 2280), `!228` *not equal*, `>`, `>=`, `<`, `<=`, and ranges `a..b`, `a..`, `..b` (ends included). Sizes take `b kb mb gb tb` (multiples of 1024); a size typed in a unit above the byte with at most one decimal (`2.2kb`) finds the sizes shown like that (2.15 to 2.25 KB). A date stands for the whole period it names (`2026`, `2026-10`, `2026-10-05`, `2026-10-05 18:12`, `…:30`), so `>2026-10` means after October and `2026-10-01..2026-10-05` includes October 5; dates are read in the zone of the machine. Anything else is an error.
+- Before the field of a number or size column, a list `==`, `<`, `>`, `<=`, `>=` gives the comparison of a plain value (`>=` and `2kb` is `>=2kb`); a text that has its own operator, a range or a regular expression is read as typed.
+- The search box reads every column as text (as shown), with the text rules above; `!x` there means that no column has `x`.
+
+**Progressive loading.** The window opens at the first object (at the end, if there is none) and fills while the pipeline goes on. The pipeline and the window are linked by a **bounded queue** (20 000 rows): the window takes what has arrived every 100 ms, in batches, and a pipeline faster than the window waits. New columns appear when a new kind of object arrives. The status bar says `loading…`, `truncated at n rows`, or `input interrupted` when the pipeline ended without finishing (Ctrl+C, an error: `end` is not called then). The `Pause` button before the row count stops the table from taking rows; the queue fills up and the pipeline waits in its turn (`Resume` goes on; the button is disabled once everything has arrived). Closing the window stops the pipeline.
+
+**Use of the table.** The selected rows are copied by Ctrl+C as tab-separated text (header and rows as shown, whole) and by Ctrl+Shift+C as JSON (the values: numbers stay numbers, a size is its bytes, a date is ISO 8601), only the visible columns, in the order of the table. A right click on a cell gives `Copy cell` and the two copies; a right click on a header gives `Fit to content` and `Hide column`; `Columns ▾` shows and hides each column; F3 (or `Details`) shows every property of the selected row, hidden columns included. Esc empties the text field that has the focus, otherwise closes the window. The position and size of the window are kept in `fx-grid.properties` of the configuration folder (§8), and brought back on the screen if it has changed.
+
+**`--pass-thru`.** A column of check boxes comes first (it is not a column of the data). `Select all` ticks the rows **found by the filter**, `Unselect all` unticks them; the other rows are not touched. The tick belongs to the row: a filter or a sort does not change it. `OK` gives back to the pipeline **the objects received** that are ticked, **the ones a filter hides included**, in the order of the table (the sort, otherwise the order of arrival); `Cancel`, the cross, Esc, Ctrl+C or OK with nothing ticked give nothing. With `--single` ticking a row unticks the other and `Select all` is not shown. The cmdlet is `passThrough` (completion knows the type of the objects after it).
+
+Acceptance criteria (CA), checked by `docs/recettes/fx-grid.md`:
+- Unpacking the zip into `~/.powerj/modules/` then `mod-list` lists `io.powerj.fx` with `[grid]`, after the question of §4.4; `ls | grid` opens a window at once and gives the prompt back.
+- Without a display, `ls | grid` fails with the message above, a second try says it failed earlier, and the shell keeps working. `grid` alone is an error.
+- `ls | grid` shows `name`, `size`, `modified`, `dir`; sizes readable and right-aligned; `greet --name Ada | grid` (a record of another module) shows its columns; `1 row`, `No result` and `0 rows` are handled.
+- Clicking `size` three times gives ascending (9 KB before 10 KB), descending, then the order of arrival; two keys with Shift; empty cells last in both directions.
+- In `size`, `228` keeps only the file of 228 bytes (not 2280, 12288, 3280), `2.2kb` keeps the files shown 2.2 KB, `>=2kb` with the list `>=` and `2kb` keeps the same files as `>=2kb`; `KB` turns the field pink and the table keeps its last filter; `/(/` in a text column too.
+- `sh slow.sh | grid` (30 lines, one every 0.3 s) opens at the first line, shows `loading…`, then `30 rows`; Ctrl+C leaves the window with `input interrupted`; closing it gives the prompt back at once; `Pause` freezes the count and `Resume` brings the waiting rows.
+- `grid --max-rows 5000` on 400 000 objects stops at 5000 and says `truncated`; `--max-rows 0` is an error.
+- Ctrl+C on selected rows and Ctrl+Shift+C give the texts of the visible columns; `--columns size,name` shows these two columns in this order; `--wait` keeps the prompt until the window is closed, and Ctrl+C closes the window.
+- With `--pass-thru`: ticking two rows and `OK` gives these two objects to the next stage; after a filter, `Select all` and `Unselect all` only touch the rows shown, and `OK` gives back a ticked row that the filter hides; `Cancel` gives nothing; `--single` allows one row; `--single` alone is an error.
+- A window closed at some place opens there next time; the report of coverage lists `io.powerj.fx.model`, `grid` and `runtime` above 90 %.
+
 ### 3.10 Native commands
 
 **FR-37 — Principle: streams stay streams.** A native command is **not** wrapped in an object: its standard output and its error output are handled as streams, the way a classic shell does.
@@ -1421,6 +1464,7 @@ Yves   Hello Yves!   2026-10-07 10:12:03
   - **No answer yet, interactive terminal** (startup or `mod-load`): PowerJ asks `The module "io.powerj.fx" uses native code (modules: …). Load it? [y/N]` (`y`, `yes`, `o`, `oui` accept, anything else refuses), records the answer in `config.properties` (comments and other settings are kept) and goes on. Ctrl+C or the end of the input records nothing and does not load the module.
   - **No answer yet, nobody to ask** (`powerj -c`, a `.pj` file, standard input that is not a terminal): the module is **not loaded** and the message names the setting to add. Nothing is ever asked or recorded there.
   - This is informed consent, not a sandbox: anyone who can write in `~/.powerj/` can already install code that runs with the rights of the user.
+- A module with dependencies and resources is `powerj-fx` (FR-77): a folder `fx/` with its jar and the JavaFX jars, built into a zip, with its own messages in `en` and `fr`, a settings file in the configuration folder, and the consent above for its native libraries. It is a better template than `greet` for a real module.
 - An invalid module (unreadable jar, missing dependency, no cmdlet, module already loaded, conflicting name, exception during loading) is reported with a warning; the other modules are loaded normally.
 
 ---
@@ -1438,6 +1482,7 @@ powerj/                         (parent POM, packaging pom)
 │                               native execution
 ├── powerj-cmdlets/             Built-in cmdlets (ls, grep, where, map, collect, env)
 ├── powerj-shell/               JLine REPL, completion, highlighting, main
+├── powerj-fx/                  Optional module, not in the distribution: JavaFX cmdlets (`grid`, FR-77)
 ├── powerj-coverage/            Test coverage of all the modules (JaCoCo report and threshold, NFR-05)
 ├── powerj-sample-module/       Sample third-party module (greet)
 └── powerj-dist/                jlink + jpackage → powerj.exe
@@ -1517,6 +1562,7 @@ Java's new features are used **where they bring a concrete benefit**:
 - **GitHub Actions CI**:
   - `build` job (Linux): `mvn verify` on every push and PR;
   - `package-windows` job (`windows-latest`): produces the installer and the portable `powerj/` folder as **downloadable artifacts** on every push to a release branch.
+- `powerj-fx` is built with the others (`mvn verify`) and produces `powerj-fx/target/powerj-fx-<version>-<platform>.zip`, kept as an artifact of the CI on Linux and on Windows; it is not part of the application image, which stays free of JavaFX (FR-77).
 - Linux/macOS launchers (`jpackage --type app-image`) as a bonus, non-blocking.
 
 ---
@@ -1532,6 +1578,7 @@ User folder `~/.powerj/` (created on first launch):
 | `config.properties` | `history.size=10000`, `language=en` (or `fr`, FR-61), `native.prefer=find,sort`, `colors.cmdlet=green`, `modules.nativeAccess.<module>=true` (consent to load a module that uses native code, §4.4)… |
 | `logs/` | Diagnostic log, in English (FR-60). |
 | `protected-paths` | Paths that `rm` and `mv` refuse to remove (FR-72): one per line, `~` for the home folder, `#` for comments; created at first launch with the defaults of the platform. |
+| `fx-grid.properties` | Position and size of the window of `grid` (`x`, `y`, `width`, `height`), written when the window is closed (FR-77). |
 | `profile.pj` | Commands run when the interactive shell starts (FR-63): variable assignments (`$proj = Path.of("D:/dev")`), `import java.time.*`, `env --set MAVEN_OPTS=-Xmx2g`. `$profile` contains its path. |
 
 Environment variables read by PowerJ:
@@ -1742,6 +1789,7 @@ The backlog cmdlets (§12.3) are added **one per mini-iteration**, each with a s
 | 23 | `ps`, `kill` | FR-74 | `docs/recettes/ps-kill.md` |
 | 24 | Background execution `&`, `jobs` | FR-75 | `docs/recettes/background.md` |
 | 25 | Perf mode (Alt+P), `perf` | FR-76 | `docs/recettes/perf.md` |
+| 26 | Optional JavaFX module `powerj-fx`, `grid` (table, sort, filter, progressive loading, `--pass-thru`) | FR-77 | `docs/recettes/fx-grid.md` |
 
 Version 2 will introduce scripting (`if`, `foreach`, functions, `.pj` files).
 
@@ -1835,6 +1883,7 @@ PJ C:\dev> (ls)*.name.stream().map({ $_.toUpperCase() }).sorted().toList()
 | `http`, `ping` | Network | `HttpResponse`, `PingResult` |
 | `env` | Environment variables | `EnvVar` |
 | `open` | Open with the associated application | — |
+| ~~`grid`~~ | Table window with sort, filter and selection (`Out-GridView`) — **done**, optional module `powerj-fx` (FR-77) | unchanged with `--pass-thru` |
 
 Target vision once the backlog is complete:
 
@@ -1859,6 +1908,7 @@ With the cmdlets of the roadmap (`find` was cancelled), the end-to-end check is 
 | `& "C:\outil.exe"` | `^"C:\outil.exe"` |
 | `Start-Process notepad`, `Start-Job` | `notepad &` (native commands only, FR-75); `jobs` |
 | `Get-Member` | `help members` |
+| `Out-GridView`, `Out-GridView -PassThru`, `-Wait` | `grid` (optional module `powerj-fx`), `grid --pass-thru`, `grid --wait` (FR-77) |
 | `[System.Math]::Max(3, 7)` | `Math.max(3, 7)` |
 | `[System.IO.File]::ReadAllLines("a.txt")` | `java.nio.file.Files.readAllLines(Path.of("a.txt"))` |
 | `New-Object System.Text.StringBuilder` | `new StringBuilder()` |
