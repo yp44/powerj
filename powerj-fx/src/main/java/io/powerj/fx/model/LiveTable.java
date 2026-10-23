@@ -39,6 +39,7 @@ public final class LiveTable {
     private volatile boolean paused;
     private volatile Done done = Done.NO;
     private volatile Thread producer;
+    private volatile List<GridRow> accepted;
     private final CountDownLatch closedLatch = new CountDownLatch(1);
     private final List<Runnable> closeListeners = new CopyOnWriteArrayList<>();
 
@@ -86,6 +87,20 @@ public final class LiveTable {
             closedLatch.countDown();
             closeListeners.forEach(Runnable::run);
         }
+    }
+
+    /**
+     * The user validated the selection ({@code --pass-thru}): these rows go back to the pipeline. The window then closes.
+     * Closing it any other way gives nothing back.
+     */
+    public void accept(List<GridRow> rows) {
+        accepted = List.copyOf(rows);
+        close();
+    }
+
+    /** The rows validated with OK, empty if the window was closed in another way (or is still open). */
+    public java.util.Optional<List<GridRow>> accepted() {
+        return java.util.Optional.ofNullable(accepted);
     }
 
     /** Runs {@code action} when {@link #close()} is called (at once if it was). It runs on the thread that closes. */

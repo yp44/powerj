@@ -280,6 +280,43 @@ class LiveTableTest {
     }
 
     @Test
+    void acceptingGivesTheRowsBackAndClosesTheWindow() {
+        var live = new LiveTable(1);
+        assertThat(live.accepted()).isEmpty();
+        var calls = new java.util.concurrent.atomic.AtomicInteger();
+        live.onClosed(calls::incrementAndGet);
+        var row = new GridRow("x", java.util.Map.of("a", 1));
+        live.accept(List.of(row));
+        assertThat(live.accepted()).contains(List.of(row));
+        assertThat(live.isClosed()).isTrue();
+        assertThat(calls).hasValue(1);
+    }
+
+    @Test
+    void closingInAnotherWayGivesNothingBack() {
+        var live = new LiveTable(1);
+        live.close();
+        assertThat(live.accepted()).isEmpty();
+    }
+
+    @Test
+    void theResultIsThereWhenAwaitClosedReturns() throws Exception {
+        var live = new LiveTable(1);
+        var row = new GridRow("x", java.util.Map.of());
+        CompletableFuture<Object> seen = CompletableFuture.supplyAsync(() -> {
+            try {
+                live.awaitClosed();
+                return live.accepted().orElseThrow();
+            } catch (InterruptedException e) {
+                throw new IllegalStateException(e);
+            }
+        });
+        Thread.sleep(100);
+        live.accept(List.of(row));
+        assertThat(seen.get(5, TimeUnit.SECONDS)).isEqualTo(List.of(row));
+    }
+
+    @Test
     void theCapacityIsMandatory() {
         assertThatThrownBy(() -> new LiveTable(0)).isInstanceOf(IllegalArgumentException.class);
     }

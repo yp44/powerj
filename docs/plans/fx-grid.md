@@ -235,7 +235,7 @@ PJ ~> echo | grid                     # empty input: an empty table, not an erro
 - Checked with the real launcher under Xvfb and real clicks/keys: Ctrl+C and Ctrl+Shift+C (clipboard read back), both context menus and their actions, the columns menu (a hidden column leaves the copy), `--columns`, the unknown-column message, `--wait` (the prompt waits, Esc and Ctrl+C free it), the saved window (reopened at x=300 y=100 700×400, file created on first close).
 - Coverage: `io.powerj.fx.model` and `grid` above 90 %; 240 tests in the module.
 
-### Phase 7 — `--pass-thru`: selection goes back into the pipeline
+### Phase 7 — `--pass-thru`: selection goes back into the pipeline — **done**
 **Goal:** `grid` as an interactive filter, like `Out-GridView -PassThru`.
 
 - `--pass-thru` implies `--wait`. The window shows an **OK** and a **Cancel** button and multi-row selection. On OK, the **original objects** (kept by `GridRow`) of the selected rows are emitted in the **displayed order**; on Cancel or window close, nothing is emitted (and `$?` is `true`).
@@ -244,6 +244,16 @@ PJ ~> echo | grid                     # empty input: an empty table, not an erro
 - Unit tests: emission order after sort and filter, cancel emits nothing, `--single`, the original object is the exact instance received (not a copy), the cmdlet is never `previewable` (it opens a window; `previewable` returns `false`).
 
 **Manual test:** `ls | grid --pass-thru | map { $_.name }` (select 2 files, OK → two names); sort first, then select, check the order; Cancel → nothing printed; a filter that hides a selected row; `ps | grid --pass-thru --single | kill` on a throw-away process.
+
+**Decisions taken while building it (with the user):**
+- `--pass-thru` shows a **column of check boxes first**, a `Select all` and an `Unselect all` button that act on **the rows found by the filter**, `OK` and `Cancel`; `n selected` is in the status bar. It implies `--wait`.
+- **The selection is cumulative and independent of the filter** (`RowSelection`, one tick per row, rows told apart by identity): `Select all`/`Unselect all` only touch the rows the filter shows, and **`OK` gives back every ticked row, the hidden ones too**. This differs from the first plan ("rows hidden by a filter are not emitted"): with those two buttons, a tick that vanishes silently would be a trap. The rows come out in the order of the sort, or of arrival.
+- The objects given back are **the objects received**, not copies (`GridRow.source()`); the cmdlet's output type is now `Object` and it is declared `passThrough` so that completion after `grid --pass-thru |` knows the type of `$_`.
+- `LiveTable.accept(rows)` keeps the answer and closes; any other close (Cancel, the cross, Esc, Ctrl+C) gives nothing.
+- `--single`: ticking a row unticks the other, `Select all` is hidden. `--single` without `--pass-thru` is an error.
+- Found by the real window, not by the tests: the check boxes of a `TableView` are **disabled unless the table is editable**, and an editable table **keeps Esc for itself** (cancelling an edit), so Esc is now caught by a **filter** on the scene (and left alone while a drop-down list is open); `OK` is not the default button (Enter in a filter field must not validate).
+- Checked with the real launcher under Xvfb: ticking by click, filter + `Select all` / `Unselect all` (`2 selected`, `4 selected`, `1 selected`), `OK` printing the four objects including the hidden one, `--single`, `Cancel` and Esc giving nothing, the error of `--single`.
+- Coverage: `io.powerj.fx.model` and `grid` above 90 %; 261 tests in the module.
 
 ### Phase 8 — Documentation, CI and wrap-up
 - `docs/SPECIFICATION.md`: new **FR-77 — Graphical cmdlets (module `fx`), `grid`** (syntax, options, records, acceptance criteria), §4.4 (a module with dependencies, example `fx`), §5.1 module list, §11 row 26, §12.3.

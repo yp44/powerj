@@ -26,7 +26,7 @@ public final class GridWindowOpener implements WindowOpener {
             Rectangle2D screen = Screen.getPrimary().getVisualBounds();
             Stage stage = new Stage();
             stage.setTitle(options.title());
-            GridView view = new GridView(new GridTable(), live, options.columns());
+            GridView view = new GridView(new GridTable(), live, options);
             Scene scene = new Scene(view.root(), Math.min(1200, screen.getWidth() * 0.8),
                     Math.min(700, screen.getHeight() * 0.8));
             view.bind(scene, stage::close);

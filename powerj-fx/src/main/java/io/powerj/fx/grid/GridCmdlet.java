@@ -27,10 +27,10 @@ import io.powerj.fx.view.GridWindowOpener;
  * {@code grid}: shows the objects received from the pipeline as a table in a window (specification FR-77). The window
  * opens at the first object and fills while the pipeline goes on; at most {@code --max-rows} rows are read.
  */
-@CmdletInfo(name = "grid", category = "Graphical", summary = "Shows the objects in a window",
+@CmdletInfo(name = "grid", category = "Graphical", passThrough = true, summary = "Shows the objects in a window",
         examples = {"ls -r | grid", "ps | grid --columns pid,name", "ls -r / | grid --max-rows 5000",
-                "ls | grid --title Files --wait"})
-public final class GridCmdlet implements Cmdlet<GridParams, Object, Void> {
+                "ls | grid --title Files --wait", "ls -r | grid --pass-thru | rm"})
+public final class GridCmdlet implements Cmdlet<GridParams, Object, Object> {
 
     /** Rows that can wait for the window before the pipeline has to wait. */
     static final int LIVE_CAPACITY = 20_000;
@@ -68,9 +68,12 @@ public final class GridCmdlet implements Cmdlet<GridParams, Object, Void> {
     }
 
     @Override
-    public void begin(GridParams p, CmdletContext<Void> context) {
+    public void begin(GridParams p, CmdletContext<Object> context) {
         if (!context.hasInput()) {
             throw new IllegalArgumentException(Messages.get("grid.noInput"));
+        }
+        if (p.single() && !p.passThru()) {
+            throw new IllegalArgumentException(Messages.get("grid.single.needsPassThru"));
         }
         if (p.limit() <= 0) {
             throw new IllegalArgumentException(Messages.get("grid.maxRows.invalid", p.limit()));
@@ -86,11 +89,11 @@ public final class GridCmdlet implements Cmdlet<GridParams, Object, Void> {
         String title = p.title() == null || p.title().isBlank() ? Messages.get("grid.title") : p.title();
         var settings = context.configDirectory().map(dir -> dir.resolve(WindowSettings.FILE_NAME)).orElse(null);
         executions.put(context, new Execution(new ObjectReader(new ScriptReader(context)), p.limit(),
-                new WindowOptions(title, columns, settings)));
+                new WindowOptions(title, columns, settings, p.passThru(), p.single())));
     }
 
     @Override
-    public void process(GridParams p, Object input, CmdletContext<Void> context) throws InterruptedException {
+    public void process(GridParams p, Object input, CmdletContext<Object> context) throws InterruptedException {
         Execution execution = executions.get(context);
         if (execution.stopped) {
             return;
@@ -121,7 +124,7 @@ public final class GridCmdlet implements Cmdlet<GridParams, Object, Void> {
     }
 
     @Override
-    public void end(GridParams p, CmdletContext<Void> context) throws InterruptedException {
+    public void end(GridParams p, CmdletContext<Object> context) throws InterruptedException {
         Execution execution = executions.remove(context);
         if (execution.live == null) {
             execution.live = new LiveTable(LIVE_CAPACITY); // nothing arrived: the window says so
@@ -132,17 +135,21 @@ public final class GridCmdlet implements Cmdlet<GridParams, Object, Void> {
         if (!missing.isEmpty()) {
             context.error(Messages.get("grid.columns.unknown", String.join(", ", missing)));
         }
-        if (p.waitClose()) {
+        if (p.waitClose() || p.passThru()) {
             try {
                 execution.live.awaitClosed();
             } catch (InterruptedException e) {
-                execution.live.close(); // Ctrl+C: the window goes with the command
+                execution.live.close(); // Ctrl+C: the window goes with the command, nothing goes on
                 throw e;
             }
         }
+        if (p.passThru()) {
+            // OK gave the ticked rows (the ones a filter hides too); any other way to close gives nothing.
+            execution.live.accepted().ifPresent(rows -> rows.forEach(row -> context.emit(row.source())));
+        }
     }
 
-    private static void stop(Execution execution, CmdletContext<Void> context) {
+    private static void stop(Execution execution, CmdletContext<Object> context) {
         execution.stopped = true;
         context.stopInput();
     }

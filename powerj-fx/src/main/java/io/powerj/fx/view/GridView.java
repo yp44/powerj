@@ -21,6 +21,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.ComboBoxBase;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuButton;
@@ -28,6 +29,7 @@ import javafx.scene.control.MenuItem;
 import javafx.scene.control.SelectionMode;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.TableCell;
+import javafx.scene.control.cell.CheckBoxTableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextArea;
@@ -37,14 +39,17 @@ import javafx.scene.control.Tooltip;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
 import io.powerj.fx.Messages;
+import io.powerj.fx.grid.WindowOptions;
 import io.powerj.fx.model.CellFormatter;
 import io.powerj.fx.model.ColumnChoice;
 import io.powerj.fx.model.ColumnKind;
@@ -56,6 +61,7 @@ import io.powerj.fx.model.FilterOperator;
 import io.powerj.fx.model.GridRow;
 import io.powerj.fx.model.GridTable;
 import io.powerj.fx.model.LiveTable;
+import io.powerj.fx.model.RowSelection;
 import io.powerj.fx.model.RowExporter;
 import io.powerj.fx.model.SortDirection;
 import io.powerj.fx.model.SortKey;
@@ -82,12 +88,18 @@ final class GridView {
     /** The table takes what arrived this often, and at most this many rows each time. */
     private static final int FEED_PERIOD_MILLIS = 100;
     private static final int FEED_BATCH = 20_000;
+    /** Id of the column of tick boxes ({@code --pass-thru}): not a column of the data. */
+    private static final String TICK_ID = "\u0000tick";
+    private static final double TICK_WIDTH = 40;
     private static final String ERROR_STYLE = "-fx-control-inner-background: #ffdede;";
 
     private final BorderPane root = new BorderPane();
     private final GridTable data;
     private final LiveTable live;
     private final ColumnChoice choice;
+    /** The ticked rows with {@code --pass-thru}, {@code null} otherwise. */
+    private final RowSelection selection;
+    private Runnable closeWindow = () -> { };
     private final TableView<GridRow> table;
     private final Label placeholder = new Label();
     /** Moves the rows that arrived into the table, a batch at a time. */
@@ -109,15 +121,21 @@ final class GridView {
     private final ToggleButton detailsToggle = new ToggleButton(Messages.get("grid.details"));
     private final SplitPane split = new SplitPane();
 
-    GridView(GridTable data, LiveTable live, ColumnChoice choice) {
+    GridView(GridTable data, LiveTable live, WindowOptions options) {
         this.data = data;
         this.live = live;
-        this.choice = choice;
+        this.choice = options.columns();
+        this.selection = options.passThru() ? new RowSelection(options.single()) : null;
         editor = new FilterEditor(data.columns());
         table = new TableView<>(data.rows());
         table.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
         placeholder.setText(Messages.get("grid.loading"));
         table.setPlaceholder(placeholder);
+        if (selection != null) {
+            // The check boxes of a table are disabled unless the table, the column and the cell can be edited.
+            table.setEditable(true);
+            table.getColumns().add(tickColumn());
+        }
         data.columns().forEach(this::addColumn);
         // Columns arrive with the objects: a new kind of object can bring new ones.
         data.columns().addListener((ListChangeListener<ColumnSpec>) this::columnsChanged);
@@ -142,6 +160,15 @@ final class GridView {
         detailsToggle.setFocusTraversable(false);
         detailsToggle.selectedProperty().addListener((_, _, on) -> showDetails(on));
         HBox bar = new HBox(6, search, columnsMenu, detailsToggle, clear);
+        if (selection != null) {
+            Button selectAll = new Button(Messages.get("grid.select.all"));
+            selectAll.setOnAction(_ -> selection.selectAll(List.copyOf(data.rows())));
+            selectAll.setVisible(!selection.isSingle());
+            selectAll.setManaged(!selection.isSingle());
+            Button unselectAll = new Button(Messages.get("grid.select.none"));
+            unselectAll.setOnAction(_ -> selection.unselectAll(List.copyOf(data.rows())));
+            bar.getChildren().addAll(1, List.of(selectAll, unselectAll));
+        }
         HBox.setHgrow(search, Priority.ALWAYS);
         bar.setPadding(new Insets(6));
 
@@ -158,6 +185,19 @@ final class GridView {
         });
         pause.setFocusTraversable(false);
         HBox bottom = new HBox(10, pause, status);
+        if (selection != null) {
+            Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+            Button ok = new Button(Messages.get("grid.ok"));
+            ok.setOnAction(_ -> {
+                live.accept(selection.selected(data.sort().comparator()));
+                closeWindow.run();
+            });
+            Button cancel = new Button(Messages.get("grid.cancel"));
+            cancel.setOnAction(_ -> closeWindow.run());
+            bottom.getChildren().addAll(spacer, ok, cancel);
+            selection.count().addListener((InvalidationListener) _ -> updateStatus());
+        }
         bottom.setAlignment(Pos.CENTER_LEFT);
         bottom.setPadding(new Insets(3, 8, 3, 8));
         data.rows().addListener((InvalidationListener) _ -> updateStatus());
@@ -211,15 +251,38 @@ final class GridView {
         TableColumn<GridRow, GridRow> column = column(spec);
         column.setVisible(choice.visible(spec.name()));
         int index = choice.insertIndex(columnNames(), spec.name());
-        table.getColumns().add(index, column);
+        table.getColumns().add(index + tickOffset(), column);
         CheckMenuItem item = new CheckMenuItem(spec.name());
         item.selectedProperty().bindBidirectional(column.visibleProperty());
         columnItems.put(spec.name(), item);
         columnsMenu.getItems().add(Math.min(index, columnsMenu.getItems().size()), item);
     }
 
+    /** The columns of the data, in the order of the table (the column of ticks is not one of them). */
     private List<String> columnNames() {
-        return table.getColumns().stream().map(TableColumn::getId).toList();
+        return table.getColumns().stream().map(TableColumn::getId).filter(id -> !TICK_ID.equals(id)).toList();
+    }
+
+    /** The column of ticks, when there is one, comes first. */
+    private int tickOffset() {
+        return selection == null ? 0 : 1;
+    }
+
+    /** The column of check boxes of {@code --pass-thru}: one per row, bound to the selection. */
+    private TableColumn<GridRow, Boolean> tickColumn() {
+        TableColumn<GridRow, Boolean> column = new TableColumn<>();
+        column.setId(TICK_ID);
+        column.setCellValueFactory(cell -> selection.property(cell.getValue()));
+        column.setCellFactory(CheckBoxTableCell.forTableColumn(column));
+        column.setGraphic(new VBox(new Label(Messages.get("grid.select.header"))));
+        column.setPrefWidth(TICK_WIDTH);
+        column.setMinWidth(TICK_WIDTH);
+        column.setMaxWidth(TICK_WIDTH);
+        column.setResizable(false);
+        column.setSortable(false);
+        column.setReorderable(false);
+        column.setEditable(true);
+        return column;
     }
 
     /** A column whose kind became clearer: shown as a number, say, once its first numbers arrived. */
@@ -418,6 +481,7 @@ final class GridView {
      * the focus, or else closes the window.
      */
     void bind(Scene scene, Runnable close) {
+        this.closeWindow = close;
         scene.getAccelerators().put(new KeyCodeCombination(KeyCode.F, KeyCombination.SHORTCUT_DOWN),
                 () -> {
                     search.requestFocus();
@@ -425,11 +489,16 @@ final class GridView {
                 });
         scene.getAccelerators().put(new KeyCodeCombination(KeyCode.F3),
                 () -> detailsToggle.setSelected(!detailsToggle.isSelected()));
-        scene.setOnKeyPressed(event -> {
+        // A filter, not a handler: an editable table (--pass-thru) keeps Esc for itself, to cancel an edit.
+        scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
             if (event.getCode() != KeyCode.ESCAPE) {
                 return;
             }
             Node focus = scene.getFocusOwner();
+            if (focus instanceof ComboBoxBase<?> list && list.isShowing()) {
+                return; // Esc closes the list
+            }
+            event.consume();
             if (focus instanceof TextField field && !field.getText().isEmpty()) {
                 field.clear();
                 debouncer.cancel();
@@ -487,6 +556,9 @@ final class GridView {
             case TRUNCATED -> Messages.get("grid.state.truncated", total);
             case INTERRUPTED -> Messages.get("grid.state.interrupted");
         };
+        if (selection != null) {
+            rows += "  ·  " + Messages.get("grid.selected", selection.count().get());
+        }
         status.setText(note.isEmpty() ? rows : rows + "  ·  " + note);
         placeholder.setText(Messages.get(state == LiveTable.State.LOADING ? "grid.loading" : "grid.empty"));
     }

@@ -182,3 +182,22 @@ Top bar: search box, `Columns ▾`, `Details`, `Clear filters`. With `ls | selec
 | 96 | `help grid` | `--title`, `--columns`, `--wait`, `--max-rows`, in French too. |
 
 Not done (see the plan): `--no-focus` (JavaFX has no reliable way to open a window without taking the focus; to be decided).
+
+## Phase 7 — `--pass-thru`: the ticked rows go back into the pipeline
+
+With `ls | grid --pass-thru | map { $_.name }` in a folder of files `f1228.bin`, `f12288.bin`, `f2252.bin`, `f228.bin`, `f2280.bin`, `f3280.bin`, `f5.bin`. The window has a **check box in the first column**, `Select all` and `Unselect all` at the top, `OK` and `Cancel` at the bottom right, and the status bar says `n selected`.
+
+| # | Action | Expected result |
+|---|---|---|
+| 97 | `ls \| grid --pass-thru \| map { $_.name }` | The window opens with a column of check boxes first (it is not a column of the data: no filter, no sort, not in the `Columns` menu, not in a copy); the prompt is **not** given back (as `--wait`). |
+| 98 | Tick two rows with the mouse, press `OK` | The window closes and the shell prints the names of the two ticked objects, **in the order of the table** (the sort if there is one, otherwise the order of arrival); they are the objects themselves, so `map { $_.name }`, `rm`… work on them. |
+| 99 | Tick a row, press `Cancel`, or close the window, or press Esc | Nothing goes on in the pipeline, the prompt comes back. OK with **nothing** ticked also gives nothing. |
+| 100 | Filter with `f2` in `name`, press `Select all` | Only the rows **found by the filter** are ticked (`3 / 7 rows · 3 selected`). The ones the filter hides are not touched. |
+| 101 | Press `Unselect all` with the same filter | Only the rows found by the filter are unticked. A row ticked **before** the filter that the filter hides stays ticked (`1 selected`). |
+| 102 | Tick a row, filter it away, press `OK` | It **is** given back: what is ticked goes on, whatever the filter shows at that moment. (The plan said the opposite; with `Select all` and `Unselect all` acting on the filter, a tick that disappears silently would be a surprise.) |
+| 103 | Sort a column, tick rows, `OK` | The objects come out in the sorted order. |
+| 104 | `ls \| grid --pass-thru --single` | One check box at a time: ticking a row unticks the other; `Select all` is not shown; `OK` gives one object. |
+| 105 | `ls \| grid --single` | `grid: --single only goes with --pass-thru`. |
+| 106 | `ls -r ~ \| grid --pass-thru --max-rows 500`, tick a row, `OK` | The table is truncated at 500 rows; what is ticked among them goes on. Closing the window while it loads stops the reading and gives nothing. |
+| 107 | Ctrl+C in the terminal while the window is open | The window closes and nothing goes on. |
+| 108 | `help grid` | `--pass-thru` and `--single`, in French too. |
