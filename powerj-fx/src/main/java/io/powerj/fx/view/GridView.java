@@ -85,6 +85,7 @@ final class GridView {
     private final Map<String, ComboBox<FilterOperator>> operators = new LinkedHashMap<>();
     private final TextField search = new TextField();
     private final Label status = new Label();
+    private final Button pause = new Button();
 
     GridView(GridTable data, LiveTable live) {
         this.data = data;
@@ -111,13 +112,20 @@ final class GridView {
         HBox.setHgrow(search, Priority.ALWAYS);
         bar.setPadding(new Insets(6));
 
-        status.setPadding(new Insets(4, 8, 4, 8));
+        pause.setOnAction(_ -> {
+            live.setPaused(!live.isPaused());
+            updateStatus();
+        });
+        pause.setFocusTraversable(false);
+        HBox bottom = new HBox(10, pause, status);
+        bottom.setAlignment(Pos.CENTER_LEFT);
+        bottom.setPadding(new Insets(3, 8, 3, 8));
         data.rows().addListener((InvalidationListener) _ -> updateStatus());
         updateStatus();
 
         root.setTop(bar);
         root.setCenter(table);
-        root.setBottom(status);
+        root.setBottom(bottom);
     }
 
     Parent root() {
@@ -249,7 +257,13 @@ final class GridView {
         String rows = shown != total ? Messages.get("grid.rows.filtered", shown, total)
                 : Messages.get(total == 1 ? "grid.rows.one" : "grid.rows", total);
         LiveTable.State state = live.state();
-        String note = switch (state) {
+        boolean paused = live.isPaused();
+        // Nothing to pause once everything has arrived (and is shown).
+        boolean over = state != LiveTable.State.LOADING && live.pending() == 0;
+        pause.setDisable(over);
+        pause.setText(Messages.get(paused ? "grid.resume" : "grid.pause"));
+        // Paused with rows still waiting: even if the input is over, the table is not complete.
+        String note = paused && !over ? Messages.get("grid.state.paused") : switch (state) {
             case LOADING -> Messages.get("grid.state.loading");
             case COMPLETE -> "";
             case TRUNCATED -> Messages.get("grid.state.truncated", total);

@@ -34,6 +34,7 @@ public final class LiveTable {
 
     private final BlockingQueue<Reading> queue;
     private volatile boolean closed;
+    private volatile boolean paused;
     private volatile Done done = Done.NO;
     private volatile Thread producer;
 
@@ -80,11 +81,27 @@ public final class LiveTable {
     }
 
     /**
-     * Moves up to {@code max} rows that wait into the table. Called on the toolkit thread.
+     * Stops (or starts again) giving the rows that wait to the table. The queue fills up, so the pipeline waits in its turn:
+     * the loading is really suspended, a slow command is not read faster than the window takes it.
+     */
+    public void setPaused(boolean paused) {
+        this.paused = paused;
+    }
+
+    public boolean isPaused() {
+        return paused;
+    }
+
+    /**
+     * Moves up to {@code max} rows that wait into the table, none while the loading is paused. Called on the toolkit
+     * thread.
      *
      * @return how many were moved
      */
     public int drain(GridTable table, int max) {
+        if (paused) {
+            return 0;
+        }
         List<Reading> batch = new ArrayList<>();
         queue.drainTo(batch, max);
         if (!batch.isEmpty()) {

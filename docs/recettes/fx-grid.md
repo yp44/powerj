@@ -149,3 +149,16 @@ A slow producer, `slow.sh`: `i=1; while [ $i -le 30 ]; do echo "line$i"; sleep 0
 | 77 | `help grid` | The option `--max-rows <value>` with its description, in French too (`POWERJ_LANG=fr`). |
 | 78 | `ls -r ~ \| grid` on a big tree | The window opens at once and fills; the shell is not blocked; sorting and filtering stay smooth. |
 | 79 | Open and close twenty windows (`ls \| grid` then Esc, twenty times) | No slowdown; the processor is idle once the windows are closed (a closed window stops its timer and its pipeline). Not measured by the tests. |
+
+### Phase 5 — the Pause button
+
+At the bottom, before the number of rows, there is a button `Pause` (`Reprendre` once paused, in French).
+
+| # | Action | Expected result |
+|---|---|---|
+| 80 | `sh slow.sh \| grid`, click `Pause` while it loads | The button says `Resume` and the status `20 rows · paused`; **no row is added any more**, even after the producer has finished (several seconds later the count is the same). |
+| 81 | Click `Resume` | The rows that waited come in at once (`30 rows`), or the loading goes on if the input is not over; the button says `Pause` again. |
+| 82 | Once everything has arrived | The button is **disabled** (nothing to pause). |
+| 83 | On a big input (`IntStream.range(0, 400000).boxed().toList() \| grid --max-rows 300000`), pause | The pipeline **waits** too (the queue of 20 000 rows fills up, then the producer is blocked): pausing really suspends the loading, it does not hide it. Resume goes on. |
+| 84 | Pause, then close the window (Esc) | The window closes and the pipeline is stopped (the prompt comes back); closing while paused does not leave the producer waiting. Ctrl+C in the terminal while paused ends the producer; the window says `input interrupted`. |
+| 85 | Pause, sort or filter | Sorting and filtering still work on the rows already there. |
