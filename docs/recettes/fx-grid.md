@@ -62,14 +62,14 @@ In a folder with a few files and a sub-folder (`cd ~/dev/powerj`, say), with the
 | 23 | `ls \| grid` | Columns `name`, `size`, `modified`, `dir` (the columns of the terminal table). Sizes are readable (`7.6 KB`) and aligned to the right, dates are local (`2026-10-23 13:00`), `dir` is `true`/`false`. The status bar says `n rows`. |
 | 24 | `ps \| grid` | Columns `pid`, `name`, `user`, `cpu`, `start`; `pid` aligned to the right; the same values as `ps` in the terminal. |
 | 25 | `ls -r --filter *.xml \| select name kb={ $_.size / 1kb } \| grid` | The columns of `select`, in order: `name` (left) and `kb` (right). |
-| 26 | `(ls ; "text") \| grid` is not valid; use two stages: `List.of("a", "b") \| grid` | One column `value` with the two strings. |
+| 26 | `List.of("a", "b") \| grid` | One column `value` with the two strings. |
 | 27 | `java.util.Map.of("a", 1) \| grid` | One row, one column per key of the map (`a`), not a key/value table. |
 | 28 | `ls \| map { $_.path } \| grid` | One column `value` with the paths. |
 | 29 | `greet --name Ada -c 3 \| grid` (module `greet` of the examples, copied into `modules/`) | The records of **another third-party module** are read too: columns `name`, `message`, `at`. |
 | 30 | `ls \| where { $_.size > 1tb } \| grid` | `No result` in the middle of the table, `0 rows`. |
 | 31 | `cat pom.xml \| grid` then widen the window | The columns of `cat` (path, line, text…); a very long line is cut with `…` and its full text shows in a tooltip when the mouse stays on the cell. |
 | 32 | Press Esc in the window | The window closes; the shell and the other windows are not affected. |
-| 33 | `ls -r / \| grid` | The window opens when `ls` has finished (it does not fill while loading, that comes in phase 5); scrolling the thousands of rows is smooth. |
+| 33 | `ls -r ~ \| grid` (a large tree) | The window opens when `ls` has finished (it does not fill while loading, that comes in phase 5); scrolling the thousands of rows is smooth. |
 | 34 | A record whose property raises an error (none among the built-in cmdlets: only a test covers it) | One message `cannot read the property x: …` per column, the cell stays empty, the other cells are shown. |
 
 Not done yet (later phases): sorting and filtering, copying, column menu, selection given back to the pipeline.
