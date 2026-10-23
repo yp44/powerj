@@ -69,7 +69,7 @@ In a folder with a few files and a sub-folder (`cd ~/dev/powerj`, say), with the
 | 30 | `ls \| where { $_.size > 1tb } \| grid` | `No result` in the middle of the table, `0 rows`. |
 | 31 | `cat pom.xml \| grid` then widen the window | The columns of `cat` (path, line, text…); a very long line is cut with `…` and its full text shows in a tooltip when the mouse stays on the cell. |
 | 32 | Press Esc in the window | The window closes; the shell and the other windows are not affected. |
-| 33 | `ls -r ~ \| grid` (a large tree) | The window opens when `ls` has finished (it does not fill while loading, that comes in phase 5); scrolling the thousands of rows is smooth. |
+| 33 | `ls -r ~ \| grid` (a large tree) | The window opens at the first object and fills while `ls` goes on (see phase 5); scrolling the rows is smooth. |
 | 34 | A record whose property raises an error (none among the built-in cmdlets: only a test covers it) | One message `cannot read the property x: …` per column, the cell stays empty, the other cells are shown. |
 
 Not done yet (later phases): copying, column menu, selection given back to the pipeline.
@@ -131,3 +131,21 @@ In front of the filter of a column of numbers or of sizes there is a list: `==`,
 | 66 | With `>=` chosen, empty the field | No filter. |
 | 67 | Click `Clear filters` | Fields emptied and every list back to `==`. |
 | 68 | The `size` column, narrowed by hand | The header keeps the list and a few characters of field (the column starts at least 150 px wide). |
+
+## Phase 5 — progressive loading and large inputs
+
+A slow producer, `slow.sh`: `i=1; while [ $i -le 30 ]; do echo "line$i"; sleep 0.3; i=$((i+1)); done`.
+
+| # | Action | Expected result |
+|---|---|---|
+| 69 | `sh slow.sh \| grid` | The window opens **at the first line** (not after 9 s) and the rows appear as they arrive; the status bar says `17 rows · loading…` and, at the end, `30 rows`. While there is no row yet the table says `Loading…`, not `No result`. |
+| 70 | Same, then **Ctrl+C** in the terminal after a few seconds | The prompt comes back at once; the window **stays** with what arrived and says `20 rows · input interrupted`. |
+| 71 | Same, then close the window (Esc) while it loads | The prompt comes back **at once** (the producer is stopped, it does not run its 9 s to the end). |
+| 72 | `sh slow.sh \| grid`, click a header to sort, type a filter, while it loads | The rows that arrive are put in their place and filtered by the same sort and filter (`12 / 30 rows`). |
+| 73 | `java.util.stream.IntStream.range(0, 400000).boxed().toList() \| grid --max-rows 5000` | `5000 rows · truncated at 5000 rows (--max-rows)`; the reading stopped at 5000 (it did not read 400000). Numbers are aligned to the right and have the list of comparisons. |
+| 74 | The same without `--max-rows` | The default limit: `100000 rows · truncated at 100000 rows (--max-rows)`; the window stays responsive. |
+| 75 | `ls --max-rows 3 \| grid` is wrong (the option is for `grid`): `ls \| grid --max-rows 3` | 3 rows, `truncated at 3 rows`. With **exactly** as many objects as the limit, nothing is said (not truncated). |
+| 76 | `ls \| grid --max-rows 0` | `grid: --max-rows must be at least 1: 0`; no window. |
+| 77 | `help grid` | The option `--max-rows <value>` with its description, in French too (`POWERJ_LANG=fr`). |
+| 78 | `ls -r ~ \| grid` on a big tree | The window opens at once and fills; the shell is not blocked; sorting and filtering stay smooth. |
+| 79 | Open and close twenty windows (`ls \| grid` then Esc, twenty times) | No slowdown; the processor is idle once the windows are closed (a closed window stops its timer and its pipeline). Not measured by the tests. |

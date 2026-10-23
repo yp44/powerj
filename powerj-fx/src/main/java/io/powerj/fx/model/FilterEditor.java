@@ -13,12 +13,13 @@ import java.util.Optional;
  */
 public final class FilterEditor {
 
-    private final List<ColumnSpec> columns;
+    private List<ColumnSpec> columns;
     private final FilterParser parser;
     private final Map<String, Parsed> good = new LinkedHashMap<>();
     private final Map<String, String> errors = new LinkedHashMap<>();
     private final Map<String, Parsed> searchGood = new LinkedHashMap<>();
     private String searchError;
+    private String searchText = "";
     private FilterSpec spec = FilterSpec.NONE;
 
     public FilterEditor(List<ColumnSpec> columns) {
@@ -59,8 +60,21 @@ public final class FilterEditor {
         return rebuild();
     }
 
+    /**
+     * The columns the table has now: columns arrive while the input is read. The search text is looked for in the new
+     * ones too.
+     */
+    public FilterSpec columns(List<ColumnSpec> now) {
+        if (!columns.equals(now)) {
+            columns = List.copyOf(now);
+            return setSearch(searchText);
+        }
+        return spec;
+    }
+
     /** Sets the search text, looked for in every column; empty removes it. */
     public FilterSpec setSearch(String text) {
+        searchText = text == null ? "" : text;
         Map<String, Parsed> perColumn = new LinkedHashMap<>();
         String error = null;
         for (ColumnSpec column : columns) {
@@ -87,6 +101,7 @@ public final class FilterEditor {
         errors.clear();
         searchGood.clear();
         searchError = null;
+        searchText = "";
         return rebuild();
     }
 

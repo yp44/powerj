@@ -150,6 +150,26 @@ class FilterEditorTest {
     }
 
     @Test
+    void theSearchReachesTheColumnsThatArriveLater() {
+        var late = new FilterEditor(List.of(new ColumnSpec("name", ColumnKind.TEXT)),
+                new FilterParser(ZoneId.of("UTC")));
+        late.setSearch("ada");
+        GridRow row = reader.read(new File("x", 1, Instant.EPOCH, "ada")).row();
+        assertThat(late.spec().predicate().test(row)).isFalse(); // the owner column is not known yet
+        late.columns(COLUMNS);
+        assertThat(late.spec().predicate().test(row)).isTrue();
+        assertThat(late.columns(COLUMNS)).isSameAs(late.spec()); // nothing changed: nothing recomputed
+    }
+
+    @Test
+    void clearingForgetsTheSearchForTheColumnsToo() {
+        editor.setSearch("ada");
+        editor.clear();
+        editor.columns(List.of(COLUMNS.get(0)));
+        assertThat(editor.spec().isEmpty()).isTrue();
+    }
+
+    @Test
     void anEmptyCellCanBeFound() {
         editor.setColumn("owner", "=");
         assertThat(shown()).containsExactly("notes.txt");

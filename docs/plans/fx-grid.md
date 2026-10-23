@@ -188,7 +188,7 @@ PJ ~> echo | grid                     # empty input: an empty table, not an erro
 - Coverage: `io.powerj.fx.model` 477/478 lines, 407/420 branches (152 tests in the module).
 - Not done, for a later phase: a `--filter` option to start with a filter typed in; the columns keep their width when the window is narrowed.
 
-### Phase 5 — Streaming and large inputs
+### Phase 5 — Streaming and large inputs — **done**
 **Goal:** the window opens at the first object and fills while the pipeline runs; huge inputs do not freeze the shell.
 
 - `GridCmdlet.process` hands each object to the window through a bounded buffer (`model.RowBuffer`) that the FX thread drains in batches (`Platform.runLater` at most every ~100 ms), so the FX queue is never flooded.
@@ -198,6 +198,16 @@ PJ ~> echo | grid                     # empty input: an empty table, not an erro
 - Unit tests: `RowBuffer` (batching, ordering, overflow, truncation flag), column growth with late object types, `--max-rows` through `stopInput`, cancellation (`context.cancelled()`).
 
 **Manual test:** `ls -r / | grid` (the window appears at once and fills); `1..2000000 | grid --max-rows 5000` (stops at 5 000 with the notice); Ctrl+C during a long `ls -r /`; scroll and sort while it is still loading; `ps | grid` repeated 20 times (no leak of windows or threads, `jobs`/task manager).
+
+**Decisions taken while building it:**
+- `LiveTable` (model, no display) is the link: the pipeline thread calls `offer` on a **bounded** queue (20 000 rows; beyond it the pipeline waits, so the window sets the pace); the window thread calls `drain` **every 100 ms** (a `Timeline`, so the toolkit queue is never flooded) for at most 20 000 rows at a time and gives them to `GridTable.append`. Closing the window calls `close()`: `offer` answers `false` and the cmdlet calls `stopInput()`.
+- `GridTable` grows: rows first, then the new columns (announced on an observable list so the window can measure them), a column whose kind became clearer (it held only empty cells) is replaced where it is. `FilterEditor.columns(...)` follows, and the search box looks in the new columns too.
+- The window opens **at the first object** (already in it), or at the end if nothing arrived.
+- **`end` is not called when the pipeline is cancelled (Ctrl+C) or fails**, so the cmdlet cannot say "finished". `LiveTable.state()` watches the thread that fed it: gone without `finish` = `INTERRUPTED`, and the status bar says so instead of `loading…` for ever. (A listener on a `FXCollections.unmodifiableObservableList` is held weakly by the list behind it: `GridTable` keeps one view, found when the window showed no column.)
+- `--max-rows` is an `Integer` (the default 100 000 is applied by `GridParams.limit()`), at least 1; one more object than the limit marks the table truncated and stops the input; exactly the limit does not.
+- A column is sized from the rows there are when it appears: with a slow producer it can be narrow; it is resizable by hand.
+- Checked with the real launcher under Xvfb: a producer that lasts 9 s, Ctrl+C, closing the window while it loads (the prompt came back in 0.2 s), 400 000 numbers with `--max-rows 5000` and with the default, sort and filter while loading.
+- Coverage: `io.powerj.fx.model` 569/570 lines and 472/486 branches, `io.powerj.fx.grid` 59/59 (191 tests in the module).
 
 ### Phase 6 — Usability and polish
 **Goal:** the window behaves like a tool people leave open.

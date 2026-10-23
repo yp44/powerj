@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
@@ -157,6 +158,88 @@ class GridTableTest {
         assertThat(table.rows()).isEmpty();
         assertThat(items.rows()).hasSize(4);
         assertThat(table.total()).isEqualTo(4);
+    }
+
+    private final ObjectReader objects = new ObjectReader(Reflect::read);
+
+    private record Other(String name, String extra) {
+    }
+
+    @Test
+    void anEmptyTableGrowsWithWhatIsAppended() {
+        var table = new GridTable();
+        assertThat(table.total()).isZero();
+        assertThat(table.columns()).isEmpty();
+        table.append(List.of(objects.read(new Item("b", 10, "x")), objects.read(new Item("a", 5, "y"))));
+        assertThat(names(table)).containsExactly("b", "a");
+        assertThat(table.columns().stream().map(ColumnSpec::name)).containsExactly("name", "size", "group");
+        table.append(List.of(objects.read(new Item("c", 7, "x"))));
+        assertThat(names(table)).containsExactly("b", "a", "c");
+        assertThat(table.total()).isEqualTo(3);
+        assertThat(table.rows().stream().map(GridRow::position)).containsExactly(0, 1, 2);
+    }
+
+    @Test
+    void theListenersOfTheColumnsSurviveACollection() {
+        var table = new GridTable();
+        List<Object> heard = new ArrayList<>();
+        table.columns().addListener((javafx.collections.ListChangeListener<ColumnSpec>) heard::add);
+        for (int i = 0; i < 3; i++) {
+            System.gc();
+        }
+        table.append(List.of(objects.read(new Item("a", 1, "x"))));
+        assertThat(heard).isNotEmpty();
+        assertThat(table.columns()).isSameAs(table.columns());
+    }
+
+    @Test
+    void newColumnsAreAnnouncedAfterTheirRows() {
+        var table = new GridTable();
+        List<String> events = new ArrayList<>();
+        table.columns().addListener((javafx.collections.ListChangeListener<ColumnSpec>) change -> {
+            while (change.next()) {
+                events.add((change.wasReplaced() ? "replaced " : "added ") + change.getList().size()
+                        + " with " + table.total() + " rows");
+            }
+        });
+        table.append(List.of(objects.read(new Item("a", 1, "x"))));
+        table.append(List.of(objects.read(new Item("b", 2, "y"))));             // nothing new
+        table.append(List.of(objects.read(new Other("c", "e"))));               // one new column
+        assertThat(events).containsExactly("added 3 with 1 rows", "added 4 with 3 rows");
+        assertThat(table.columns().stream().map(ColumnSpec::name)).containsExactly("name", "size", "group", "extra");
+    }
+
+    @Test
+    void aColumnWhoseKindBecomesClearerIsReplacedWhereItIs() {
+        var table = new GridTable();
+        java.util.Map<String, Object> empty = new java.util.HashMap<>();
+        empty.put("v", null);
+        table.append(List.of(objects.read(empty)));
+        assertThat(table.columns()).containsExactly(new ColumnSpec("v", ColumnKind.UNKNOWN));
+        List<String> events = new ArrayList<>();
+        table.columns().addListener((javafx.collections.ListChangeListener<ColumnSpec>) change -> {
+            while (change.next()) {
+                events.add(change.wasReplaced() ? "replaced" : change.wasAdded() ? "added" : "other");
+            }
+        });
+        table.append(List.of(objects.read(Map.of("v", 5))));
+        assertThat(table.columns()).containsExactly(new ColumnSpec("v", ColumnKind.NUMBER));
+        assertThat(events).containsExactly("replaced");
+        table.append(List.of(objects.read(Map.of("v", 6))));
+        assertThat(events).hasSize(1); // the kind did not change again
+    }
+
+    @Test
+    void theSortAndTheFilterApplyToTheRowsThatArriveLater() {
+        var table = new GridTable();
+        table.append(List.of(objects.read(new Item("b", 10, "x")), objects.read(new Item("d", 20, "y"))));
+        table.sort(by("name", SortDirection.DESCENDING));
+        table.filter(new FilterEditor(table.columns()).setColumn("group", "x"));
+        assertThat(names(table)).containsExactly("b");
+        table.append(List.of(objects.read(new Item("c", 30, "x")), objects.read(new Item("e", 40, "y")),
+                objects.read(new Item("a", 50, "x"))));
+        assertThat(names(table)).containsExactly("c", "b", "a");
+        assertThat(table.total()).isEqualTo(5);
     }
 
     @Test

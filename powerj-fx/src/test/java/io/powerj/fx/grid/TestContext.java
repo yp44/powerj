@@ -17,6 +17,12 @@ final class TestContext<O> implements CmdletContext<O> {
     final List<O> emitted = new ArrayList<>();
     final List<String> errors = new ArrayList<>();
     boolean hasInput = true;
+    int stopInputCalls;
+
+    @Override
+    public void stopInput() {
+        stopInputCalls++;
+    }
 
     @Override
     public void emit(O value) {

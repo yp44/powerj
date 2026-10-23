@@ -12,7 +12,9 @@ import org.junit.jupiter.api.Test;
 import io.powerj.api.CmdletInfo;
 import io.powerj.fx.model.ColumnKind;
 import io.powerj.fx.model.ColumnSpec;
-import io.powerj.fx.model.GridModel;
+import io.powerj.fx.model.GridRow;
+import io.powerj.fx.model.GridTable;
+import io.powerj.fx.model.LiveTable;
 import io.powerj.fx.runtime.FxUnavailableException;
 
 class GridCmdletTest {
@@ -26,82 +28,222 @@ class GridCmdletTest {
         }
     }
 
-    /** Remembers what the cmdlet asked to show. */
+    /** Remembers the windows the cmdlet asked for, and how many rows it had given them at that moment. */
     private static final class RecordingOpener implements WindowOpener {
         final List<String> titles = new ArrayList<>();
-        final List<GridModel> models = new ArrayList<>();
+        final List<LiveTable> lives = new ArrayList<>();
+        final List<Integer> pendingAtOpening = new ArrayList<>();
 
         @Override
-        public void open(String title, GridModel model) {
+        public void open(String title, LiveTable live) {
             titles.add(title);
-            models.add(model);
+            lives.add(live);
+            pendingAtOpening.add(live.pending());
+        }
+
+        LiveTable live() {
+            return lives.getFirst();
+        }
+
+        /** What the window would show: everything the pipeline gave, in order. */
+        GridTable show() {
+            var table = new GridTable();
+            live().drain(table, Integer.MAX_VALUE);
+            return table;
         }
     }
 
-    private static void run(GridCmdlet grid, TestContext<Void> context, Object... inputs) {
-        GridParams params = new GridParams();
+    private static final GridParams NO_OPTIONS = new GridParams(null);
+
+    private static void run(GridCmdlet grid, GridParams params, TestContext<Void> context, Object... inputs)
+            throws Exception {
         grid.begin(params, context);
         for (Object input : inputs) {
+            if (context.stopInputCalls > 0) {
+                break; // the runner reads no more once the cmdlet stopped its input
+            }
             grid.process(params, input, context);
         }
         grid.end(params, context);
     }
 
-    @Test
-    void opensOneWindowWithTheObjectsAsATable() {
-        RecordingOpener opener = new RecordingOpener();
-        run(new GridCmdlet(opener), new TestContext<>(), new Person("Ada", 36), new Person("Alan", 41));
-        assertThat(opener.titles).containsExactly("PowerJ grid");
-        GridModel model = opener.models.getFirst();
-        assertThat(model.columns()).containsExactly(new ColumnSpec("name", ColumnKind.TEXT),
-                new ColumnSpec("age", ColumnKind.NUMBER));
-        assertThat(model.rows()).hasSize(2);
-        assertThat(model.rows().get(1).values()).containsExactly(Map.entry("name", "Alan"), Map.entry("age", 41));
+    private static List<Object> names(GridTable table) {
+        return table.rows().stream().map(r -> r.get("name")).toList();
     }
 
     @Test
-    void objectsOfSeveralTypesShareTheTable() {
+    void theWindowOpensAtTheFirstObjectWhichIsAlreadyInIt() throws Exception {
         RecordingOpener opener = new RecordingOpener();
-        run(new GridCmdlet(opener), new TestContext<>(), new Person("Ada", 36), "text", Map.of("k", 1));
-        GridModel model = opener.models.getFirst();
-        assertThat(model.columns().stream().map(ColumnSpec::name)).containsExactly("name", "age", "value", "k");
-        assertThat(model.rows()).hasSize(3);
-    }
-
-    @Test
-    void emptyInputStillOpensTheWindow() {
-        RecordingOpener opener = new RecordingOpener();
-        run(new GridCmdlet(opener), new TestContext<>());
-        assertThat(opener.models.getFirst().rows()).isEmpty();
-        assertThat(opener.models.getFirst().columns()).isEmpty();
-    }
-
-    @Test
-    void emitsNothing() {
+        GridCmdlet grid = new GridCmdlet(opener);
         TestContext<Void> context = new TestContext<>();
-        run(new GridCmdlet(new RecordingOpener()), context, new Person("Ada", 36));
+        grid.begin(NO_OPTIONS, context);
+        assertThat(opener.lives).isEmpty();                       // nothing yet: no object has arrived
+        grid.process(NO_OPTIONS, new Person("Ada", 36), context);
+        assertThat(opener.titles).containsExactly("PowerJ grid"); // opened as soon as there is something to show
+        assertThat(opener.pendingAtOpening).containsExactly(1);
+        assertThat(opener.live().state()).isEqualTo(LiveTable.State.LOADING);
+        grid.process(NO_OPTIONS, new Person("Alan", 41), context);
+        assertThat(opener.lives).hasSize(1);                      // one window, not one per object
+        grid.end(NO_OPTIONS, context);
+        assertThat(opener.live().state()).isEqualTo(LiveTable.State.COMPLETE);
+        GridTable table = opener.show();
+        assertThat(table.columns()).containsExactly(new ColumnSpec("name", ColumnKind.TEXT),
+                new ColumnSpec("age", ColumnKind.NUMBER));
+        assertThat(table.rows().stream().map(GridRow::source)).containsExactly(new Person("Ada", 36),
+                new Person("Alan", 41));
+    }
+
+    @Test
+    void objectsOfSeveralTypesShareTheTable() throws Exception {
+        RecordingOpener opener = new RecordingOpener();
+        run(new GridCmdlet(opener), NO_OPTIONS, new TestContext<>(), new Person("Ada", 36), "text", Map.of("k", 1));
+        GridTable table = opener.show();
+        assertThat(table.columns().stream().map(ColumnSpec::name)).containsExactly("name", "age", "value", "k");
+        assertThat(table.total()).isEqualTo(3);
+    }
+
+    @Test
+    void emptyInputOpensTheWindowAtTheEnd() throws Exception {
+        RecordingOpener opener = new RecordingOpener();
+        run(new GridCmdlet(opener), NO_OPTIONS, new TestContext<>());
+        assertThat(opener.lives).hasSize(1);
+        assertThat(opener.live().state()).isEqualTo(LiveTable.State.COMPLETE);
+        assertThat(opener.show().total()).isZero();
+    }
+
+    @Test
+    void emitsNothing() throws Exception {
+        TestContext<Void> context = new TestContext<>();
+        run(new GridCmdlet(new RecordingOpener()), NO_OPTIONS, context, new Person("Ada", 36));
         assertThat(context.emitted).isEmpty();
+        assertThat(context.errors).isEmpty();
+        assertThat(context.stopInputCalls).isZero();
+    }
+
+    // --- --max-rows ---
+
+    @Test
+    void readingStopsAtTheLimitAndTheTableIsTruncated() throws Exception {
+        RecordingOpener opener = new RecordingOpener();
+        TestContext<Void> context = new TestContext<>();
+        run(new GridCmdlet(opener), new GridParams(3), context, "a", "b", "c", "d", "e", "f");
+        assertThat(opener.show().total()).isEqualTo(3);
+        assertThat(context.stopInputCalls).isEqualTo(1);
+        assertThat(opener.live().state()).isEqualTo(LiveTable.State.TRUNCATED);
+    }
+
+    @Test
+    void exactlyTheLimitIsNotTruncated() throws Exception {
+        RecordingOpener opener = new RecordingOpener();
+        TestContext<Void> context = new TestContext<>();
+        run(new GridCmdlet(opener), new GridParams(3), context, "a", "b", "c");
+        assertThat(opener.show().total()).isEqualTo(3);
+        assertThat(context.stopInputCalls).isZero();
+        assertThat(opener.live().state()).isEqualTo(LiveTable.State.COMPLETE);
+    }
+
+    @Test
+    void theDefaultLimitIsOneHundredThousand() {
+        assertThat(NO_OPTIONS.limit()).isEqualTo(100_000);
+        assertThat(new GridParams(7).limit()).isEqualTo(7);
+        assertThat(GridParams.DEFAULT_MAX_ROWS).isEqualTo(100_000);
+    }
+
+    @Test
+    void aLimitBelowOneIsRefused() {
+        for (int bad : new int[] {0, -5}) {
+            assertThatThrownBy(() -> new GridCmdlet(new RecordingOpener()).begin(new GridParams(bad), new TestContext<>()))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("--max-rows must be at least 1: " + bad);
+        }
+    }
+
+    @Test
+    void aProcessAfterTheStopIsIgnored() throws Exception {
+        RecordingOpener opener = new RecordingOpener();
+        TestContext<Void> context = new TestContext<>();
+        GridCmdlet grid = new GridCmdlet(opener);
+        GridParams params = new GridParams(1);
+        grid.begin(params, context);
+        grid.process(params, "a", context);
+        grid.process(params, "b", context);   // over the limit: stops
+        grid.process(params, "c", context);   // the runner would not call, but it would do nothing
+        grid.end(params, context);
+        assertThat(context.stopInputCalls).isEqualTo(1);
+        assertThat(opener.show().total()).isEqualTo(1);
+    }
+
+    // --- the window goes away ---
+
+    @Test
+    void whenTheWindowIsClosedTheCmdletStopsReading() throws Exception {
+        RecordingOpener opener = new RecordingOpener();
+        TestContext<Void> context = new TestContext<>();
+        GridCmdlet grid = new GridCmdlet(opener);
+        grid.begin(NO_OPTIONS, context);
+        grid.process(NO_OPTIONS, "a", context);
+        opener.live().close();                          // the user closes the window
+        grid.process(NO_OPTIONS, "b", context);
+        assertThat(context.stopInputCalls).isEqualTo(1);
+        grid.process(NO_OPTIONS, "c", context);        // nothing more
+        grid.end(NO_OPTIONS, context);
+        assertThat(context.stopInputCalls).isEqualTo(1);
         assertThat(context.errors).isEmpty();
     }
 
     @Test
-    void aPropertyThatCannotBeReadIsReportedOncePerColumn() {
-        TestContext<Void> context = new TestContext<>();
+    void aCancelledPipelineLeavesTheWindowInterrupted() throws Exception {
         RecordingOpener opener = new RecordingOpener();
-        run(new GridCmdlet(opener), context, new Fragile("a", 1), new Fragile("b", 2), new Fragile("c", 3));
-        assertThat(context.errors).containsExactly("cannot read the property broken: cannot read broken");
-        assertThat(opener.models.getFirst().rows()).hasSize(3);
-        assertThat(opener.models.getFirst().rows().get(2).get("name")).isEqualTo("c");
-        assertThat(opener.models.getFirst().rows().get(2).get("broken")).isNull();
+        GridCmdlet grid = new GridCmdlet(opener);
+        TestContext<Void> context = new TestContext<>();
+        Thread stage = Thread.ofVirtual().start(() -> {
+            try {
+                grid.begin(NO_OPTIONS, context);
+                grid.process(NO_OPTIONS, "a", context);
+                // Ctrl+C: the stage ends, and end() is not called.
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
+        stage.join(5_000);
+        assertThat(opener.live().state()).isEqualTo(LiveTable.State.INTERRUPTED);
+        assertThat(opener.show().total()).isEqualTo(1); // what arrived is shown
     }
 
     @Test
-    void theErrorOfAnExecutionIsReportedAgainInTheNext() {
+    void aWindowThatCannotOpenIsAUsageError() {
+        WindowOpener failing = (title, live) -> {
+            throw new FxUnavailableException("no display", new RuntimeException("x"));
+        };
+        assertThatThrownBy(() -> run(new GridCmdlet(failing), NO_OPTIONS, new TestContext<>(), "a"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("no display")
+                .hasCauseInstanceOf(FxUnavailableException.class);
+        assertThatThrownBy(() -> run(new GridCmdlet(failing), NO_OPTIONS, new TestContext<>()))
+                .isInstanceOf(IllegalArgumentException.class); // an empty input opens it at the end
+    }
+
+    // --- errors, usage ---
+
+    @Test
+    void aPropertyThatCannotBeReadIsReportedOncePerColumn() throws Exception {
+        TestContext<Void> context = new TestContext<>();
+        RecordingOpener opener = new RecordingOpener();
+        run(new GridCmdlet(opener), NO_OPTIONS, context, new Fragile("a", 1), new Fragile("b", 2), new Fragile("c", 3));
+        assertThat(context.errors).containsExactly("cannot read the property broken: cannot read broken");
+        GridTable table = opener.show();
+        assertThat(table.total()).isEqualTo(3);
+        assertThat(table.rows().get(2).get("name")).isEqualTo("c");
+        assertThat(table.rows().get(2).get("broken")).isNull();
+    }
+
+    @Test
+    void theErrorOfAnExecutionIsReportedAgainInTheNext() throws Exception {
         TestContext<Void> first = new TestContext<>();
         TestContext<Void> second = new TestContext<>();
         GridCmdlet grid = new GridCmdlet(new RecordingOpener());
-        run(grid, first, new Fragile("a", 1));
-        run(grid, second, new Fragile("a", 1));
+        run(grid, NO_OPTIONS, first, new Fragile("a", 1));
+        run(grid, NO_OPTIONS, second, new Fragile("a", 1));
         assertThat(first.errors).hasSize(1);
         assertThat(second.errors).hasSize(1);
     }
@@ -110,38 +252,31 @@ class GridCmdletTest {
     void refusesToRunAtTheHeadOfAPipeline() {
         TestContext<Void> context = new TestContext<>();
         context.hasInput = false;
-        assertThatThrownBy(() -> new GridCmdlet(new RecordingOpener()).begin(new GridParams(), context))
+        assertThatThrownBy(() -> new GridCmdlet(new RecordingOpener()).begin(NO_OPTIONS, context))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("grid expects objects from a pipeline (ls | grid)");
     }
 
     @Test
-    void anUnavailableToolkitIsAUsageError() {
-        WindowOpener failing = (title, model) -> {
-            throw new FxUnavailableException("no display", new RuntimeException("x"));
-        };
-        assertThatThrownBy(() -> run(new GridCmdlet(failing), new TestContext<>(), "a"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("no display")
-                .hasCauseInstanceOf(FxUnavailableException.class);
-    }
-
-    @Test
-    void executionsDoNotShareTheirRows() {
+    void executionsDoNotShareTheirRows() throws Exception {
         RecordingOpener opener = new RecordingOpener();
         GridCmdlet grid = new GridCmdlet(opener);
         TestContext<Void> first = new TestContext<>();
         TestContext<Void> second = new TestContext<>();
-        GridParams params = new GridParams();
-        grid.begin(params, first);
-        grid.begin(params, second);
-        grid.process(params, "a", first);
-        grid.process(params, "b", second);
-        grid.process(params, "c", second);
-        grid.end(params, second);
-        grid.end(params, first);
-        assertThat(opener.models.get(0).rows()).hasSize(2);
-        assertThat(opener.models.get(1).rows()).hasSize(1);
+        grid.begin(NO_OPTIONS, first);
+        grid.begin(NO_OPTIONS, second);
+        grid.process(NO_OPTIONS, "a", first);
+        grid.process(NO_OPTIONS, "b", second);
+        grid.process(NO_OPTIONS, "c", second);
+        grid.end(NO_OPTIONS, second);
+        grid.end(NO_OPTIONS, first);
+        assertThat(opener.lives).hasSize(2);
+        var one = new GridTable();
+        var two = new GridTable();
+        opener.lives.get(0).drain(one, 10);
+        opener.lives.get(1).drain(two, 10);
+        assertThat(two.total()).isEqualTo(2);
+        assertThat(one.total()).isEqualTo(1);
     }
 
     @Test
