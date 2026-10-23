@@ -1,0 +1,203 @@
+# Plan — `powerj-fx`: JavaFX cmdlets as a third-party module, starting with `grid` (mini-iteration 26, FR-77)
+
+## Context
+Tables in the terminal are limited to what fits on the screen and cannot be re-sorted or filtered once printed. A window with a sortable, filterable table, fed by a pipeline (`ls -r | grid`), covers the same need as PowerShell's `Out-GridView`.
+
+JavaFX is **not** added to the distribution (`powerj-dist` stays at ~92 MB; JavaFX 25 would add ~8-9 MB to the zip and ~32 MB to the installed folder). It is delivered as a **third-party module** (spec §4.4) that the user copies into `~/.powerj/modules/`. That makes `powerj-fx` the first real consumer of the module mechanism with dependencies, and the place for any later graphical cmdlet (`chart`, `form`…).
+
+Decisions taken with the user:
+1. A separate module, `powerj-fx`, loaded like any third-party module: **no change to the shell is expected** (see risk R3 for the only possible exception).
+2. First cmdlet: `grid`, a window with a table of the objects received from the pipe, **sortable and filterable by column**.
+3. Every phase can be tested by hand, and unit-test coverage stays high even though JavaFX itself is hard to test (see "Testability and coverage").
+
+Out of scope here (possible later iterations): charts, forms, a tree view, editing cells, a `grid` that reads from a file, packaging as an installer, signed distribution.
+
+Branch: `claude/inspiring-cerf-2lllas`, from `main` @ 845eac0. One PR per phase (or per group of phases) as in `cmdlet-roadmap.md`.
+
+## What the user gets
+
+```text
+PJ ~> ls -r --filter *.java | grid                  # opens the window, the prompt comes back at once
+PJ ~> ps | grid --title "Processes" --wait          # blocks until the window is closed
+PJ ~> ls -r | grid --pass-thru | rm                 # the rows selected in the window go on in the pipeline
+```
+
+Installation:
+
+```bash
+./mvnw -pl powerj-fx -am package                    # → powerj-fx/target/powerj-fx-<version>-<platform>.zip
+unzip powerj-fx-0.1.0-linux-x64.zip -d ~/.powerj/modules/     # creates ~/.powerj/modules/fx/
+```
+`~/.powerj/modules/fx/` holds `powerj-fx.jar` and the JavaFX jars (`javafx-base`, `javafx-graphics`, `javafx-controls`, with the classifier of the platform): a subfolder is a single `ModuleLayer` (spec §4.4). `mod-load ~/.powerj/modules/fx` loads it without restarting.
+
+## Architecture
+
+```text
+powerj-fx/                              (new Maven module, JPMS: io.powerj.fx)
+└── io.powerj.fx
+    ├── FxProvider                      CmdletProvider (messages en/fr)
+    ├── grid.GridCmdlet                 the cmdlet: collects, then asks the runtime to open a window
+    ├── grid.GridParams                 options record
+    ├── model.*                         PURE JAVA, no JavaFX Toolkit: columns, cells, sorting, filtering
+    ├── runtime.FxRuntime               start-up of the toolkit, run-on-FX-thread, window registry
+    └── view.*                          JavaFX nodes only (TableView, filter fields, status bar); as thin as possible
+```
+
+- `requires io.powerj.api; requires javafx.controls;` (transitively `javafx.graphics`, `javafx.base`).
+- **`model` has no dependency on the Toolkit.** It may use `javafx.base` (`ObservableList`, `FilteredList`, `SortedList`, properties), which runs without a display and can be unit tested: the sort/filter pipeline is `rows → FilteredList → SortedList → TableView`, so the `TableView` only displays what the model computed.
+- `view` classes do nothing but wiring: column definitions are produced by the model (`ColumnSpec`), cell text by the model (`CellFormatter`), the comparator by the model (`SortSpec`), the predicate by the model (`FilterSpec`).
+- The module depends **only on `powerj-api`**. The column logic (record components, `@Display`, `Row`, `Map`, `@Bytes`) is therefore re-implemented in `model` rather than shared with `powerj-core`. If duplication turns out to be annoying, a small public helper can be moved to `powerj-api` in a later phase (compatibility impact: additive).
+- **Threads.** A cmdlet runs in a virtual thread; JavaFX needs its own thread. `FxRuntime.startup()` calls `Platform.startup` once per JVM (a second call throws `IllegalStateException`, which is caught), `Platform.setImplicitExit(false)` so that closing the last window does not stop the toolkit (`Platform.exit()` cannot be undone in the same JVM), and `FxRuntime.runAndWait(Runnable)` bridges to `Platform.runLater`. `Main` ends with `System.exit`, so the FX thread never keeps the JVM alive.
+- **Build.** JavaFX artifacts have a per-platform classifier. The module declares a property `javafx.platform` set by OS profiles (`linux`, `win`, `mac`, `mac-aarch64`), like the `windows`/`mac` profiles of `powerj-dist`. Packaging copies the runtime dependencies and the module jar into `target/module/fx/`, then zips it.
+
+## Testability and coverage
+The root rule (80 % of lines and branches, `powerj-coverage`) must keep passing, and the new code should do clearly better than that.
+
+| Part | How it is tested | Target |
+|---|---|---|
+| `model.*` (columns, cells, sort, filter, passthru bookkeeping) | plain JUnit + AssertJ, `javafx.base` only, no display | ≥ 95 % lines, ≥ 90 % branches |
+| `grid.GridCmdlet`, `FxProvider`, params, i18n | JUnit with `TestContext` (same pattern as `powerj-cmdlets`) and a **fake `GridWindow`** injected through a small interface (`WindowOpener`) so that the cmdlet never touches JavaFX in tests | ≥ 90 % |
+| `runtime.FxRuntime` | the logic around the toolkit (single start-up, error mapping for "no display" / "toolkit unavailable") behind an interface; the real call is covered only by the manual checklist | ≥ 70 % |
+| `view.*` | **optional headless UI tests** with TestFX + Monocle (`-Dglass.platform=Monocle -Dmonocle.platform=Headless -Dprism.order=sw`) in a dedicated Maven profile `fx-ui`, enabled in CI if Monocle works with JavaFX 25 (to verify in phase 1). Otherwise `view` is excluded from the threshold **by a narrow, documented JaCoCo exclusion** (`io/powerj/fx/view/**`) and covered by the manual checklist | not counted if excluded |
+
+- `powerj-coverage` gets `powerj-fx` as a dependency (same mechanism as the other modules) and a **new rule for the packages `io.powerj.fx.model` and `io.powerj.fx.grid`** at 90 % lines and branches, next to the existing rule for `io.powerj.cmdlets`. The exclusion for `view` is explicit in the same file so that nobody has to guess why it is missing.
+- Rule of thumb for reviews: if a `view` class contains an `if`, the `if` belongs in `model`.
+
+## Risks to settle first (phase 1 is a spike for these)
+| # | Risk | What to check | Fallback |
+|---|---|---|---|
+| R1 | JavaFX inside a non-boot `ModuleLayer` loaded by `ModuleLoader` (`defineModulesWithOneLoader`, parent = system loader). Class loading, the `modena.css` resource and native libraries must work. | A window with a `TableView` opens from `mod-load`. | Load JavaFX in the shell's own module path through `powerj-dist` options (then JavaFX is in the dist, +32 MB) or add a "boot-layer module folder" to `ModuleLoader`. |
+| R2 | Native libraries are extracted from the jars into `~/.openjfx/cache/<version>` at first use. | Works on a read-only home? Time of the first window. | `-Djavafx.cachedir`, or document. |
+| R3 | JDK 24+ warns about restricted methods and `sun.misc.Unsafe` memory access used by JavaFX 24/25, and `--enable-native-access` only reaches modules of the boot layer. | Output of `mod-load` / first `grid` on a real JDK 25 terminal. | Tolerate the warning; else a small `ModuleLoader` change using `ModuleLayer.Controller.enableNativeAccess(Module)` for the modules of `~/.powerj/modules` (decision needed, since it widens what a third-party module may do). |
+| R4 | No display (SSH, container, CI): `Platform.startup` fails. | Clear error, shell stays usable. | Message `fx.noDisplay`; nothing else. |
+| R5 | Linux needs GTK 3 on the target; macOS needs the AppKit thread. | Test on Linux and Windows first. | macOS declared best effort. |
+| R6 | Monocle for JavaFX 25 may not exist (versions lag). | Look for a compatible `openjfx-monocle`. | `view` excluded from the threshold, see above. |
+
+## Phases
+Each phase ends with a state that builds, passes `./mvnw verify`, and **can be tried by hand** with the steps given. The manual checklist grows into `docs/recettes/fx-grid.md` as the phases land.
+
+### Phase 1 — Skeleton, packaging, an empty window (answers R1-R4)
+**Goal:** prove that the module installs by copying a folder, and that a JavaFX window opens from PowerJ.
+
+- New Maven module `powerj-fx` in the parent `<modules>` and `dependencyManagement`; `module-info.java` (`io.powerj.fx`, `provides CmdletProvider with FxProvider`); OS profiles for `javafx.platform`; JavaFX `25.0.x` pinned in the parent.
+- Packaging: `target/module/fx/` + `powerj-fx-<version>-<platform>.zip` (profile `package` or default `package` phase, like `powerj-dist`'s `dist` profile).
+- `FxProvider` + `GridCmdlet` that ignores its input and opens a window titled "PowerJ grid" showing "n objects received" (the count, so the pipe is already proven).
+- `FxRuntime` (single start-up, `runAndWait`, `setImplicitExit(false)`), error `fx.noDisplay` for a headless session.
+- i18n en/fr for the summary and the errors.
+- Unit tests: `FxProvider` (declares one cmdlet, bundle present in en and fr), `GridCmdlet` with a fake `WindowOpener` (receives the count, an exception from the opener becomes a clean error), `FxRuntime` error mapping.
+- Decide R6 (Monocle) and R3 (native-access warning) and record the decisions in this plan.
+
+**Manual test:**
+```bash
+./mvnw -pl powerj-fx -am package
+unzip powerj-fx/target/powerj-fx-*.zip -d ~/.powerj/modules/
+powerj                      # or: mod-load ~/.powerj/modules/fx
+PJ ~> mod-list              # fx listed with its version and the cmdlet grid
+PJ ~> ls | grid             # a window "n objects received"; the prompt is back at once
+PJ ~> ls | grid ; ls | grid # two windows; closing one does not affect the other
+PJ ~> exit                  # the process ends, windows included
+# over SSH without a display: grid prints "no graphical display available", the shell keeps running
+```
+
+### Phase 2 — A read-only table (`model`: columns and cells)
+**Goal:** `grid` displays the received objects as a table.
+
+- `model.ColumnSpec` (name, Java type, value reader, numeric/size/date flags) and `model.ColumnExtractor`:
+  - records → components, in `@Display(columns=…)` order when present (otherwise all, like the terminal table);
+  - `Row` and `Map` → keys, in order;
+  - scalars (`String`, numbers, `Path`, dates, enums…) → one column `value`;
+  - other objects → public getters of the bean (`getX`/`isX`), as a last resort;
+  - objects of **different types** in one stream: union of the columns in order of first appearance, empty cell where an object lacks the column.
+- `model.CellFormatter`: `null` → empty, `@Bytes` and `Row.sizeColumns()` → readable size (`14.2 KB`), dates/`Path`/`Duration` → readable text, long text cut to one line with the full text as tooltip, line breaks shown as `↵`.
+- `model.GridModel`: the `ObservableList<GridRow>` plus the column list; keeps the **original object** in each `GridRow` (needed for phase 7).
+- `view.GridView`: a `TableView<GridRow>` with one `TableColumn` per `ColumnSpec`, right alignment for numbers/sizes, status bar "n rows". Window sized to the screen, closable with Esc.
+- Unit tests (`model`): each input type above, `@Display` order, heterogeneous streams, `null` values, `Row` with size columns, getters fallback, a record with a `Path`, an empty input (an empty table with a "no result" message, not an error).
+
+**Manual test:**
+```text
+PJ ~> ls | grid                       # name, size (readable), modified, dir, ext
+PJ ~> ps | grid                       # a record with a pid
+PJ ~> ls | select name size | grid    # Row: two columns
+PJ ~> java.util.Map.of("a", 1) | grid # key / value
+PJ ~> "a" | grid ; 1..100 | grid      # scalars, one `value` column
+PJ ~> (ls ; ps) | grid                # two types: union of the columns
+PJ ~> echo | grid                     # empty input: an empty table, not an error
+```
+
+### Phase 3 — Sorting by column
+**Goal:** click a header to sort; shift-click to add a secondary key.
+
+- `model.SortSpec`: a list of (column, direction); builds one `Comparator<GridRow>`. Natural order by type: numbers numerically, sizes by bytes (not by text), dates chronologically, `Path` by text, strings case-insensitively with the original as tie-break; `null` always last; **stable** (as `sort`, FR-67).
+- `view`: header click cycles ascending → descending → none; shift-click adds a key; the sort indicator and the order number of the keys are shown. The `SortedList` comparator is bound to a `SortSpec` that the view updates.
+- Unit tests: every column type, ascending/descending, multi-key, stability, `null`s last, mixed types in one column (numbers and text: numbers first), the state cycle of a header click.
+
+**Manual test:** `ls -r | grid`; sort by `size` (10 KB must come after 9 KB), by `modified`, by `name`; shift-click `ext` then `size` for a two-key sort; click again to reverse, once more to clear; sort a column that contains empty cells.
+
+### Phase 4 — Filtering by column
+**Goal:** a filter field under each header, plus a global search box.
+
+- `model.FilterSpec`: a global text plus one expression per column, combined with AND. Expression grammar (parsed by `model.FilterParser`, with exact messages for invalid input):
+  - `text` → contains, case-insensitive;
+  - `=text` → equals; `!text` → does not contain;
+  - `/regex/` → regular expression (invalid regex → the field turns red, the table keeps its last good filter);
+  - on numeric, size and date columns: `>10kb`, `>=3`, `<2026-01-01`, `a..b` (size suffixes `kb`, `mb`, `gb` as in PowerJ).
+- The filter is applied to the **displayed text and to the raw value** (the size column answers to both `>10kb` and `KB`).
+- `view`: a filter row under the headers, a global search box (Ctrl+F focuses it), a "clear filters" button, status bar "n / total rows" (e.g. `127 / 4 312`).
+- The filter is debounced (200 ms) so typing stays smooth on large tables.
+- Unit tests: every operator, case-insensitivity, invalid input, a size/date column, combination of several columns, empty filter = everything, the debounce logic (with an injected clock/scheduler).
+
+**Manual test:** `ls -r / | grid` (a large tree); type `java` in `name`; `>1mb` in `size`; `/^[A-Z]/` in `name`; an invalid regex like `/(/` (red field, table unchanged); `2026..` in `modified`; then clear the filters; check the status bar counts and that sort and filters combine.
+
+### Phase 5 — Streaming and large inputs
+**Goal:** the window opens at the first object and fills while the pipeline runs; huge inputs do not freeze the shell.
+
+- `GridCmdlet.process` hands each object to the window through a bounded buffer (`model.RowBuffer`) that the FX thread drains in batches (`Platform.runLater` at most every ~100 ms), so the FX queue is never flooded.
+- Columns grow while new object types arrive. The status bar shows "loading…" until `end`.
+- `--max-rows <n>` (default 100 000): beyond it, the cmdlet stops reading (`context.stopInput()`, FR-68b) and the status bar says "truncated at n rows".
+- Ctrl+C in the shell while loading stops the feed; the window stays with what was received.
+- Unit tests: `RowBuffer` (batching, ordering, overflow, truncation flag), column growth with late object types, `--max-rows` through `stopInput`, cancellation (`context.cancelled()`).
+
+**Manual test:** `ls -r / | grid` (the window appears at once and fills); `1..2000000 | grid --max-rows 5000` (stops at 5 000 with the notice); Ctrl+C during a long `ls -r /`; scroll and sort while it is still loading; `ps | grid` repeated 20 times (no leak of windows or threads, `jobs`/task manager).
+
+### Phase 6 — Usability and polish
+**Goal:** the window behaves like a tool people leave open.
+
+- Copy: Ctrl+C copies the selected rows as TSV with the header (and Ctrl+Shift+C as JSON); "copy cell" in the context menu.
+- Column menu: show/hide columns, "fit to content", reorder by drag (native to `TableView`).
+- `--title`, `--columns a,b,c` (initial selection and order), `--wait` (block until closed; Ctrl+C in the shell closes the window), `--no-focus`.
+- Window position/size remembered in `~/.powerj/fx-grid.properties` (read through `CmdletContext.configDirectory()`).
+- A details pane (F3) showing the selected object's properties as `name : value`, useful for long text.
+- i18n for every label (en/fr) with a test that both bundles have the same keys.
+- Unit tests: TSV/JSON serialisation (`model.RowExporter`), `--columns` parsing and errors, settings read/write with a temp dir, the key-parity test of the bundles.
+
+**Manual test:** each shortcut and menu on `ls -r | grid`; paste the clipboard into a spreadsheet; `grid --columns name,size`; `ls | grid --wait ; echo back` (`back` appears only after closing the window); `Ctrl+C` while waiting; reopen and check the remembered size; switch the language (`language=fr`) and check the labels.
+
+### Phase 7 — `--pass-thru`: selection goes back into the pipeline
+**Goal:** `grid` as an interactive filter, like `Out-GridView -PassThru`.
+
+- `--pass-thru` implies `--wait`. The window shows an **OK** and a **Cancel** button and multi-row selection. On OK, the **original objects** (kept by `GridRow`) of the selected rows are emitted in the **displayed order**; on Cancel or window close, nothing is emitted (and `$?` is `true`).
+- `--single` allows only one row.
+- Selection is by object identity, so sorting and filtering do not lose it; rows hidden by a filter are **not** emitted.
+- Unit tests: emission order after sort and filter, cancel emits nothing, `--single`, the original object is the exact instance received (not a copy), the cmdlet is never `previewable` (it opens a window; `previewable` returns `false`).
+
+**Manual test:** `ls | grid --pass-thru | map { $_.name }` (select 2 files, OK → two names); sort first, then select, check the order; Cancel → nothing printed; a filter that hides a selected row; `ps | grid --pass-thru --single | kill` on a throw-away process.
+
+### Phase 8 — Documentation, CI and wrap-up
+- `docs/SPECIFICATION.md`: new **FR-77 — Graphical cmdlets (module `fx`), `grid`** (syntax, options, records, acceptance criteria), §4.4 (a module with dependencies, example `fx`), §5.1 module list, §11 row 26, §12.3.
+- `docs/recettes/fx-grid.md`: the manual checklists of phases 1-7 merged, in the format of `grep.md`.
+- `README.md`: "Optional graphical module" section (what it is, why it is not in the distribution, how to install it, the cost: ~8-9 MB zip / ~32 MB installed) and the cmdlet in the table.
+- `examples/` is untouched: `greet` remains the minimal template, `powerj-fx` is the realistic one (dependencies, i18n, config).
+- CI (`.github/workflows/ci.yml`): build `powerj-fx` on `ubuntu` and `windows`, run the unit tests (headless), upload `powerj-fx-*.zip` as an artifact; if Monocle works (R6), run the `fx-ui` profile under `xvfb` on Linux.
+- `powerj-coverage`: dependency on `powerj-fx`, the new package rule and the documented `view` exclusion (or Monocle coverage).
+- Final check: `./mvnw verify` with the coverage report, and the complete manual checklist on **Windows and Linux**.
+
+## Order and dependencies
+Phase 1 first (it can invalidate the approach through R1-R3). Then 2 → 3 → 4 are sequential (each builds on the model of the previous one). Phase 5 can go before or after 6; phase 7 needs 2-4 only. Phase 8 closes the iteration. A first usable version is already available after **phase 4**.
+
+## Open questions for the user
+1. **Cmdlet name:** `grid` (proposed), or `out-grid` / `ogv` aliases for PowerShell users?
+2. **Default of `--wait`:** non-blocking (proposed: the prompt comes back, like `xeyes &`), or blocking as `Out-GridView` does?
+3. **JavaFX version:** 25 (LTS, requires JDK 23+; fits Java 25 of the project) — fine?
+4. **R3:** is a small, generic change to `ModuleLoader` acceptable if the native-access warning is too noisy, or must third-party modules stay strictly unprivileged?
+5. **Platforms** to guarantee: Windows and Linux (proposed); macOS best effort.
+6. **Coverage fallback:** if Monocle is unusable, accept the documented exclusion of `view` from the JaCoCo threshold (with a ≥ 90 % rule on `model` and `grid` instead)?
