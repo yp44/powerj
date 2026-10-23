@@ -88,6 +88,19 @@
                     </compilerArgs>
                 </configuration>
             </plugin>
+            <!-- JavaFX loads native libraries: the shell asks the user before loading the module (FR-77) and then enables
+                 native access for the modules of its folder. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <configuration>
+                    <archive>
+                        <manifestEntries>
+                            <Enable-Native-Access>true</Enable-Native-Access>
+                        </manifestEntries>
+                    </archive>
+                </configuration>
+            </plugin>
             <!-- The module folder: powerj-fx.jar and the JavaFX jars. powerj-api is left out, the shell provides it. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

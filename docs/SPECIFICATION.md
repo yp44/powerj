@@ -1416,6 +1416,11 @@ Yves   Hello Yves!   2026-10-07 10:12:03
 - The runtime and PowerJ modules take precedence: a jar that bundles its own copy of `powerj-api` uses the shell's copy.
 - `mod-load <path>` hot-loads a module (jar or folder) and displays the added cmdlets; `mod-list` lists the loaded modules (name, version, cmdlets, source), including the built-in cmdlets.
 - A module's classes are **not** usable in Java expressions (§3.13): `new com.example.greet.Greeting(…)` answers `class not found: com.example.greet.Greeting`. Only its cmdlets are exposed; the objects they produce are used normally (`$g.message`, `where`, `map`). This is the intended way to use an external library from PowerJ.
+- **Modules that use native code.** A module whose jar manifest has `Enable-Native-Access: true` (case-insensitive value) needs the user's consent before it is loaded: without it the JDK warns, and in a future release blocks, the loading of native libraries by a module of a layer defined at run time (`--enable-native-access` only reaches the boot layer). The answers are the settings `modules.nativeAccess.<module>=true|false` of `config.properties` (§8), one per module name (`modules.nativeAccess.io.powerj.fx=true`).
+  - **Recorded answer:** `true` loads the module and enables native access for **every module of its layer** (the code that loads the libraries is often a dependency, e.g. `javafx.graphics`); `false` does not load it (`not loaded, native access refused for module …`).
+  - **No answer yet, interactive terminal** (startup or `mod-load`): PowerJ asks `The module "io.powerj.fx" uses native code (modules: …). Load it? [y/N]` (`y`, `yes`, `o`, `oui` accept, anything else refuses), records the answer in `config.properties` (comments and other settings are kept) and goes on. Ctrl+C or the end of the input records nothing and does not load the module.
+  - **No answer yet, nobody to ask** (`powerj -c`, a `.pj` file, standard input that is not a terminal): the module is **not loaded** and the message names the setting to add. Nothing is ever asked or recorded there.
+  - This is informed consent, not a sandbox: anyone who can write in `~/.powerj/` can already install code that runs with the rights of the user.
 - An invalid module (unreadable jar, missing dependency, no cmdlet, module already loaded, conflicting name, exception during loading) is reported with a warning; the other modules are loaded normally.
 
 ---
@@ -1524,7 +1529,7 @@ User folder `~/.powerj/` (created on first launch):
 |---|---|
 | `history` | Command history (FR-09). |
 | `modules/` | Third-party module jars (§4.4). |
-| `config.properties` | `history.size=10000`, `language=en` (or `fr`, FR-61), `native.prefer=find,sort`, `colors.cmdlet=green`… |
+| `config.properties` | `history.size=10000`, `language=en` (or `fr`, FR-61), `native.prefer=find,sort`, `colors.cmdlet=green`, `modules.nativeAccess.<module>=true` (consent to load a module that uses native code, §4.4)… |
 | `logs/` | Diagnostic log, in English (FR-60). |
 | `protected-paths` | Paths that `rm` and `mv` refuse to remove (FR-72): one per line, `~` for the home folder, `#` for comments; created at first launch with the defaults of the platform. |
 | `profile.pj` | Commands run when the interactive shell starts (FR-63): variable assignments (`$proj = Path.of("D:/dev")`), `import java.time.*`, `env --set MAVEN_OPTS=-Xmx2g`. `$profile` contains its path. |

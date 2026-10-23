@@ -98,6 +98,19 @@ public final class Repl {
         return colors != null && colors >= 8 && (noColor == null || noColor.isEmpty());
     }
 
+    /**
+     * Consent for the modules that use native code (FR-77): answers recorded in {@code configFile}. On a real terminal
+     * the user is asked for the missing ones; on a dumb one (pipe, file) nobody is asked and the module is not loaded.
+     */
+    public void nativeAccess(Path configFile) {
+        boolean interactive = !terminal.getType().startsWith("dumb");
+        interpreter.nativeAccess(new NativeAccessConsent(new ConfigFile(configFile),
+                interactive ? new TerminalAsker(terminal) : null, line -> {
+                    out.println(line);
+                    out.flush();
+                }));
+    }
+
     /** Loads third-party modules (§4.4); warnings are displayed below the banner. */
     public void loadModules(java.nio.file.Path dir) {
         moduleWarnings = interpreter.loadModules(dir);

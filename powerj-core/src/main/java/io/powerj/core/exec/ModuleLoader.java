@@ -5,6 +5,7 @@ import java.lang.module.Configuration;
 import java.lang.module.FindException;
 import java.lang.module.ModuleFinder;
 import java.lang.module.ModuleReference;
+import java.lang.module.ResolvedModule;
 import java.lang.module.ResolutionException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
@@ -16,6 +17,8 @@ import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.jar.JarFile;
+import java.util.jar.Manifest;
 
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletProvider;
@@ -38,8 +41,12 @@ public final class ModuleLoader {
         }
     }
 
+    /** Manifest attribute of a module that uses native code: {@code Enable-Native-Access: true}. */
+    static final String NATIVE_ACCESS_ATTRIBUTE = "Enable-Native-Access";
+
     private final CmdletRegistry registry;
     private final Set<String> reserved;
+    private volatile NativeAccessPolicy nativeAccess = NativeAccessPolicy.NONE;
 
     /**
      * @param reserved names of the built-in commands: a cmdlet with the same name would never be called
@@ -47,6 +54,11 @@ public final class ModuleLoader {
     public ModuleLoader(CmdletRegistry registry, Set<String> reserved) {
         this.registry = registry;
         this.reserved = reserved;
+    }
+
+    /** Policy asked before loading a module that declares {@value #NATIVE_ACCESS_ATTRIBUTE} (none by default). */
+    public void nativeAccess(NativeAccessPolicy policy) {
+        this.nativeAccess = java.util.Objects.requireNonNull(policy, "policy");
     }
 
     /** Loads each jar and each subdirectory of {@code dir}; a missing directory loads nothing. */
@@ -107,9 +119,30 @@ public final class ModuleLoader {
         // uses the shell's one.
         Configuration configuration = Configuration.resolve(ModuleFinder.of(), List.of(parent.configuration()),
                 finder, roots);
+        boolean grantNativeAccess = false;
+        List<String> declaring = declaringNativeAccess(finder, roots);
+        if (!declaring.isEmpty()) {
+            List<String> inLayer = configuration.modules().stream().map(ResolvedModule::name).sorted().toList();
+            for (String module : declaring) {
+                Optional<Boolean> answer = nativeAccess.consent(module, inLayer);
+                if (answer.isEmpty()) {
+                    return Result.failure(Messages.get("module.nativeAccess.noAnswer", path.getFileName(), module,
+                            NativeAccessPolicy.setting(module)));
+                }
+                if (!answer.get()) {
+                    return Result.failure(Messages.get("module.nativeAccess.refused", path.getFileName(), module,
+                            NativeAccessPolicy.setting(module)));
+                }
+            }
+            grantNativeAccess = true;
+        }
         var controller = ModuleLayer.defineModulesWithOneLoader(configuration, List.of(parent),
                 ClassLoader.getSystemClassLoader());
         ModuleLayer layer = controller.layer();
+        if (grantNativeAccess) {
+            // The code that loads the native libraries is often a dependency (javafx.graphics), not the module itself.
+            layer.modules().forEach(controller::enableNativeAccess);
+        }
         Module powerj = ModuleLoader.class.getModule();
         for (Module module : layer.modules()) {
             if (!module.getDescriptor().isAutomatic()) {
@@ -147,6 +180,30 @@ public final class ModuleLoader {
             warnings.add(Messages.get("module.noCmdlet", path.getFileName(), CmdletProvider.class.getName()));
         }
         return new Result(List.copyOf(cmdlets), List.copyOf(warnings));
+    }
+
+    /** Names of the modules among {@code roots} whose manifest has {@code Enable-Native-Access: true}. */
+    private static List<String> declaringNativeAccess(ModuleFinder finder, List<String> roots) {
+        List<String> declaring = new ArrayList<>();
+        for (ModuleReference reference : finder.findAll()) {
+            String name = reference.descriptor().name();
+            if (roots.contains(name) && reference.location().map(ModuleLoader::declaresNativeAccess).orElse(false)) {
+                declaring.add(name);
+            }
+        }
+        declaring.sort(null);
+        return declaring;
+    }
+
+    /** {@code true} if the jar at {@code location} has {@code Enable-Native-Access: true} in its manifest. */
+    private static boolean declaresNativeAccess(java.net.URI location) {
+        try (JarFile jar = new JarFile(Path.of(location).toFile())) {
+            Manifest manifest = jar.getManifest();
+            return manifest != null
+                    && "true".equalsIgnoreCase(manifest.getMainAttributes().getValue(NATIVE_ACCESS_ATTRIBUTE));
+        } catch (IOException | RuntimeException _) {
+            return false;
+        }
     }
 
     /** Layer containing {@code powerj-api}; the boot layer during tests (classpath). */
