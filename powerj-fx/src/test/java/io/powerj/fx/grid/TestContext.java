@@ -18,6 +18,12 @@ final class TestContext<O> implements CmdletContext<O> {
     final List<String> errors = new ArrayList<>();
     boolean hasInput = true;
     int stopInputCalls;
+    Path configDirectory;
+
+    @Override
+    public java.util.Optional<Path> configDirectory() {
+        return java.util.Optional.ofNullable(configDirectory);
+    }
 
     @Override
     public void stopInput() {

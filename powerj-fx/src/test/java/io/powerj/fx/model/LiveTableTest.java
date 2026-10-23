@@ -224,6 +224,62 @@ class LiveTableTest {
     }
 
     @Test
+    void closeRunsTheListenersOnce() {
+        var live = new LiveTable(1);
+        var calls = new java.util.concurrent.atomic.AtomicInteger();
+        live.onClosed(calls::incrementAndGet);
+        assertThat(calls).hasValue(0);
+        live.close();
+        live.close();
+        assertThat(calls).hasValue(1);
+    }
+
+    @Test
+    void aListenerAddedAfterTheCloseRunsAtOnce() {
+        var live = new LiveTable(1);
+        live.close();
+        var calls = new java.util.concurrent.atomic.AtomicInteger();
+        live.onClosed(calls::incrementAndGet);
+        assertThat(calls).hasValue(1);
+    }
+
+    @Test
+    void awaitClosedWaitsForTheClose() throws Exception {
+        var live = new LiveTable(1);
+        CompletableFuture<Void> waiting = CompletableFuture.runAsync(() -> {
+            try {
+                live.awaitClosed();
+            } catch (InterruptedException e) {
+                throw new IllegalStateException(e);
+            }
+        });
+        Thread.sleep(150);
+        assertThat(waiting).isNotDone();
+        live.close();
+        waiting.get(5, TimeUnit.SECONDS);
+        live.awaitClosed(); // already closed: no wait
+    }
+
+    @Test
+    void awaitClosedCanBeInterrupted() throws Exception {
+        var live = new LiveTable(1);
+        AtomicReference<Throwable> failure = new AtomicReference<>();
+        Thread waiting = new Thread(() -> {
+            try {
+                live.awaitClosed();
+            } catch (InterruptedException e) {
+                failure.set(e);
+            }
+        });
+        waiting.start();
+        Thread.sleep(150);
+        waiting.interrupt();
+        waiting.join(5_000);
+        assertThat(failure.get()).isInstanceOf(InterruptedException.class);
+        assertThat(live.isClosed()).isFalse();
+    }
+
+    @Test
     void theCapacityIsMandatory() {
         assertThatThrownBy(() -> new LiveTable(0)).isInstanceOf(IllegalArgumentException.class);
     }

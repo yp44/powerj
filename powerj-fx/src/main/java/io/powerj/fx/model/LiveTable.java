@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -37,6 +39,8 @@ public final class LiveTable {
     private volatile boolean paused;
     private volatile Done done = Done.NO;
     private volatile Thread producer;
+    private final CountDownLatch closedLatch = new CountDownLatch(1);
+    private final List<Runnable> closeListeners = new CopyOnWriteArrayList<>();
 
     /** @param capacity rows that can wait for the window; the pipeline waits beyond */
     public LiveTable(int capacity) {
@@ -70,10 +74,35 @@ public final class LiveTable {
         done = truncated ? Done.TRUNCATED : Done.COMPLETE;
     }
 
-    /** The window is gone: nothing is waited for any more, and {@link #offer} says no. */
+    /**
+     * The window is gone, or is to go: nothing is waited for any more, {@link #offer} says no, {@link #awaitClosed} returns
+     * and the listeners run. Calling it again does nothing.
+     */
     public void close() {
+        boolean first = !closed;
         closed = true;
         queue.clear();
+        if (first) {
+            closedLatch.countDown();
+            closeListeners.forEach(Runnable::run);
+        }
+    }
+
+    /** Runs {@code action} when {@link #close()} is called (at once if it was). It runs on the thread that closes. */
+    public void onClosed(Runnable action) {
+        closeListeners.add(action);
+        if (closed) {
+            action.run();
+        }
+    }
+
+    /**
+     * Waits until the window is closed ({@code --wait}).
+     *
+     * @throws InterruptedException if the pipeline is cancelled (Ctrl+C) while it waits
+     */
+    public void awaitClosed() throws InterruptedException {
+        closedLatch.await();
     }
 
     public boolean isClosed() {

@@ -11,5 +11,5 @@ public interface WindowOpener {
      *
      * @throws io.powerj.fx.runtime.FxUnavailableException if the graphical toolkit cannot be used
      */
-    void open(String title, LiveTable live);
+    void open(WindowOptions options, LiveTable live);
 }

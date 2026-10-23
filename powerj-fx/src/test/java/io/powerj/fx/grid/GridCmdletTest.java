@@ -31,12 +31,14 @@ class GridCmdletTest {
     /** Remembers the windows the cmdlet asked for, and how many rows it had given them at that moment. */
     private static final class RecordingOpener implements WindowOpener {
         final List<String> titles = new ArrayList<>();
+        final List<WindowOptions> optionsSeen = new ArrayList<>();
         final List<LiveTable> lives = new ArrayList<>();
         final List<Integer> pendingAtOpening = new ArrayList<>();
 
         @Override
-        public void open(String title, LiveTable live) {
-            titles.add(title);
+        public void open(WindowOptions options, LiveTable live) {
+            titles.add(options.title());
+            optionsSeen.add(options);
             lives.add(live);
             pendingAtOpening.add(live.pending());
         }
@@ -212,7 +214,7 @@ class GridCmdletTest {
 
     @Test
     void aWindowThatCannotOpenIsAUsageError() {
-        WindowOpener failing = (title, live) -> {
+        WindowOpener failing = (options, live) -> {
             throw new FxUnavailableException("no display", new RuntimeException("x"));
         };
         assertThatThrownBy(() -> run(new GridCmdlet(failing), NO_OPTIONS, new TestContext<>(), "a"))
@@ -221,6 +223,114 @@ class GridCmdletTest {
                 .hasCauseInstanceOf(FxUnavailableException.class);
         assertThatThrownBy(() -> run(new GridCmdlet(failing), NO_OPTIONS, new TestContext<>()))
                 .isInstanceOf(IllegalArgumentException.class); // an empty input opens it at the end
+    }
+
+    // --- title, columns, wait, settings ---
+
+    private static GridParams params(String title, String columns, boolean waitClose) {
+        return new GridParams(null, title, columns, waitClose);
+    }
+
+    @Test
+    void theWindowHasATitleOfItsOwnOrTheDefaultOne() throws Exception {
+        RecordingOpener opener = new RecordingOpener();
+        run(new GridCmdlet(opener), params("Files", null, false), new TestContext<>(), "a");
+        run(new GridCmdlet(opener), params(null, null, false), new TestContext<>(), "a");
+        run(new GridCmdlet(opener), params("  ", null, false), new TestContext<>(), "a");
+        assertThat(opener.titles).containsExactly("Files", "PowerJ grid", "PowerJ grid");
+    }
+
+    @Test
+    void theColumnsAskedForAreGivenToTheWindow() throws Exception {
+        RecordingOpener opener = new RecordingOpener();
+        run(new GridCmdlet(opener), params(null, "age, name", false), new TestContext<>(), new Person("Ada", 36));
+        assertThat(opener.optionsSeen.getFirst().columns().names()).containsExactly("age", "name");
+        run(new GridCmdlet(opener), NO_OPTIONS, new TestContext<>(), new Person("Ada", 36));
+        assertThat(opener.optionsSeen.get(1).columns().isAll()).isTrue();
+    }
+
+    @Test
+    void aListWithoutColumnNameIsRefused() {
+        for (String bad : new String[] {"", " ", ",", " , ,"}) {
+            assertThatThrownBy(() -> new GridCmdlet(new RecordingOpener()).begin(params(null, bad, false),
+                    new TestContext<>())).isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("--columns needs at least one column name: " + bad);
+        }
+    }
+
+    @Test
+    void aColumnAskedForThatNeverArrivedIsReportedAtTheEnd() throws Exception {
+        TestContext<Void> context = new TestContext<>();
+        run(new GridCmdlet(new RecordingOpener()), params(null, "name,Nothing,AGE,other", false), context,
+                new Person("Ada", 36));
+        assertThat(context.errors).containsExactly("no such column: Nothing, other");
+    }
+
+    @Test
+    void aColumnThatArrivesLaterIsNotReported() throws Exception {
+        TestContext<Void> context = new TestContext<>();
+        run(new GridCmdlet(new RecordingOpener()), params(null, "name,extra", false), context, new Person("Ada", 36),
+                Map.of("extra", 1));
+        assertThat(context.errors).isEmpty();
+    }
+
+    @Test
+    void theWindowSettingsAreInTheConfigurationFolder() throws Exception {
+        RecordingOpener opener = new RecordingOpener();
+        TestContext<Void> context = new TestContext<>();
+        context.configDirectory = java.nio.file.Path.of("home");
+        run(new GridCmdlet(opener), NO_OPTIONS, context, "a");
+        assertThat(opener.optionsSeen.getFirst().settings()).isEqualTo(java.nio.file.Path.of("home", "fx-grid.properties"));
+        run(new GridCmdlet(opener), NO_OPTIONS, new TestContext<>(), "a");
+        assertThat(opener.optionsSeen.get(1).settings()).isNull();
+    }
+
+    @Test
+    void waitBlocksUntilTheWindowIsClosed() throws Exception {
+        RecordingOpener opener = new RecordingOpener();
+        GridCmdlet grid = new GridCmdlet(opener);
+        TestContext<Void> context = new TestContext<>();
+        var done = new java.util.concurrent.CompletableFuture<Void>();
+        Thread stage = Thread.ofVirtual().start(() -> {
+            try {
+                run(grid, params(null, null, true), context, "a", "b");
+                done.complete(null);
+            } catch (Exception e) {
+                done.completeExceptionally(e);
+            }
+        });
+        Thread.sleep(300);
+        assertThat(done).isNotDone();                       // the prompt is not given back
+        assertThat(opener.live().state()).isEqualTo(LiveTable.State.COMPLETE);
+        opener.live().close();                              // the user closes the window
+        done.get(5, java.util.concurrent.TimeUnit.SECONDS);
+        stage.join(5_000);
+    }
+
+    @Test
+    void withoutWaitThePromptIsGivenBackAtOnce() throws Exception {
+        RecordingOpener opener = new RecordingOpener();
+        run(new GridCmdlet(opener), params(null, null, false), new TestContext<>(), "a");
+        assertThat(opener.live().isClosed()).isFalse();
+    }
+
+    @Test
+    void ctrlCWhileWaitingClosesTheWindow() throws Exception {
+        RecordingOpener opener = new RecordingOpener();
+        var failure = new java.util.concurrent.atomic.AtomicReference<Throwable>();
+        Thread stage = new Thread(() -> {
+            try {
+                run(new GridCmdlet(opener), params(null, null, true), new TestContext<>(), "a");
+            } catch (Exception e) {
+                failure.set(e);
+            }
+        });
+        stage.start();
+        Thread.sleep(300);
+        stage.interrupt();                                  // Ctrl+C
+        stage.join(5_000);
+        assertThat(failure.get()).isInstanceOf(InterruptedException.class);
+        assertThat(opener.live().isClosed()).isTrue();      // the window follows
     }
 
     // --- errors, usage ---

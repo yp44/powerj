@@ -162,3 +162,23 @@ At the bottom, before the number of rows, there is a button `Pause` (`Reprendre`
 | 83 | On a big input (`IntStream.range(0, 400000).boxed().toList() \| grid --max-rows 300000`), pause | The pipeline **waits** too (the queue of 20 000 rows fills up, then the producer is blocked): pausing really suspends the loading, it does not hide it. Resume goes on. |
 | 84 | Pause, then close the window (Esc) | The window closes and the pipeline is stopped (the prompt comes back); closing while paused does not leave the producer waiting. Ctrl+C in the terminal while paused ends the producer; the window says `input interrupted`. |
 | 85 | Pause, sort or filter | Sorting and filtering still work on the rows already there. |
+
+## Phase 6 — copy, menus, options, window
+
+Top bar: search box, `Columns ▾`, `Details`, `Clear filters`. With `ls | select name size path | grid` (the files of 5, 228, 1228, … bytes).
+
+| # | Action | Expected result |
+|---|---|---|
+| 86 | Click a row, Shift+click another, press **Ctrl+C**, paste into a text editor or a spreadsheet | The header and the selected rows, tab-separated, **as shown** (`1.2 KB`) but whole; only the **visible** columns, in the order of the table. A tab or a line break inside a cell becomes a space. |
+| 87 | Same with **Ctrl+Shift+C** | A JSON array, one object per line, with the **values**: `"size": 1228` (bytes, a number), dates in ISO 8601, `null` for an empty cell. |
+| 88 | Right-click a cell | `Copy cell` (the text of that cell, whole), `Copy rows (tab-separated)`, `Copy rows (JSON)`. |
+| 89 | `Columns ▾` | One entry per column with a tick; unticking hides the column, ticking shows it. A hidden column is left out of the copy. |
+| 90 | Right-click a column header (the name) | `Fit to content` (the column takes the width of its widest cells, read on the first 2 000 rows) and `Hide column`. |
+| 91 | Select a row, press **F3** (or click `Details`) | A pane on the right with every property of the object, **hidden columns included**: `name : f1228.bin`, `size : 1.2 KB`, the names aligned, long texts and line breaks whole. F3 again hides it; it follows the selection. |
+| 92 | `ls \| grid --columns size,name` (case does not matter) | Only `size` then `name`, in this order; the other columns are hidden and are in the `Columns` menu. A name that never arrives (`--columns size,nothing`) gives, once the input is over, `grid: no such column: nothing`. `--columns ,` or `--columns ""` is refused. |
+| 93 | `ls \| grid --title Files` | The window is called `Files` (`PowerJ grid` by default). Not visible on a machine without a window manager. |
+| 94 | `ls \| grid --wait` then `"result=" + (1+2)` | The prompt is **not** given back while the window is open; closing the window (Esc) gives it back and runs the next line. **Ctrl+C** in the terminal closes the window and ends the command. |
+| 95 | Close a window, then open another | The new window opens where the last one was, with its size; the file is `~/.powerj/fx-grid.properties` (`x`, `y`, `width`, `height`). A file that is damaged, or too small, is ignored; a position that is no longer on the screen (another monitor) is brought back. |
+| 96 | `help grid` | `--title`, `--columns`, `--wait`, `--max-rows`, in French too. |
+
+Not done (see the plan): `--no-focus` (JavaFX has no reliable way to open a window without taking the focus; to be decided).

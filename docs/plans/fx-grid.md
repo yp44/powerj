@@ -210,7 +210,7 @@ PJ ~> echo | grid                     # empty input: an empty table, not an erro
 - Checked with the real launcher under Xvfb: a producer that lasts 9 s, Ctrl+C, closing the window while it loads (the prompt came back in 0.2 s), 400 000 numbers with `--max-rows 5000` and with the default, sort and filter while loading.
 - Coverage: `io.powerj.fx.model` 569/570 lines and 472/486 branches, `io.powerj.fx.grid` 59/59 (191 tests in the module).
 
-### Phase 6 — Usability and polish
+### Phase 6 — Usability and polish — **done** (except `--no-focus`)
 **Goal:** the window behaves like a tool people leave open.
 
 - Copy: Ctrl+C copies the selected rows as TSV with the header (and Ctrl+Shift+C as JSON); "copy cell" in the context menu.
@@ -222,6 +222,18 @@ PJ ~> echo | grid                     # empty input: an empty table, not an erro
 - Unit tests: TSV/JSON serialisation (`model.RowExporter`), `--columns` parsing and errors, settings read/write with a temp dir, the key-parity test of the bundles.
 
 **Manual test:** each shortcut and menu on `ls -r | grid`; paste the clipboard into a spreadsheet; `grid --columns name,size`; `ls | grid --wait ; echo back` (`back` appears only after closing the window); `Ctrl+C` while waiting; reopen and check the remembered size; switch the language (`language=fr`) and check the labels.
+
+**Decisions taken while building it:**
+- `RowExporter` (model) makes the three texts: **tab-separated** (header + rows, cells as shown but whole), **JSON** (the raw values: numbers stay numbers, a size is its bytes, a date ISO 8601, `NaN` is `null`) and **details** (one object, `name : value`). Ctrl+C / Ctrl+Shift+C on the table, and the right-click menu of a cell (`Copy cell`, `Copy rows`, `Copy rows (JSON)`).
+- The columns menu is our own `Columns ▾` button, not the native one of `TableView`: the native one lists the *text* of the columns, which is empty here (the header is a title and a filter field). A header right-click gives `Fit to content` (read on the first 2 000 rows, not the private resize of the skin) and `Hide column`.
+- `--columns a,b` (`ColumnChoice`): shown first in this order, the others hidden; names without regard to case; a name that never arrives is reported once, at the end, as a non-blocking error; a list without a name is refused. A late column goes after the asked-for ones.
+- `--wait`: `end` waits on `LiveTable.awaitClosed()`; **Ctrl+C closes the window** (the interrupt closes the `LiveTable`, whose listener closes the stage). `LiveTable.onClosed` is also what lets a closed-from-outside window go.
+- The place and size of the window are kept in `fx-grid.properties` in the configuration folder (`CmdletContext.configDirectory()`), read before showing, written when it is hidden, and brought back on the screen (`WindowState.fit`). Whatever goes wrong with the file, the defaults apply.
+- The **record component of `--wait` is `waitClose`** (`wait` is not a legal name: it clashes with `Object.wait()`), with `@Option(longName = "wait")`.
+- **Not done: `--no-focus`.** JavaFX has no public way to show a window without activating it, and the machine used to check has no window manager, so nothing could be verified; `Stage.toBack()` would be a guess. To decide with the user.
+- The detail pane is a `SplitPane` item toggled by F3 or the `Details` button.
+- Checked with the real launcher under Xvfb and real clicks/keys: Ctrl+C and Ctrl+Shift+C (clipboard read back), both context menus and their actions, the columns menu (a hidden column leaves the copy), `--columns`, the unknown-column message, `--wait` (the prompt waits, Esc and Ctrl+C free it), the saved window (reopened at x=300 y=100 700×400, file created on first close).
+- Coverage: `io.powerj.fx.model` and `grid` above 90 %; 240 tests in the module.
 
 ### Phase 7 — `--pass-thru`: selection goes back into the pipeline
 **Goal:** `grid` as an interactive filter, like `Out-GridView -PassThru`.

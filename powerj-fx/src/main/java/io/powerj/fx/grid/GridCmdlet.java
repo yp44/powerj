@@ -1,8 +1,10 @@
 package io.powerj.fx.grid;
 
 import java.util.Collections;
+import java.util.Locale;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
@@ -12,6 +14,8 @@ import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.ScriptBlock;
 import io.powerj.fx.Messages;
+import io.powerj.fx.model.ColumnChoice;
+import io.powerj.fx.model.WindowSettings;
 import io.powerj.fx.model.LiveTable;
 import io.powerj.fx.model.ObjectReader;
 import io.powerj.fx.model.PropertyReader;
@@ -24,7 +28,8 @@ import io.powerj.fx.view.GridWindowOpener;
  * opens at the first object and fills while the pipeline goes on; at most {@code --max-rows} rows are read.
  */
 @CmdletInfo(name = "grid", category = "Graphical", summary = "Shows the objects in a window",
-        examples = {"ls -r | grid", "ps | grid", "ls -r / | grid --max-rows 5000"})
+        examples = {"ls -r | grid", "ps | grid --columns pid,name", "ls -r / | grid --max-rows 5000",
+                "ls | grid --title Files --wait"})
 public final class GridCmdlet implements Cmdlet<GridParams, Object, Void> {
 
     /** Rows that can wait for the window before the pipeline has to wait. */
@@ -36,15 +41,19 @@ public final class GridCmdlet implements Cmdlet<GridParams, Object, Void> {
     private static final class Execution {
         final ObjectReader reader;
         final int limit;
+        final WindowOptions options;
         final Set<String> reported = new HashSet<>();
+        /** Lower-case names of the columns that have arrived, to tell the ones asked for that never did. */
+        final Set<String> seenColumns = new HashSet<>();
         LiveTable live;
         int count;
         boolean truncated;
         boolean stopped;
 
-        Execution(ObjectReader reader, int limit) {
+        Execution(ObjectReader reader, int limit, WindowOptions options) {
             this.reader = reader;
             this.limit = limit;
+            this.options = options;
         }
     }
 
@@ -66,7 +75,18 @@ public final class GridCmdlet implements Cmdlet<GridParams, Object, Void> {
         if (p.limit() <= 0) {
             throw new IllegalArgumentException(Messages.get("grid.maxRows.invalid", p.limit()));
         }
-        executions.put(context, new Execution(new ObjectReader(new ScriptReader(context)), p.limit()));
+        ColumnChoice columns = ColumnChoice.ALL;
+        if (p.columns() != null) {
+            try {
+                columns = ColumnChoice.parse(p.columns());
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException(Messages.get("grid.columns.invalid", p.columns()), e);
+            }
+        }
+        String title = p.title() == null || p.title().isBlank() ? Messages.get("grid.title") : p.title();
+        var settings = context.configDirectory().map(dir -> dir.resolve(WindowSettings.FILE_NAME)).orElse(null);
+        executions.put(context, new Execution(new ObjectReader(new ScriptReader(context)), p.limit(),
+                new WindowOptions(title, columns, settings)));
     }
 
     @Override
@@ -82,6 +102,7 @@ public final class GridCmdlet implements Cmdlet<GridParams, Object, Void> {
             return;
         }
         Reading reading = execution.reader.read(input);
+        reading.columns().forEach(column -> execution.seenColumns.add(column.name().toLowerCase(Locale.ROOT)));
         // One report per column: a property that fails fails for every object.
         reading.errors().forEach((column, reason) -> {
             if (execution.reported.add(column)) {
@@ -91,7 +112,7 @@ public final class GridCmdlet implements Cmdlet<GridParams, Object, Void> {
         if (execution.live == null) {
             execution.live = new LiveTable(LIVE_CAPACITY);
             execution.live.offer(reading);
-            open(execution.live);
+            open(execution);
         } else if (!execution.live.offer(reading)) {
             stop(execution, context); // the window was closed: nobody to read for
             return;
@@ -100,13 +121,25 @@ public final class GridCmdlet implements Cmdlet<GridParams, Object, Void> {
     }
 
     @Override
-    public void end(GridParams p, CmdletContext<Void> context) {
+    public void end(GridParams p, CmdletContext<Void> context) throws InterruptedException {
         Execution execution = executions.remove(context);
         if (execution.live == null) {
             execution.live = new LiveTable(LIVE_CAPACITY); // nothing arrived: the window says so
-            open(execution.live);
+            open(execution);
         }
         execution.live.finish(execution.truncated);
+        List<String> missing = execution.options.columns().missing(execution.seenColumns);
+        if (!missing.isEmpty()) {
+            context.error(Messages.get("grid.columns.unknown", String.join(", ", missing)));
+        }
+        if (p.waitClose()) {
+            try {
+                execution.live.awaitClosed();
+            } catch (InterruptedException e) {
+                execution.live.close(); // Ctrl+C: the window goes with the command
+                throw e;
+            }
+        }
     }
 
     private static void stop(Execution execution, CmdletContext<Void> context) {
@@ -114,9 +147,9 @@ public final class GridCmdlet implements Cmdlet<GridParams, Object, Void> {
         context.stopInput();
     }
 
-    private void open(LiveTable live) {
+    private void open(Execution execution) {
         try {
-            opener.open(Messages.get("grid.title"), live);
+            opener.open(execution.options, execution.live);
         } catch (FxUnavailableException e) {
             throw new IllegalArgumentException(e.getMessage(), e);
         }
