@@ -145,7 +145,7 @@ PJ ~> echo | grid                     # empty input: an empty table, not an erro
 - The model has no JavaFX in it yet: plain records and lists. Phase 3 wraps the rows in `FilteredList`/`SortedList` of `javafx.base`.
 - `io.powerj.fx.model` is under the 90 % rule of `powerj-coverage` (143/143 lines, 132/134 branches).
 
-### Phase 3 — Sorting by column
+### Phase 3 — Sorting by column — **done**
 **Goal:** click a header to sort; shift-click to add a secondary key.
 
 - `model.SortSpec`: a list of (column, direction); builds one `Comparator<GridRow>`. Natural order by type: numbers numerically, sizes by bytes (not by text), dates chronologically, `Path` by text, strings case-insensitively with the original as tie-break; `null` always last; **stable** (as `sort`, FR-67).
@@ -153,6 +153,13 @@ PJ ~> echo | grid                     # empty input: an empty table, not an erro
 - Unit tests: every column type, ascending/descending, multi-key, stability, `null`s last, mixed types in one column (numbers and text: numbers first), the state cycle of a header click.
 
 **Manual test:** `ls -r | grid`; sort by `size` (10 KB must come after 9 KB), by `modified`, by `name`; shift-click `ext` then `size` for a two-key sort; click again to reverse, once more to clear; sort a column that contains empty cells.
+
+**Decisions taken while building it:**
+- The **header click is the native one of `TableView`** (▲, ▼, then none; Shift adds a key, with the arrows and the order marks drawn by JavaFX); the table has a sort policy that turns `getSortOrder()` into a `SortSpec` and hands it to `GridTable`. Nothing is drawn by hand, and the cycle was checked with real clicks (`java.awt.Robot` under Xvfb), not assumed.
+- `SortedList` of JavaFX re-sorts **from the current order**, not from the order of arrival: the same sort gave a different result depending on the clicks before. Each `GridRow` therefore has its rank of arrival (`position`, given by `GridModel.Builder`) and `SortSpec.comparator()` ends with it: equal rows always keep the order they arrived in (tested in `GridTableTest.theSameSortGivesTheSameOrderWhateverCameBefore`).
+- Values are compared **raw**, not as displayed: a size by its bytes, a date to the second (a column that shows only the minute can look unsorted for a second key). Enums and `Duration` use their natural order (declaration order for an enum).
+- Numbers: exact for integers and for `BigInteger`/`BigDecimal`; a `NaN` or an infinity does not fail the sort. A column with several kinds shows numbers, dates, booleans, then texts.
+- Coverage: `io.powerj.fx.model` 100 % of the lines.
 
 ### Phase 4 — Filtering by column
 **Goal:** a filter field under each header, plus a global search box.

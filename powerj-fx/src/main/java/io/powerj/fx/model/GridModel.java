@@ -28,7 +28,7 @@ public record GridModel(List<ColumnSpec> columns, List<GridRow> rows) {
             for (ColumnSpec column : reading.columns()) {
                 columns.merge(column.name(), column, ColumnSpec::merge);
             }
-            rows.add(reading.row());
+            rows.add(reading.row().withPosition(rows.size()));
             return this;
         }
 

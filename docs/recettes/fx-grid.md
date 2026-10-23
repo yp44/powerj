@@ -72,4 +72,23 @@ In a folder with a few files and a sub-folder (`cd ~/dev/powerj`, say), with the
 | 33 | `ls -r ~ \| grid` (a large tree) | The window opens when `ls` has finished (it does not fill while loading, that comes in phase 5); scrolling the thousands of rows is smooth. |
 | 34 | A record whose property raises an error (none among the built-in cmdlets: only a test covers it) | One message `cannot read the property x: …` per column, the cell stays empty, the other cells are shown. |
 
-Not done yet (later phases): sorting and filtering, copying, column menu, selection given back to the pipeline.
+Not done yet (later phases): filtering, copying, column menu, selection given back to the pipeline.
+
+## Phase 3 — sorting
+
+With `ls -r --filter *.java | grid` in a folder with Java files of different sizes.
+
+| # | Action | Expected result |
+|---|---|---|
+| 35 | Click the header `size` | Arrow ▲ on the header; the smallest first: `99 B`, `120 B`, … and `9.0 KB` **before** `10.0 KB` (sorted by bytes, not by text). |
+| 36 | Click `size` again | Arrow ▼; the largest first. |
+| 37 | Click `size` a third time | No arrow; the rows are back in the order they arrived. |
+| 38 | Click `name` | ▲; names without regard to case (`CellFormatter.java` before `ColumnKind.java`, `apple` before `Banana`). |
+| 39 | Click `dir` (all `false`), then **Shift**+click `size` | Two arrows (the second with a mark for the order of the keys): the rows are sorted by `dir`, and by `size` inside each `dir`. |
+| 40 | Shift+click `size` again | Only `size` flips to ▼; `dir` keeps ▲. |
+| 41 | Click `modified` | Chronological order, **to the second**: two lines that show the same minute can look out of order for a second key; that is not a bug. |
+| 42 | `List.of("b", 3, true, "a", 1.5, "C") \| grid`, click `value` | ▲: `1.5`, `3`, `true`, `a`, `b`, `C` (numbers, then booleans, then texts without regard to case); ▼ gives the exact opposite. |
+| 43 | `ls -r --filter *.java \| select name ext \| grid` where some cell is empty (e.g. a file without extension), click that column in both directions | The empty cells are **last** in both directions. |
+| 44 | Click `size` (▲), then click `dir`, then clear the sort; click `dir` again | Two files with the same size, or the same `dir`, are always in the order they arrived: the result of a sort does not depend on the sorts made before. |
+| 45 | Press Esc after sorting | The window closes (checked with a real key press under Xvfb). |
+| 46 | `ls -r ~ \| grid`, click `size` | A large table is sorted at once; the window stays responsive. |

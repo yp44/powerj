@@ -77,6 +77,14 @@ class GridModelTest {
     }
 
     @Test
+    void rowsKnowTheirRankOfArrival() {
+        var builder = new GridModel.Builder();
+        builder.add(reader.read(new A("a", 1))).add(reader.read(new A("b", 2))).add(reader.read("c"));
+        assertThat(builder.build().rows().stream().map(GridRow::position)).containsExactly(0, 1, 2);
+        assertThat(new GridRow("x", Map.of()).position()).isZero();
+    }
+
+    @Test
     void aRowKeepsItsObjectAndItsValuesAreReadOnly() {
         var a = new A("a", 1);
         GridRow row = reader.read(a).row();
