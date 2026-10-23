@@ -120,8 +120,48 @@ class GridTableTest {
         assertThat(table.rows()).isEmpty();
     }
 
+    private FilterSpec filter(String column, String expression) {
+        var editor = new FilterEditor(items.columns());
+        return editor.setColumn(column, expression);
+    }
+
+    @Test
+    void filteringKeepsTheMatchingRowsInTheCurrentOrder() {
+        var table = new GridTable(items);
+        table.filter(filter("group", "x"));
+        assertThat(names(table)).containsExactly("b", "c");
+        assertThat(table.total()).isEqualTo(4);
+        table.sort(by("name", SortDirection.DESCENDING));
+        assertThat(names(table)).containsExactly("c", "b");
+        table.filter(filter("size", ">=10240"));
+        assertThat(names(table)).containsExactly("c", "b");
+        table.filter(filter("size", "<10240"));
+        assertThat(names(table)).containsExactly("d", "a");
+    }
+
+    @Test
+    void noFilterShowsEverythingAgainWithoutLosingTheSort() {
+        var table = new GridTable(items);
+        table.sort(by("name", SortDirection.ASCENDING));
+        table.filter(filter("group", "y"));
+        assertThat(names(table)).containsExactly("a", "d");
+        table.filter(FilterSpec.NONE);
+        assertThat(names(table)).containsExactly("a", "b", "c", "d");
+        assertThat(table.rows()).hasSize(table.total());
+    }
+
+    @Test
+    void theModelIsNotFiltered() {
+        var table = new GridTable(items);
+        table.filter(filter("name", "zzz"));
+        assertThat(table.rows()).isEmpty();
+        assertThat(items.rows()).hasSize(4);
+        assertThat(table.total()).isEqualTo(4);
+    }
+
     @Test
     void theArgumentsAreMandatory() {
+        assertThatThrownBy(() -> new GridTable(items).filter(null)).isInstanceOf(NullPointerException.class);
         assertThatThrownBy(() -> new GridTable(null)).isInstanceOf(NullPointerException.class);
         assertThatThrownBy(() -> new GridTable(items).sort(null)).isInstanceOf(NullPointerException.class);
     }

@@ -33,6 +33,11 @@ public final class CellFormatter {
         return full.equals(text(value, kind)) ? null : full;
     }
 
+    /** The text of the cell as the terminal would show it, whole: what a filter looks at. */
+    public static String fullText(Object value, ColumnKind kind) {
+        return full(value, kind);
+    }
+
     private static String full(Object value, ColumnKind kind) {
         return switch (value) {
             case null -> "";

@@ -2,7 +2,6 @@ package io.powerj.fx.view;
 
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Scene;
-import javafx.scene.input.KeyCode;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
 
@@ -22,13 +21,10 @@ public final class GridWindowOpener implements WindowOpener {
             Rectangle2D screen = Screen.getPrimary().getVisualBounds();
             Stage stage = new Stage();
             stage.setTitle(title);
-            Scene scene = new Scene(new GridView(model).root(), Math.min(1200, screen.getWidth() * 0.8),
+            GridView view = new GridView(model);
+            Scene scene = new Scene(view.root(), Math.min(1200, screen.getWidth() * 0.8),
                     Math.min(700, screen.getHeight() * 0.8));
-            scene.setOnKeyPressed(event -> {
-                if (event.getCode() == KeyCode.ESCAPE) {
-                    stage.close();
-                }
-            });
+            view.bind(scene, stage::close);
             stage.setScene(scene);
             stage.show();
         });

@@ -72,7 +72,7 @@ In a folder with a few files and a sub-folder (`cd ~/dev/powerj`, say), with the
 | 33 | `ls -r ~ \| grid` (a large tree) | The window opens when `ls` has finished (it does not fill while loading, that comes in phase 5); scrolling the thousands of rows is smooth. |
 | 34 | A record whose property raises an error (none among the built-in cmdlets: only a test covers it) | One message `cannot read the property x: …` per column, the cell stays empty, the other cells are shown. |
 
-Not done yet (later phases): filtering, copying, column menu, selection given back to the pipeline.
+Not done yet (later phases): copying, column menu, selection given back to the pipeline.
 
 ## Phase 3 — sorting
 
@@ -92,3 +92,26 @@ With `ls -r --filter *.java | grid` in a folder with Java files of different siz
 | 44 | Click `size` (▲), then click `dir`, then clear the sort; click `dir` again | Two files with the same size, or the same `dir`, are always in the order they arrived: the result of a sort does not depend on the sorts made before. |
 | 45 | Press Esc after sorting | The window closes (checked with a real key press under Xvfb). |
 | 46 | `ls -r ~ \| grid`, click `size` | A large table is sorted at once; the window stays responsive. |
+
+## Phase 4 — filtering
+
+With `ls -r --filter *.java | grid`. Under each header there is a `filter` field; above the table, a search box (`Search in every column (Ctrl+F)`) and a `Clear filters` button; the status bar says `shown / total rows`. The table is filtered 200 ms after the last key, so typing stays smooth.
+
+| # | Action | Expected result |
+|---|---|---|
+| 47 | Click in the `name` field and type `sort` | Only the names that contain `sort`, without regard to case; the status bar says `4 / 50 rows`. Clicking in a field does **not** sort the column. |
+| 48 | Type `>5kb` in `size` | Both filters apply: the rows must satisfy both (`1 / 50 rows`). Units: `b kb mb gb tb`, multiples of 1024; `>=`, `<`, `<=`, `=` also work. |
+| 49 | In `size`, try `1kb..1mb`, `5kb..`, `..1kb` | A range, with the ends included; one end can be missing. |
+| 50 | In `name`, type `=Parser.java`, then `!test`, then `/^Sort.*Test/` | The exact name; the names without `test`; a regular expression (without regard to case). |
+| 51 | In `name`, type `/(/` (an invalid regular expression) | The field turns **pink** with the reason in a tooltip; the table keeps the last good filter instead of emptying. Fix the text: the pink goes away. |
+| 52 | In `size`, type `>10xb` | Pink, tooltip `not a size (4096, 10kb, 1.5mb, 2gb…): 10xb`. |
+| 53 | In `name`, type `>` or `!` alone, or `..` in `size` | Nothing is filtered (an operator alone is ignored), no pink. |
+| 54 | In `modified`, type `>=2026-10-23 14:00` | The files modified from 14:00 on. Also try `2026`, `2026-10`, `=2026-10-23`, `2026-10-01..2026-10-23`, `<2026-10-23`: a date stands for the **whole** period it names, so `>2026-10` means after October and `..2026-10-23` includes that whole day. |
+| 55 | In `size`, type `KB`, then `14520` (exact bytes of a file of 14.2 KB) | The filter looks at the text shown **and** at the value: both find that file. |
+| 56 | In a column with empty cells, type `=` | Only the rows whose cell is empty. |
+| 57 | Press Ctrl+F, type `Table` in the search box | The focus goes to the search box; the rows that have `table` in **any** column (`2 / 50 rows`); `!sort` there gives the rows where no column has it, `/regex/` works too. The column filters and the search combine. |
+| 58 | Press Esc while a field has text | The field is emptied (and the table refiltered); a second Esc, with the focus elsewhere or the field empty, closes the window. |
+| 59 | Click `Clear filters` | Every field and the search box are emptied, `50 rows` again. |
+| 60 | Sort a column (▲), then filter | The filtered rows stay in the sort order; removing the filter brings the others back in place. |
+| 61 | Filter so that nothing is left | `No result` in the table and `0 / 50 rows`. |
+| 62 | `ls -r ~ \| grid`, type in a filter | The table stays responsive on a large input. |

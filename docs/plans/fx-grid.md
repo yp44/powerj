@@ -161,7 +161,7 @@ PJ ~> echo | grid                     # empty input: an empty table, not an erro
 - Numbers: exact for integers and for `BigInteger`/`BigDecimal`; a `NaN` or an infinity does not fail the sort. A column with several kinds shows numbers, dates, booleans, then texts.
 - Coverage: `io.powerj.fx.model` 235/236 lines and 224/234 branches.
 
-### Phase 4 — Filtering by column
+### Phase 4 — Filtering by column — **done**
 **Goal:** a filter field under each header, plus a global search box.
 
 - `model.FilterSpec`: a global text plus one expression per column, combined with AND. Expression grammar (parsed by `model.FilterParser`, with exact messages for invalid input):
@@ -175,6 +175,17 @@ PJ ~> echo | grid                     # empty input: an empty table, not an erro
 - Unit tests: every operator, case-insensitivity, invalid input, a size/date column, combination of several columns, empty filter = everything, the debounce logic (with an injected clock/scheduler).
 
 **Manual test:** `ls -r / | grid` (a large tree); type `java` in `name`; `>1mb` in `size`; `/^[A-Z]/` in `name`; an invalid regex like `/(/` (red field, table unchanged); `2026..` in `modified`; then clear the filters; check the status bar counts and that sort and filters combine.
+
+**Decisions taken while building it:**
+- `FilterParser` (pure) turns an expression into a `Parsed` (the condition, whether it is negated, or the reason it is invalid); `FilterEditor` keeps what is typed and the **last good filter of each field**; `FilterSpec` is the predicate; `GridTable` is now `source → FilteredList → SortedList`; `Debouncer` takes a `Scheduler` (the toolkit's `PauseTransition` in the window, a fake clock in the tests).
+- A date names a **period** (`2026`, `2026-10`, `2026-10-05`, with a time down to the second), so `>2026-10` means after October and a range includes its last period; dates are typed in the zone of the table.
+- An operator alone (`>`, `!`, `..`) filters nothing, so that typing it does not empty the table; `=` alone finds the empty cells.
+- Text conditions look at the text shown **and** the value, so `KB` and `14520` both find `14.2 KB`.
+- The search box is the same grammar with the text rules, applied to every column; `!x` there means no column has `x`.
+- The filter fields live in the **headers** (the graphic of each column), so they follow the columns when the table scrolls sideways; a click in a field does not sort. Esc empties the field that has the focus, then closes the window.
+- Checked with real clicks, keys and pasted text under Xvfb (`java.awt.Robot`).
+- Coverage: `io.powerj.fx.model` 477/478 lines, 407/420 branches (152 tests in the module).
+- Not done, for a later phase: a `--filter` option to start with a filter typed in; the columns keep their width when the window is narrowed.
 
 ### Phase 5 — Streaming and large inputs
 **Goal:** the window opens at the first object and fills while the pipeline runs; huge inputs do not freeze the shell.
