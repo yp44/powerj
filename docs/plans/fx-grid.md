@@ -159,7 +159,7 @@ PJ ~> echo | grid                     # empty input: an empty table, not an erro
 - `SortedList` of JavaFX re-sorts **from the current order**, not from the order of arrival: the same sort gave a different result depending on the clicks before. Each `GridRow` therefore has its rank of arrival (`position`, given by `GridModel.Builder`) and `SortSpec.comparator()` ends with it: equal rows always keep the order they arrived in (tested in `GridTableTest.theSameSortGivesTheSameOrderWhateverCameBefore`).
 - Values are compared **raw**, not as displayed: a size by its bytes, a date to the second (a column that shows only the minute can look unsorted for a second key). Enums and `Duration` use their natural order (declaration order for an enum).
 - Numbers: exact for integers and for `BigInteger`/`BigDecimal`; a `NaN` or an infinity does not fail the sort. A column with several kinds shows numbers, dates, booleans, then texts.
-- Coverage: `io.powerj.fx.model` 100 % of the lines.
+- Coverage: `io.powerj.fx.model` 235/236 lines and 224/234 branches.
 
 ### Phase 4 — Filtering by column
 **Goal:** a filter field under each header, plus a global search box.
