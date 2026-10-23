@@ -118,3 +118,16 @@ With `ls -r --filter *.java | grid`. Under each header there is a `filter` field
 | 60 | Sort a column (▲), then filter | The filtered rows stay in the sort order; removing the filter brings the others back in place. |
 | 61 | Filter so that nothing is left | `No result` in the table and `0 / 50 rows`. |
 | 62 | `ls -r ~ \| grid`, type in a filter | The table stays responsive on a large input. |
+
+### Phase 4 — the list of comparisons (numbers and sizes)
+
+In front of the filter of a column of numbers or of sizes there is a list: `==`, `<`, `>`, `<=`, `>=` (text and date columns have none). With files of 228, 1228, 2252, 2280, 3280 and 12288 bytes and `ls | select name size path | grid`:
+
+| # | Action | Expected result |
+|---|---|---|
+| 63 | Choose `>=` in the list of `size`, type `2kb` in its field | The sizes from 2 KB up: 12.0, 2.2, 2.2, 3.2 KB. Changing the list refilters at once (after the same 200 ms). |
+| 64 | Choose `<` | The sizes under 2 KB: 1.2 KB, 228 B, 5 B. |
+| 65 | With `<` chosen, type `>3kb` | The text has its own operator, so **the text wins**: 12.0 and 3.2 KB. Same for `=…`, `!…`, `a..b` and `/regex/`; the tooltip of the list says so. |
+| 66 | With `>=` chosen, empty the field | No filter. |
+| 67 | Click `Clear filters` | Fields emptied and every list back to `==`. |
+| 68 | The `size` column, narrowed by hand | The header keeps the list and a few characters of field (the column starts at least 150 px wide). |

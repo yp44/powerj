@@ -102,6 +102,54 @@ class FilterEditorTest {
     }
 
     @Test
+    void theOperatorOfTheListGoesWithAPlainValue() {
+        editor.setColumn("size", FilterOperator.GREATER, "10kb");
+        assertThat(shown()).containsExactly("Parser.java", "notes.txt");
+        editor.setColumn("size", FilterOperator.LESS_OR_EQUAL, "9kb");
+        assertThat(shown()).containsExactly("ParserTest.java", "README.md");
+        editor.setColumn("size", FilterOperator.LESS, "9kb");
+        assertThat(shown()).containsExactly("README.md");
+        editor.setColumn("size", FilterOperator.GREATER_OR_EQUAL, "9kb");
+        assertThat(shown()).containsExactly("Parser.java", "ParserTest.java", "notes.txt");
+        editor.setColumn("size", FilterOperator.EQUAL, "400b");
+        assertThat(shown()).containsExactly("README.md");
+        editor.setColumn("size", FilterOperator.LESS, "");
+        assertThat(shown()).hasSize(4);
+    }
+
+    @Test
+    void aTextWithItsOwnOperatorIgnoresTheList() {
+        editor.setColumn("size", FilterOperator.LESS, ">10kb");
+        assertThat(shown()).containsExactly("Parser.java", "notes.txt");
+        editor.setColumn("size", FilterOperator.LESS, "1kb..10kb");
+        assertThat(shown()).containsExactly("ParserTest.java");
+        editor.setColumn("size", FilterOperator.GREATER, "/^4/");
+        assertThat(shown()).containsExactly("README.md");
+    }
+
+    @Test
+    void theOperatorAlsoGoesWithDates() {
+        editor.setColumn("modified", FilterOperator.GREATER_OR_EQUAL, "2026-10-06");
+        assertThat(shown()).containsExactly("ParserTest.java");
+        editor.setColumn("modified", FilterOperator.LESS, "2026");
+        assertThat(shown()).containsExactly("README.md");
+    }
+
+    @Test
+    void aTextColumnIgnoresTheList() {
+        editor.setColumn("name", FilterOperator.GREATER, "read");
+        assertThat(shown()).containsExactly("README.md");
+        editor.setColumn("name", FilterOperator.LESS, ">me");
+        assertThat(shown()).isEmpty(); // text: ">me" is looked for as it is typed
+    }
+
+    @Test
+    void aBadValueWithAnOperatorIsReportedAsBefore() {
+        editor.setColumn("size", FilterOperator.GREATER, "abc");
+        assertThat(editor.error("size")).contains("not a size (4096, 10kb, 1.5mb, 2gb…): abc");
+    }
+
+    @Test
     void anEmptyCellCanBeFound() {
         editor.setColumn("owner", "=");
         assertThat(shown()).containsExactly("notes.txt");

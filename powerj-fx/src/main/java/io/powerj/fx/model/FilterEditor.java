@@ -32,8 +32,19 @@ public final class FilterEditor {
 
     /** Sets the expression of a column; an empty one removes its filter. Unknown columns are ignored. */
     public FilterSpec setColumn(String column, String text) {
+        return setColumn(column, FilterOperator.EQUAL, text);
+    }
+
+    /**
+     * Sets the filter of a column from the operator of its list and the value typed: {@code >=} and {@code 2kb} filter
+     * {@code >=2kb}. The operator only goes with a plain value of a number, a size or a date; any other text is read as it
+     * is typed, and so is the text of a text column.
+     */
+    public FilterSpec setColumn(String column, FilterOperator operator, String text) {
         columns.stream().filter(c -> c.name().equals(column)).findFirst().ifPresent(spec -> {
-            Parsed parsed = parser.parse(text, spec.kind(), spec.kind());
+            boolean typed = spec.kind() == ColumnKind.NUMBER || spec.kind() == ColumnKind.SIZE
+                    || spec.kind() == ColumnKind.DATE;
+            Parsed parsed = parser.parse(typed ? operator.apply(text) : text, spec.kind(), spec.kind());
             if (!parsed.isValid()) {
                 errors.put(column, parsed.error());
             } else {
