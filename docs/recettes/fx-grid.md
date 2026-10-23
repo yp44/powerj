@@ -20,13 +20,13 @@ unzip powerj-fx/target/powerj-fx-*.zip -d ~/.powerj/modules/      # creates ~/.p
 |---|---|---|
 | 1 | Start `powerj`, then `mod-list` | A line `io.powerj.fx  0.1.0-SNAPSHOT  [grid]` with the folder as its source. No warning at startup. |
 | 2 | `help grid` | `grid — Shows the objects in a window`, the example `ls -r \| grid`, `Module: io.powerj.fx`. |
-| 3 | `ls \| grid` | A window titled `PowerJ grid` opens and says `n objects received`; **the prompt is back at once**. |
+| 3 | `ls \| grid` | A window titled `PowerJ grid` opens with a table (columns of the terminal table of `ls`); **the prompt is back at once**. See phase 2 below for the details of the table. |
 | 4 | `ls \| grid ; ls / \| grid` | Two windows, the prompt is back. Closing one leaves the other open. |
-| 5 | `ls \| select name \| grid` then a single-file folder: `ls somefile \| grid` | `1 object received` (singular). |
+| 5 | `ls somefile \| grid` (a single file) | A table with one row and `1 row` in the status bar (singular). |
 | 6 | `grid` (nothing before it) | Error `grid: grid expects objects from a pipeline (ls \| grid)`; the shell goes on. |
-| 7 | `ls \| where { $_.size > 1tb } \| grid` | A window with `0 objects received`, not an error. |
+| 7 | `ls \| where { $_.size > 1tb } \| grid` | A window with `No result` and `0 rows`, not an error. |
 | 8 | `exit` while a window is open | The process ends, the windows disappear. |
-| 9 | With the language set to French (`POWERJ_LANG=fr`), `ls \| grid` | The summary in `help grid` and the window text are in French (`n objets reçus`). |
+| 9 | With the language set to French (`POWERJ_LANG=fr`), `ls \| grid` | The summary in `help grid` and the status bar are in French (`3 lignes`). |
 | 10 | Without a display (`env -u DISPLAY powerj`, or over SSH), `ls \| grid` | Error `grid: the graphical toolkit cannot start (no graphical display?): Unable to open DISPLAY`; the shell keeps working. |
 | 11 | Same session, `ls \| grid` again | At once (no hang), error `… failed to start earlier in this session and cannot be restarted: restart PowerJ (…)`. |
 | 12 | Start `powerj` **without** the module in `~/.powerj/modules`, then `mod-load ~/.powerj/modules/fx` and `ls \| grid` | The module loads without restarting, `grid` works. |
@@ -52,3 +52,24 @@ unzip powerj-fx/target/powerj-fx-*.zip -d ~/.powerj/modules/      # creates ~/.p
 
 - `./mvnw -Pdist verify` is green, the coverage rule of `io.powerj.fx`, `io.powerj.fx.grid` and `io.powerj.fx.runtime` (90 %) holds, and `io.powerj.fx.view` is listed at its real value in `powerj-coverage/target/site/jacoco-aggregate/`.
 - `powerj-dist` is unchanged in size by this module (JavaFX is not in the distribution).
+
+## Phase 2 — the table
+
+In a folder with a few files and a sub-folder (`cd ~/dev/powerj`, say), with the module installed and accepted.
+
+| # | Action | Expected result |
+|---|---|---|
+| 23 | `ls \| grid` | Columns `name`, `size`, `modified`, `dir` (the columns of the terminal table). Sizes are readable (`7.6 KB`) and aligned to the right, dates are local (`2026-10-23 13:00`), `dir` is `true`/`false`. The status bar says `n rows`. |
+| 24 | `ps \| grid` | Columns `pid`, `name`, `user`, `cpu`, `start`; `pid` aligned to the right; the same values as `ps` in the terminal. |
+| 25 | `ls -r --filter *.xml \| select name kb={ $_.size / 1kb } \| grid` | The columns of `select`, in order: `name` (left) and `kb` (right). |
+| 26 | `(ls ; "text") \| grid` is not valid; use two stages: `List.of("a", "b") \| grid` | One column `value` with the two strings. |
+| 27 | `java.util.Map.of("a", 1) \| grid` | One row, one column per key of the map (`a`), not a key/value table. |
+| 28 | `ls \| map { $_.path } \| grid` | One column `value` with the paths. |
+| 29 | `greet --name Ada -c 3 \| grid` (module `greet` of the examples, copied into `modules/`) | The records of **another third-party module** are read too: columns `name`, `message`, `at`. |
+| 30 | `ls \| where { $_.size > 1tb } \| grid` | `No result` in the middle of the table, `0 rows`. |
+| 31 | `cat pom.xml \| grid` then widen the window | The columns of `cat` (path, line, text…); a very long line is cut with `…` and its full text shows in a tooltip when the mouse stays on the cell. |
+| 32 | Press Esc in the window | The window closes; the shell and the other windows are not affected. |
+| 33 | `ls -r / \| grid` | The window opens when `ls` has finished (it does not fill while loading, that comes in phase 5); scrolling the thousands of rows is smooth. |
+| 34 | A record whose property raises an error (none among the built-in cmdlets: only a test covers it) | One message `cannot read the property x: …` per column, the cell stays empty, the other cells are shown. |
+
+Not done yet (later phases): sorting and filtering, copying, column menu, selection given back to the pipeline.

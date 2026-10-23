@@ -113,7 +113,7 @@ PJ ~> exit                  # the process ends, windows included
 # over SSH without a display: grid prints "no graphical display available", the shell keeps running
 ```
 
-### Phase 2 — A read-only table (`model`: columns and cells)
+### Phase 2 — A read-only table (`model`: columns and cells) — **done**
 **Goal:** `grid` displays the received objects as a table.
 
 - `model.ColumnSpec` (name, Java type, value reader, numeric/size/date flags) and `model.ColumnExtractor`:
@@ -132,11 +132,18 @@ PJ ~> exit                  # the process ends, windows included
 PJ ~> ls | grid                       # name, size (readable), modified, dir, ext
 PJ ~> ps | grid                       # a record with a pid
 PJ ~> ls | select name size | grid    # Row: two columns
-PJ ~> java.util.Map.of("a", 1) | grid # key / value
+PJ ~> java.util.Map.of("a", 1) | grid # one row, one column per key
 PJ ~> "a" | grid ; 1..100 | grid      # scalars, one `value` column
 PJ ~> (ls ; ps) | grid                # two types: union of the columns
 PJ ~> echo | grid                     # empty input: an empty table, not an error
 ```
+
+**Decisions taken while building it:**
+- The values of the properties are read with `context.compile("$_.name")`, as the shell does, and **not** by reflection in the module: the packages of a third-party module are opened to `powerj-core` only, so reading the records of another module (`greet | grid`) would fail from `io.powerj.fx`. The columns come from the metadata of the class (`getRecordComponents`, `getMethods`), which needs no access. Checked with the `greet` example.
+- The objects are read **as they arrive** (in `process`), into a `GridRow` that keeps the object and its values; the window opens in `end`. This is the shape phase 5 (streaming) and phase 7 (`--pass-thru`) need.
+- A `Map` gives one column per key, like `Row` (a single big map, such as `System.getenv()`, is one wide row; use `env` for the variables).
+- The model has no JavaFX in it yet: plain records and lists. Phase 3 wraps the rows in `FilteredList`/`SortedList` of `javafx.base`.
+- `io.powerj.fx.model` is under the 90 % rule of `powerj-coverage` (143/143 lines, 132/134 branches).
 
 ### Phase 3 — Sorting by column
 **Goal:** click a header to sort; shift-click to add a secondary key.

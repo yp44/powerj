@@ -9,6 +9,7 @@ import java.util.Optional;
 
 import io.powerj.api.CmdletContext;
 import io.powerj.api.ScriptBlock;
+import io.powerj.fx.model.Reflect;
 
 /** In-memory context of a cmdlet. */
 final class TestContext<O> implements CmdletContext<O> {
@@ -52,8 +53,23 @@ final class TestContext<O> implements CmdletContext<O> {
         return false;
     }
 
+    /** {@code $_.name}, read by reflection: what the shell does for a property. */
     @Override
     public ScriptBlock compile(String expression) {
-        throw new UnsupportedOperationException(expression);
+        if (!expression.startsWith("$_.")) {
+            throw new IllegalArgumentException(expression);
+        }
+        String name = expression.substring(3);
+        return new ScriptBlock() {
+            @Override
+            public Object invoke(Object current) {
+                return Reflect.read(current, name);
+            }
+
+            @Override
+            public String source() {
+                return expression;
+            }
+        };
     }
 }

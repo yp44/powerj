@@ -161,6 +161,7 @@
                                     <includes>
                                         <include>io.powerj.fx</include>
                                         <include>io.powerj.fx.grid</include>
+                                        <include>io.powerj.fx.model</include>
                                         <include>io.powerj.fx.runtime</include>
                                     </includes>
                                     <limits>
