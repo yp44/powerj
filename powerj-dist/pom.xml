@@ -133,9 +133,11 @@
                                             <!-- JLine accesses the native console (FFM / native library). -->
                                             <arg value="--java-options"/>
                                             <arg value="--enable-native-access=org.jline.terminal.ffm,org.jline.nativ,io.powerj.core"/>
-                                            <!-- The profiler is an optional dependency of powerj-core: it is only resolved when asked. -->
+                                            <!-- The profiler is an optional dependency of powerj-core: it is only resolved when asked.
+                                                 jdk.unsupported is in the image but nothing requires it: the third-party modules
+                                                 that do (javafx.graphics of powerj-fx) need it in the boot layer. -->
                                             <arg value="--java-options"/>
-                                            <arg value="--add-modules=jdk.jfr,jdk.management"/>
+                                            <arg value="--add-modules=jdk.unsupported,jdk.jfr,jdk.management"/>
                                             <arg value="--jlink-options"/>
                                             <arg value="--strip-java-debug-attributes --no-header-files --no-man-pages"/>
                                             <arg value="--dest"/>
