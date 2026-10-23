@@ -16,11 +16,13 @@
     <description>
         Test coverage of PowerJ (NFR-05): the tests of every module count for every module. Report in
         target/site/jacoco-aggregate/; the build fails below 80% of lines or branches, for PowerJ as a whole
-        and for the built-in cmdlets.
+        for the built-in cmdlets and for the optional JavaFX module (outside its view).
     </description>
 
     <properties>
         <coverage.minimum>0.80</coverage.minimum>
+        <!-- The optional JavaFX module, outside its view package. -->
+        <coverage.fx.minimum>0.90</coverage.fx.minimum>
         <coverage.data>${project.build.directory}/coverage/jacoco.exec</coverage.data>
     </properties>
 
@@ -40,6 +42,10 @@
         <dependency>
             <groupId>io.powerj</groupId>
             <artifactId>powerj-cmdlets</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.powerj</groupId>
+            <artifactId>powerj-fx</artifactId>
         </dependency>
         <dependency>
             <groupId>io.powerj</groupId>
@@ -108,6 +114,11 @@
                         </goals>
                         <configuration>
                             <dataFile>${coverage.data}</dataFile>
+                            <!-- The JavaFX nodes cannot be run without a display: they are wiring only, and the manual
+                                 checklist (docs/recettes/fx-grid.md) covers them. They stay in the report, at 0%. -->
+                            <excludes>
+                                <exclude>io/powerj/fx/view/**</exclude>
+                            </excludes>
                             <rules>
                                 <!-- PowerJ as a whole. -->
                                 <rule>
@@ -141,6 +152,27 @@
                                             <counter>BRANCH</counter>
                                             <value>COVEREDRATIO</value>
                                             <minimum>${coverage.minimum}</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                                <!-- The optional JavaFX module: everything but the view. -->
+                                <rule>
+                                    <element>PACKAGE</element>
+                                    <includes>
+                                        <include>io.powerj.fx</include>
+                                        <include>io.powerj.fx.grid</include>
+                                        <include>io.powerj.fx.runtime</include>
+                                    </includes>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>${coverage.fx.minimum}</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>BRANCH</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>${coverage.fx.minimum}</minimum>
                                         </limit>
                                     </limits>
                                 </rule>

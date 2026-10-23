@@ -58,7 +58,7 @@ The root rule (80 % of lines and branches, `powerj-coverage`) must keep passing,
 | `model.*` (columns, cells, sort, filter, passthru bookkeeping) | plain JUnit + AssertJ, `javafx.base` only, no display | ≥ 95 % lines, ≥ 90 % branches |
 | `grid.GridCmdlet`, `FxProvider`, params, i18n | JUnit with `TestContext` (same pattern as `powerj-cmdlets`) and a **fake `GridWindow`** injected through a small interface (`WindowOpener`) so that the cmdlet never touches JavaFX in tests | ≥ 90 % |
 | `runtime.FxRuntime` | the logic around the toolkit (single start-up, error mapping for "no display" / "toolkit unavailable") behind an interface; the real call is covered only by the manual checklist | ≥ 70 % |
-| `view.*` | **optional headless UI tests** with TestFX + Monocle (`-Dglass.platform=Monocle -Dmonocle.platform=Headless -Dprism.order=sw`) in a dedicated Maven profile `fx-ui`, enabled in CI if Monocle works with JavaFX 25 (to verify in phase 1). Otherwise `view` is excluded from the threshold **by a narrow, documented JaCoCo exclusion** (`io/powerj/fx/view/**`) and covered by the manual checklist | not counted if excluded |
+| `view.*` | `view` is excluded from the threshold **by a narrow, documented JaCoCo exclusion** (`io/powerj/fx/view/**`, in `powerj-coverage`; the report still shows it) and covered by the manual checklist. Monocle does not exist for JavaFX 25 (phase 1), so optional UI tests, if worth it, run the **real toolkit under `xvfb-run`** in a dedicated Maven profile `fx-ui`, enabled in CI on Linux | not counted |
 
 - `powerj-coverage` gets `powerj-fx` as a dependency (same mechanism as the other modules) and a **new rule for the packages `io.powerj.fx.model` and `io.powerj.fx.grid`** at 90 % lines and branches, next to the existing rule for `io.powerj.cmdlets`. The exclusion for `view` is explicit in the same file so that nobody has to guess why it is missing.
 - Rule of thumb for reviews: if a `view` class contains an `if`, the `if` belongs in `model`.
@@ -71,12 +71,26 @@ The root rule (80 % of lines and branches, `powerj-coverage`) must keep passing,
 | R3 | JDK 24+ warns about restricted methods and `sun.misc.Unsafe` memory access used by JavaFX 24/25, and `--enable-native-access` only reaches modules of the boot layer. | Output of `mod-load` / first `grid` on a real JDK 25 terminal. | Tolerate the warning; else a small `ModuleLoader` change using `ModuleLayer.Controller.enableNativeAccess(Module)` for the modules of `~/.powerj/modules` (decision needed, since it widens what a third-party module may do). |
 | R4 | No display (SSH, container, CI): `Platform.startup` fails. | Clear error, shell stays usable. | Message `fx.noDisplay`; nothing else. |
 | R5 | Linux needs GTK 3 on the target; macOS needs the AppKit thread. | Test on Linux and Windows first. | macOS declared best effort. |
-| R6 | Monocle for JavaFX 25 may not exist (versions lag). | Look for a compatible `openjfx-monocle`. | `view` excluded from the threshold, see above. |
+| R6 | Monocle for JavaFX 25 may not exist (versions lag). | Look for a compatible `openjfx-monocle`. | `view` excluded from the threshold, see above. **Settled in phase 1: no Monocle for 25, Xvfb instead.** |
+
+## Results of phase 1 (risks)
+Checked on Linux (Temurin 25, JavaFX 25.0.5, Xvfb, the real `jpackage` launcher), see the checklist `docs/recettes/fx-grid.md`:
+
+| # | Result |
+|---|---|
+| R1 | **Works.** JavaFX loaded from `~/.powerj/modules/fx/` (one `ModuleLayer`, by startup or `mod-load`) opens a window; the Modena CSS and the native libraries load. It needed **one change in the distribution**: `javafx.graphics` requires `jdk.unsupported`, which is in the jlink image but was not resolved at run time (nothing required it). `powerj-dist` now passes `--add-modules=jdk.unsupported,jdk.jfr,jdk.management` to the launcher. No size change (the module was already in the image). Not tried yet on Windows. |
+| R2 | The natives are extracted from the jars on first use (no problem seen). Not tried on a read-only home. |
+| R3 | **Open, needs a decision (question 4).** JDK 25 prints, at the first window, `WARNING: A restricted method in java.lang.System has been called … by com.sun.glass.utils.NativeLibLoader in module javafx.graphics` and `Restricted methods will be blocked in a future release`. `--enable-native-access=javafx.graphics` does not reach a module of a non-boot layer; the fix would be `ModuleLayer.Controller.enableNativeAccess` in `ModuleLoader`. |
+| R4 | **Handled.** Without a display, `grid` fails with `the graphical toolkit cannot start (no graphical display?): Unable to open DISPLAY` and the shell keeps running. Finding: after a failed start, a second `Platform.startup` **never returns** in the same JVM, so `FxRuntime` remembers the failure and answers `failed to start earlier in this session … restart PowerJ` without retrying. |
+| R5 | Linux with GTK 3 works. macOS not tried. |
+| R6 | **Monocle is not available for JavaFX 25** (`org.testfx:openjfx-monocle` stops at 21.0.2). Decision: `view` is excluded from the JaCoCo threshold (explicit exclusion in `powerj-coverage`), and the UI tests of the later phases will run the **real toolkit under Xvfb** (`xvfb-run`) in a Maven profile, instead of Monocle. |
+
+Other numbers: the module zip is 7.6 MB (8.4 MB unpacked); the distribution measured with JDK 25 is 103 MB (not 92 MB: that figure came from a JDK 21 runtime).
 
 ## Phases
 Each phase ends with a state that builds, passes `./mvnw verify`, and **can be tried by hand** with the steps given. The manual checklist grows into `docs/recettes/fx-grid.md` as the phases land.
 
-### Phase 1 — Skeleton, packaging, an empty window (answers R1-R4)
+### Phase 1 — Skeleton, packaging, an empty window (answers R1-R4) — **done**
 **Goal:** prove that the module installs by copying a folder, and that a JavaFX window opens from PowerJ.
 
 - New Maven module `powerj-fx` in the parent `<modules>` and `dependencyManagement`; `module-info.java` (`io.powerj.fx`, `provides CmdletProvider with FxProvider`); OS profiles for `javafx.platform`; JavaFX `25.0.x` pinned in the parent.
