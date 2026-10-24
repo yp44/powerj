@@ -137,7 +137,7 @@
                                                  jdk.unsupported is in the image but nothing requires it: the third-party modules
                                                  that do (javafx.graphics of powerj-fx) need it in the boot layer. -->
                                             <arg value="--java-options"/>
-                                            <arg value="--add-modules=jdk.unsupported,jdk.jfr,jdk.management"/>
+                                            <arg value="--add-modules=jdk.jfr,jdk.management,jdk.unsupported"/>
                                             <arg value="--jlink-options"/>
                                             <arg value="--strip-java-debug-attributes --no-header-files --no-man-pages"/>
                                             <arg value="--dest"/>

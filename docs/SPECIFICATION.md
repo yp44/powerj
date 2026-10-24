@@ -977,7 +977,7 @@ Acceptance criteria (CA):
 - With `env --set POWERJ_PERF_AUTOEXIT=1`, Alt+P then a line prints the summary and the prompt is `PJ <dir>> ` again; the next line is not measured; `perf` then shows the line that was; Alt+P measures one more line.
 - With `env --set POWERJ_PERF_JFR_SAMPLEPERIOD=1ms`, the next measured CPU-bound line has several times more samples in `perf --view hot`; `env --set POWERJ_PERF_JFR_SAMPLEPERIOD=often` gives a message once and keeps the default.
 - With `env --set POWERJ_PERF_JFR_ALLOCTHROTTLE=1/s`, the file saved by `perf --save` after an allocating line holds a handful of `jdk.ObjectAllocationSample` events (`jfr summary`), and thousands with `off`; `lots` gives a message once and keeps the default.
-- `bin/java --list-modules` of the application image lists `jdk.jfr` and `jdk.management`, and the launcher configuration holds `--add-modules=jdk.jfr,jdk.management`.
+- `bin/java --list-modules` of the application image lists `jdk.jfr` and `jdk.management`, and the launcher configuration holds `--add-modules=jdk.jfr,jdk.management` (followed by `,jdk.unsupported`, which `powerj-fx` needs, FR-77).
 
 #### FR-77 — Graphical cmdlets: the optional `powerj-fx` module, and `grid`
 
