@@ -100,7 +100,8 @@ public final class Repl {
 
     /**
      * Consent for the modules that use native code (FR-77): answers recorded in {@code configFile}. On a real terminal
-     * the user is asked for the missing ones; on a dumb one (pipe, file) nobody is asked and the module is not loaded.
+     * the user is asked for the missing ones; on a "dumb" terminal (JLine's type for input and output that are not a
+     * terminal: a pipe, a file, a script) nobody is asked and the module is not loaded without a recorded answer.
      */
     public void nativeAccess(Path configFile) {
         boolean interactive = !terminal.getType().startsWith("dumb");
