@@ -51,6 +51,8 @@ Then `cd C:\tmp\s`.
 | 18 | Alt+V, then type `ls \| select name size` | The preview shows the table. |
 | 19 | `help select` | Help with `<columns>`, the column forms, and the examples. |
 | 20 | `POWERJ_LANG=fr`, then `ls \| select` | `select : colonne attendue : …`. |
+| 21 | `select content={(cat notes.txt)} another={(cat app.log)}` (first stage of the pipeline) | One row with the columns `content` and `another`. |
+| 22 | `select content={(cat notes.txt)} \| map { $_.content }` | The text of `notes.txt`. |
 
 ## Known limitations
 

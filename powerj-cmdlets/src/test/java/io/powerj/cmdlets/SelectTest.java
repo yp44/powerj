@@ -132,6 +132,31 @@ class SelectTest {
     }
 
     @Test
+    void atTheHeadOfAPipelineItGivesOneRowFromBlocksOnly() {
+        context.hasInput = false;
+        var content = block("(cat file.txt)", current -> "text of " + current);
+        var other = block("(cat another.txt)", current -> "other");
+        List<Row> rows = select(columns("content=", content, "other=", other));
+        assertThat(rows).hasSize(1);
+        assertThat(rows.getFirst().keySet()).containsExactly("content", "other");
+        assertThat(rows.getFirst()).containsEntry("content", "text of null").containsEntry("other", "other");
+        assertThat(rows.getFirst().sizeColumns()).isEmpty();
+        assertThat(context.errors).isEmpty();
+    }
+
+    @Test
+    void atTheHeadOfAPipelineAPropertyIsAnEmptyCellAndOneError() {
+        context.hasInput = false;
+        context.compiler = source -> block(source, current -> {
+            throw new IllegalStateException("no current object");
+        });
+        List<Row> rows = select(columns("name"));
+        assertThat(rows).hasSize(1);
+        assertThat(rows.getFirst()).containsEntry("name", null);
+        assertThat(context.errors).containsExactly("column name: no current object");
+    }
+
+    @Test
     void invalidColumns() {
         assertThatThrownBy(() -> select(columns())).isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("column expected");

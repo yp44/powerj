@@ -278,6 +278,18 @@ class BuiltinCmdletsTest {
     }
 
     @Test
+    void selectStartsAPipeline() throws Exception {
+        Files.writeString(tmp.resolve("file.txt"), "hello\n");
+        Files.writeString(tmp.resolve("another.txt"), "world\n");
+        assertThat(run("select content={(cat file.txt)} another={(cat another.txt)} | map { $_.content }"))
+                .isEqualTo("hello\n");
+        assertThat(run("select content={(cat file.txt)} another={(cat another.txt)} | map { $_.another }"))
+                .isEqualTo("world\n");
+        assertThat(run("select n={ 1 + 1 } | count")).isEqualTo("1\n");
+        assertThat(errors).isEmpty();
+    }
+
+    @Test
     void countAndMeasure() throws Exception {
         Files.writeString(tmp.resolve("big.txt"), "x".repeat(2048));
         assertThat(run("ls | count")).isEqualTo("3\n");
