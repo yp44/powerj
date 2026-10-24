@@ -88,7 +88,7 @@ public final class GridCmdlet implements Cmdlet<GridParams, Object, Object> {
         }
         String title = p.title() == null || p.title().isBlank() ? Messages.get("grid.title") : p.title();
         var settings = context.configDirectory().map(dir -> dir.resolve(WindowSettings.FILE_NAME)).orElse(null);
-        executions.put(context, new Execution(new ObjectReader(new ScriptReader(context)), p.limit(),
+        executions.put(context, new Execution(new ObjectReader(new ScriptReader(context), p.raw()), p.limit(),
                 new WindowOptions(title, columns, settings, p.passThru(), p.single())));
     }
 

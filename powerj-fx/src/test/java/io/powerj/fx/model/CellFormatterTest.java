@@ -76,6 +76,12 @@ class CellFormatterTest {
     }
 
     @Test
+    void aBigDecimalIsNeverInScientificNotation() {
+        assertThat(text(new java.math.BigDecimal("9E+1"))).isEqualTo("90");
+        assertThat(text(new java.math.BigDecimal("1.31"))).isEqualTo("1.31");
+    }
+
+    @Test
     void durationsAreSecondsThenMinutes() {
         assertThat(text(Duration.ofMillis(10))).isEqualTo("0.010 s");
         assertThat(text(Duration.ofSeconds(59))).isEqualTo("59.000 s");

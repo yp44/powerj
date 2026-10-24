@@ -3,9 +3,11 @@ package io.powerj.fx.model;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.RecordComponent;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.temporal.Temporal;
 import java.time.temporal.TemporalAmount;
 import java.util.ArrayList;
@@ -29,6 +31,8 @@ import io.powerj.api.Row;
  *   <li>a scalar (text, number, date, path…) gives the single column {@value #VALUE};</li>
  *   <li>any other object gives one column per public getter ({@code getX()}, {@code isX()}), by name.</li>
  * </ul>
+ * With {@code raw}, the values are shown as they are: a size is a plain number of bytes and a {@link Duration} a plain
+ * number of seconds, so both are numbers like any other.
  */
 public final class ObjectReader {
 
@@ -36,10 +40,20 @@ public final class ObjectReader {
     public static final String VALUE = "value";
 
     private final PropertyReader reader;
+    private final boolean raw;
 
-    /** @param reader reads the components and getters of the objects that are not maps */
-    public ObjectReader(PropertyReader reader) {
+    /**
+     * @param reader reads the components and getters of the objects that are not maps
+     * @param raw    sizes and durations are shown as plain numbers, without unit
+     */
+    public ObjectReader(PropertyReader reader, boolean raw) {
         this.reader = reader;
+        this.raw = raw;
+    }
+
+    /** A reader that shows sizes and durations with their units. */
+    public ObjectReader(PropertyReader reader) {
+        this(reader, false);
     }
 
     public Reading read(Object object) {
@@ -52,22 +66,24 @@ public final class ObjectReader {
         };
     }
 
-    private static Reading scalar(Object object) {
-        var column = new ColumnSpec(VALUE, ColumnKind.ofValue(object));
+    private Reading scalar(Object object) {
+        Object value = shown(object);
+        var column = new ColumnSpec(VALUE, ColumnKind.ofValue(value));
         var values = new LinkedHashMap<String, Object>();
-        values.put(VALUE, object);
+        values.put(VALUE, value);
         return new Reading(List.of(column), new GridRow(object, values), Map.of());
     }
 
-    private static Reading fromMap(Object source, Map<?, ?> map, java.util.Set<String> sizeColumns) {
+    private Reading fromMap(Object source, Map<?, ?> map, java.util.Set<String> sizeColumns) {
         List<ColumnSpec> columns = new ArrayList<>();
         Map<String, Object> values = new LinkedHashMap<>();
         for (Map.Entry<?, ?> entry : map.entrySet()) {
             String name = String.valueOf(entry.getKey());
-            ColumnKind kind = sizeColumns.contains(name) && ColumnKind.ofValue(entry.getValue()) == ColumnKind.NUMBER
-                    ? ColumnKind.SIZE : ColumnKind.ofValue(entry.getValue());
+            Object value = shown(entry.getValue());
+            ColumnKind kind = !raw && sizeColumns.contains(name) && ColumnKind.ofValue(value) == ColumnKind.NUMBER
+                    ? ColumnKind.SIZE : ColumnKind.ofValue(value);
             columns.add(new ColumnSpec(name, kind));
-            values.put(name, entry.getValue());
+            values.put(name, value);
         }
         return columns.isEmpty() ? scalar(source) : new Reading(columns, new GridRow(source, values), Map.of());
     }
@@ -80,7 +96,7 @@ public final class ObjectReader {
         Map<String, String> errors = new LinkedHashMap<>();
         for (ColumnSpec column : columns) {
             try {
-                values.put(column.name(), reader.read(source, column.name()));
+                values.put(column.name(), shown(reader.read(source, column.name())));
             } catch (RuntimeException e) {
                 values.put(column.name(), null);
                 errors.put(column.name(), e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
@@ -94,32 +110,52 @@ public final class ObjectReader {
     }
 
     /** Columns of a record type: the ones of {@code @Display} that exist, otherwise every component. */
-    private static List<ColumnSpec> recordColumns(Class<?> type) {
+    private List<ColumnSpec> recordColumns(Class<?> type) {
         RecordComponent[] components = type.getRecordComponents();
         List<ColumnSpec> columns = new ArrayList<>();
         Display display = type.getAnnotation(Display.class);
         if (display != null) {
             for (String name : display.columns()) {
                 Arrays.stream(components).filter(c -> c.getName().equals(name)).findFirst()
-                        .ifPresent(c -> columns.add(new ColumnSpec(c.getName(), ColumnKind.of(c))));
+                        .ifPresent(c -> columns.add(new ColumnSpec(c.getName(), kind(c))));
             }
             if (!columns.isEmpty()) {
                 return columns;
             }
         }
         for (RecordComponent component : components) {
-            columns.add(new ColumnSpec(component.getName(), ColumnKind.of(component)));
+            columns.add(new ColumnSpec(component.getName(), kind(component)));
         }
         return columns;
     }
 
+    /** The kind of a record component, a number if it is shown raw. */
+    private ColumnKind kind(RecordComponent component) {
+        return raw ? rawKind(ColumnKind.of(component), component.getType()) : ColumnKind.of(component);
+    }
+
+    private ColumnKind kind(Method getter) {
+        return raw ? rawKind(ColumnKind.of(getter), getter.getReturnType()) : ColumnKind.of(getter);
+    }
+
+    private static ColumnKind rawKind(ColumnKind kind, Class<?> type) {
+        return kind == ColumnKind.SIZE || type == Duration.class ? ColumnKind.NUMBER : kind;
+    }
+
+    /** The value as the table keeps it: a duration is a number of seconds if it is shown raw. */
+    private Object shown(Object value) {
+        return raw && value instanceof Duration d
+                ? BigDecimal.valueOf(d.getSeconds()).add(BigDecimal.valueOf(d.getNano(), 9)).stripTrailingZeros()
+                : value;
+    }
+
     /** One column per public getter, by name. */
-    private static List<ColumnSpec> beanColumns(Class<?> type) {
+    private List<ColumnSpec> beanColumns(Class<?> type) {
         Map<String, ColumnSpec> byName = new java.util.TreeMap<>();
         for (Method method : type.getMethods()) {
             String property = property(method);
             if (property != null) {
-                byName.putIfAbsent(property, new ColumnSpec(property, ColumnKind.of(method)));
+                byName.putIfAbsent(property, new ColumnSpec(property, kind(method)));
             }
         }
         return List.copyOf(byName.values().stream().sorted(Comparator.comparing(ColumnSpec::name)).toList());

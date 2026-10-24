@@ -983,7 +983,7 @@ Acceptance criteria (CA):
 
 **The module.** `powerj-fx` is a third-party module (§4.4) written with JavaFX 25; the first graphical cmdlet it provides is `grid`. It is **not part of the distribution**: JavaFX adds about 8 MB to an archive and 32 MB to the installed folder, and it needs a graphical session (GTK 3 on Linux). It is built with `./mvnw -pl powerj-fx -am package` (the JavaFX jars of the platform are chosen by the build; `-Djavafx.platform=win` builds for another one) into `powerj-fx/target/powerj-fx-<version>-<platform>.zip`, which holds the folder `fx/` (`powerj-fx.jar` and the JavaFX jars; `powerj-api` is not in it, the shell provides it). It is installed by unpacking the zip into `~/.powerj/modules/`, or by `mod-load ~/.powerj/modules/fx`. Its manifest has `Enable-Native-Access: true`, so the user is asked once before it is loaded (§4.4: `modules.nativeAccess.io.powerj.fx`). JavaFX is started at the first window, once for the JVM, and kept: closing the last window does not stop it. Without a display `grid` says `the graphical toolkit cannot start (no graphical display?)` and the shell goes on; a start that failed is not tried again in that session. The launcher of the distribution lists `jdk.unsupported` among its root modules, which `javafx.graphics` requires.
 
-**`grid [--max-rows <n>] [--title <text>] [--columns <a,b,…>] [--wait] [--pass-thru [--single]]`** shows the objects it receives from the pipeline in a window, as a table. It must receive objects (`ls | grid`), is never run by the preview (FR-66), and emits nothing, except with `--pass-thru`.
+**`grid [--max-rows <n>] [--title <text>] [--columns <a,b,…>] [--wait] [--raw] [--pass-thru [--single]]`** shows the objects it receives from the pipeline in a window, as a table. It must receive objects (`ls | grid`), is never run by the preview (FR-66), and emits nothing, except with `--pass-thru`.
 
 | Option | Effect |
 |---|---|
@@ -991,6 +991,7 @@ Acceptance criteria (CA):
 | `--title <text>` | Title of the window (`PowerJ grid`). |
 | `--columns a,b,c` | Columns shown first, in this order; the others are hidden and are in the `Columns` menu. Names are matched without regard to case; a name that never arrives is reported once at the end (`no such column: x`, non-blocking); a list without a name is an error. |
 | `--wait` | Does not give the prompt back until the window is closed; Ctrl+C closes the window and ends the command. |
+| `--raw` | The real values, without units: a size (`@Bytes`, `Row` size column) is shown as its number of bytes (`14520` instead of `14.2 KB`), a `Duration` as a number of seconds (`1.31` instead of `1.310 s`, `90` instead of `1:30`). These columns become plain numbers: sorted and filtered as such (a filter is `>1000` or `1000..2000`, with no unit), copied and exported with the same values. Without `--raw`, units are shown. |
 | `--pass-thru` | The user ticks rows; OK gives them back (below). It waits for the window as `--wait`. |
 | `--single` | With `--pass-thru`: one row at a time. Without it, an error. |
 

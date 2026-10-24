@@ -1,5 +1,6 @@
 package io.powerj.fx.model;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -44,6 +45,7 @@ public final class CellFormatter {
             case Number n when kind == ColumnKind.SIZE -> humanBytes(n.longValue());
             case Instant instant -> DATE_TIME.format(instant.atZone(ZoneId.systemDefault()));
             case Duration d -> duration(d);
+            case BigDecimal d -> d.toPlainString();
             default -> String.valueOf(value);
         };
     }

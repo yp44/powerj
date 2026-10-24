@@ -228,7 +228,25 @@ class GridCmdletTest {
     // --- title, columns, wait, settings ---
 
     private static GridParams params(String title, String columns, boolean waitClose) {
-        return new GridParams(null, title, columns, waitClose, false, false);
+        return new GridParams(null, title, columns, waitClose, false, false, false);
+    }
+
+    private record Process(String name, @io.powerj.api.Bytes long memory) {
+    }
+
+    @Test
+    void rawShowsTheRealValuesWithoutUnits() throws Exception {
+        RecordingOpener opener = new RecordingOpener();
+        GridParams raw = new GridParams(null, null, null, false, false, false, true);
+        run(new GridCmdlet(opener), raw, new TestContext<>(), new Process("a", 14_520),
+                java.time.Duration.ofMillis(1310));
+        GridTable table = opener.show();
+        assertThat(table.columns()).extracting(ColumnSpec::kind).contains(ColumnKind.NUMBER).doesNotContain(ColumnKind.SIZE);
+        run(new GridCmdlet(opener), NO_OPTIONS, new TestContext<>(), new Process("a", 14_520));
+        assertThat(opener.lives.get(1)).isNotNull();
+        GridTable plain = new GridTable();
+        opener.lives.get(1).drain(plain, Integer.MAX_VALUE);
+        assertThat(plain.columns()).extracting(ColumnSpec::kind).contains(ColumnKind.SIZE);
     }
 
     @Test
@@ -335,7 +353,7 @@ class GridCmdletTest {
 
     // --- --pass-thru ---
 
-    private static final GridParams PASS_THRU = new GridParams(null, null, null, false, true, false);
+    private static final GridParams PASS_THRU = new GridParams(null, null, null, false, true, false, false);
 
     /** Runs {@code grid --pass-thru} on a thread; the test plays the user with the {@link LiveTable} of the window. */
     private static final class PassThru {
@@ -431,7 +449,7 @@ class GridCmdletTest {
         plain.ok();
         assertThat(plain.opener.optionsSeen.getFirst().passThru()).isTrue();
         assertThat(plain.opener.optionsSeen.getFirst().single()).isFalse();
-        PassThru single = new PassThru(new GridParams(null, null, null, false, true, true), "a");
+        PassThru single = new PassThru(new GridParams(null, null, null, false, true, true, false), "a");
         single.ok();
         assertThat(single.opener.optionsSeen.getFirst().single()).isTrue();
         RecordingOpener without = new RecordingOpener();
@@ -442,7 +460,7 @@ class GridCmdletTest {
     @Test
     void singleNeedsPassThru() {
         assertThatThrownBy(() -> new GridCmdlet(new RecordingOpener()).begin(
-                new GridParams(null, null, null, false, false, true), new TestContext<>()))
+                new GridParams(null, null, null, false, false, true, false), new TestContext<>()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("--single only goes with --pass-thru");
     }
@@ -458,7 +476,7 @@ class GridCmdletTest {
 
     @Test
     void aTruncatedTableGivesWhatWasTicked() throws Exception {
-        PassThru run = new PassThru(new GridParams(2, null, null, false, true, false), "a", "b", "c", "d");
+        PassThru run = new PassThru(new GridParams(2, null, null, false, true, false, false), "a", "b", "c", "d");
         run.ok(1);
         assertThat(run.context.emitted).containsExactly("b");
         assertThat(run.opener.live().state()).isEqualTo(LiveTable.State.TRUNCATED);

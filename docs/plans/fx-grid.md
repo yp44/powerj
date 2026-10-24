@@ -255,6 +255,8 @@ PJ ~> echo | grid                     # empty input: an empty table, not an erro
 - Checked with the real launcher under Xvfb: ticking by click, filter + `Select all` / `Unselect all` (`2 selected`, `4 selected`, `1 selected`), `OK` printing the four objects including the hidden one, `--single`, `Cancel` and Esc giving nothing, the error of `--single`.
 - Coverage: `io.powerj.fx.model` and `grid` above 90 %; 261 tests in the module.
 
+**Added after phase 7, at the user's request — `--raw`:** `grid --raw` shows the real values without units. `ObjectReader(reader, raw)` turns the `SIZE` columns into plain `NUMBER` columns (bytes) and every `Duration` (value or declared type, so a missing one does not turn the column into text) into a `BigDecimal` number of seconds, shown without exponent (`CellFormatter`). Sort, filter, copy and export then treat them as numbers. Not done: a toggle in the window (the option is chosen when the command runs).
+
 ### Phase 8 — Documentation, CI and wrap-up — **done** (except the Windows run)
 - `docs/SPECIFICATION.md`: new **FR-77 — Graphical cmdlets (module `fx`), `grid`** (syntax, options, records, acceptance criteria), §4.4 (a module with dependencies, example `fx`), §5.1 module list, §11 row 26, §12.3.
 - `docs/recettes/fx-grid.md`: the manual checklists of phases 1-7 merged, in the format of `grep.md`.

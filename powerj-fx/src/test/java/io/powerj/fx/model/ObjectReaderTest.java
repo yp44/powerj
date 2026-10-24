@@ -2,8 +2,10 @@ package io.powerj.fx.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.time.DayOfWeek;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -171,6 +173,43 @@ class ObjectReaderTest {
     void aSizeColumnThatIsNotANumberStaysText() {
         Reading reading = reader.read(Row.of(Map.of("bytes", "n/a"), Set.of("bytes")));
         assertThat(reading.columns()).containsExactly(new ColumnSpec("bytes", ColumnKind.TEXT));
+    }
+
+    private record Process(String name, @Bytes long memory, Duration cpu) {
+    }
+
+    @Test
+    void rawShowsSizesAndDurationsAsPlainNumbers() {
+        ObjectReader raw = new ObjectReader(Reflect::read, true);
+        Process process = new Process("java", 14_520, Duration.ofMillis(1310));
+        Reading reading = raw.read(process);
+        assertThat(reading.columns()).containsExactly(new ColumnSpec("name", ColumnKind.TEXT),
+                new ColumnSpec("memory", ColumnKind.NUMBER), new ColumnSpec("cpu", ColumnKind.NUMBER));
+        assertThat(reading.row().get("memory")).isEqualTo(14_520L);
+        assertThat(reading.row().get("cpu")).isEqualTo(new BigDecimal("1.31"));
+        assertThat(reading.row().source()).isSameAs(process);
+        // A missing duration keeps its column a number, so it merges with the others.
+        assertThat(raw.read(new Process("x", 0, null)).columns().get(2).kind()).isEqualTo(ColumnKind.NUMBER);
+        assertThat((BigDecimal) raw.read(new Process("x", 0, Duration.ofSeconds(90))).row().get("cpu"))
+                .isEqualByComparingTo("90");
+        // Without raw, the units stay.
+        Reading plain = reader.read(process);
+        assertThat(plain.columns().get(1).kind()).isEqualTo(ColumnKind.SIZE);
+        assertThat(plain.row().get("cpu")).isEqualTo(Duration.ofMillis(1310));
+    }
+
+    @Test
+    void rawAppliesToRowsMapsScalarsAndBeans() {
+        ObjectReader raw = new ObjectReader(Reflect::read, true);
+        Reading row = raw.read(Row.of(Map.of("bytes", 2048L), Set.of("bytes")));
+        assertThat(row.columns()).containsExactly(new ColumnSpec("bytes", ColumnKind.NUMBER));
+        Reading map = raw.read(Map.of("wait", Duration.ofMillis(1500)));
+        assertThat(map.columns()).containsExactly(new ColumnSpec("wait", ColumnKind.NUMBER));
+        assertThat(map.row().get("wait")).isEqualTo(new BigDecimal("1.5"));
+        Reading scalar = raw.read(Duration.ofSeconds(2));
+        assertThat(scalar.columns()).containsExactly(new ColumnSpec("value", ColumnKind.NUMBER));
+        assertThat(scalar.row().source()).isEqualTo(Duration.ofSeconds(2));
+        assertThat(raw.read(new Bean()).columns()).contains(new ColumnSpec("age", ColumnKind.NUMBER));
     }
 
     @Test

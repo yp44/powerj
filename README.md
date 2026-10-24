@@ -183,6 +183,7 @@ PJ ~/dev> ls -r | grid --pass-thru | where { $_.size > 1mb } | rm -n     # tick 
 - **Filter** in the field under each header and in the search box (Ctrl+F). Text columns: `abc`, `=abc`, `!abc`, `/regex/`. Numbers, sizes and dates are typed: `228` means *equal to 228*, `>=2kb`, `1kb..1mb`, `>2026-10`; a drop-down `== < > <= >=` goes before the field of numeric columns.
 - **Loading** while the pipeline runs (`loading…`), at most `--max-rows` (100 000) rows, a **Pause** button, Ctrl+C or closing the window stops the pipeline.
 - **Copy** selected rows with Ctrl+C (tab-separated) or Ctrl+Shift+C (JSON); right click for the cell, the rows, `Fit to content`, `Hide column`; F3 shows every property of a row; the position and size of the window are remembered.
+- **`--raw`**: the real values, without units: sizes in bytes (`14520` rather than `14.2 KB`), durations in seconds (`1.31` rather than `1.310 s`); these columns are then plain numbers to sort and filter.
 - **`--pass-thru`**: a check box column, `Select all` / `Unselect all` on the rows the filter shows, `OK` sends every ticked row on (the filtered-out ones too), `Cancel` sends nothing; `--single` allows one row.
 
 Details: [FR-77](docs/SPECIFICATION.md), plan [fx-grid](docs/plans/fx-grid.md).

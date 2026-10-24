@@ -13,6 +13,7 @@ import io.powerj.api.Option;
  * @param passThru  rows can be ticked in the window, and the ones ticked when OK is pressed go on in the pipeline; it
  *                  waits for the window, as {@code --wait}
  * @param single    with {@code --pass-thru}, only one row can be ticked
+ * @param raw       sizes are shown in bytes and durations in seconds, as plain numbers without unit
  */
 public record GridParams(
         @Option(longName = "max-rows", description = "Most rows shown (default 100000): the input is not read beyond")
@@ -27,13 +28,15 @@ public record GridParams(
                 + "or nothing (Cancel); waits for the window")
         boolean passThru,
         @Option(description = "With --pass-thru: only one row can be ticked")
-        boolean single) {
+        boolean single,
+        @Option(description = "Shows sizes in bytes and durations in seconds, as plain numbers without unit")
+        boolean raw) {
 
     public static final int DEFAULT_MAX_ROWS = 100_000;
 
     /** Options for a plain {@code grid}, with the limit of rows given. */
     public GridParams(Integer maxRows) {
-        this(maxRows, null, null, false, false, false);
+        this(maxRows, null, null, false, false, false, false);
     }
 
     /** The limit of rows, the default if none was given. */

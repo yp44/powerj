@@ -200,6 +200,16 @@ With `ls | grid --pass-thru | map { $_.name }` in a folder of files `f1228.bin`,
 | 107 | Ctrl+C in the terminal while the window is open | The window closes and nothing goes on. |
 | 108 | `help grid` | `--pass-thru` and `--single`, in French too. |
 
+## `--raw` — the real values, without units
+
+| # | Do | Expected |
+|---|---|---|
+| 109 | `ls \| select name size \| grid` then `ls \| select name size \| grid --raw` | The first shows `7.6 KB`, `0 B`; the second `7745`, `0` (bytes, aligned right). |
+| 110 | With `--raw`, sort the `size` column, then filter `>1000` and `1000..9000` | Sorted by number; the filter works on the numbers (no unit needed; `kb` is refused: the field turns pink). |
+| 111 | `ps \| grid --raw` (or any object with a `Duration`) | Durations are plain seconds (`1.31`), never `1.310 s` or `1:30`; the column is aligned right. |
+| 112 | With `--raw`, select rows, Ctrl+C then paste | The copied text has the same plain numbers. |
+| 113 | `help grid` | `--raw` described, in French too. |
+
 ## Where this checklist was run, and what it does not cover
 
 - **Linux** (Ubuntu, JDK 25, JavaFX 25.0.5, under Xvfb without a window manager): every row was run with the real launcher and real mouse and key events (`java.awt.Robot`); the clipboard was read back.
