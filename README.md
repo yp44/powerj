@@ -93,6 +93,7 @@ Out of scope for v1: control structures (`if`, `foreach`, functions — planned 
 | `select` | Chooses and computes columns: `select name size`, `select file=name kb={ $_.size / 1kb }`; first in a pipeline it gives one row: `select content={(cat a.txt)}`; the `Row`s are tables and their columns stay properties (`\| sort kb -d`) | [select](docs/recettes/select.md) |
 | `count`, `measure` | Count the objects (`ls -r \| count`); count, sum, average, min and max of a property (`ls -r \| measure size`, sizes in readable form) | [count-measure](docs/recettes/count-measure.md) |
 | `group` | Groups by key: `ls -r \| group ext \| sort count -d \| first 5`; one `Group(key, count, items)` per key, several keys allowed, `-n` keeps only the counts | [group](docs/recettes/group.md) |
+| `join` | Joins the pipeline objects with those of another source by key: `cat a.csv \| from-csv \| join -r { (cat b.csv \| from-csv) } -k id`; one `Row` per matching pair, `--left-key`/`--right-key` when the keys differ, `-o` keeps the objects without a match | [join](docs/recettes/join.md) |
 | `mkdir`, `touch`, `cp`, `mv`, `rm` | File operations, also from the pipeline (`ls --filter *.tmp \| rm -v`); `-n` dry run, `-f` to overwrite, `-r` for folders, `-p <n>` to copy or remove a tree in virtual threads (`cp`, `rm`); `rm` and `mv` refuse the protected paths listed in `~/.powerj/protected-paths` | [fileops](docs/recettes/fileops.md) |
 | `to-json`, `from-json`, `to-csv`, `from-csv` | JSON and CSV: `ls \| select name size \| to-json > files.json`, `cat files.json \| from-json \| where { $_.size > 1kb }`, `cat data.csv \| from-csv -d ";"`; always an array, JSON Lines with `-l`, CSV values as strings, objects as `Row`s | [json-csv](docs/recettes/json-csv.md) |
 | `ps`, `kill` | Processes as objects: `ps java \| sort cpu --desc \| first 3`, `ps notepad \| kill -n`, then `ps notepad \| kill -w`; `-f` forcible stop, `-v` shows what was stopped | [ps-kill](docs/recettes/ps-kill.md) |
@@ -279,7 +280,7 @@ All modules are JPMS modules (`module-info.java`); the only runtime dependency i
 | `powerj-api` | Public API for writing cmdlets (`Cmdlet`, `@CmdletInfo`, `@Option`, `CmdletProvider`); no dependencies |
 | `powerj-fs` | File tree walk, sequential or parallel in virtual threads (`FileWalker`), reusable by any cmdlet |
 | `powerj-core` | Lexer, parser, interpreter, pipeline, option binding, Java interoperability, completion engine, output formatting, native execution |
-| `powerj-cmdlets` | Built-in cmdlets (`ls`, `grep`, `cat`, `where`, `map`, `sort`, `first`, `last`, `range`, `select`, `count`, `measure`, `group`, `mkdir`, `touch`, `cp`, `mv`, `rm`, `collect`, `env`) |
+| `powerj-cmdlets` | Built-in cmdlets (`ls`, `grep`, `cat`, `where`, `map`, `sort`, `first`, `last`, `range`, `select`, `count`, `measure`, `group`, `join`, `mkdir`, `touch`, `cp`, `mv`, `rm`, `collect`, `env`) |
 | `powerj-shell` | Entry point (`Main`), JLine REPL, profile, script mode, history expansion |
 | `powerj-fx` | Optional module, not in the distribution: the JavaFX cmdlets (`grid`); a template for a real third-party module (dependencies, messages, settings) |
 | `powerj-coverage` | Test coverage of all the modules: JaCoCo report and 80% threshold |
@@ -382,7 +383,7 @@ Unit and integration tests use JUnit 5 and AssertJ: lexer, parser, option bindin
 PowerJ is in active development (version `0.1.0-SNAPSHOT`). Implemented so far:
 
 - REPL with line editing, persistent history and Ctrl+R; native commands, `cd`, chaining, background commands (`&`, `jobs`), variables, redirections; non-interactive mode;
-- object pipeline with the `ls`, `where`, `map`, `sort`, `first`, `last`, `range`, `select`, `count`, `measure`, `group`, `mkdir`, `touch`, `cp`, `mv`, `rm`, `to-json`, `from-json`, `to-csv`, `from-csv`, `ps`, `kill`, `collect`, `env`, `grep`, `cat` and `perf` cmdlets, and a parallel file walker;
+- object pipeline with the `ls`, `where`, `map`, `sort`, `first`, `last`, `range`, `select`, `count`, `measure`, `group`, `join`, `mkdir`, `touch`, `cp`, `mv`, `rm`, `to-json`, `from-json`, `to-csv`, `from-csv`, `ps`, `kill`, `collect`, `env`, `grep`, `cat` and `perf` cmdlets, and a parallel file walker;
 - direct access to the JRE's Java API, Java-style lambdas and method references;
 - Tab completion and syntax highlighting;
 - third-party modules loaded from jars;

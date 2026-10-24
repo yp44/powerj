@@ -321,6 +321,25 @@ class BuiltinCmdletsTest {
     }
 
     @Test
+    void joinMultipliesTheObjectsByKey() throws Exception {
+        Files.writeString(tmp.resolve("countries.csv"), "statezip,country\nFR,France\nIT,Italy\nES,Spain\n");
+        Files.writeString(tmp.resolve("zip.csv"), "zipcode,city\nfr,Paris\nfr,Lyon\nit,Rome\n");
+        assertThat(run("cat countries.csv | from-csv | join -r { (cat zip.csv | from-csv) } --left-key statezip"
+                + " --right-key { $_.zipcode.toUpperCase() } | map { $_.country + \"/\" + $_.city }"))
+                .isEqualTo("France/Paris\nFrance/Lyon\nItaly/Rome\n");
+        assertThat(run("join -l { (cat countries.csv | from-csv) } -r { (cat zip.csv | from-csv) } --left-key statezip"
+                + " --right-key { $_.zipcode.toUpperCase() } -o | where { $_.city == null } | map { $_.country }"))
+                .isEqualTo("Spain\n");
+        assertThat(run("ls --files | join -r { (cat zip.csv | from-csv) } -k name | count")).isEqualTo("0\n");
+        assertThat(run("List.of(1, 2) | join -r { List.of(1L, 1L) } --left-key { $_ } | count")).isEqualTo("2\n");
+        assertThat(errors).isEmpty();
+        assertThat(run("join -l { (ls) } -r { (cat missing.csv | from-csv) } -k name")).isEmpty();
+        assertThat(errors).singleElement().asString().startsWith("cat: not found");
+        run("ls | join -k name");
+        assertThat(errors).singleElement().asString().startsWith("join: right side expected");
+    }
+
+    @Test
     void fileOperations() throws Exception {
         session.configDirectory(Files.createDirectories(tmp.resolve("config")));
         Files.write(tmp.resolve("config/protected-paths"), List.of(tmp.resolve("docs").toString()));

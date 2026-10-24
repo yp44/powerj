@@ -70,7 +70,7 @@ public final class GroupCmdlet implements Cmdlet<GroupCmdlet.Params, Object, Gro
             context.error(Messages.get("pipeline.object.skipped", e.getMessage(), Where.abbreviate(input)));
             return;
         }
-        Bucket bucket = state.buckets().computeIfAbsent(normalized(key), k -> new Bucket(key));
+        Bucket bucket = state.buckets().computeIfAbsent(Keys.normalized(key), k -> new Bucket(key));
         bucket.count++;
         if (!p.noItems()) {
             bucket.items.add(input);
@@ -98,20 +98,5 @@ public final class GroupCmdlet implements Cmdlet<GroupCmdlet.Params, Object, Gro
             values[i] = keys.get(i).invoke(input);
         }
         return Collections.unmodifiableList(Arrays.asList(values));
-    }
-
-    /** Value compared to find the group: integral numbers as {@code Long} ({@code 1} and {@code 1L} are one group). */
-    private static Object normalized(Object key) {
-        return switch (key) {
-            case Integer i -> (long) i;
-            case Short s -> (long) s;
-            case Byte b -> (long) b;
-            case List<?> list -> {
-                List<Object> values = new ArrayList<>(list.size());
-                list.forEach(value -> values.add(normalized(value)));
-                yield values;
-            }
-            case null, default -> key;
-        };
     }
 }
