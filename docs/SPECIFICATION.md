@@ -721,6 +721,8 @@ Each received object gives a **`Row`** (`io.powerj.api.Row`): an immutable, orde
 
 Column names are identifiers. No column, an invalid name or a duplicate name is a blocking error.
 
+**At the head of a pipeline** (`select content={(cat file.txt)} another={(cat another.txt)}`), `select` receives nothing: it emits **one** `Row`, and each block is evaluated once with no current object (`$_` is `null`). Only the computed and named-block columns make sense there; a property column (`select name`) gives an empty cell and the usual single error.
+
 A property missing on an object, or a block that fails, gives an empty cell (`null`). The `Row` is still emitted, and **one** non-blocking error is reported per column (`select: column nmae: …`), not one per object.
 
 Display: consecutive `Row`s with the same columns form one table, whatever the number of columns. Numbers are right-aligned. A column taken directly from a `@Bytes` component (`select name size` after `ls`) is still shown as a size (`14.2 KB`).
@@ -733,7 +735,8 @@ CA:
 - `ls | select name kb={ $_.size / 1kb } | sort kb -d | first 3`;
 - `ls -r | select path.fileName size` displays a column `fileName`;
 - `ls | select nmae` displays an empty column and a single error;
-- `ls | select` and `ls | select a name a=size` are blocking errors.
+- `ls | select` and `ls | select a name a=size` are blocking errors;
+- `select content={(cat file.txt)} another={(cat another.txt)}` displays one row with the columns `content` and `another`, and `… | map { $_.content }` gives the text of `file.txt`.
 
 #### FR-70 — `count`, `measure`: count and aggregate
 

@@ -24,13 +24,16 @@ import io.powerj.api.ScriptBlock;
  * ls | select name size
  * ls | select file=name kb={ $_.size / 1kb }
  * ls -r | select path.fileName size
+ * select content={ (cat file.txt) } other={ (cat another.txt) }
  * </pre>
+ * At the head of a pipeline, {@code select} emits one {@link Row} whose blocks are evaluated once, with no current object.
  * A property missing on an object gives an empty cell, with one non-blocking error per column.
  */
 @CmdletInfo(name = "select", preview = true, category = "Filters", summary = "Chooses and computes the columns of the objects",
         examples = {"ls | select name size", "ls | select file=name kb={ $_.size / 1kb }",
                 "ls -r | select path.fileName size | sort size -d | first 5",
-                "env | select name len={ $_.value.length() } | sort len -d | first 3"})
+                "env | select name len={ $_.value.length() } | sort len -d | first 3",
+                "select content={ (cat file.txt) } other={ (cat another.txt) }"})
 public final class Select implements Cmdlet<Select.Params, Object, Row> {
 
     /** Parameters of {@code select}. */
@@ -63,7 +66,13 @@ public final class Select implements Cmdlet<Select.Params, Object, Row> {
 
     @Override
     public void begin(Params p, CmdletContext<Row> context) {
-        states.put(context, new State(columns(p.columns(), context)));
+        State state = new State(columns(p.columns(), context));
+        states.put(context, state);
+        if (!context.hasInput()) {
+            // Head of a pipeline: a single row, its blocks evaluated once with no current object.
+            state.sizeColumns = Set.of();
+            context.emit(row(state, null, context));
+        }
     }
 
     @Override
@@ -72,6 +81,10 @@ public final class Select implements Cmdlet<Select.Params, Object, Row> {
         if (state.sizeColumns == null) {
             state.sizeColumns = sizeColumns(state.columns, input);
         }
+        context.emit(row(state, input, context));
+    }
+
+    private static Row row(State state, Object input, CmdletContext<Row> context) {
         Map<String, Object> values = new LinkedHashMap<>();
         for (Column column : state.columns) {
             Object value;
@@ -87,7 +100,7 @@ public final class Select implements Cmdlet<Select.Params, Object, Row> {
             }
             values.put(column.name(), value);
         }
-        context.emit(Row.of(values, state.sizeColumns));
+        return Row.of(values, state.sizeColumns);
     }
 
     @Override
