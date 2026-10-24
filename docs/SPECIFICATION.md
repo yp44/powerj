@@ -405,7 +405,7 @@ Short rule: **`$_` for one-line filters typed at the keyboard, a named lambda as
 
 ### 3.9 Cmdlets in the current scope
 
-Only **four cmdlets** are in the scope of the first steps: `ls`, `where`, `map` and `env`; the mini-iterations add `collect` (FR-36d), `grep` (FR-64), `cat` (FR-65), `sort` (FR-67), `first`, `last` and `range` (FR-68), `select` (FR-69), `count` and `measure` (FR-70), `group` (FR-71), and the file operations `mkdir`, `touch`, `cp`, `mv`, `rm` (FR-72), the conversions `to-json`, `from-json`, `to-csv`, `from-csv` (FR-73), and the processes `ps`, `kill` (FR-74), and `perf` (FR-76). The first two alone cover the core mechanisms: producing record objects, attribute access, the pipeline, expressions, and mixing with native commands.
+Only **four cmdlets** are in the scope of the first steps: `ls`, `where`, `map` and `env`; the mini-iterations add `collect` (FR-36d), `grep` (FR-64), `cat` (FR-65), `sort` (FR-67), `first`, `last` and `range` (FR-68), `select` (FR-69), `count` and `measure` (FR-70), `group` (FR-71), `join` (FR-78), and the file operations `mkdir`, `touch`, `cp`, `mv`, `rm` (FR-72), the conversions `to-json`, `from-json`, `to-csv`, `from-csv` (FR-73), and the processes `ps`, `kill` (FR-74), and `perf` (FR-76). The first two alone cover the core mechanisms: producing record objects, attribute access, the pipeline, expressions, and mixing with native commands.
 
 #### FR-35 — `ls`: list files
 
@@ -1025,6 +1025,37 @@ Acceptance criteria (CA), checked by `docs/recettes/fx-grid.md`:
 - Ctrl+C on selected rows and Ctrl+Shift+C give the texts of the visible columns; `--columns size,name` shows these two columns in this order; `--wait` keeps the prompt until the window is closed, and Ctrl+C closes the window.
 - With `--pass-thru`: ticking two rows and `OK` gives these two objects to the next stage; after a filter, `Select all` and `Unselect all` only touch the rows shown, and `OK` gives back a ticked row that the filter hides; `Cancel` gives nothing; `--single` allows one row; `--single` alone is an error.
 - A window closed at some place opens there next time; the report of coverage lists `io.powerj.fx.model`, `grid` and `runtime` above 90 %.
+
+#### FR-78 — `join`: join objects by key
+
+```text
+join --right <bloc> [--left <bloc>] (--key <clé> | --left-key <clé> [--right-key <clé>]) [-o|--outer]
+```
+
+Emits one **`Row`** per pair made of a left object and a right object with the same key: a left object that matches three right objects gives three rows.
+
+| Option | Short | Description |
+|---|---|---|
+| `--right` (required) | `-r` | Right side: a block evaluated **once**, with no current object; its result is unrolled like a pipeline value (collection, array, stream). |
+| `--left` | `-l` | Left side when `join` starts a pipeline (block evaluated once). Otherwise the left side is the pipeline objects. |
+| `--key` | `-k` | Key of both sides: property, property path or block, as for `sort` (FR-67). |
+| `--left-key`, `--right-key` | — | Key of each side, when they differ (`--right-key { $_.zipcode.toUpperCase() }`). Without `--right-key`, the right key is the left one. |
+| `--outer` | `-o` | Left outer join: a left object without a match gives one row whose right columns are empty. |
+
+- **Algorithm:** hash join. The right side is read in `begin` and indexed by key; the left side is streamed, so `join` emits as soon as a left object arrives. Memory holds the right side only: put the smaller source on the right.
+- **Keys** are compared with `equals`; integral numbers are compared by value (`1` and `1L` match), as for `group` (FR-71). A `null` key matches nothing; with `-o` the left object is still emitted.
+- **Columns:** those of the left object, then those of the right object, as for `to-csv` (FR-73): the components of a record, the entries of a map or a `Row`, otherwise one column `value`. A right column whose name is already taken is renamed `right_<name>`. With `--key <property>`, the key column of the right side is left out (one column `code`). Size columns (a `@Bytes` component, a size column of a `Row`) stay displayed as sizes.
+- **Order:** the left objects in their order; for each one, its matches in the order of the right side.
+- **Errors:** blocking without `--right`, without a key, with `--key` and `--left-key`/`--right-key` together, with `--left` after a `|`, without `--left` at the head of a pipeline, for an invalid property name, or if the block of a side fails. An error while evaluating a key is non-blocking: the object is skipped.
+
+`join` is allowed in preview mode (FR-66).
+
+CA:
+- `cat countries.csv | from-csv | join -r { (cat zip.csv | from-csv) } --left-key statezip --right-key { $_.zipcode.toUpperCase() }` gives one row per zip code, with the columns of its country;
+- `join -l { (cat a.csv | from-csv) } -r { (cat b.csv | from-csv) } -k code` starts a pipeline, with a single column `code`;
+- `… | join -r { … } -k id -o` also keeps the left objects without a match, with empty right columns;
+- a right column with the name of a left column is called `right_<name>`;
+- `ls | join -k name` is a blocking error (`right side expected`).
 
 ### 3.10 Native commands
 
@@ -1794,6 +1825,7 @@ The backlog cmdlets (§12.3) are added **one per mini-iteration**, each with a s
 | 24 | Background execution `&`, `jobs` | FR-75 | `docs/recettes/background.md` |
 | 25 | Perf mode (Alt+P), `perf` | FR-76 | `docs/recettes/perf.md` |
 | 26 | Optional JavaFX module `powerj-fx`, `grid` (table, sort, filter, progressive loading, `--pass-thru`) | FR-77 | `docs/recettes/fx-grid.md` |
+| 27 | `join` (inner and left outer join by key) | FR-78 | `docs/recettes/join.md` |
 
 Version 2 will introduce scripting (`if`, `foreach`, functions, `.pj` files).
 
@@ -1879,6 +1911,7 @@ PJ C:\dev> (ls)*.name.stream().map({ $_.toUpperCase() }).sorted().toList()
 | ~~`first`, `last`~~ | First / last N — **done** (FR-68) | unchanged |
 | ~~`range`~~ | Objects between two bounds — **done** (FR-68) | unchanged |
 | ~~`group`~~ | Grouping — **done** (FR-71) | `Group` |
+| ~~`join`~~ | Join of two sources by key — **done** (FR-78) | `Row` |
 | ~~`count`, `measure`~~ | Aggregates (count, sum, average, min, max) — **done** (FR-70) | `Long`, `Row` |
 | `uniq` | Deduplication | unchanged |
 | `tee` | Copy into a variable | unchanged |

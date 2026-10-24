@@ -41,4 +41,22 @@ final class Keys {
         }
         return blocks;
     }
+
+    /**
+     * Value compared to match keys ({@code group}, {@code join}): integral numbers as {@code Long} ({@code 1} and
+     * {@code 1L} are equal).
+     */
+    static Object normalized(Object key) {
+        return switch (key) {
+            case Integer i -> (long) i;
+            case Short s -> (long) s;
+            case Byte b -> (long) b;
+            case List<?> list -> {
+                List<Object> values = new ArrayList<>(list.size());
+                list.forEach(value -> values.add(normalized(value)));
+                yield values;
+            }
+            case null, default -> key;
+        };
+    }
 }
