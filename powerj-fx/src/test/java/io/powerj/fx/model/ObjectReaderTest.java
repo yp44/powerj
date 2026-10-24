@@ -125,11 +125,12 @@ class ObjectReaderTest {
     }
 
     @Test
-    void displayChoosesTheColumnsAndTheirOrder() {
+    void displayPutsItsColumnsFirstThenTheOtherComponents() {
         Reading reading = reader.read(new Entry("a.txt", 2048, "secret"));
         assertThat(reading.columns()).containsExactly(new ColumnSpec("name", ColumnKind.TEXT),
-                new ColumnSpec("size", ColumnKind.SIZE));
-        assertThat(reading.row().values()).containsOnlyKeys("name", "size");
+                new ColumnSpec("size", ColumnKind.SIZE), new ColumnSpec("hidden", ColumnKind.TEXT));
+        assertThat(reading.row().values()).containsOnlyKeys("name", "size", "hidden");
+        assertThat(reading.row().get("hidden")).isEqualTo("secret");
     }
 
     @Test

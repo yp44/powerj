@@ -26,7 +26,7 @@ import io.powerj.api.Row;
 /**
  * Turns a received object into a {@link Reading}, with the same idea of columns as the table of the terminal (FR-30):
  * <ul>
- *   <li>a record gives one column per component (or the ones of {@link Display}, in its order);</li>
+ *   <li>a record gives one column per component, the ones of {@link Display} first, in its order;</li>
  *   <li>a {@link Row} or any {@link Map} gives one column per key;</li>
  *   <li>a scalar (text, number, date, path…) gives the single column {@value #VALUE};</li>
  *   <li>any other object gives one column per public getter ({@code getX()}, {@code isX()}), by name.</li>
@@ -109,7 +109,10 @@ public final class ObjectReader {
         return fromProperties(bean, beanColumns(bean.getClass()));
     }
 
-    /** Columns of a record type: the ones of {@code @Display} that exist, otherwise every component. */
+    /**
+     * Columns of a record type: the ones of {@code @Display} that exist come first, in its order, then every other
+     * component, so that the table has all the properties of the object (the terminal shows only the first ones).
+     */
     private List<ColumnSpec> recordColumns(Class<?> type) {
         RecordComponent[] components = type.getRecordComponents();
         List<ColumnSpec> columns = new ArrayList<>();
@@ -119,12 +122,11 @@ public final class ObjectReader {
                 Arrays.stream(components).filter(c -> c.getName().equals(name)).findFirst()
                         .ifPresent(c -> columns.add(new ColumnSpec(c.getName(), kind(c))));
             }
-            if (!columns.isEmpty()) {
-                return columns;
-            }
         }
         for (RecordComponent component : components) {
-            columns.add(new ColumnSpec(component.getName(), kind(component)));
+            if (columns.stream().noneMatch(c -> c.name().equals(component.getName()))) {
+                columns.add(new ColumnSpec(component.getName(), kind(component)));
+            }
         }
         return columns;
     }

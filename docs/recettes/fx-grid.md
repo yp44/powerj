@@ -209,6 +209,7 @@ With `ls | grid --pass-thru | map { $_.name }` in a folder of files `f1228.bin`,
 | 111 | `ps \| grid --raw` (or any object with a `Duration`) | Durations are plain seconds (`1.31`), never `1.310 s` or `1:30`; the column is aligned right. |
 | 112 | With `--raw`, select rows, Ctrl+C then paste | The copied text has the same plain numbers. |
 | 113 | `help grid` | `--raw` described, in French too. |
+| 114 | `ls \| grid` | All the properties of the files are columns: `name`, `size`, `modified`, `dir` (the ones the terminal shows) then `path`, `ext`; each can be hidden in the `Columns` menu. |
 
 ## Where this checklist was run, and what it does not cover
 

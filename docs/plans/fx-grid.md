@@ -117,7 +117,7 @@ PJ ~> exit                  # the process ends, windows included
 **Goal:** `grid` displays the received objects as a table.
 
 - `model.ColumnSpec` (name, Java type, value reader, numeric/size/date flags) and `model.ColumnExtractor`:
-  - records → components, in `@Display(columns=…)` order when present (otherwise all, like the terminal table);
+  - records → every component, those of `@Display(columns=…)` first in its order (changed after phase 8, at the user's request: the grid must show all the properties, not only the compact view of the terminal);
   - `Row` and `Map` → keys, in order;
   - scalars (`String`, numbers, `Path`, dates, enums…) → one column `value`;
   - other objects → public getters of the bean (`getX`/`isX`), as a last resort;
