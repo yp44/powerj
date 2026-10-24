@@ -107,6 +107,7 @@ public final class Main {
         session.configDirectory(home.dir());
         int width = console ? columns() : 10_000;
         var script = new ScriptMode(session, CmdletRegistry.discover(), out, err::println, width, input);
+        script.nativeAccess(home.configFile());
         script.loadModules(home.modulesDir());
         int code = script.run(lines);
         out.flush();
@@ -157,6 +158,7 @@ public final class Main {
                     System.getenv());
             session.configDirectory(home.dir());
             var repl = new Repl(reader, new Supervisor(), session, CmdletRegistry.discover());
+            repl.nativeAccess(home.configFile());
             repl.loadModules(home.modulesDir());
             repl.useProfile(home.profileFile(), runProfile);
             int code = repl.run(BuildInfo.current());

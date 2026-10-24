@@ -94,6 +94,11 @@ public final class Interpreter {
         this.modules = new ModuleLoader(registry, java.util.Collections.unmodifiableSet(builtins.keySet()));
     }
 
+    /** Consent asked before loading a module that uses native code (FR-77); none by default: it is not loaded. */
+    public void nativeAccess(NativeAccessPolicy policy) {
+        modules.nativeAccess(policy);
+    }
+
     /**
      * Loads the third-party modules from the directory (at startup, §4.4).
      *

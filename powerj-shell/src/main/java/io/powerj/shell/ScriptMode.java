@@ -42,6 +42,11 @@ final class ScriptMode {
         input.ifPresent(interpreter::useStandardInput);
     }
 
+    /** Consent for the modules that use native code (FR-77): a script never asks, only the recorded answers count. */
+    void nativeAccess(java.nio.file.Path configFile) {
+        interpreter.nativeAccess(new NativeAccessConsent(new ConfigFile(configFile), null, errors));
+    }
+
     /** Loads third-party modules (§4.4); warnings go to the error output. */
     void loadModules(java.nio.file.Path dir) {
         interpreter.loadModules(dir).forEach(errors);

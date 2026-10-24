@@ -113,6 +113,34 @@ jobs:
           grep -q 'com.example.greet .*\[greet\]' greet.txt
           grep -q 'class not found: com.example.greet.Greeting' greet.txt
 
+      - name: Test de fumée du module graphique (powerj-fx)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgtk-3-0 libxtst6 libxxf86vm1 libgl1
+          pj=$PWD/powerj-dist/target/jpackage/powerj/bin/powerj
+          export POWERJ_HOME=$RUNNER_TEMP/fxhome
+          mkdir -p $POWERJ_HOME/modules
+          unzip -q powerj-fx/target/powerj-fx-*-linux.zip -d $POWERJ_HOME/modules
+          # Sans réponse enregistrée et sans terminal, un module qui utilise du code natif n'est pas chargé (spec §4.4).
+          $pj -c 'mod-list' > fx.txt 2>&1
+          printf 'modules.nativeAccess.io.powerj.fx=false\n' > $POWERJ_HOME/config.properties
+          $pj -c 'mod-list' >> fx.txt 2>&1
+          printf 'modules.nativeAccess.io.powerj.fx=true\n' > $POWERJ_HOME/config.properties
+          xvfb-run -a $pj -c 'mod-list' >> fx.txt 2>&1
+          xvfb-run -a $pj -c 'help grid' >> fx.txt 2>&1
+          # Une vraie fenêtre JavaFX s'ouvre dans la couche du module, sans erreur ni avertissement du JDK sur le code natif.
+          # NO_AT_BRIDGE: le runner n'a pas de bus d'accessibilité, GTK s'en plaint sinon (message sans rapport avec PowerJ).
+          NO_AT_BRIDGE=1 xvfb-run -a $pj -c 'ls | grid --title ci --columns name,size' > fxwin.txt 2>&1
+          # Sans affichage : un message clair, le shell continue.
+          env -u DISPLAY $pj -c 'ls | grid' >> fx.txt 2>&1 || true
+          cat fx.txt fxwin.txt
+          grep -q 'no answer is recorded (set modules.nativeAccess.io.powerj.fx=true' fx.txt
+          grep -q 'native access refused for module io.powerj.fx' fx.txt
+          grep -q 'io.powerj.fx .*\[grid\]' fx.txt
+          grep -q -- '--max-rows' fx.txt
+          grep -q 'the graphical toolkit cannot start' fx.txt
+          if grep -Eiq 'restricted method|cannot start|exception' fxwin.txt; then echo 'fenêtre : message inattendu'; exit 1; fi
+
       - name: Test de fumée des langues (en / fr)
         run: |
           pj=$PWD/powerj-dist/target/jpackage/powerj/bin/powerj
@@ -142,6 +170,13 @@ jobs:
           grep -qx "$HOME" tilde.txt
           grep -qx 'note.txt' tilde.txt
           test -f $HOME/out.txt
+
+      - name: Module graphique powerj-fx
+        uses: actions/upload-artifact@v5
+        with:
+          name: powerj-fx-linux-x64
+          path: powerj-fx/target/powerj-fx-*-linux.zip
+          if-no-files-found: error
 
       - name: Module d'exemple greet.jar
         uses: actions/upload-artifact@v5
@@ -261,6 +296,33 @@ jobs:
           $modules
           if (-not ($modules -match 'com.example.greet')) { throw "mod-list ne liste pas com.example.greet" }
           exit 0
+
+      - name: Test de fumée du module graphique (powerj-fx)
+        shell: pwsh
+        run: |
+          # Chargement et consentement seulement : l'ouverture d'une fenêtre se vérifie à la main (docs/recettes/fx-grid.md).
+          $pj = "$PWD\powerj-dist\target\jpackage\powerj\powerj.exe"
+          $env:POWERJ_HOME = "$env:RUNNER_TEMP\fxhome"
+          New-Item -ItemType Directory -Force "$env:POWERJ_HOME\modules" | Out-Null
+          Expand-Archive (Get-ChildItem powerj-fx\target\powerj-fx-*-win.zip).FullName "$env:POWERJ_HOME\modules"
+          $refus = & $pj -c 'mod-list' 2>&1 | Out-String
+          $refus
+          if (-not ($refus -match 'modules.nativeAccess.io.powerj.fx=true')) { throw "consentement absent : $refus" }
+          Set-Content "$env:POWERJ_HOME\config.properties" 'modules.nativeAccess.io.powerj.fx=true'
+          $modules = & $pj -c 'mod-list' | Out-String
+          $modules
+          if (-not ($modules -match 'io.powerj.fx')) { throw "mod-list ne liste pas io.powerj.fx" }
+          $aide = & $pj -c 'help grid' | Out-String
+          $aide
+          if (-not ($aide -match '--max-rows')) { throw "help grid sans --max-rows : $aide" }
+          exit 0
+
+      - name: Module graphique powerj-fx
+        uses: actions/upload-artifact@v5
+        with:
+          name: powerj-fx-windows-x64
+          path: powerj-fx/target/powerj-fx-*-win.zip
+          if-no-files-found: error
 
       - name: Archive portable powerj.exe
         uses: actions/upload-artifact@v5

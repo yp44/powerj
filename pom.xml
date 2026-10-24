@@ -17,6 +17,7 @@
         <module>powerj-fs</module>
         <module>powerj-core</module>
         <module>powerj-cmdlets</module>
+        <module>powerj-fx</module>
         <module>powerj-shell</module>
         <module>powerj-coverage</module>
         <module>powerj-dist</module>
@@ -34,6 +35,7 @@
         <assertj.version>3.27.4</assertj.version>
         <jline.version>4.4.7</jline.version>
         <jacoco.version>0.8.15</jacoco.version>
+        <javafx.version>25.0.5</javafx.version>
     </properties>
 
     <dependencyManagement>
@@ -61,6 +63,11 @@
             <dependency>
                 <groupId>io.powerj</groupId>
                 <artifactId>powerj-shell</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.powerj</groupId>
+                <artifactId>powerj-fx</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

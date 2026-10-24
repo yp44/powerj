@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.powerj</groupId>
+        <artifactId>powerj-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>powerj-fx</artifactId>
+    <name>PowerJ FX</name>
+    <description>
+        Optional third-party module with the JavaFX cmdlets (grid). It is not part of the distribution: the zip built
+        here is unpacked into ~/.powerj/modules/ (specification §4.4).
+    </description>
+
+    <properties>
+        <!-- JavaFX artifacts carry the platform as a classifier; the profiles below pick the one of the build machine,
+             -Djavafx.platform=win builds the module for another platform. -->
+        <javafx.platform>linux</javafx.platform>
+        <fx.module>${project.build.directory}/module</fx.module>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.powerj</groupId>
+            <artifactId>powerj-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-base</artifactId>
+            <version>${javafx.version}</version>
+            <classifier>${javafx.platform}</classifier>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-graphics</artifactId>
+            <version>${javafx.version}</version>
+            <classifier>${javafx.platform}</classifier>
+            <!-- The classified jars above are the real ones: the unclassified artifacts that JavaFX declares
+                 transitively are empty stubs, which would clash with them on the module path. -->
+            <exclusions>
+                <exclusion>
+                    <groupId>org.openjfx</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+            <version>${javafx.version}</version>
+            <classifier>${javafx.platform}</classifier>
+            <!-- The classified jars above are the real ones: the unclassified artifacts that JavaFX declares
+                 transitively are empty stubs, which would clash with them on the module path. -->
+            <exclusions>
+                <exclusion>
+                    <groupId>org.openjfx</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>powerj-fx</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <compilerArgs>
+                        <arg>--module-version</arg>
+                        <arg>${project.version}</arg>
+                    </compilerArgs>
+                </configuration>
+            </plugin>
+            <!-- JavaFX loads native libraries: the shell asks the user before loading the module (FR-77) and then enables
+                 native access for the modules of its folder. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <configuration>
+                    <archive>
+                        <manifestEntries>
+                            <Enable-Native-Access>true</Enable-Native-Access>
+                        </manifestEntries>
+                    </archive>
+                </configuration>
+            </plugin>
+            <!-- The module folder: powerj-fx.jar and the JavaFX jars. powerj-api is left out, the shell provides it. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>copy-javafx</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>copy-dependencies</goal>
+                        </goals>
+                        <configuration>
+                            <includeScope>runtime</includeScope>
+                            <excludeGroupIds>io.powerj</excludeGroupIds>
+                            <outputDirectory>${fx.module}/fx</outputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>module-zip</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <copy file="${project.build.directory}/${project.build.finalName}.jar"
+                                      todir="${fx.module}/fx"/>
+                                <zip destfile="${project.build.directory}/powerj-fx-${project.version}-${javafx.platform}.zip">
+                                    <zipfileset dir="${fx.module}" includes="fx/**"/>
+                                </zip>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <profile>
+            <id>fx-windows</id>
+            <activation>
+                <os>
+                    <family>windows</family>
+                </os>
+            </activation>
+            <properties>
+                <javafx.platform>win</javafx.platform>
+            </properties>
+        </profile>
+        <profile>
+            <id>fx-mac-intel</id>
+            <activation>
+                <os>
+                    <family>mac</family>
+                    <arch>x86_64</arch>
+                </os>
+            </activation>
+            <properties>
+                <javafx.platform>mac</javafx.platform>
+            </properties>
+        </profile>
+        <profile>
+            <id>fx-mac-arm</id>
+            <activation>
+                <os>
+                    <family>mac</family>
+                    <arch>aarch64</arch>
+                </os>
+            </activation>
+            <properties>
+                <javafx.platform>mac-aarch64</javafx.platform>
+            </properties>
+        </profile>
+        <profile>
+            <id>fx-linux-arm</id>
+            <activation>
+                <os>
+                    <name>Linux</name>
+                    <arch>aarch64</arch>
+                </os>
+            </activation>
+            <properties>
+                <javafx.platform>linux-aarch64</javafx.platform>
+            </properties>
+        </profile>
+    </profiles>
+</project>

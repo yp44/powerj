@@ -136,8 +136,116 @@ class ModuleLoaderTest {
         assertThat(errors).singleElement().asString().contains("org.test.hello.Greeting");
     }
 
+    /** Policy that answers {@code answer} and records what it was asked. */
+    private static final class RecordingPolicy implements NativeAccessPolicy {
+        final List<String> asked = new ArrayList<>();
+        final List<List<String>> layers = new ArrayList<>();
+        final java.util.Optional<Boolean> answer;
+
+        RecordingPolicy(java.util.Optional<Boolean> answer) {
+            this.answer = answer;
+        }
+
+        @Override
+        public java.util.Optional<Boolean> consent(String module, List<String> layer) {
+            asked.add(module);
+            layers.add(layer);
+            return answer;
+        }
+    }
+
+    private static final Map<String, String> NATIVE = Map.of("Enable-Native-Access", "true");
+
+    @Test
+    void aModuleThatUsesNativeCodeIsNotLoadedWithoutAnAnswer() throws Exception {
+        hello(tmp.resolve("native.jar"), "org.test.nat", "nat", NATIVE);
+        run("mod-load native.jar");
+        assertThat(errors).containsExactly(
+                "native.jar: not loaded, module org.test.nat uses native code and no answer is recorded "
+                        + "(set modules.nativeAccess.org.test.nat=true in config.properties to allow it)",
+                "mod-load: native.jar not loaded");
+        assertThat(interpreter.commandKind("nat")).isEqualTo(Interpreter.CommandKind.UNKNOWN);
+    }
+
+    @Test
+    void aRefusedModuleIsNotLoaded() throws Exception {
+        var policy = new RecordingPolicy(java.util.Optional.of(false));
+        interpreter.nativeAccess(policy);
+        hello(tmp.resolve("native.jar"), "org.test.nat", "nat", NATIVE);
+        run("mod-load native.jar");
+        assertThat(errors).first().asString().isEqualTo(
+                "native.jar: not loaded, native access refused for module org.test.nat "
+                        + "(modules.nativeAccess.org.test.nat=false in config.properties)");
+        assertThat(interpreter.commandKind("nat")).isEqualTo(Interpreter.CommandKind.UNKNOWN);
+        assertThat(policy.asked).containsExactly("org.test.nat");
+    }
+
+    @Test
+    void anAcceptedModuleIsLoadedWithNativeAccessForItsLayer() throws Exception {
+        var policy = new RecordingPolicy(java.util.Optional.of(true));
+        interpreter.nativeAccess(policy);
+        hello(tmp.resolve("native.jar"), "org.test.nat", "nat", NATIVE);
+        assertThat(run("mod-load native.jar")).isEqualTo("nat\n");
+        assertThat(errors).isEmpty();
+        assertThat(policy.asked).containsExactly("org.test.nat");
+        assertThat(policy.layers.getFirst()).containsExactly("org.test.nat");
+        Module module = registry.find("nat").orElseThrow().cmdlet().getClass().getModule();
+        assertThat(module.isNativeAccessEnabled()).isTrue();
+    }
+
+    @Test
+    void aModuleWithoutTheAttributeIsNeverAsked() throws Exception {
+        var policy = new RecordingPolicy(java.util.Optional.of(false));
+        interpreter.nativeAccess(policy);
+        hello(tmp.resolve("plain.jar"), "org.test.plain", "plain");
+        hello(tmp.resolve("off.jar"), "org.test.off", "off", Map.of("Enable-Native-Access", "false"));
+        hello(tmp.resolve("other.jar"), "org.test.other2", "other2", Map.of("Enable-Native-Access", "ALL-UNNAMED"));
+        run("mod-load plain.jar off.jar other.jar");
+        assertThat(errors).isEmpty();
+        assertThat(policy.asked).isEmpty();
+        assertThat(registry.find("plain").orElseThrow().cmdlet().getClass().getModule().isNativeAccessEnabled())
+                .isFalse();
+    }
+
+    @Test
+    void theAttributeIsReadWhateverTheCase() throws Exception {
+        var policy = new RecordingPolicy(java.util.Optional.of(true));
+        interpreter.nativeAccess(policy);
+        hello(tmp.resolve("native.jar"), "org.test.nat", "nat", Map.of("Enable-Native-Access", "TRUE"));
+        run("mod-load native.jar");
+        assertThat(policy.asked).containsExactly("org.test.nat");
+    }
+
+    @Test
+    void theStartupLoadAsksToo() throws Exception {
+        Path modules = Files.createDirectories(tmp.resolve("modules"));
+        hello(modules.resolve("native.jar"), "org.test.nat", "nat", NATIVE);
+        assertThat(interpreter.loadModules(modules)).singleElement().asString()
+                .contains("modules.nativeAccess.org.test.nat=true");
+        interpreter.nativeAccess(new RecordingPolicy(java.util.Optional.of(true)));
+        Files.createDirectories(tmp.resolve("modules2"));
+        hello(tmp.resolve("modules2").resolve("native2.jar"), "org.test.nat2", "nat2", NATIVE);
+        assertThat(interpreter.loadModules(tmp.resolve("modules2"))).isEmpty();
+        assertThat(interpreter.commandKind("nat2")).isEqualTo(Interpreter.CommandKind.CMDLET);
+    }
+
+    @Test
+    void thePolicyIsMandatory() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> interpreter.nativeAccess(null))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    void settingNameIsPrefixedByTheModule() {
+        assertThat(NativeAccessPolicy.setting("io.powerj.fx")).isEqualTo("modules.nativeAccess.io.powerj.fx");
+    }
+
     /** Module {@code module} providing a cmdlet {@code name}: {@code name -n X -c 2}. */
     private void hello(Path jar, String module, String name) throws IOException {
+        hello(jar, module, name, Map.of());
+    }
+
+    private void hello(Path jar, String module, String name, Map<String, String> manifest) throws IOException {
         String pkg = module;
         Map<String, String> sources = Map.of(
                 "Greeting.java", "package " + pkg + "; public record Greeting(String name, String message) { }",
@@ -186,13 +294,19 @@ class ModuleLoaderTest {
         }
         entries.put("META-INF/services/" + CmdletProvider.class.getName(),
                 (pkg + ".Provider").getBytes(StandardCharsets.UTF_8));
-        jar(jar, module, entries);
+        jar(jar, module, entries, manifest);
     }
 
     private static void jar(Path jar, String module, Map<String, byte[]> entries) throws IOException {
+        jar(jar, module, entries, Map.of());
+    }
+
+    private static void jar(Path jar, String module, Map<String, byte[]> entries, Map<String, String> attributes)
+            throws IOException {
         var manifest = new Manifest();
         manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
         manifest.getMainAttributes().putValue("Automatic-Module-Name", module);
+        attributes.forEach(manifest.getMainAttributes()::putValue);
         try (OutputStream file = Files.newOutputStream(jar); var stream = new JarOutputStream(file, manifest)) {
             for (var entry : entries.entrySet()) {
                 stream.putNextEntry(new JarEntry(entry.getKey()));
