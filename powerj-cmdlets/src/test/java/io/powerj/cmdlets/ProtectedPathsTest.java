@@ -74,6 +74,7 @@ class ProtectedPathsTest {
 
     @Test
     void dotDotAfterALinkIsTheParentOfWhatTheLinkPointsTo() throws IOException {
+        org.junit.jupiter.api.Assumptions.assumeFalse(HostOs.WINDOWS, "Windows collapses the .. as text, before the file system");
         Path protectedFolder = Files.createDirectories(tmp.resolve("area/p"));
         Files.createDirectories(protectedFolder.resolve("sub"));
         Files.createDirectories(tmp.resolve("area/q"));

@@ -20,8 +20,9 @@ final class RealPaths {
      * (removing it, moving it) acts on the link and not on what it points to. The part that does not exist yet (a
      * destination) is kept as written. If the folders cannot be resolved the lexical path is returned.
      * <p>
-     * The order matters: {@code alias/..} is the parent of what {@code alias} points to, not the folder that holds
-     * {@code alias}, so the path is resolved before it is normalized, never after.
+     * The order matters: on Unix, {@code alias/..} is the parent of what {@code alias} points to, not the folder that
+     * holds {@code alias}, so the path is resolved before it is normalized, never after. (Windows collapses the
+     * {@code ..} as text before it asks the file system: there, the two are the same.)
      */
     static Path of(Path path) {
         Path absolute = path.toAbsolutePath();

@@ -36,8 +36,7 @@ public final class ProtectedPaths {
 
     ProtectedPaths(List<Path> paths, Path currentDirectory) {
         this.paths = paths.stream().flatMap(path -> keys(path).stream()).distinct().toList();
-        this.currentDirectories = List.of(RealPaths.compared(currentDirectory.toAbsolutePath().normalize()),
-                RealPaths.ofFolder(currentDirectory)).stream().distinct().toList();
+        this.currentDirectories = keys(currentDirectory);
     }
 
     /** Content of the file written at first launch: comments, then the defaults of the platform. */
@@ -137,12 +136,13 @@ public final class ProtectedPaths {
     }
 
     /**
-     * What a protected entry protects: the path as written, and the real path if the entry is a link or goes through
-     * one ({@code /etc} is a link to {@code /private/etc} on macOS).
+     * What a path stands for: itself, keyed as a target is (the links above it resolved, itself not followed), and what
+     * it points to if it is a link ({@code /etc} is a link to {@code /private/etc} on macOS). Keyed the same way as the
+     * targets, so that a path and its alias meet whatever the spelling of the folders (8.3 names on Windows).
      */
-    private static List<Path> keys(Path entry) {
-        Path lexical = RealPaths.compared(entry.toAbsolutePath().normalize());
-        Path real = RealPaths.ofFolder(entry);
-        return lexical.equals(real) ? List.of(lexical) : List.of(lexical, real);
+    private static List<Path> keys(Path path) {
+        Path itself = RealPaths.of(path);
+        Path pointedTo = RealPaths.ofFolder(path);
+        return itself.equals(pointedTo) ? List.of(itself) : List.of(itself, pointedTo);
     }
 }
