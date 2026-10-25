@@ -40,7 +40,8 @@ class ApiSurfaceTest {
             Files.writeString(SNAPSHOT, actual, StandardCharsets.UTF_8);
             return;
         }
-        String expected = Files.readString(SNAPSHOT, StandardCharsets.UTF_8);
+        // A Windows checkout may have turned the line feeds of the snapshot into carriage return + line feed.
+        String expected = Files.readString(SNAPSHOT, StandardCharsets.UTF_8).replace("\r\n", "\n");
         if (!expected.equals(actual)) {
             List<String> before = expected.lines().toList();
             List<String> after = actual.lines().toList();
