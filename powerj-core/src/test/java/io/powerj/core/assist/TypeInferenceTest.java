@@ -113,7 +113,7 @@ class TypeInferenceTest {
 
     /** Types known at the end of the line, as the analysis of the line finds the frame there. */
     private Scope scopeAt(String line) {
-        return types.scope(line, Completions.analyze(line, line.length()).frame());
+        return types.scope(line, LineContext.of(line, line.length()).frame());
     }
 
     @Test

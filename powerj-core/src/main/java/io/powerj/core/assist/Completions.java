@@ -1,39 +1,15 @@
 package io.powerj.core.assist;
 
-import java.io.IOException;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.lang.reflect.RecordComponent;
-import java.nio.file.DirectoryStream;
-import java.nio.file.Files;
-import java.nio.file.InvalidPathException;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
-import java.util.Optional;
-import java.util.Set;
-import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import io.powerj.core.command.CmdletRegistry;
-import io.powerj.core.command.OptionBinder;
-import io.powerj.core.error.PjException;
-import io.powerj.core.i18n.Messages;
 import io.powerj.core.java.JavaClasses;
 import io.powerj.core.java.JavaIndex;
-import io.powerj.core.java.JavaInvoker;
-import io.powerj.core.java.Members;
-import io.powerj.core.java.PreviewPolicy;
 import io.powerj.core.java.PropertyAccess;
 import io.powerj.core.lang.Lexer;
 import io.powerj.core.lang.Scanning;
 import io.powerj.core.nativeexec.NativeCommands;
-import io.powerj.core.nativeexec.Platform;
 import io.powerj.core.runtime.CommandCatalog;
 import io.powerj.core.runtime.Session;
 
@@ -68,8 +44,6 @@ public final class Completions {
         }
     }
 
-    private static final Set<String> KEYWORDS = Set.of("true", "false", "null", "now", "new");
-    private static final int MAX_FILES = 500;
     private static final Pattern ASSIGNMENT = Pattern.compile("\\$[\\p{L}_][\\p{L}\\p{N}_]*\\s*=(?!=)\\s*");
 
     private final CommandCatalog catalog;
@@ -77,7 +51,11 @@ public final class Completions {
     /** Preview mode (FR-66): only what can run in a preview is offered. */
     private volatile boolean previewMode;
     private final JavaIndex index;
-    private final NativeCommands natives;
+    private final PathCompleter paths;
+    private final NameCompleter names;
+    private final MemberCompleter members;
+    private final CommandCompleter commands;
+    private final ArgumentCompleter arguments;
 
     public Completions(CommandCatalog catalog) {
         this(catalog, new JavaIndex(), new NativeCommands());
@@ -87,7 +65,12 @@ public final class Completions {
         this.catalog = catalog;
         this.types = new TypeInference(catalog);
         this.index = index;
-        this.natives = natives;
+        var packages = new PackageCompleter(catalog, index);
+        this.paths = new PathCompleter(catalog);
+        this.names = new NameCompleter(catalog, types, packages);
+        this.members = new MemberCompleter(packages);
+        this.commands = new CommandCompleter(catalog, natives, packages);
+        this.arguments = new ArgumentCompleter(catalog, paths, packages);
     }
 
     /**
@@ -107,77 +90,6 @@ public final class Completions {
         return catalog.session();
     }
 
-    // --- Context analysis ---
-
-    /** Context at the cursor. */
-    record Context(Frame frame, boolean inString, int stringStart) { }
-
-    static Context analyze(String line, int cursor) {
-        Frame frame = new Frame(Frame.Kind.COMMAND, 0, null);
-        String typed = line.substring(0, cursor);
-        int i = 0;
-        while (i < cursor) {
-            char c = line.charAt(i);
-            switch (c) {
-                case '"' -> {
-                    int end = Scanning.stringEnd(typed, i);
-                    if (end < 0) {
-                        return new Context(frame, true, i);
-                    }
-                    i = end;
-                    continue;
-                }
-                case '{' -> frame = new Frame(Frame.Kind.BLOCK, i + 1, frame);
-                case '(', '[' -> {
-                    boolean command = frame.kind == Frame.Kind.COMMAND && c == '('
-                            && (i == 0 || !Character.isJavaIdentifierPart(line.charAt(i - 1)));
-                    frame = new Frame(command ? Frame.Kind.COMMAND : Frame.Kind.EXPRESSION, i + 1, frame);
-                }
-                case '}', ')', ']' -> {
-                    if (frame.parent != null) {
-                        frame = frame.parent;
-                    }
-                }
-                case '|' -> {
-                    if (frame.kind == Frame.Kind.COMMAND) {
-                        if (i + 1 < cursor && line.charAt(i + 1) == '|') {
-                            frame.stageStarts.clear(); // ||: new statement
-                            i++;
-                        }
-                        frame.stageStarts.add(i + 1);
-                    }
-                }
-                case ';' -> {
-                    if (frame.kind == Frame.Kind.COMMAND) {
-                        frame.stageStarts.clear();
-                        frame.stageStarts.add(i + 1);
-                    }
-                }
-                case '&' -> {
-                    if (frame.kind == Frame.Kind.COMMAND && i + 1 < cursor && line.charAt(i + 1) == '&') {
-                        frame.stageStarts.clear();
-                        frame.stageStarts.add(i + 2);
-                        i++;
-                    } else if (frame.kind == Frame.Kind.COMMAND && isBackground(line, i, cursor)) {
-                        frame.stageStarts.clear(); // &: background, new statement (FR-75)
-                        frame.stageStarts.add(i + 1);
-                    }
-                }
-                default -> { }
-            }
-            i++;
-        }
-        return new Context(frame, false, -1);
-    }
-
-    /** Lone {@code &} that ends a statement (FR-75): not inside a word such as {@code ?a=1&b=2}. */
-    private static boolean isBackground(String line, int at, int cursor) {
-        return at + 1 >= cursor || line.charAt(at + 1) == ';' || Lexer.isBlank(line.charAt(at + 1))
-                || at > 0 && Lexer.isBlank(line.charAt(at - 1));
-    }
-
-    // --- Entry point ---
-
     /** Suggestions for the word that ends at the cursor. */
     public Result complete(String line, int cursor) {
         try {
@@ -188,34 +100,34 @@ public final class Completions {
     }
 
     private Result doComplete(String line, int cursor) {
-        Context context = analyze(line, cursor);
+        LineContext context = LineContext.of(line, cursor);
         Frame frame = context.frame();
         if (context.inString()) {
-            if (frame.kind == Frame.Kind.COMMAND && !isHead(line, frame, context.stringStart())) {
-                return paths(line, context.stringStart(), cursor);
+            if (frame.kind == Frame.Kind.COMMAND && !LineText.isHead(line, frame, context.stringStart())) {
+                return paths.paths(line, context.stringStart(), cursor);
             }
             return Result.none(cursor);
         }
         int identStart = cursor;
-        while (identStart > 0 && isIdentifierChar(line.charAt(identStart - 1))) {
+        while (identStart > 0 && LineText.isIdentifierChar(line.charAt(identStart - 1))) {
             identStart--;
         }
         String fragment = line.substring(identStart, cursor);
         char before = identStart > 0 ? line.charAt(identStart - 1) : '\0';
 
         if (before == '$') {
-            return variables(identStart - 1, "$" + fragment, frame.kind != Frame.Kind.COMMAND);
+            return names.variables(identStart - 1, "$" + fragment, frame.kind != Frame.Kind.COMMAND);
         }
         if (before == ':' && identStart >= 2 && line.charAt(identStart - 2) == ':') {
-            String receiver = receiverText(line, identStart - 2);
-            return new Result(identStart, fragment, methodReferences(types.typeOf(receiver, types.scope(line, frame))));
+            String receiver = LineText.receiverText(line, identStart - 2);
+            return new Result(identStart, fragment, MemberCompleter.methodReferences(types.typeOf(receiver, types.scope(line, frame))));
         }
-        boolean head = frame.kind == Frame.Kind.COMMAND && isHead(line, frame, identStart);
+        boolean head = frame.kind == Frame.Kind.COMMAND && LineText.isHead(line, frame, identStart);
         if (before == '.') {
             boolean spread = identStart >= 2 && line.charAt(identStart - 2) == '*';
             int dot = spread ? identStart - 2 : identStart - 1;
-            String receiver = receiverText(line, dot);
-            boolean receiverAtHead = frame.kind == Frame.Kind.COMMAND && isHead(line, frame, dot - receiver.length());
+            String receiver = LineText.receiverText(line, dot);
+            boolean receiverAtHead = frame.kind == Frame.Kind.COMMAND && LineText.isHead(line, frame, dot - receiver.length());
             if (receiverAtHead) {
                 head = true;
             }
@@ -225,23 +137,19 @@ public final class Completions {
                 if (spread) {
                     type = TypeInference.elementOf(type);
                 }
-                List<Candidate> members = members(type);
-                if (!members.isEmpty() || frame.kind != Frame.Kind.COMMAND || head) {
-                    return new Result(identStart, fragment, members);
+                List<Candidate> found = members.members(type, previewMode);
+                if (!found.isEmpty() || frame.kind != Frame.Kind.COMMAND || head) {
+                    return new Result(identStart, fragment, found);
                 }
             }
         }
         if (frame.kind != Frame.Kind.COMMAND || isExpressionStage(line, frame, identStart)) {
-            return identifiers(line, frame, identStart, fragment);
+            return names.identifiers(line, frame, identStart, fragment);
         }
         if (head) {
-            return commands(line, frame, identStart, fragment);
+            return commands.commands(line, frame, identStart, fragment, previewMode);
         }
-        return arguments(line, frame, cursor);
-    }
-
-    private static boolean isIdentifierChar(char c) {
-        return Character.isLetterOrDigit(c) || c == '_';
+        return arguments.arguments(line, frame, cursor);
     }
 
     /** Is the current stage an expression ({@code new java.io.F}, {@code Math.max(…)}) rather than a command? */
@@ -255,441 +163,11 @@ public final class Completions {
         return start < at && Lexer.expressionAt(line, start, session().java()::isStaticReference);
     }
 
-    /** Is the word starting at {@code at} the first one of its stage (command name)? */
-    private static boolean isHead(String line, Frame frame, int at) {
-        String before = line.substring(frame.stageStart(), at).strip();
-        return before.isEmpty() || before.equals("^") || before.matches("\\$[\\p{L}_][\\p{L}\\p{N}_]*\\s*=");
-    }
-
     /** As a command argument, {@code x.} is an expression only for a variable, a call or a class. */
     private boolean isExpressionReceiver(String receiver) {
         return receiver.startsWith("$") || receiver.endsWith(")") || receiver.endsWith("]")
                 || session().java().find(receiver).isPresent();
     }
 
-    /** Text of the expression preceding the dot (or {@code ::}) at {@code dot}. */
-    private static String receiverText(String line, int dot) {
-        int i = dot;
-        while (i > 0) {
-            char c = line.charAt(i - 1);
-            if (Character.isJavaIdentifierPart(c) || c == '.' || c == '$') {
-                i--;
-            } else if (c == '*' && i < line.length() && line.charAt(i) == '.') {
-                i--;
-            } else if (c == ')' || c == ']') {
-                int open = matchingBackward(line, i - 1);
-                if (open < 0) {
-                    break;
-                }
-                i = open;
-            } else if (c == '"') {
-                int open = line.lastIndexOf('"', i - 2);
-                if (open < 0) {
-                    break;
-                }
-                i = open;
-            } else {
-                break;
-            }
-        }
-        return line.substring(i, dot);
-    }
 
-    private static int matchingBackward(String line, int close) {
-        int depth = 0;
-        for (int i = close; i >= 0; i--) {
-            char c = line.charAt(i);
-            if (c == ')' || c == ']' || c == '}') {
-                depth++;
-            } else if (c == '(' || c == '[' || c == '{') {
-                depth--;
-                if (depth == 0) {
-                    return i;
-                }
-            }
-        }
-        return -1;
-    }
-
-    // --- Commands, options, arguments ---
-
-    private Result commands(String line, Frame frame, int identStart, String fragment) {
-        String before = line.substring(frame.stageStart(), identStart).strip();
-        List<Candidate> candidates = new ArrayList<>();
-        boolean preview = previewMode;
-        if (!before.equals("^")) {
-            for (String builtin : preview ? List.<String>of() : new TreeSet<>(catalog.builtinNames())) {
-                candidates.add(new Candidate(builtin, builtin + " " + Messages.get("completion.tag.builtin"),
-                        Messages.get("completion.builtin"), true));
-            }
-            for (var cmdlet : catalog.cmdlets()) {
-                if (preview && !cmdlet.preview()) {
-                    continue;
-                }
-                candidates.add(new Candidate(cmdlet.name(), cmdlet.name() + " " + Messages.get("completion.tag.cmdlet"),
-                        cmdlet.summary(), true));
-            }
-            if (!fragment.isEmpty() && Character.isUpperCase(fragment.charAt(0))) {
-                importedClasses().forEach(c -> candidates.add(new Candidate(c, c, Messages.get("completion.javaClass"), false)));
-            }
-        }
-        for (String name : preview ? Set.<String>of() : natives.names(session().environment())) {
-            candidates.add(new Candidate(name, name + " " + Messages.get("completion.tag.native"),
-                    Messages.get("completion.program"), true));
-        }
-        return new Result(identStart, fragment, candidates);
-    }
-
-    private Result arguments(String line, Frame frame, int cursor) {
-        int wordStart = cursor;
-        while (wordStart > frame.stageStart() && !isArgumentBoundary(line.charAt(wordStart - 1))) {
-            wordStart--;
-        }
-        String word = line.substring(wordStart, cursor);
-        List<String> words = LineText.splitWords(line.substring(frame.stageStart(), wordStart));
-        String command = words.getFirst();
-        boolean forceNative = command.startsWith("^");
-        String name = forceNative ? command.substring(1) : command;
-        var cmdlet = forceNative ? Optional.<CmdletRegistry.Registered>empty() : catalog.cmdlet(name);
-
-        if (name.equals("import")) {
-            return imports(wordStart, word);
-        }
-        if (cmdlet.isPresent()) {
-            List<OptionBinder.OptionSpec> specs = OptionBinder.specs(cmdlet.get().parameters());
-            if (word.startsWith("-")) {
-                return new Result(wordStart, word, options(cmdlet.get(), specs, words));
-            }
-            Optional<OptionBinder.OptionSpec> expecting = valueOf(specs, words.getLast());
-            if (expecting.isPresent()) {
-                return optionValues(expecting.get(), line, wordStart, cursor);
-            }
-            // Textual positional parameter (often a path: ls docs); not for a block (where, map).
-            boolean pathPositional = specs.stream().anyMatch(s -> s.isPositional()
-                    && (s.component().getType() == Path.class || s.component().getType() == String.class
-                        || isPathList(s) || s.isList() && s.component().getGenericType().getTypeName().contains("String")));
-            return pathPositional ? paths(line, wordStart, cursor) : Result.none(cursor);
-        }
-        if (catalog.builtinNames().contains(name) && !name.equals("cd")) {
-            return Result.none(cursor);
-        }
-        return paths(line, wordStart, cursor); // cd and native commands: paths (FR-25)
-    }
-
-    private static boolean isArgumentBoundary(char c) {
-        return Character.isWhitespace(c) || Character.isSpaceChar(c) || c == '|' || c == ';' || c == '(' || c == '>';
-    }
-
-    private static boolean isPathList(OptionBinder.OptionSpec spec) {
-        return spec.isList() && spec.component().getGenericType().getTypeName().contains("Path");
-    }
-
-    /** Options of the cmdlet, excluding those already typed (FR-22). */
-    private static List<Candidate> options(CmdletRegistry.Registered cmdlet, List<OptionBinder.OptionSpec> specs,
-                                           List<String> words) {
-        List<Candidate> candidates = new ArrayList<>();
-        for (var spec : specs) {
-            if (spec.isPositional() && spec.shortName() == '\0' && !spec.isFlag()) {
-                continue; // purely positional
-            }
-            boolean used = words.stream().anyMatch(w -> w.equals("--" + spec.longName())
-                    || w.startsWith("--" + spec.longName() + "=")
-                    || (spec.shortName() != '\0' && w.matches("-[^-]*" + spec.shortName() + "[^-]*")));
-            if (!used || spec.isList()) {
-                String label = "--" + spec.longName() + (spec.shortName() != '\0' ? ", -" + spec.shortName() : "");
-                candidates.add(new Candidate("--" + spec.longName(), label,
-                        cmdlet.optionDescription(spec.longName(), spec.description()), true));
-            }
-        }
-        if (words.stream().noneMatch(w -> w.startsWith("--on-error"))) {
-            candidates.add(new Candidate("--on-error", "--on-error", Messages.get("completion.onError"), true));
-        }
-        candidates.add(new Candidate("--help", "--help", Messages.get("completion.help"), true));
-        return candidates;
-    }
-
-    /** Option expecting a value, designated by the last typed word ({@code --filter}, {@code -f}). */
-    private static Optional<OptionBinder.OptionSpec> valueOf(List<OptionBinder.OptionSpec> specs, String word) {
-        for (var spec : specs) {
-            if (spec.isFlag()) {
-                continue;
-            }
-            if (word.equals("--" + spec.longName())
-                    || (spec.shortName() != '\0' && word.matches("-[^-]*" + spec.shortName()))) {
-                return Optional.of(spec);
-            }
-        }
-        return Optional.empty();
-    }
-
-    /** Values of an option according to its type (FR-23): enum constants, paths. */
-    private Result optionValues(OptionBinder.OptionSpec spec, String line, int start, int cursor) {
-        Class<?> type = spec.component().getType();
-        if (type.isEnum()) {
-            List<Candidate> candidates = new ArrayList<>();
-            for (Object constant : type.getEnumConstants()) {
-                String value = ((Enum<?>) constant).name().toLowerCase(Locale.ROOT);
-                candidates.add(new Candidate(value, value, "", true));
-            }
-            return new Result(start, line.substring(start, cursor), candidates);
-        }
-        if (type == Path.class || isPathList(spec)) {
-            return paths(line, start, cursor);
-        }
-        return Result.none(cursor);
-    }
-
-    private Result imports(int start, String word) {
-        int dot = word.lastIndexOf('.');
-        if (dot < 0) {
-            List<Candidate> roots = new ArrayList<>();
-            new TreeSet<>(index.packages().stream().map(p -> p.split("\\.")[0]).toList())
-                    .forEach(r -> roots.add(new Candidate(r + ".", r, Messages.get("completion.package"), false)));
-            return new Result(start, word, roots);
-        }
-        String pkg = word.substring(0, dot);
-        List<Candidate> candidates = new ArrayList<>();
-        for (Candidate c : subpackages(pkg)) {
-            candidates.add(new Candidate(pkg + "." + c.value() + ".", c.display(), c.description(), c.complete()));
-        }
-        for (Candidate c : packageClasses(pkg)) {
-            candidates.add(new Candidate(pkg + "." + c.value(), c.display(), c.description(), c.complete()));
-        }
-        if (index.packages().contains(pkg)) {
-            candidates.add(new Candidate(pkg + ".*", "*", Messages.get("completion.allClasses"), true));
-        }
-        return new Result(start, word, candidates);
-    }
-
-    // --- Paths ---
-
-    /** File paths for the word starting at {@code start} (possibly quoted). */
-    private Result paths(String line, int start, int cursor) {
-        String raw = line.substring(start, cursor);
-        boolean quoted = raw.startsWith("\"");
-        String text = quoted ? unescape(raw.substring(1)) : raw;
-        int slash = Math.max(text.lastIndexOf('/'), text.lastIndexOf('\\'));
-        String dirPart = text.substring(0, slash + 1);
-        String prefix = text.substring(slash + 1);
-        Path base;
-        try {
-            base = dirPart.isEmpty() ? session().currentDirectory()
-                    : dirPart.startsWith("~") ? session().home().resolve(dirPart.substring(1).replaceFirst("^[/\\\\]", ""))
-                    : session().currentDirectory().resolve(dirPart);
-        } catch (InvalidPathException e) {
-            return Result.none(cursor);
-        }
-        if (!Files.isDirectory(base)) {
-            return Result.none(cursor);
-        }
-        char separator = dirPart.contains("/") ? '/' : dirPart.contains("\\") ? '\\'
-                : Platform.isWindows() ? '\\' : '/';
-        boolean ignoreCase = Platform.isWindows();
-        List<Candidate> candidates = new ArrayList<>();
-        try (DirectoryStream<Path> entries = Files.newDirectoryStream(base)) {
-            for (Path entry : entries) {
-                String name = entry.getFileName().toString();
-                boolean matches = ignoreCase ? name.toLowerCase(Locale.ROOT).startsWith(prefix.toLowerCase(Locale.ROOT))
-                        : name.startsWith(prefix);
-                if (!matches || (name.startsWith(".") && !prefix.startsWith("."))) {
-                    continue;
-                }
-                boolean dir = Files.isDirectory(entry);
-                String value = dirPart + name + (dir ? String.valueOf(separator) : "");
-                candidates.add(new Candidate(value, name + (dir ? separator : ""), dir ? Messages.get("completion.directory") : "", !dir));
-                if (candidates.size() >= MAX_FILES) {
-                    break;
-                }
-            }
-        } catch (IOException | SecurityException e) {
-            return Result.none(cursor);
-        }
-        candidates.sort(Comparator.comparing(Candidate::value));
-        return new Result(start, text, candidates);
-    }
-
-    private static String unescape(String text) {
-        var out = new StringBuilder();
-        for (int i = 0; i < text.length(); i++) {
-            char c = text.charAt(i);
-            if (c == '\\' && i + 1 < text.length()) {
-                out.append(text.charAt(++i));
-            } else {
-                out.append(c);
-            }
-        }
-        return out.toString();
-    }
-
-    // --- Variables and identifiers ---
-
-    private Result variables(int start, String word, boolean inBlock) {
-        List<Candidate> candidates = new ArrayList<>();
-        if (inBlock) {
-            candidates.add(new Candidate("$_", "$_", Messages.get("completion.current"), false));
-        }
-        for (String name : session().variableNames()) {
-            Object value;
-            try {
-                value = session().variable(name);
-            } catch (PjException e) {
-                continue;
-            }
-            candidates.add(new Candidate("$" + name, "$" + name,
-                    value == null ? "null" : value.getClass().getSimpleName(), false));
-        }
-        return new Result(start, word, candidates);
-    }
-
-    /** In an expression: lambda parameters, imported classes, keywords. */
-    private Result identifiers(String line, Frame frame, int start, String fragment) {
-        List<Candidate> candidates = new ArrayList<>();
-        Scope scope = types.scope(line, frame);
-        scope.parameters().keySet().forEach(p -> candidates.add(new Candidate(p, p, Messages.get("completion.parameter"), false)));
-        String before = line.substring(Math.max(0, start - 4), start);
-        if (before.endsWith("new ")) {
-            importedClasses().forEach(c -> candidates.add(new Candidate(c, c, Messages.get("completion.javaClass"), false)));
-            return new Result(start, fragment, candidates);
-        }
-        KEYWORDS.stream().sorted().forEach(k -> candidates.add(new Candidate(k, k, Messages.get("completion.keyword"), false)));
-        if (!fragment.isEmpty() && Character.isUpperCase(fragment.charAt(0))) {
-            importedClasses().forEach(c -> candidates.add(new Candidate(c, c, Messages.get("completion.javaClass"), false)));
-        }
-        return new Result(start, fragment, candidates);
-    }
-
-    /** Simple names of the imported classes (default imports and {@code import}). */
-    private List<String> importedClasses() {
-        TreeSet<String> names = new TreeSet<>();
-        for (String imported : session().java().imports()) {
-            if (imported.endsWith(".*")) {
-                names.addAll(index.classes(imported.substring(0, imported.length() - 2)));
-            } else {
-                names.add(imported.substring(imported.lastIndexOf('.') + 1));
-            }
-        }
-        return List.copyOf(names);
-    }
-
-    // --- Members ---
-
-    private List<Candidate> members(TypeInfo type) {
-        return switch (type) {
-            case TypeInfo.Instance(var t, var value) when value instanceof io.powerj.api.Row row -> {
-                List<Candidate> candidates = new ArrayList<>();
-                row.forEach((name, cell) -> candidates.add(new Candidate(name, name, Members.Kind.PROPERTY.toString(),
-                        false)));
-                candidates.addAll(instanceMembers(t));
-                yield candidates;
-            }
-            case TypeInfo.Instance(var t, _) -> instanceMembers(t);
-            case TypeInfo.ListOf _ -> instanceMembers(List.class);
-            case TypeInfo.Static(var t) -> staticMembers(t);
-            case TypeInfo.Package(var name) -> packageMembers(name);
-            case TypeInfo.Unknown _ -> List.of();
-        };
-    }
-
-    /** Properties (components, getters, fields) and instance methods, with their signature (FR-24b). */
-    private List<Candidate> instanceMembers(Class<?> type) {
-        boolean preview = previewMode;
-        List<Candidate> candidates = new ArrayList<>();
-        for (Members.Member m : Members.ofType(type)) {
-            if (m.kind() != Members.Kind.METHOD) {
-                candidates.add(new Candidate(m.name(), m.name() + " : " + m.type(), m.kind().toString(), false));
-            }
-        }
-        Set<String> components = new HashSet<>();
-        if (type.isRecord()) {
-            for (RecordComponent c : type.getRecordComponents()) {
-                components.add(c.getName());
-            }
-        }
-        JavaInvoker.instanceMethods(type).forEach((name, methods) -> {
-            if (name.equals("equals") || name.equals("hashCode")) {
-                return; // noise in the menu
-            }
-            for (Method method : methods) {
-                if (method.getParameterCount() == 0 && components.contains(name)) {
-                    continue; // record accessor: already offered as a property
-                }
-                if (preview && !PreviewPolicy.allows(method)) {
-                    continue;
-                }
-                candidates.add(methodCandidate(method));
-            }
-        });
-        return candidates;
-    }
-
-    private List<Candidate> staticMembers(Class<?> type) {
-        boolean preview = previewMode;
-        List<Candidate> candidates = new ArrayList<>();
-        for (Method method : type.getMethods()) {
-            if (Modifier.isStatic(method.getModifiers()) && method.getDeclaringClass() == type
-                    && (!preview || PreviewPolicy.allows(method))) {
-                candidates.add(methodCandidate(method));
-            }
-        }
-        for (Field field : type.getFields()) {
-            if (Modifier.isStatic(field.getModifiers())) {
-                candidates.add(new Candidate(field.getName(), field.getName() + " : " + field.getType().getSimpleName(),
-                        Messages.get("completion.staticField"), false));
-            }
-        }
-        for (Class<?> nested : type.getClasses()) {
-            if (JavaClasses.accessible(nested)) {
-                candidates.add(new Candidate(nested.getSimpleName(), nested.getSimpleName(),
-                        Messages.get("completion.class"), false));
-            }
-        }
-        return candidates;
-    }
-
-    private static Candidate methodCandidate(Method method) {
-        String value = method.getName() + (method.getParameterCount() == 0 ? "()" : "(");
-        return new Candidate(value, JavaInvoker.signature(method) + " : " + method.getReturnType().getSimpleName(),
-                Messages.get("completion.method"), false);
-    }
-
-    /** Subpackages and classes of a package ({@code java.util.} → {@code List}, {@code concurrent}…). */
-    private List<Candidate> packageMembers(String pkg) {
-        List<Candidate> candidates = new ArrayList<>(subpackages(pkg));
-        candidates.addAll(packageClasses(pkg));
-        return candidates;
-    }
-
-    private List<Candidate> subpackages(String pkg) {
-        TreeSet<String> subpackages = new TreeSet<>();
-        for (String p : index.packages()) {
-            if (p.startsWith(pkg + ".")) {
-                subpackages.add(p.substring(pkg.length() + 1).split("\\.")[0]);
-            }
-        }
-        String description = Messages.get("completion.package");
-        return subpackages.stream().map(s -> new Candidate(s, s, description, false)).toList();
-    }
-
-    private List<Candidate> packageClasses(String pkg) {
-        String description = Messages.get("completion.class");
-        return index.classes(pkg).stream().map(c -> new Candidate(c, c, description, false)).toList();
-    }
-
-    /** After {@code Class::} or {@code $x::}: method names (and {@code new} for a class). */
-    private static List<Candidate> methodReferences(TypeInfo type) {
-        TreeSet<String> names = new TreeSet<>();
-        switch (type) {
-            case TypeInfo.Static(var t) -> {
-                for (Method m : t.getMethods()) {
-                    names.add(m.getName());
-                }
-                if (!t.isInterface() && t.getConstructors().length > 0) {
-                    names.add("new");
-                }
-            }
-            case TypeInfo.Instance(var t, _) -> names.addAll(JavaInvoker.instanceMethods(t).keySet());
-            default -> { }
-        }
-        return names.stream().map(n -> new Candidate(n, n, Messages.get("completion.method"), false)).toList();
-    }
 }

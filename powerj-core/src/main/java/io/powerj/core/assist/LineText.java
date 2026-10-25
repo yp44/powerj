@@ -22,4 +22,58 @@ final class LineText {
         }
         return words;
     }
+
+    static boolean isIdentifierChar(char c) {
+        return Character.isLetterOrDigit(c) || c == '_';
+    }
+
+    /** Is the word starting at {@code at} the first one of its stage (command name)? */
+    static boolean isHead(String line, Frame frame, int at) {
+        String before = line.substring(frame.stageStart(), at).strip();
+        return before.isEmpty() || before.equals("^") || before.matches("\\$[\\p{L}_][\\p{L}\\p{N}_]*\\s*=");
+    }
+
+    /** Text of the expression preceding the dot (or {@code ::}) at {@code dot}. */
+    static String receiverText(String line, int dot) {
+        int i = dot;
+        while (i > 0) {
+            char c = line.charAt(i - 1);
+            if (Character.isJavaIdentifierPart(c) || c == '.' || c == '$') {
+                i--;
+            } else if (c == '*' && i < line.length() && line.charAt(i) == '.') {
+                i--;
+            } else if (c == ')' || c == ']') {
+                int open = matchingBackward(line, i - 1);
+                if (open < 0) {
+                    break;
+                }
+                i = open;
+            } else if (c == '"') {
+                int open = line.lastIndexOf('"', i - 2);
+                if (open < 0) {
+                    break;
+                }
+                i = open;
+            } else {
+                break;
+            }
+        }
+        return line.substring(i, dot);
+    }
+
+    static int matchingBackward(String line, int close) {
+        int depth = 0;
+        for (int i = close; i >= 0; i--) {
+            char c = line.charAt(i);
+            if (c == ')' || c == ']' || c == '}') {
+                depth++;
+            } else if (c == '(' || c == '[' || c == '{') {
+                depth--;
+                if (depth == 0) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
 }
