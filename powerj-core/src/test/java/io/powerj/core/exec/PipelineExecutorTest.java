@@ -11,6 +11,8 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,8 +33,82 @@ class PipelineExecutorTest {
     private final List<String> errors = Collections.synchronizedList(new ArrayList<>());
     private final Map<String, Builtin> builtins = new LinkedHashMap<>();
     private final List<Object> values = Collections.synchronizedList(new ArrayList<>());
+    private final RecordingObserver observer = new RecordingObserver();
     private ErrorReporter reporter;
     private PipelineExecutor executor;
+
+    /** Writes down what the executor tells it, and counts the values that reach the sink of the last stage. */
+    private static final class RecordingObserver implements ExecutionObserver, ExecutionObserver.PipelineObserver {
+        final List<String> events = Collections.synchronizedList(new ArrayList<>());
+        final List<String> labels = Collections.synchronizedList(new ArrayList<>());
+        final List<Integer> positions = Collections.synchronizedList(new ArrayList<>());
+        final List<Boolean> nativeStages = Collections.synchronizedList(new ArrayList<>());
+        final AtomicInteger sunk = new AtomicInteger();
+
+        @Override
+        public PipelineObserver pipelineEntered() {
+            events.add("entered");
+            return this;
+        }
+
+        @Override
+        public void displayed(long nanos) {
+            events.add("displayed");
+        }
+
+        @Override
+        public void resolved(long nanos) {
+            events.add("resolved");
+        }
+
+        @Override
+        public StageObserver stage(int position, String label, boolean nativeStage) {
+            positions.add(position);
+            labels.add(label);
+            nativeStages.add(nativeStage);
+            StageObserver plain = new StageObserver.Unobserved(position);
+            return new StageObserver() {
+                @Override
+                public String threadName() {
+                    return plain.threadName();
+                }
+
+                @Override
+                public Consumer<Object> sink(Consumer<Object> sink, boolean display) {
+                    return value -> {
+                        sunk.incrementAndGet();
+                        sink.accept(value);
+                    };
+                }
+
+                @Override
+                public boolean run(Body body) throws InterruptedException {
+                    return plain.run(body);
+                }
+
+                @Override
+                public void measured(long nanos) {
+                    plain.measured(nanos);
+                }
+
+                @Override
+                public void natives(List<NativeRun> runs) {
+                    plain.natives(runs);
+                }
+            };
+        }
+
+        @Override
+        public Pipe pipe(StageObserver writer, StageObserver reader) {
+            events.add("pipe");
+            return new Pipe();
+        }
+
+        @Override
+        public void exited() {
+            events.add("exited");
+        }
+    }
 
     @BeforeEach
     void setUp() {
@@ -48,7 +124,8 @@ class PipelineExecutorTest {
         var evaluator = new Evaluator(session, _ -> {
             throw new UnsupportedOperationException("no subexpression in these tests");
         }, () -> new Syntax(_ -> false, _ -> false));
-        executor = new PipelineExecutor(session, io, resolution, new NativeRunner(), evaluator, reporter, () -> null);
+        executor = new PipelineExecutor(session, io, resolution, new NativeRunner(), evaluator, reporter,
+                () -> observer);
     }
 
     private static Ast.Pipeline pipeline(String line) {
@@ -115,5 +192,37 @@ class PipelineExecutorTest {
     void onlyNativeCommandsRunInTheBackground() {
         assertThatThrownBy(() -> executor.background(pipeline("items"), Redirections.NONE))
                 .isInstanceOf(PjException.class).hasMessageStartingWith("& only applies to native commands");
+    }
+
+    @Test
+    void theObserverHearsOfEveryStageOfThePipeline() throws Exception {
+        run("items -n 3 | filter { $_.size > 15 } | count");
+
+        assertThat(observer.positions).containsExactly(1, 2, 3);
+        assertThat(observer.labels).containsExactly("items -n 3", "filter {…}", "count");
+        assertThat(observer.nativeStages).containsOnly(false);
+        assertThat(observer.events).containsExactly("entered", "resolved", "pipe", "pipe", "exited");
+    }
+
+    @Test
+    void theValuesOfTheLastStageGoThroughTheObserver() throws Exception {
+        run("items -n 3 | filter { $_.size > 15 }");
+
+        assertThat(observer.sunk).hasValue(2);
+        assertThat(values).hasSize(2);
+    }
+
+    @Test
+    void theObserverIsToldTheEndOfAPipelineThatCouldNotBePlanned() {
+        assertThatThrownBy(() -> run("items | nothing-of-that-name")).isInstanceOf(PjException.class);
+
+        assertThat(observer.events).containsExactly("entered", "exited");
+    }
+
+    @Test
+    void theObserverIsToldTheEndOfAPipelineThatFailed() {
+        assertThatThrownBy(() -> run("boom")).isInstanceOf(PjException.class);
+
+        assertThat(observer.events).endsWith("exited");
     }
 }

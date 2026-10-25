@@ -14,6 +14,8 @@ import java.util.logging.Logger;
 
 import io.powerj.api.Collected;
 import io.powerj.api.ScriptBlock;
+import io.powerj.core.exec.ExecutionObserver.PipelineObserver;
+import io.powerj.core.exec.ExecutionObserver.StageObserver;
 import io.powerj.core.lang.Ast;
 
 /**
@@ -32,24 +34,24 @@ final class PipelineExecutor {
     private final NativeRunner nativeRunner;
     private final Evaluator evaluator;
     private final ErrorReporter reporter;
-    /** Measure of the line being executed, or {@code null}. */
-    private final Supplier<PerfRecorder> recorder;
+    /** Who measures the line being executed; {@link ExecutionObserver#NONE} when nobody does. */
+    private final Supplier<ExecutionObserver> observer;
     /** Standard input lines in non-interactive mode, read by the first stage; otherwise {@code null}. */
     private Source standardInput;
     private boolean inheritStandardInput;
 
     /**
-     * @param recorder gives the measure of the line being executed, or {@code null} if it is not measured
+     * @param observer gives who measures the line being executed
      */
     PipelineExecutor(Session session, ShellIo io, CommandResolution resolution, NativeRunner nativeRunner,
-                     Evaluator evaluator, ErrorReporter reporter, Supplier<PerfRecorder> recorder) {
+                     Evaluator evaluator, ErrorReporter reporter, Supplier<ExecutionObserver> observer) {
         this.session = session;
         this.io = io;
         this.resolution = resolution;
         this.nativeRunner = nativeRunner;
         this.evaluator = evaluator;
         this.reporter = reporter;
-        this.recorder = recorder;
+        this.observer = observer;
     }
 
     /**
@@ -100,19 +102,14 @@ final class PipelineExecutor {
     boolean execute(Ast.Pipeline pipeline, Consumer<Object> sink, boolean capture, Redirections redirections)
             throws InterruptedException {
         // Perf mode (FR-76): only the outermost pipeline of the line is measured; the others count as "resolve".
-        PerfRecorder current = recorder.get();
-        PerfRecorder perf = current != null && !PreviewGuard.active() && current.enterPipeline() ? current : null;
+        PipelineObserver observed = observer.get().pipelineEntered();
         try {
             long resolveStart = System.nanoTime();
             List<Segment> segments = segments(pipeline.stages());
-            if (perf != null) {
-                perf.addResolve(System.nanoTime() - resolveStart);
-            }
-            return run(segments, sink, capture, redirections, perf);
+            observed.resolved(System.nanoTime() - resolveStart);
+            return run(segments, sink, capture, redirections, observed);
         } finally {
-            if (perf != null) {
-                perf.exitPipeline();
-            }
+            observed.exited();
         }
     }
 
@@ -142,33 +139,28 @@ final class PipelineExecutor {
     }
 
     private boolean run(List<Segment> segments, Consumer<Object> sink, boolean capture, Redirections redirections,
-                        PerfRecorder perf) throws InterruptedException {
+                        PipelineObserver observed) throws InterruptedException {
         Consumer<String> errorSink = synchronizedErrors(reporter.sink(redirections.err()));
         int n = segments.size();
-        List<StageProbe> probes = new ArrayList<>(n);
-        for (Segment segment : segments) {
-            probes.add(perf == null ? null : perf.newStage(label(segment), segment instanceof NativeSegment));
+        List<StageObserver> stages = new ArrayList<>(n);
+        for (int i = 0; i < n; i++) {
+            Segment segment = segments.get(i);
+            stages.add(observed.stage(i + 1, label(segment), segment instanceof NativeSegment));
         }
-        if (perf != null) {
-            // The last stage hands its objects to the display, or to the variable that captures them.
-            sink = probes.getLast().sink(sink, !capture);
-        }
+        // The last stage hands its objects to the display, or to the variable that captures them.
+        sink = stages.getLast().sink(sink, !capture);
         if (n == 1 && segments.getFirst() instanceof NativeSegment(var commands) && commands.size() == 1) {
             NativeRunner.Command command = commands.getFirst();
-            StageProbe probe = probes.getFirst();
+            StageObserver stage = stages.getFirst();
             long start = System.nanoTime();
             NativeRunner.Result result;
             try {
                 result = nativeRunner.run(command, new ExecutionContext(session, io, sink, capture, redirections,
                         errorSink, inheritsInput()));
             } finally {
-                if (probe != null) {
-                    probe.measured(System.nanoTime() - start);
-                }
+                stage.measured(System.nanoTime() - start);
             }
-            if (probe != null) {
-                probe.natives(List.of(result.run()));
-            }
+            stage.natives(List.of(result.run()));
             session.recordNative(result.run());
             result.capturedLines().forEach(sink);
             return result.run().succeeded();
@@ -177,17 +169,13 @@ final class PipelineExecutor {
         var last = new ExecutionContext(session, io, sink, capture, redirections.withSharedErrors(), errorSink,
                 inheritsInput());
         if (n == 1) {
-            return segment(segments.getFirst(), standardInput, null, last, probes.getFirst());
+            return segment(segments.getFirst(), standardInput, null, last, stages.getFirst());
         }
         var intermediate = last.forIntermediateStage();
 
         List<Pipe> pipes = new ArrayList<>(n - 1);
         for (int i = 0; i < n - 1; i++) {
-            pipes.add(new Pipe(perf != null));
-            if (perf != null) {
-                probes.get(i).output(pipes.get(i));
-                probes.get(i + 1).input(pipes.get(i));
-            }
+            pipes.add(observed.pipe(stages.get(i), stages.get(i + 1)));
         }
         var blockingErrors = new AtomicBoolean();
         List<Thread> threads = new ArrayList<>(n - 1);
@@ -195,12 +183,11 @@ final class PipelineExecutor {
             Segment segment = segments.get(i);
             Source input = i == 0 ? standardInput : pipes.get(i - 1);
             Pipe output = pipes.get(i);
-            StageProbe probe = probes.get(i);
-            String threadName = StageProbe.threadName(probe == null ? i + 1 : probe.index());
-            threads.add(Thread.ofVirtual().name(threadName).unstarted(PreviewGuard.propagate(() -> {
+            StageObserver stage = stages.get(i);
+            threads.add(Thread.ofVirtual().name(stage.threadName()).unstarted(PreviewGuard.propagate(() -> {
                 output.onAbort(Thread.currentThread()::interrupt);
                 try {
-                    segment(segment, input, output, intermediate, probe);
+                    segment(segment, input, output, intermediate, stage);
                     output.close();
                 } catch (InterruptedException | CancellationException e) {
                     closeQuietly(output);
@@ -225,7 +212,7 @@ final class PipelineExecutor {
         Pipe lastInput = pipes.getLast();
         boolean succeeded;
         try {
-            succeeded = segment(segments.getLast(), lastInput, null, last, probes.getLast());
+            succeeded = segment(segments.getLast(), lastInput, null, last, stages.getLast());
         } finally {
             lastInput.abort();
             joinAll(threads);
@@ -237,17 +224,14 @@ final class PipelineExecutor {
     }
 
     /** Runs a segment; {@code output} is the queue to the next stage, or {@code null} at the end of the pipeline. */
-    private boolean segment(Segment segment, Source input, Pipe output, ExecutionContext context, StageProbe probe)
+    private boolean segment(Segment segment, Source input, Pipe output, ExecutionContext context, StageObserver stage)
             throws InterruptedException {
-        if (probe != null) {
-            return probe.run(() -> runSegment(segment, input, output, context, probe));
-        }
-        return runSegment(segment, input, output, context, null);
+        return stage.run(() -> runSegment(segment, input, output, context, stage));
     }
 
-    /** @param measuring probe that receives the native processes of the stage, or {@code null} */
+    /** @param measuring receives the native processes of the stage */
     private boolean runSegment(Segment segment, Source input, Pipe output, ExecutionContext context,
-                               StageProbe measuring) throws InterruptedException {
+                               StageObserver measuring) throws InterruptedException {
         return switch (segment) {
             case ObjectSegment(var stage, _) -> {
                 try {
@@ -260,9 +244,7 @@ final class PipelineExecutor {
             }
             case NativeSegment(var commands) -> {
                 List<NativeRun> runs = nativeRunner.runGroup(commands, context, input, output);
-                if (measuring != null) {
-                    measuring.natives(runs);
-                }
+                measuring.natives(runs);
                 if (output != null && output.aborted()) {
                     // FR-68b: stopped by the next stage (first, range…): not a failure, $exit is left as it is.
                     yield true;

@@ -51,8 +51,8 @@ public final class Interpreter {
 
     /** Perf mode (FR-76): each line executed is measured, and a summary is printed after it. */
     private volatile boolean perfMode;
-    /** Measure of the line being executed, or {@code null}. */
-    private volatile PerfRecorder recorder;
+    /** Who measures the line being executed. */
+    private volatile ExecutionObserver observer = ExecutionObserver.NONE;
     /** The profiler records each measured line (FR-76, part B); only a test or a runtime without it turns it off. */
     private volatile boolean perfProfiler = true;
     /** Folder of the profiler's recordings, created at the first one. */
@@ -85,7 +85,7 @@ public final class Interpreter {
         builtins.putIfAbsent("exit", Builtins::exit);
         this.resolution = new CommandResolution(builtins, registry, resolver);
         this.executor = new PipelineExecutor(session, io, resolution, nativeRunner, evaluator, reporter,
-                () -> recorder);
+                () -> observer);
         this.modules = new ModuleLoader(registry, Collections.unmodifiableSet(builtins.keySet()));
     }
 
@@ -198,7 +198,7 @@ public final class Interpreter {
             // Starting the profiler is not part of the line.
             perf = new PerfRecorder(line, begin + (System.nanoTime() - started), parsed);
         }
-        recorder = perf;
+        observer = perf == null ? ExecutionObserver.NONE : perf;
         boolean cancelled = false;
         try {
             boolean succeeded = true;
@@ -220,7 +220,7 @@ public final class Interpreter {
             cancelled = true;
             throw e;
         } finally {
-            recorder = null;
+            observer = ExecutionObserver.NONE;
             if (perf != null) {
                 printPerf(perf, capture, cancelled);
             }
@@ -386,7 +386,7 @@ public final class Interpreter {
                 session.setVariable(statement.assignTo().get(), Evaluator.single(values));
                 return succeeded;
             }
-            try (var output = new StatementOutput(io, outTarget, recorder)) {
+            try (var output = new StatementOutput(io, outTarget, observer)) {
                 return executor.execute(statement.pipeline(), output::accept, false, redirections);
             }
         } catch (PjException e) {

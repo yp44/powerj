@@ -34,7 +34,7 @@ class StatementOutputTest {
 
     @Test
     void valuesGoToTheTerminalByDefault() {
-        try (var output = new StatementOutput(io, Optional.empty(), null)) {
+        try (var output = new StatementOutput(io, Optional.empty(), ExecutionObserver.NONE)) {
             output.accept("hello");
         }
 
@@ -45,7 +45,7 @@ class StatementOutputTest {
     void valuesGoToTheFileOfARedirection() throws IOException {
         Path file = tmp.resolve("out.txt");
 
-        try (var output = new StatementOutput(io, to(file, false), null)) {
+        try (var output = new StatementOutput(io, to(file, false), ExecutionObserver.NONE)) {
             output.accept("hello");
         }
 
@@ -57,7 +57,7 @@ class StatementOutputTest {
     void theFileIsOnlyOpenedAtTheFirstValue() {
         Path file = tmp.resolve("out.txt");
 
-        try (var output = new StatementOutput(io, to(file, false), null)) {
+        try (var output = new StatementOutput(io, to(file, false), ExecutionObserver.NONE)) {
             assertThat(file).doesNotExist(); // a redirected native command writes it itself
         }
 
@@ -69,7 +69,7 @@ class StatementOutputTest {
         Path file = tmp.resolve("out.txt");
         Files.writeString(file, "before" + System.lineSeparator());
 
-        try (var output = new StatementOutput(io, to(file, true), null)) {
+        try (var output = new StatementOutput(io, to(file, true), ExecutionObserver.NONE)) {
             output.accept("after");
         }
 
@@ -81,7 +81,7 @@ class StatementOutputTest {
         Path file = tmp.resolve("out.txt");
         Files.writeString(file, "before");
 
-        try (var output = new StatementOutput(io, to(file, false), null)) {
+        try (var output = new StatementOutput(io, to(file, false), ExecutionObserver.NONE)) {
             output.accept("after");
         }
 
@@ -93,7 +93,7 @@ class StatementOutputTest {
         Path file = tmp.resolve("out.txt");
         String wide = "x".repeat(300);
 
-        try (var output = new StatementOutput(io, to(file, false), null)) {
+        try (var output = new StatementOutput(io, to(file, false), ExecutionObserver.NONE)) {
             output.accept(new FakeCmdlets.Item(wide, 1));
         }
 
@@ -104,7 +104,7 @@ class StatementOutputTest {
     void aTableOnTheTerminalIsTruncatedToItsWidth() {
         String wide = "x".repeat(300);
 
-        try (var output = new StatementOutput(io, Optional.empty(), null)) {
+        try (var output = new StatementOutput(io, Optional.empty(), ExecutionObserver.NONE)) {
             output.accept(new FakeCmdlets.Item(wide, 1));
         }
 
@@ -115,7 +115,7 @@ class StatementOutputTest {
     void anUnwritableFileIsReported() throws IOException {
         Path folder = Files.createDirectory(tmp.resolve("folder"));
 
-        try (var output = new StatementOutput(io, to(folder, false), null)) {
+        try (var output = new StatementOutput(io, to(folder, false), ExecutionObserver.NONE)) {
             assertThatThrownBy(() -> output.accept("hello")).isInstanceOf(PjException.class)
                     .hasMessageContaining("cannot write to");
         }

@@ -18,15 +18,15 @@ final class StatementOutput implements AutoCloseable {
 
     private final ShellIo io;
     private final Optional<NativeRunner.FileTarget> target;
-    /** Measure of the line, which is told how long closing (the last of the display) took; or {@code null}. */
-    private final PerfRecorder perf;
+    /** Told how long closing (the last of the display) took. */
+    private final ExecutionObserver observer;
     private OutputFormatter formatter;
     private PrintWriter file;
 
-    StatementOutput(ShellIo io, Optional<NativeRunner.FileTarget> target, PerfRecorder perf) {
+    StatementOutput(ShellIo io, Optional<NativeRunner.FileTarget> target, ExecutionObserver observer) {
         this.io = io;
         this.target = target;
-        this.perf = perf;
+        this.observer = observer;
     }
 
     void accept(Object value) {
@@ -55,7 +55,7 @@ final class StatementOutput implements AutoCloseable {
 
     @Override
     public void close() {
-        long start = perf == null ? 0 : System.nanoTime();
+        long start = System.nanoTime();
         try {
             if (formatter != null) {
                 formatter.close();
@@ -67,9 +67,7 @@ final class StatementOutput implements AutoCloseable {
                 }
             }
         } finally {
-            if (perf != null) {
-                perf.addDisplay(System.nanoTime() - start);
-            }
+            observer.displayed(System.nanoTime() - start);
         }
     }
 }

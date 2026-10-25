@@ -17,13 +17,7 @@ import io.powerj.api.StageStat;
  * for its neighbours is read from the {@link Pipe}s that link it to them, which count it only when a call has to block,
  * so no time is read per object. What is left is the {@code active} time.
  */
-final class StageProbe {
-
-    /** Body of a stage. */
-    @FunctionalInterface
-    interface Body {
-        boolean run() throws InterruptedException;
-    }
+final class StageProbe implements ExecutionObserver.StageObserver {
 
     /** Calls of a block, in nanoseconds. */
     private static final class BlockCalls {
@@ -36,8 +30,8 @@ final class StageProbe {
     private final int index;
     private final String label;
     private final boolean nativeStage;
-    private Pipe input;
-    private Pipe output;
+    private MeasuredPipe input;
+    private MeasuredPipe output;
     private volatile long startNanos;
     private volatile long endNanos;
     /** When the stage ran, to find the profiler's samples of the calling thread (which also runs the shell). */
@@ -57,6 +51,11 @@ final class StageProbe {
 
     int index() {
         return index;
+    }
+
+    @Override
+    public String threadName() {
+        return threadName(index);
     }
 
     /** Start of the name of a stage thread; {@link JfrCapture} reads the stage number back from the name. */
@@ -80,16 +79,19 @@ final class StageProbe {
         return endTime;
     }
 
-    void input(Pipe pipe) {
+    @Override
+    public void readsFrom(MeasuredPipe pipe) {
         this.input = pipe;
     }
 
-    void output(Pipe pipe) {
+    @Override
+    public void writesTo(MeasuredPipe pipe) {
         this.output = pipe;
     }
 
     /** Runs the stage with this probe bound to the thread, so that the blocks it evaluates are attributed to it. */
-    boolean run(Body body) throws InterruptedException {
+    @Override
+    public boolean run(Body body) throws InterruptedException {
         onCallingThread = !Thread.currentThread().isVirtual();
         startTime = Instant.now();
         startNanos = System.nanoTime();
@@ -101,14 +103,15 @@ final class StageProbe {
         }
     }
 
-    /** The stage was timed from outside (a single native command): it lasted {@code nanos}. */
-    void measured(long nanos) {
+    @Override
+    public void measured(long nanos) {
         endNanos = System.nanoTime();
         startNanos = endNanos - nanos;
     }
 
     /** Wraps the sink of the last stage: counts the objects and, if {@code display}, the time spent displaying them. */
-    Consumer<Object> sink(Consumer<Object> sink, boolean display) {
+    @Override
+    public Consumer<Object> sink(Consumer<Object> sink, boolean display) {
         return value -> {
             if (display) {
                 long start = System.nanoTime();
@@ -124,8 +127,8 @@ final class StageProbe {
         };
     }
 
-    /** Native processes of this stage. */
-    synchronized void natives(List<NativeRun> runs) {
+    @Override
+    public synchronized void natives(List<NativeRun> runs) {
         natives.addAll(runs);
     }
 

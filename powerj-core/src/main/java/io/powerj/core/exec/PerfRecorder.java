@@ -24,7 +24,7 @@ import io.powerj.api.StageStat;
  * Only the outermost pipeline of the line is measured, the pipelines of arguments and sub-expressions count in
  * {@code resolve}.
  */
-final class PerfRecorder {
+final class PerfRecorder implements ExecutionObserver, ExecutionObserver.PipelineObserver {
 
     /** Probe of the stage the current thread runs, seen by the blocks it evaluates. */
     static final ScopedValue<StageProbe> STAGE = ScopedValue.newInstance();
@@ -81,27 +81,43 @@ final class PerfRecorder {
                 .forEach(pool -> pool.resetPeakUsage());
     }
 
-    /** {@code true} for the outermost pipeline only: it is the one to measure; it must then be {@link #exitPipeline}d. */
-    boolean enterPipeline() {
-        return pipelineOpen.compareAndSet(false, true);
+    /**
+     * The outermost pipeline is the one to measure, and only while the user is not typing: a preview runs the same
+     * code, and must not be counted in the line. It must then be {@linkplain #exited() exited}.
+     */
+    @Override
+    public PipelineObserver pipelineEntered() {
+        return !PreviewGuard.active() && pipelineOpen.compareAndSet(false, true) ? this : PipelineObserver.NONE;
     }
 
-    void exitPipeline() {
+    @Override
+    public void exited() {
         pipelineOpen.set(false);
     }
 
-    void addResolve(long nanos) {
+    @Override
+    public void resolved(long nanos) {
         resolveNanos += nanos;
     }
 
-    void addDisplay(long nanos) {
+    @Override
+    public void displayed(long nanos) {
         closeNanos += nanos;
     }
 
-    synchronized StageProbe newStage(String label, boolean nativeStage) {
+    @Override
+    public synchronized StageProbe stage(int position, String label, boolean nativeStage) {
         var probe = new StageProbe(stages.size() + 1, label, nativeStage);
         stages.add(probe);
         return probe;
+    }
+
+    @Override
+    public Pipe pipe(StageObserver writer, StageObserver reader) {
+        var pipe = new MeasuredPipe();
+        writer.writesTo(pipe);
+        reader.readsFrom(pipe);
+        return pipe;
     }
 
     /**
