@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -60,6 +61,18 @@ class ShellConfigTest {
     @Test
     void invalidHistorySizeFallsBackToDefault() throws Exception {
         var file = Files.writeString(tmp.resolve("config.properties"), "history.size=-3\n");
+
+        assertThat(ShellConfig.load(file)).isEqualTo(ShellConfig.defaults());
+    }
+
+    /**
+     * Review C-11: {@code Properties.load} throws IllegalArgumentException on a malformed {@code \\uXXXX}, which a Windows path
+     * written without doubling its backslashes is. The class promises that invalid values take their default.
+     */
+    @Disabled("C-11, fixed in Phase 1.2: ShellConfig.load, ConfigFile and NativeAccessConsent must survive a malformed file")
+    @Test
+    void aWindowsPathWithSingleBackslashesDoesNotPreventStartup() throws Exception {
+        var file = Files.writeString(tmp.resolve("config.properties"), "history.size=500\nsomething=C:\\users\\yves\n");
 
         assertThat(ShellConfig.load(file)).isEqualTo(ShellConfig.defaults());
     }
