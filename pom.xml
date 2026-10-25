@@ -40,6 +40,10 @@
         <jline.version>4.4.7</jline.version>
         <jacoco.version>0.8.15</jacoco.version>
         <archunit.version>1.5.1</archunit.version>
+
+        <!-- Per-module coverage floor, overridden by each module (see the jacoco plugin below). -->
+        <coverage.module.line>0.00</coverage.module.line>
+        <coverage.module.branch>0.00</coverage.module.branch>
         <javafx.version>25.0.5</javafx.version>
     </properties>
 
@@ -242,6 +246,43 @@
                         <goals>
                             <goal>prepare-agent</goal>
                         </goals>
+                    </execution>
+                    <!-- Per-module ratchet (review C-30): the tests of a module alone must keep covering what they cover
+                         today, whatever the other modules' tests add to the aggregate of powerj-coverage. Each module
+                         sets coverage.module.line / coverage.module.branch to its measured value (floor, two decimals);
+                         raise them when coverage goes up, never lower them. A module without tests is skipped. -->
+                    <execution>
+                        <id>module-report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>module-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>${coverage.module.line}</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>BRANCH</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>${coverage.module.branch}</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

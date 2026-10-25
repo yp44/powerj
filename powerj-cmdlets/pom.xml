@@ -13,6 +13,12 @@
     <artifactId>powerj-cmdlets</artifactId>
     <name>PowerJ Cmdlets</name>
 
+    <properties>
+        <!-- Coverage floor of the tests of this module alone (parent pom, jacoco module-check). -->
+        <coverage.module.line>0.93</coverage.module.line>
+        <coverage.module.branch>0.91</coverage.module.branch>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>io.powerj</groupId>

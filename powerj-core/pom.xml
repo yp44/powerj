@@ -13,6 +13,12 @@
     <artifactId>powerj-core</artifactId>
     <name>PowerJ Core</name>
 
+    <properties>
+        <!-- Coverage floor of the tests of this module alone (parent pom, jacoco module-check). -->
+        <coverage.module.line>0.84</coverage.module.line>
+        <coverage.module.branch>0.76</coverage.module.branch>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>io.powerj</groupId>
