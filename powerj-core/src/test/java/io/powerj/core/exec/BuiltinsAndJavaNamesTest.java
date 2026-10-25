@@ -26,6 +26,10 @@ class BuiltinsAndJavaNamesTest {
         return new Session(tmp, tmp, Map.of("PATH", ""));
     }
 
+    private CallPolicy policy() {
+        return new CallPolicy(session());
+    }
+
     private List<Object> help(Object... args) {
         return Help.run(Arrays.asList(args), CmdletRegistry.of(FakeCmdlets.all()), session().java());
     }
@@ -68,17 +72,17 @@ class BuiltinsAndJavaNamesTest {
 
     @Test
     void methodReferencesDescribeThemselves() {
-        var bound = new MethodReference.Bound("abc", "length");
+        var bound = new MethodReference.Bound("abc", "length", policy());
         assertThat(bound.source()).isEqualTo("String::length");
         assertThat(bound.apply(new Object[0])).isEqualTo(3);
-        var byName = new MethodReference.ByTypeName("CharSequence", "length");
+        var byName = new MethodReference.ByTypeName("CharSequence", "length", policy());
         assertThat(byName.toString()).isEqualTo("CharSequence::length");
         assertThat(byName.invoke("abcd")).isEqualTo(4); // String implements CharSequence
         assertThatThrownBy(() -> byName.apply(new Object[0]))
                 .hasMessage("CharSequence::length: CharSequence expected, got no arguments");
         assertThatThrownBy(() -> byName.invoke(42))
                 .hasMessage("CharSequence::length: CharSequence expected, got Integer");
-        assertThatThrownBy(() -> new MethodReference.OfClass(String.class, "length").apply(new Object[0]))
+        assertThatThrownBy(() -> new MethodReference.OfClass(String.class, "length", policy()).apply(new Object[0]))
                 .hasMessage("String::length: does not apply without arguments");
     }
 

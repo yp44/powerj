@@ -67,7 +67,7 @@ class EvaluatorTest {
     @Test
     void systemAndRuntimeExitEndTheShell() throws Exception {
         assertThat(error("System.setOut(null)")).isEqualTo("System.setOut is refused: it would break the shell display");
-        assertThat(error("System.exit(\"x\")")).isEqualTo("exit: an integer code is expected, e.g. System.exit(0)");
+        assertThat(error("System.exit(\"x\")")).startsWith("no overload of exit matches the arguments (String)");
         interpreter.execute("Runtime.getRuntime().halt(4)");
         assertThat(session.exitRequest()).hasValue(4);
     }

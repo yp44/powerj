@@ -1267,6 +1267,8 @@ The REPL loop boils down to `switch (supervisor.run(line))` over these four case
 | `System.exit(n)`, `Runtime.getRuntime().exit(n)`, `Runtime.getRuntime().halt(n)` | Equivalent to the `exit n` command (clean shutdown, history saved). |
 | `System.setOut(…)`, `System.setErr(…)`, `System.setIn(…)` | Refused, with an explanatory message (would break the terminal display). |
 
+The interception sits at the one place every Java call goes through, so it applies whichever way the call is written: a direct call, a method reference (`System::exit`, also when a stream calls it), a lambda, or `Method.invoke` on the method. It guards against accidents, not against hostile code: a `MethodHandle`, native code or a third-party module is not seen.
+
 Java code that writes to `System.out` / `System.err` (`System.out.println("x")`) is displayed normally, without corrupting the line being typed: at startup, these streams are connected to the JLine terminal.
 
 **FR-59 — Terminal and history always restored.** History is written after each command (FR-09), so an abrupt stop loses nothing. On exit, including on a fatal JVM error or when the window is closed, a shutdown hook restores the terminal to its initial state (raw mode disabled, colors reset).

@@ -34,10 +34,10 @@ sealed interface MethodReference extends ScriptBlock {
     }
 
     /** {@code $object::method}. */
-    record Bound(Object target, String method) implements MethodReference {
+    record Bound(Object target, String method, CallPolicy policy) implements MethodReference {
         @Override
         public Object apply(Object[] args) {
-            return JavaInvoker.invokeVirtual(target, method, Arrays.asList(args));
+            return JavaInvoker.invokeVirtual(policy, target, method, Arrays.asList(args));
         }
 
         @Override
@@ -47,7 +47,7 @@ sealed interface MethodReference extends ScriptBlock {
     }
 
     /** {@code Class::method} or {@code Class::new}, the class being known. */
-    record OfClass(Class<?> type, String method) implements MethodReference {
+    record OfClass(Class<?> type, String method, CallPolicy policy) implements MethodReference {
         @Override
         public Object apply(Object[] args) {
             List<Object> all = Arrays.asList(args);
@@ -55,10 +55,10 @@ sealed interface MethodReference extends ScriptBlock {
                 return JavaInvoker.construct(type, all);
             }
             if (hasStatic(args.length)) {
-                return JavaInvoker.invokeStatic(type, method, all);
+                return JavaInvoker.invokeStatic(policy, type, method, all);
             }
             if (args.length > 0 && type.isInstance(args[0])) {
-                return JavaInvoker.invokeVirtual(args[0], method, all.subList(1, all.size()));
+                return JavaInvoker.invokeVirtual(policy, args[0], method, all.subList(1, all.size()));
             }
             throw new PjException(args.length == 0 ? Messages.get("methodref.notApplicable.none", this)
                     : Messages.get("methodref.notApplicable", this, describe(args)));
@@ -81,7 +81,7 @@ sealed interface MethodReference extends ScriptBlock {
     }
 
     /** {@code Type::method}, the type being known only by its name (output of a cmdlet). */
-    record ByTypeName(String typeName, String method) implements MethodReference {
+    record ByTypeName(String typeName, String method, CallPolicy policy) implements MethodReference {
         @Override
         public Object apply(Object[] args) {
             if (args.length == 0 || args[0] == null || !hasType(args[0].getClass())) {
@@ -89,7 +89,7 @@ sealed interface MethodReference extends ScriptBlock {
                         : Messages.get("methodref.typeExpected", this, typeName, describe(args)));
             }
             List<Object> all = Arrays.asList(args);
-            return JavaInvoker.invokeVirtual(args[0], method, all.subList(1, all.size()));
+            return JavaInvoker.invokeVirtual(policy, args[0], method, all.subList(1, all.size()));
         }
 
         private boolean hasType(Class<?> type) {

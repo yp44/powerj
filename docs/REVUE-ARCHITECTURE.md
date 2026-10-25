@@ -316,7 +316,7 @@ Principes : (1) **aucune étape ne change le comportement observable** hors corr
 | 0.6 | Couverture **par module** (`jacoco:check` dans chaque module, seuil initial = valeur actuelle) | Aucun module ne peut baisser |
 | 0.7 | CI : Dependabot, CodeQL, actions par SHA, `timeout-minutes`/`concurrency`, `outputTimestamp`, découpage en jobs (build / smoke-linux / smoke-windows / fx-xvfb), scripts `ci/smoke/*.sh`, `distributionSha256Sum` | Durée CI ≤ durée actuelle grâce au parallélisme |
 
-### Phase 1 — Correctifs à fort levier, faible risque *(≈ 11 j)*
+### Phase 1 — Correctifs à fort levier, faible risque *(≈ 11 j ; **en cours, voir § 12**)*
 
 | Étape | Défaut | Action |
 |---|---|---|
@@ -437,7 +437,7 @@ Résultat : `./mvnw verify` passe, **1 288 tests** (1 114 au départ), 11 ignor�
 
 | Constat | Test | Résultat | Réactivé en |
 |---|---|---|---|
-| C-12 `System.exit` contournable | `ExitGuardTest` (JVM fille) | **confirmé** : référence de méthode et réflexion terminent la JVM ; l'appel direct est bien intercepté | 1.1 |
+| C-12 `System.exit` contournable | `ExitGuardTest` (JVM fille) | **confirmé** : référence de méthode et réflexion terminent la JVM ; l'appel direct est bien intercepté | 1.1 ✅ |
 | C-11 configuration corrompue | `ShellConfigTest.aWindowsPathWithSingleBackslashesDoesNotPreventStartup` | **confirmé** : `IllegalArgumentException: Malformed \uxxxx encoding` | 1.2 |
 | C-01 `end()` jamais appelé | `CmdletRunnerTest.endIsCalledEvenWhenProcessFails` | **confirmé** | 1.3 |
 | C-01 collision de `Where` | `cmdlets` `KnownDefectsTest.twoWhereStages…` | **réfuté** comme défaut observable (résultat correct, vert) | — |
@@ -471,3 +471,20 @@ Les quatre règles ArchUnit gelées confirment aussi, par la machine, C-05, C-09
 Pour geler les violations d'une **nouvelle** règle ArchUnit : `freeze.store.default.allowStoreCreation=true` dans `powerj-architecture/src/test/resources/archunit.properties` pour une exécution, puis commiter les fichiers écrits dans `archunit_store/`. Réactiver un test `@Disabled` : retirer l'annotation dans la phase indiquée ci-dessus, le même commit corrige le défaut.
 
 *Note d'environnement* : dans le bac à sable de cette analyse, `mvnw` ne pouvait pas télécharger Maven (`wget` ne passe pas le proxy) ; la même distribution (empreinte vérifiée contre la somme publiée) a été installée par `curl`. Ce n'est pas un défaut du dépôt.
+
+## 12. Phase 1 : correctifs ciblés (en cours)
+
+Chaque étape est un commit : le défaut est corrigé, le test rouge de la Phase 0 est réactivé dans le même commit, `./mvnw verify` reste vert.
+
+### 12.1 Statut des étapes
+
+| Étape | Statut | Ce qui a été fait | Écart avec le plan (§ 8) |
+|---|---|---|---|
+| 1.1 C-12 `System.exit` | ✅ | `CallPolicy` (une par session), consultée par `JavaInvoker.call` : le seul point par où passent l'appel direct, la référence de méthode, la lambda d'un flux et `Method.invoke`. Les deux `if` de `Evaluator` et son `Set` disparaissent. `ExitGuardTest` : 5 tests dont les 2 réactivés ; `CallPolicyTest` : 10 tests. Vérifié par mutation : neutraliser l'appel à la politique fait échouer 4 des 5 tests de la JVM fille | Le garde-fou s'applique dans `invokeStatic`/`invokeVirtual` (via `call`) ; `construct` n'en a pas besoin (aucun constructeur du JDK ne termine la JVM). `System.exit("x")` donne désormais l'erreur de surcharge habituelle, et non plus le message dédié `exit.integerExpected` (supprimé). Documenté comme garde-fou contre l'accident (README, spécification FR-58), non comme sandbox : un `MethodHandle` ou du code natif ne passe pas par `JavaInvoker` |
+| 1.2 C-11, C-13 | à faire | | |
+| 1.3 C-01 | à faire | | |
+| 1.4 C-10 | à faire | | |
+| 1.5 C-07, C-14 | à faire | | |
+| 1.6 C-15, C-16, C-18 | à faire | | |
+| 1.7 C-21, C-22 | à faire | | |
+| 1.8 hygiène | à faire | | |

@@ -117,7 +117,7 @@ PJ> [long] 5 ; import java.security.*                # casts, imports (java.util
 PJ> "today is $(LocalDate.now().dayOfWeek)"         # $( … ) inside strings, """ text blocks
 ```
 
-Overloads, varargs and argument conversions follow Java rules; `System.exit` and the like are intercepted so that Java code cannot kill the shell.
+Overloads, varargs and argument conversions follow Java rules; `System.exit` and the like are turned into the `exit` command, however they are written (direct call, `System::exit`, reflection), so that a mistyped line cannot kill the shell. This guards against accidents; it is not a sandbox.
 
 ### Shell language
 

@@ -64,7 +64,7 @@ final class JavaInvoker {
     }
 
     /** {@code target.name(arguments)}. */
-    static Object invokeVirtual(Object target, String name, List<Object> args) {
+    static Object invokeVirtual(CallPolicy policy, Object target, String name, List<Object> args) {
         if (target == null) {
             throw new PjException(Messages.get("java.callOnNull", name));
         }
@@ -73,11 +73,11 @@ final class JavaInvoker {
             throw new PjException(Messages.get("java.noMethod", target.getClass().getSimpleName(), name));
         }
         Method method = (Method) select(candidates, args, name);
-        return call(method, target, convertAll(method, args));
+        return call(policy, method, target, convertAll(method, args));
     }
 
     /** {@code Class.name(arguments)}. */
-    static Object invokeStatic(Class<?> type, String name, List<Object> args) {
+    static Object invokeStatic(CallPolicy policy, Class<?> type, String name, List<Object> args) {
         List<Executable> candidates = new ArrayList<>();
         for (Method m : type.getMethods()) {
             if (m.getName().equals(name) && Modifier.isStatic(m.getModifiers())
@@ -97,7 +97,7 @@ final class JavaInvoker {
             throw new PjException(Messages.get("java.noStaticMethod", type.getSimpleName(), name));
         }
         Method method = (Method) select(candidates, args, name);
-        return call(method, null, convertAll(method, args));
+        return call(policy, method, null, convertAll(method, args));
     }
 
     /** {@code new Class(arguments)}. */
@@ -130,7 +130,11 @@ final class JavaInvoker {
                 : Messages.get("java.exception", cause.getClass().getName(), message), cause));
     }
 
-    private static Object call(Method method, Object target, Object[] args) {
+    /** The one place where a Java method is called: the policy sees every call (review C-12). */
+    private static Object call(CallPolicy policy, Method method, Object target, Object[] args) {
+        if (policy.intercept(method, target, args)) {
+            return null;
+        }
         PreviewGuard.checkCall(method);
         try {
             return method.invoke(target, args);

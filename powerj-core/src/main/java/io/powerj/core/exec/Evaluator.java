@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.CancellationException;
 
 import io.powerj.core.lang.Ast;
@@ -29,9 +28,6 @@ final class Evaluator {
     /** {@code null} value in {@link #LOCALS}. */
     static final Object NULL = new Object();
 
-    /** Methods of {@code System} that would break the terminal display (FR-58). */
-    private static final Set<String> REFUSED_SYSTEM_METHODS = Set.of("setOut", "setErr", "setIn");
-
     /** Class referenced in an expression ({@code Math}, {@code java.util.List}). */
     record ClassRef(Class<?> type) {
         @Override
@@ -51,10 +47,12 @@ final class Evaluator {
 
     private final Session session;
     private final PipelineRunner runner;
+    private final CallPolicy policy;
 
     Evaluator(Session session, PipelineRunner runner) {
         this.session = session;
         this.runner = runner;
+        this.policy = new CallPolicy(session);
     }
 
     /** Value of the expression; a name that denotes neither a value nor a class is an error. */
@@ -160,42 +158,23 @@ final class Evaluator {
             throw new CancellationException();
         }
         return switch (target) {
-            case ClassRef(var type) -> {
-                if (type == System.class && method.equals("exit")) {
-                    yield exit(args);
-                }
-                if (type == System.class && REFUSED_SYSTEM_METHODS.contains(method)) {
-                    throw new PjException(Messages.get("java.systemRefused", method));
-                }
-                yield JavaInvoker.invokeStatic(type, method, args);
-            }
+            case ClassRef(var type) -> JavaInvoker.invokeStatic(policy, type, method, args);
             case PackageRef(var prefix) -> throw prefix.contains(".")
                     ? new PjException(Messages.get("java.classNotFound", prefix))
                     : unknownName(prefix);
-            case Runtime _ when method.equals("exit") || method.equals("halt") -> exit(args);
-            case null, default -> JavaInvoker.invokeVirtual(target, method, args);
+            case null, default -> JavaInvoker.invokeVirtual(policy, target, method, args);
         };
     }
 
     /** {@code Class::method}, {@code $object::method}, {@code FileEntry::name} (FR-33b). */
-    private static Object methodReference(Object target, String method) {
+    private Object methodReference(Object target, String method) {
         return switch (target) {
-            case ClassRef(var type) -> new MethodReference.OfClass(type, method);
-            case PackageRef(var name) when !name.contains(".") -> new MethodReference.ByTypeName(name, method);
+            case ClassRef(var type) -> new MethodReference.OfClass(type, method, policy);
+            case PackageRef(var name) when !name.contains(".") -> new MethodReference.ByTypeName(name, method, policy);
             case PackageRef(var name) -> throw new PjException(Messages.get("java.classNotFound", name));
             case null -> throw new PjException(Messages.get("methodref.onNull", method));
-            default -> new MethodReference.Bound(target, method);
+            default -> new MethodReference.Bound(target, method, policy);
         };
-    }
-
-    /** {@code System.exit(n)} is equivalent to the command {@code exit n} (FR-58). */
-    private Object exit(List<Object> args) {
-        if (args.size() != 1 || !(args.getFirst() instanceof Integer code)) {
-            throw new PjException(Messages.get("exit.integerExpected"));
-        }
-        PreviewGuard.deny(Messages.get("preview.off.exit"));
-        session.requestExit(code);
-        return null;
     }
 
     private static PjException unknownName(String name) {

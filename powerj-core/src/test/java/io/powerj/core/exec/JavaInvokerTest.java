@@ -15,6 +15,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CancellationException;
 
 import org.junit.jupiter.api.Test;
@@ -23,6 +24,9 @@ import io.powerj.api.ScriptBlock;
 
 /** Java calls: overload selection and argument conversions (FR-48 to FR-50, FR-53). */
 class JavaInvokerTest {
+
+    private static final CallPolicy POLICY = new CallPolicy(
+            new Session(Path.of("").toAbsolutePath(), Path.of("").toAbsolutePath(), Map.of()));
 
     private static final ScriptBlock BLOCK = new ScriptBlock() {
         @Override
@@ -132,21 +136,21 @@ class JavaInvokerTest {
 
     @Test
     void instanceCalls() {
-        assertThat(JavaInvoker.invokeVirtual("abc", "charAt", List.of(1))).isEqualTo('b');
+        assertThat(JavaInvoker.invokeVirtual(POLICY, "abc", "charAt", List.of(1))).isEqualTo('b');
         assertThat(JavaInvoker.hasNoArgMethod(String.class, "length")).isTrue();
         assertThat(JavaInvoker.hasNoArgMethod(String.class, "charAt")).isFalse();
-        assertThatThrownBy(() -> JavaInvoker.invokeVirtual(null, "length", List.of()))
+        assertThatThrownBy(() -> JavaInvoker.invokeVirtual(POLICY, null, "length", List.of()))
                 .isInstanceOf(PjException.class)
                 .hasMessage("call of length() on a null value");
-        assertThatThrownBy(() -> JavaInvoker.invokeVirtual("abc", "nope", List.of()))
+        assertThatThrownBy(() -> JavaInvoker.invokeVirtual(POLICY, "abc", "nope", List.of()))
                 .hasMessage("String has no method nope()");
-        assertThatThrownBy(() -> JavaInvoker.invokeVirtual("abc", "charAt", List.of("x")))
+        assertThatThrownBy(() -> JavaInvoker.invokeVirtual(POLICY, "abc", "charAt", List.of("x")))
                 .hasMessage("no overload of charAt matches the arguments (String); available: charAt(int)");
     }
 
     @Test
     void aTieBetweenUnrelatedOverloadsIsAmbiguous() {
-        assertThatThrownBy(() -> JavaInvoker.invokeVirtual(new StringBuilder(), "append", Arrays.asList((Object) null)))
+        assertThatThrownBy(() -> JavaInvoker.invokeVirtual(POLICY, new StringBuilder(), "append", Arrays.asList((Object) null)))
                 .isInstanceOf(PjException.class)
                 .hasMessageStartingWith("ambiguous call of append: ");
     }
@@ -154,18 +158,18 @@ class JavaInvokerTest {
     @Test
     void aTieIsBrokenByTheMostSpecificOverload() {
         var fixture = new InvokerFixture();
-        assertThat(JavaInvoker.invokeVirtual(fixture, "join", List.of("a"))).isEqualTo("first:a+0");
-        assertThat(JavaInvoker.invokeVirtual(fixture, "letter", List.of("x"))).isEqualTo("char:x");
-        assertThat(JavaInvoker.invokeStatic(Math.class, "abs", List.of('a'))).isEqualTo(97);
+        assertThat(JavaInvoker.invokeVirtual(POLICY, fixture, "join", List.of("a"))).isEqualTo("first:a+0");
+        assertThat(JavaInvoker.invokeVirtual(POLICY, fixture, "letter", List.of("x"))).isEqualTo("char:x");
+        assertThat(JavaInvoker.invokeStatic(POLICY, Math.class, "abs", List.of('a'))).isEqualTo(97);
     }
 
     @Test
     void staticCalls() {
-        assertThat(JavaInvoker.invokeStatic(String.class, "format", List.of("%s-%s", "a", "b"))).isEqualTo("a-b");
-        assertThat(JavaInvoker.invokeStatic(LinkedHashMap.class, "newHashMap", List.of(4))).isInstanceOf(HashMap.class);
-        assertThatThrownBy(() -> JavaInvoker.invokeStatic(Math.class, "nope", List.of()))
+        assertThat(JavaInvoker.invokeStatic(POLICY, String.class, "format", List.of("%s-%s", "a", "b"))).isEqualTo("a-b");
+        assertThat(JavaInvoker.invokeStatic(POLICY, LinkedHashMap.class, "newHashMap", List.of(4))).isInstanceOf(HashMap.class);
+        assertThatThrownBy(() -> JavaInvoker.invokeStatic(POLICY, Math.class, "nope", List.of()))
                 .hasMessage("Math has no static method nope()");
-        assertThatThrownBy(() -> JavaInvoker.invokeStatic(Integer.class, "parseInt", List.of("x")))
+        assertThatThrownBy(() -> JavaInvoker.invokeStatic(POLICY, Integer.class, "parseInt", List.of("x")))
                 .isInstanceOf(PjException.class)
                 .hasMessage("java.lang.NumberFormatException: For input string: \"x\"");
     }

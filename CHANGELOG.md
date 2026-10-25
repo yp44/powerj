@@ -28,11 +28,17 @@ structures, functions) can be built on it. The work is organised in phases (revi
 - Tests wait for a state or a signal instead of a duration; the thread-leak check of the Ctrl+C pipeline test, which
   could not fail, now can.
 
+### Fixed (Phase 1, targeted fixes — in progress)
+- **`System.exit` can no longer end the shell by another road** (review C-12, step 1.1). The guard used to be written for
+  the direct call only; `[0] | map System::exit` or `Method.invoke` ended the JVM. It is now a `CallPolicy` consulted by
+  `JavaInvoker`, the one place every Java call goes through. `System.exit("x")` now reports the usual "no overload"
+  error instead of a dedicated message.
+
 ### Planned (review §8)
-- **Phase 1 — targeted fixes.** The `System.exit` guard covers method references and reflection; a malformed
-  `config.properties` no longer prevents startup; cmdlets get an execution-scoped state in `CmdletContext`
-  (`begin`/`process`/`end` always paired); Ctrl+C is no longer swallowed by `to-json`; `sort` uses a total order;
-  destructive commands resolve symbolic links and no longer ignore case on case-sensitive file systems.
+- **Phase 1 (continued).** A malformed `config.properties` no longer prevents startup; cmdlets get an
+  execution-scoped state in `CmdletContext` (`begin`/`process`/`end` always paired); Ctrl+C is no longer swallowed by
+  `to-json`; `sort` uses a total order; destructive commands resolve symbolic links and no longer ignore case on
+  case-sensitive file systems.
 - **Phase 2 — `Interpreter` split** into a command resolution, a pipeline executor, redirections, and
   observer-based perf and preview modes.
 - **Phase 3 — packages, modules and API.** `core.exec` is split in eight packages with qualified exports, the

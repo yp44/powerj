@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -64,21 +63,21 @@ class ExitGuardTest {
         assertThat(result.output()).contains("exitRequest=OptionalInt.empty");
     }
 
-    @Disabled("C-12, fixed in Phase 1.1: the guard must sit in JavaInvoker, which every call goes through")
     @Test
     void aMethodReferenceCannotEndTheShell() throws Exception {
         Result result = run("[0] | map System::exit");
 
         assertThat(result.survived()).as("the JVM ended with code %d; output: %s", result.exitCode(), result.output())
                 .isTrue();
+        assertThat(result.output()).contains("exitRequest=OptionalInt[0]");
     }
 
-    @Disabled("C-12, fixed in Phase 1.1: the guard must sit in JavaInvoker, which every call goes through")
     @Test
     void reflectionCannotEndTheShell() throws Exception {
         Result result = run("Class.forName(\"java.lang.System\").getMethod(\"exit\", Integer.TYPE).invoke(null, 0)");
 
         assertThat(result.survived()).as("the JVM ended with code %d; output: %s", result.exitCode(), result.output())
                 .isTrue();
+        assertThat(result.output()).contains("exitRequest=OptionalInt[0]");
     }
 }
