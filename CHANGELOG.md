@@ -110,7 +110,7 @@ structures, functions) can be built on it. The work is organised in phases (revi
   tally of its report, or which of the (many) `exec` classes that use the syntax tree the report happens to list. The
   dependency that closes the `exec`/`lang` cycle (`lang` reaching into `exec`) is still compared line by line.
 
-### Changed (Phase 3, packages, modules and API — in progress)
+### Changed (Phase 3, packages, modules and API)
 - **`powerj-core` is split in packages by layer** (step 3.1): `error`, `i18n`, `lang`, `format`, `java`, `nativeexec`,
   `command`, `runtime`, `perf`, `assist` replace `core.exec`. Nothing changes for the user. `powerj-core` exports its
   packages to the shell only, `powerj-shell` exports nothing, `powerj-cmdlets` exports to the shell only (until the
@@ -135,7 +135,23 @@ structures, functions) can be built on it. The work is organised in phases (revi
   highlighting read the commands through a `CommandCatalog`, no longer through the concrete `Interpreter`, and the
   architecture rule that says so is no longer frozen. The preview policy is an ordered list of rules (`PreviewRule`),
   tested one by one.
+- **API for cmdlet authors** (step 3.4):
+  - `ScriptBlock.tryInvoke` and `tryTest` return an `Attempt` (a value, or the error that the object caused) and still
+    throw a cancellation: a cmdlet no longer has to rethrow Ctrl+C by hand to keep it from being taken for an error.
+  - `UsageException` (an `IllegalArgumentException`) says that a cmdlet was used incorrectly; `CmdletContext.property`
+    gives the block that reads a property; `CmdletContext.service(Class)` offers what only a few cmdlets need.
+  - The optional abilities of a cmdlet are interfaces, `Previewable` and `ColumnProvider`; the matching default methods
+    of `Cmdlet` (`previewable`, `columns`) are deprecated for removal and still honoured.
+  - The perf types move from `io.powerj.api` to `io.powerj.api.perf`.
 - Compiler warnings: 72 → 32.
+
+### Breaking changes of the API (for code written against the 0.1.0-SNAPSHOT, which was never released)
+
+- `CmdletContext.environment()` is a read-only copy; use `setEnvironment` and `unsetEnvironment` to change the
+  environment of the session (a cmdlet that wrote to the map now gets an `UnsupportedOperationException`).
+- `CmdletContext.perfReports()` is removed: `context.service(PerfReports.class)`. `PerfReport`, `StageStat`,
+  `BlockStat`, `NativeStat`, `PhaseStat`, `JvmStat`, `HotMethod`, `GcStat`, `AllocStat` and `LineStat` are in
+  `io.powerj.api.perf`.
 
 ### Examined, not changed
 - **The seven `Messages` classes stay** (C-10, step 1.4). Replacing them with one helper in `powerj-api` was tried on a
@@ -144,10 +160,8 @@ structures, functions) can be built on it. The work is organised in phases (revi
   class is the minimal form that works with JPMS, and the model `examples/greet` gives to module authors.
 
 ### Planned (review §8)
-Phases 1 and 2 are done (reports in the review, §12 and §13).
-- **Phase 3 — packages, modules and API.** `core.exec` is split in eight packages with qualified exports, the
-  package cycles are removed, performance types leave the public API. Deprecated API members are removed no sooner than
-  0.3.0.
+Phases 1 to 3 are done (reports in the review, §12 to §14). The API members deprecated in 0.2 (`Cmdlet.previewable`,
+`Cmdlet.columns`) are removed no sooner than 0.3.0.
 - **Phase 4 — composition root.** `ShellBootstrap`, `--version`/`--help`, a smaller `Repl`.
 - **Phase 5 — industrialisation.** Release workflow, SBOM, mutation tests, benchmarks, documentation (ADR, C4).
 
