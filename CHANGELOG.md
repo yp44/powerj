@@ -50,6 +50,12 @@ structures, functions) can be built on it. The work is organised in phases (revi
   its own state; the runner closes the states that are `AutoCloseable` when the run ends, normally or not (Ctrl+C
   included). The 23 tables are gone. `grid` closes the window of a command that was cancelled before it handed it over.
 
+### Examined, not changed
+- **The seven `Messages` classes stay** (C-10, step 1.4). Replacing them with one helper in `powerj-api` was tried on a
+  two-module experiment: `ResourceBundle.getBundle(…, module)` called from another module fails unless the owner of the
+  bundle opens its package to it, which every module (third-party ones included) would have to declare. The per-module
+  class is the minimal form that works with JPMS, and the model `examples/greet` gives to module authors.
+
 ### Planned (review §8)
 - **Phase 1 (continued).** Ctrl+C is no longer swallowed by `to-json`; `sort` uses a total order; destructive
   commands resolve symbolic links and no longer ignore case on case-sensitive file systems.
