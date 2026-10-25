@@ -107,13 +107,13 @@ class ArchitectureTest {
     }
 
     /**
-     * [C-04, C-05] The packages of the core are layered, and a lower layer never reaches into a higher one: this is what
-     * keeps them free of cycles. {@code runtime} must not know {@code perf} or {@code assist}, which plug into it.
-     * Dependencies inside a layer are not checked.
+     * [C-04, C-05] The packages of the core are layered, and a lower layer never reaches into a higher one: this keeps
+     * them free of cycles across the layers. {@code runtime} must not know {@code perf} or {@code assist}, which plug
+     * into it. Dependencies inside a layer are checked by {@link #corePackagesHaveNoCycle()}.
      */
     @Test
     void corePackagesRespectTheLayers() {
-        check(freeze(layeredArchitecture().consideringOnlyDependenciesInLayers()
+        check(layeredArchitecture().consideringOnlyDependenciesInLayers()
                 .layer("Base").definedBy("io.powerj.core.error..", "io.powerj.core.i18n..", "io.powerj.core.lang..")
                 .layer("Services").definedBy("io.powerj.core.format..", "io.powerj.core.java..",
                         "io.powerj.core.nativeexec..")
@@ -123,7 +123,13 @@ class ArchitectureTest {
                 .whereLayer("Plugged in").mayNotBeAccessedByAnyLayer()
                 .whereLayer("Runtime").mayOnlyBeAccessedByLayers("Plugged in")
                 .whereLayer("Command").mayOnlyBeAccessedByLayers("Runtime", "Plugged in")
-                .whereLayer("Services").mayOnlyBeAccessedByLayers("Command", "Runtime", "Plugged in")));
+                .whereLayer("Services").mayOnlyBeAccessedByLayers("Command", "Runtime", "Plugged in"));
+    }
+
+    /** [C-05] No cycle between the packages of the core. */
+    @Test
+    void corePackagesHaveNoCycle() {
+        check(slices().matching("io.powerj.core.(*)..").should().beFreeOfCycles());
     }
 
     /** [C-06] The completion reads the commands through a narrow interface, never the interpreter itself (step 3.3). */

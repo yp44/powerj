@@ -120,6 +120,9 @@ structures, functions) can be built on it. The work is organised in phases (revi
 - **The language depends on nothing else of the product** (step 3.2): `SyntaxException` is no longer a `PjException`
   (the interpreter converts it), `Ast` no longer knows `Token`, and what the reader needs besides the text is a typed
   `ParseContext` instead of a `Predicate<String>` that was opened with `instanceof`.
+- **The layers of the core have no debt left** (step 3.2): the rule that checks them, and the one that forbids cycles
+  between the packages, run unfrozen. The interpreter receives the perf mode through `LineMeasuring` instead of
+  building it; `Help` is a command; the engine of cmdlets and of native commands is part of the runtime.
 - Compiler warnings: 72 → 35.
 
 ### Examined, not changed

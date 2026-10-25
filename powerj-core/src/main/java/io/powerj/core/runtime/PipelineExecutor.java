@@ -14,12 +14,8 @@ import java.util.logging.Logger;
 
 import io.powerj.api.Collected;
 import io.powerj.api.ScriptBlock;
-import io.powerj.core.assist.Help;
-import io.powerj.core.command.Builtin;
+import io.powerj.core.command.Help;
 import io.powerj.core.command.CmdletRegistry;
-import io.powerj.core.command.CmdletRunner;
-import io.powerj.core.command.CommandResolution;
-import io.powerj.core.command.Resolved;
 import io.powerj.core.error.PjError;
 import io.powerj.core.error.PjException;
 import io.powerj.core.format.Values;
@@ -27,7 +23,6 @@ import io.powerj.core.i18n.Messages;
 import io.powerj.core.java.PreviewGuard;
 import io.powerj.core.lang.Ast;
 import io.powerj.core.nativeexec.NativeRun;
-import io.powerj.core.nativeexec.NativeRunner;
 import io.powerj.core.runtime.ExecutionObserver.PipelineObserver;
 import io.powerj.core.runtime.ExecutionObserver.StageObserver;
 

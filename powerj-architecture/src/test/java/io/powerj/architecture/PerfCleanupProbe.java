@@ -5,6 +5,8 @@ import java.nio.file.Path;
 import java.util.Map;
 
 import io.powerj.core.command.CmdletRegistry;
+import io.powerj.core.perf.PerfMode;
+import io.powerj.core.perf.Profiler;
 import io.powerj.core.runtime.Interpreter;
 import io.powerj.core.runtime.Session;
 import io.powerj.core.runtime.ShellIo;
@@ -23,8 +25,9 @@ public final class PerfCleanupProbe {
     public static void main(String[] args) throws Exception {
         PrintWriter out = new PrintWriter(System.out, true);
         Session session = new Session(Path.of(System.getProperty("user.home")), Path.of("").toAbsolutePath(), Map.of());
-        Interpreter interpreter = new Interpreter(session, new ShellIo(out, out::println, false, () -> 120), Map.of(),
-                CmdletRegistry.discover());
+        ShellIo io = new ShellIo(out, out::println, false, () -> 120);
+        Interpreter interpreter = new Interpreter(session, io, Map.of(), CmdletRegistry.discover(),
+                new PerfMode(session, io, Profiler.discover()));
         interpreter.perfMode(true);
         interpreter.execute("Math.max(1, 2)");
         Path recording = session.perfReports().getFirst().recording();

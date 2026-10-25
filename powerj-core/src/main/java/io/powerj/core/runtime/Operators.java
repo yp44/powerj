@@ -55,7 +55,7 @@ public final class Operators {
         if (value instanceof Boolean b) {
             return b;
         }
-        throw new PjException(Messages.get("operator.booleanExpected", op.symbol(), describe(value)));
+        throw new PjException(Messages.get("operator.booleanExpected", op.symbol(), Values.describe(value)));
     }
 
     /** Value equality ({@code Objects.equals}); numbers compared by value ({@code 1 == 1L}). */
@@ -81,7 +81,7 @@ public final class Operators {
                 && (left.getClass().isInstance(right) || right.getClass().isInstance(left))) {
             return comparable.compareTo(right);
         }
-        throw new PjException(Messages.get("operator.notBetween", op.symbol(), describe(left), describe(right)));
+        throw new PjException(Messages.get("operator.notBetween", op.symbol(), Values.describe(left), Values.describe(right)));
     }
 
     private static Object add(Object left, Object right) {
@@ -114,7 +114,7 @@ public final class Operators {
         try {
             return temporal.plus(duration);
         } catch (DateTimeException e) {
-            throw new PjException(PjError.of(Messages.get("operator.durationFailed", describe(temporal), e.getMessage()), e));
+            throw new PjException(PjError.of(Messages.get("operator.durationFailed", Values.describe(temporal), e.getMessage()), e));
         }
     }
 
@@ -228,22 +228,10 @@ public final class Operators {
     }
 
     private static PjException unsupported(Operator op, Object operand) {
-        return new PjException(Messages.get("operator.notOn", op.symbol(), describe(operand)));
+        return new PjException(Messages.get("operator.notOn", op.symbol(), Values.describe(operand)));
     }
 
     private static PjException unsupported(Operator op, Object left, Object right) {
-        return new PjException(Messages.get("operator.notBetween", op.symbol(), describe(left), describe(right)));
-    }
-
-    /** {@code null}, or type and abbreviated value: {@code String "abc"}. */
-    public static String describe(Object value) {
-        if (value == null) {
-            return "null";
-        }
-        String text = Values.text(value);
-        if (text.length() > 30) {
-            text = text.substring(0, 27) + "…";
-        }
-        return value.getClass().getSimpleName() + (value instanceof CharSequence ? " \"" + text + "\"" : " " + text);
+        return new PjException(Messages.get("operator.notBetween", op.symbol(), Values.describe(left), Values.describe(right)));
     }
 }

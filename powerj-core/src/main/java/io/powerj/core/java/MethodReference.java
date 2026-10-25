@@ -5,7 +5,6 @@ import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.List;
 
-import io.powerj.api.ScriptBlock;
 import io.powerj.core.error.PjException;
 import io.powerj.core.i18n.Messages;
 
@@ -20,10 +19,7 @@ import io.powerj.core.i18n.Messages;
  *       instance method of the first argument, which must be of this type.</li>
  * </ul>
  */
-public sealed interface MethodReference extends ScriptBlock {
-
-    /** Calls the method with the arguments received. */
-    Object apply(Object[] args);
+public sealed interface MethodReference extends Applicable {
 
     @Override
     default Object invoke(Object current) {

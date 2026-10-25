@@ -30,7 +30,7 @@ class CallPolicyTest {
     @BeforeEach
     void setUp() {
         session = new Session(tmp, tmp, Map.of("PATH", ""));
-        policy = new CallPolicy(session);
+        policy = new CallPolicy(session::requestExit);
     }
 
     private static Method method(Class<?> type, String name, Class<?>... parameters) throws NoSuchMethodException {

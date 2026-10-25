@@ -1,4 +1,4 @@
-package io.powerj.core.assist;
+package io.powerj.core.command;
 
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
@@ -10,15 +10,13 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 
 import io.powerj.api.CmdletInfo;
-import io.powerj.core.command.CmdletRegistry;
-import io.powerj.core.command.OptionBinder;
 import io.powerj.core.error.PjException;
 import io.powerj.core.format.Values;
 import io.powerj.core.i18n.Messages;
 import io.powerj.core.java.JavaClasses;
 import io.powerj.core.java.JavaInvoker;
 import io.powerj.core.java.Members;
-import io.powerj.core.runtime.Evaluator;
+import io.powerj.core.java.ClassRef;
 
 /** Help generated from cmdlet metadata (specification FR-29, FR-45). */
 public final class Help {
@@ -61,7 +59,7 @@ public final class Help {
         if (builtins.contains(name) && isDocumentedBuiltin(name)) {
             return List.of(name + " — " + builtinDescription(name), Messages.get("help.usage", builtinUsage(name)));
         }
-        if (args.getFirst() instanceof Evaluator.ClassRef(var type)) {
+        if (args.getFirst() instanceof ClassRef(var type)) {
             return javaClass(type);
         }
         var type = java.find(name);

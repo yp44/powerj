@@ -1,12 +1,12 @@
-package io.powerj.core.command;
+package io.powerj.core.runtime;
 
 import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import io.powerj.core.command.CmdletRegistry;
 import io.powerj.core.nativeexec.CommandResolver;
-import io.powerj.core.runtime.Session;
 
 /**
  * The rule that gives a command name its meaning (specification FR-13), written once: a built-in command comes first,
@@ -50,7 +50,7 @@ public final class CommandResolution {
         if (name.isEmpty()) {
             return new Resolved.Unknown(name, forcedNative);
         }
-        return natives.resolve(name, session).<Resolved>map(Resolved.NativeCall::new)
+        return natives.resolve(name, session.currentDirectory(), session.environment()).<Resolved>map(Resolved.NativeCall::new)
                 .orElseGet(() -> new Resolved.Unknown(name, forcedNative));
     }
 

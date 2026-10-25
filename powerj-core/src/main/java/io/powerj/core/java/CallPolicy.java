@@ -2,10 +2,10 @@ package io.powerj.core.java;
 
 import java.lang.reflect.Method;
 import java.util.Set;
+import java.util.function.IntConsumer;
 
 import io.powerj.core.error.PjException;
 import io.powerj.core.i18n.Messages;
-import io.powerj.core.runtime.Session;
 
 /**
  * The Java calls that would act on the shell itself rather than on the command (FR-58): ending the JVM, or taking the
@@ -27,10 +27,11 @@ public final class CallPolicy {
 
     private static final Set<String> REFUSED_SYSTEM_METHODS = Set.of("setOut", "setErr", "setIn");
 
-    private final Session session;
+    private final IntConsumer exitRequest;
 
-    public CallPolicy(Session session) {
-        this.session = session;
+    /** @param exitRequest receives the code of a {@code System.exit} typed at the prompt: the shell closes when the line ends */
+    public CallPolicy(IntConsumer exitRequest) {
+        this.exitRequest = exitRequest;
     }
 
     /**
@@ -68,6 +69,6 @@ public final class CallPolicy {
     /** Equivalent to the command {@code exit code}. */
     private void exit(int code) {
         PreviewGuard.deny(Messages.get("preview.off.exit"));
-        session.requestExit(code);
+        exitRequest.accept(code);
     }
 }

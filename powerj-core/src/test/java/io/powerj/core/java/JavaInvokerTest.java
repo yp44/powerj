@@ -29,7 +29,7 @@ import io.powerj.core.support.InvokerFixture;
 class JavaInvokerTest {
 
     private static final CallPolicy POLICY = new CallPolicy(
-            new Session(Path.of("").toAbsolutePath(), Path.of("").toAbsolutePath(), Map.of()));
+            new Session(Path.of("").toAbsolutePath(), Path.of("").toAbsolutePath(), Map.of())::requestExit);
 
     private static final ScriptBlock BLOCK = new ScriptBlock() {
         @Override

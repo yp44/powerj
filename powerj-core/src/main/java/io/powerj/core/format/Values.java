@@ -30,4 +30,16 @@ public final class Values {
         }
         return Messages.get("duration.seconds", String.format(Locale.ROOT, "%.3f", d.toNanos() / 1e9));
     }
+
+    /** {@code null}, or type and abbreviated value: {@code String "abc"}. */
+    public static String describe(Object value) {
+        if (value == null) {
+            return "null";
+        }
+        String text = Values.text(value);
+        if (text.length() > 30) {
+            text = text.substring(0, 27) + "…";
+        }
+        return value.getClass().getSimpleName() + (value instanceof CharSequence ? " \"" + text + "\"" : " " + text);
+    }
 }

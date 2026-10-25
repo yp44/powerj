@@ -10,7 +10,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
-import io.powerj.core.runtime.Session;
 
 /**
  * Lookup of a native executable (specification FR-13): explicit path ({@code .\outil.exe},
@@ -31,16 +30,21 @@ public final class CommandResolver {
         this.windows = windows;
     }
 
-    public Optional<Path> resolve(String name, Session session) {
+    /**
+     * The program a name designates: a path (relative to the current directory), or a file of the {@code PATH}.
+     *
+     * @param environment the environment of the session, for {@code PATH} and, on Windows, {@code PATHEXT}
+     */
+    public Optional<Path> resolve(String name, Path currentDirectory, Map<String, String> environment) {
         try {
             if (hasDirectory(name)) {
-                return executable(session.currentDirectory().resolve(name), session);
+                return executable(currentDirectory.resolve(name), environment);
             }
-            for (String dir : pathEntries(session.environment())) {
+            for (String dir : pathEntries(environment)) {
                 if (dir.isBlank()) {
                     continue;
                 }
-                var found = executable(session.currentDirectory().resolve(dir).resolve(name), session);
+                var found = executable(currentDirectory.resolve(dir).resolve(name), environment);
                 if (found.isPresent()) {
                     return found;
                 }
@@ -60,14 +64,14 @@ public final class CommandResolver {
         return List.of(path.split(Pattern.quote(windows ? ";" : ":")));
     }
 
-    private Optional<Path> executable(Path candidate, Session session) {
+    private Optional<Path> executable(Path candidate, Map<String, String> environment) {
         if (!windows) {
             return Files.isRegularFile(candidate) && Files.isExecutable(candidate)
                     ? Optional.of(candidate.toAbsolutePath().normalize())
                     : Optional.empty();
         }
         List<Path> candidates = new ArrayList<>();
-        List<String> extensions = extensions(session.environment());
+        List<String> extensions = extensions(environment);
         String fileName = candidate.getFileName().toString().toUpperCase(Locale.ROOT);
         if (extensions.stream().anyMatch(fileName::endsWith)) {
             candidates.add(candidate);

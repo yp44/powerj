@@ -28,11 +28,11 @@ class CommandResolverTest {
         var session = new Session(tmp, tmp, Map.of("PATH", "/nulle/part:" + bin));
         var resolver = new CommandResolver(false);
 
-        assertThat(resolver.resolve("outil", session)).contains(tool);
-        assertThat(resolver.resolve("pas-executable", session)).isEmpty();
-        assertThat(resolver.resolve("absent", session)).isEmpty();
-        assertThat(resolver.resolve("bin/outil", session)).contains(tool);
-        assertThat(resolver.resolve("./bin/outil", session)).contains(tool);
+        assertThat(resolver.resolve("outil", session.currentDirectory(), session.environment())).contains(tool);
+        assertThat(resolver.resolve("pas-executable", session.currentDirectory(), session.environment())).isEmpty();
+        assertThat(resolver.resolve("absent", session.currentDirectory(), session.environment())).isEmpty();
+        assertThat(resolver.resolve("bin/outil", session.currentDirectory(), session.environment())).contains(tool);
+        assertThat(resolver.resolve("./bin/outil", session.currentDirectory(), session.environment())).contains(tool);
     }
 
     @Test
@@ -43,9 +43,9 @@ class CommandResolverTest {
         var session = new Session(tmp, tmp, Map.of("PATH", bin.toString(), "PATHEXT", ".COM;.EXE;.BAT;.CMD"));
         var resolver = new CommandResolver(true);
 
-        assertThat(resolver.resolve("git", session)).contains(exe);
-        assertThat(resolver.resolve("git.exe", session)).contains(exe);
-        assertThat(resolver.resolve("mvn", session)).contains(cmd);
-        assertThat(resolver.resolve("absent", session)).isEmpty();
+        assertThat(resolver.resolve("git", session.currentDirectory(), session.environment())).contains(exe);
+        assertThat(resolver.resolve("git.exe", session.currentDirectory(), session.environment())).contains(exe);
+        assertThat(resolver.resolve("mvn", session.currentDirectory(), session.environment())).contains(cmd);
+        assertThat(resolver.resolve("absent", session.currentDirectory(), session.environment())).isEmpty();
     }
 }

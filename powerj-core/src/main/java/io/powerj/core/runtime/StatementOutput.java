@@ -11,7 +11,6 @@ import io.powerj.core.error.PjError;
 import io.powerj.core.error.PjException;
 import io.powerj.core.format.OutputFormatter;
 import io.powerj.core.i18n.Messages;
-import io.powerj.core.nativeexec.NativeRunner;
 
 /**
  * Destination of a statement's values: the terminal, or the file of a {@code >} redirection.

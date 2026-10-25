@@ -11,14 +11,10 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CancellationException;
 
-import io.powerj.core.assist.Help;
-import io.powerj.core.command.Builtin;
-import io.powerj.core.command.Builtins;
+import io.powerj.core.command.Help;
 import io.powerj.core.command.CmdletRegistry;
-import io.powerj.core.command.CommandResolution;
 import io.powerj.core.command.ModuleLoader;
 import io.powerj.core.command.NativeAccessPolicy;
-import io.powerj.core.command.Resolved;
 import io.powerj.core.error.PjException;
 import io.powerj.core.i18n.Messages;
 import io.powerj.core.lang.Ast.Statement;
@@ -28,9 +24,6 @@ import io.powerj.core.lang.ParseContext;
 import io.powerj.core.lang.SyntaxException;
 import io.powerj.core.lang.RedirectedStream;
 import io.powerj.core.nativeexec.CommandResolver;
-import io.powerj.core.nativeexec.NativeRunner;
-import io.powerj.core.perf.PerfMode;
-import io.powerj.core.perf.Profiler;
 
 /**
  * Executes a line: statements chained by {@code ;}, {@code &&}, {@code ||} (FR-04c) or launched in the background
@@ -51,7 +44,7 @@ public final class Interpreter {
     private final ErrorReporter reporter;
     private final PipelineExecutor executor;
     private final PreviewMode preview;
-    private final PerfMode perf;
+    private final LineMeasuring perf;
     /** Who measures the line being executed. */
     private volatile ExecutionObserver observer = ExecutionObserver.NONE;
 
@@ -59,17 +52,30 @@ public final class Interpreter {
      * @param extraBuiltins built-in commands provided by the shell (e.g. {@code history})
      */
     public Interpreter(Session session, ShellIo io, Map<String, Builtin> extraBuiltins, CmdletRegistry registry) {
-        this(session, io, extraBuiltins, registry, new CommandResolver(), new NativeRunner());
+        this(session, io, extraBuiltins, registry, LineMeasuring.OFF);
+    }
+
+    /**
+     * @param measuring the perf mode (FR-76), plugged in from outside; {@link LineMeasuring#OFF} for none
+     */
+    public Interpreter(Session session, ShellIo io, Map<String, Builtin> extraBuiltins, CmdletRegistry registry,
+                       LineMeasuring measuring) {
+        this(session, io, extraBuiltins, registry, new CommandResolver(), new NativeRunner(), measuring);
     }
 
     Interpreter(Session session, ShellIo io, Map<String, Builtin> extraBuiltins, CmdletRegistry registry,
                 CommandResolver resolver, NativeRunner nativeRunner) {
+        this(session, io, extraBuiltins, registry, resolver, nativeRunner, LineMeasuring.OFF);
+    }
+
+    private Interpreter(Session session, ShellIo io, Map<String, Builtin> extraBuiltins, CmdletRegistry registry,
+                        CommandResolver resolver, NativeRunner nativeRunner, LineMeasuring measuring) {
         this.session = session;
         this.io = io;
         this.registry = registry;
         this.evaluator = new Evaluator(session, this::capture, this::parseContext);
         this.reporter = new ErrorReporter(session, io);
-        this.perf = new PerfMode(session, io, Profiler.discover());
+        this.perf = measuring;
         this.modules = new ModuleLoader(registry, Collections.unmodifiableSet(builtins.keySet()));
         // The order is the one of the overview printed by `help`; the shell's own commands come before `exit`.
         builtins.put("cd", Builtins::cd);
@@ -167,7 +173,7 @@ public final class Interpreter {
             throw new PjException(e.getMessage()); // a line that does not parse is an error to show, like any other
         }
         long parsed = System.nanoTime() - begin;
-        PerfMode.Measurement measurement = perf.start(line, script, begin, parsed);
+        LineMeasuring.Measurement measurement = perf.start(line, script, begin, parsed);
         observer = measurement.observer();
         boolean cancelled = false;
         try {
@@ -202,11 +208,6 @@ public final class Interpreter {
 
     public void perfMode(boolean on) {
         perf.on(on);
-    }
-
-    /** Without the profiler, a line is measured with the counters only. */
-    public void perfProfiler(boolean on) {
-        perf.profiling(on);
     }
 
     private boolean statement(Statement statement) throws InterruptedException {

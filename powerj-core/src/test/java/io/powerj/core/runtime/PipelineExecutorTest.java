@@ -19,16 +19,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
-import io.powerj.core.command.Builtin;
 import io.powerj.core.command.CmdletRegistry;
-import io.powerj.core.command.CommandResolution;
 import io.powerj.core.error.PjException;
 import io.powerj.core.lang.Ast;
 import io.powerj.core.lang.Parser;
 import io.powerj.core.lang.ParseContext;
 import io.powerj.core.nativeexec.CommandResolver;
 import io.powerj.core.nativeexec.NativeRun;
-import io.powerj.core.nativeexec.NativeRunner;
 import io.powerj.core.support.FakeCmdlets;
 
 /** The executor on its own, without the interpreter that normally builds and drives it. */

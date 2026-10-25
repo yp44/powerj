@@ -15,6 +15,8 @@ import java.util.stream.Stream;
 import io.powerj.core.i18n.Messages;
 import io.powerj.core.lang.Ast;
 import io.powerj.core.runtime.ExecutionObserver;
+import io.powerj.core.runtime.LineMeasuring;
+import io.powerj.core.runtime.ExecutionObserver;
 import io.powerj.core.runtime.Session;
 import io.powerj.core.runtime.ShellIo;
 
@@ -24,7 +26,7 @@ import io.powerj.core.runtime.ShellIo;
  * ({@code POWERJ_PERF_*}), the files of the profiler's recordings, and the report kept and printed at the end of a line.
  * The measure itself is made by {@link PerfRecorder}, which the execution reaches as an {@link ExecutionObserver}.
  */
-public final class PerfMode {
+public final class PerfMode implements LineMeasuring {
 
     /**
      * Variable of the session environment ({@code env --set} in {@code profile.pj}): when it is {@code 1}, the perf mode
@@ -53,32 +55,27 @@ public final class PerfMode {
         this.profiler = profiler;
     }
 
-    /** What measures a line, and what to do when it is over. */
-    public static final class Measurement {
-
-        /** A line that is not measured. */
-        static final Measurement NONE = new Measurement(null, null, null);
+    /** The measure of a line: the recorder that is told what happens, and the profiler's recording. */
+    private static final class Measured implements Measurement {
 
         private final PerfMode mode;
         private final PerfRecorder recorder;
         private final Profiler.Recording capture;
 
-        private Measurement(PerfMode mode, PerfRecorder recorder, Profiler.Recording capture) {
+        private Measured(PerfMode mode, PerfRecorder recorder, Profiler.Recording capture) {
             this.mode = mode;
             this.recorder = recorder;
             this.capture = capture;
         }
 
-        /** Who receives what the execution reports. */
+        @Override
         public ExecutionObserver observer() {
-            return recorder == null ? ExecutionObserver.NONE : recorder;
+            return recorder;
         }
 
-        /** The line is over, ended or cancelled: keeps its report and prints its summary. */
+        @Override
         public void finish(boolean cancelled) {
-            if (recorder != null) {
-                mode.print(recorder, capture, cancelled);
-            }
+            mode.print(recorder, capture, cancelled);
         }
     }
 
@@ -105,12 +102,7 @@ public final class PerfMode {
         profiling = on;
     }
 
-    /**
-     * Starts to measure a line if the mode is on and the line is measurable.
-     *
-     * @param begin  {@code System.nanoTime()} when the line started to be parsed
-     * @param parsed duration of the parsing
-     */
+    @Override
     public Measurement start(String line, Ast.Script script, long begin, long parsed) {
         if (!on || !measurable(script)) {
             return Measurement.NONE;
@@ -118,7 +110,7 @@ public final class PerfMode {
         long started = System.nanoTime();
         Profiler.Recording capture = startProfiler();
         // Starting the profiler is not part of the line.
-        return new Measurement(this, new PerfRecorder(line, begin + (System.nanoTime() - started), parsed), capture);
+        return new Measured(this, new PerfRecorder(line, begin + (System.nanoTime() - started), parsed), capture);
     }
 
     /** A line is measured unless it is empty, runs in the background, or starts with {@code perf}. */

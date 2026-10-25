@@ -1,4 +1,4 @@
-package io.powerj.core.command;
+package io.powerj.core.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -17,12 +17,10 @@ import org.junit.jupiter.api.io.TempDir;
 
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletInfo;
-import io.powerj.core.assist.Help;
+import io.powerj.core.command.CmdletRegistry;
+import io.powerj.core.command.Help;
 import io.powerj.core.nativeexec.CommandResolver;
 import io.powerj.core.nativeexec.Platform;
-import io.powerj.core.runtime.Interpreter;
-import io.powerj.core.runtime.Session;
-import io.powerj.core.runtime.ShellIo;
 import io.powerj.core.support.FakeCmdlets;
 
 /** The one rule that gives a command name its meaning (FR-13), and everything that now reads its answer. */

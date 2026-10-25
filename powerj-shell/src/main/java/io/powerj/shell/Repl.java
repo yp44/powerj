@@ -18,16 +18,18 @@ import org.jline.utils.AttributedStyle;
 import org.jline.utils.InfoCmp;
 
 import io.powerj.core.BuildInfo;
-import io.powerj.core.command.CmdletRegistry;
 import io.powerj.core.assist.Completions;
+import io.powerj.core.command.CmdletRegistry;
+import io.powerj.core.error.PjException;
+import io.powerj.core.format.Values;
+import io.powerj.core.perf.PerfMode;
+import io.powerj.core.perf.Profiler;
 import io.powerj.core.runtime.ConsoleInput;
 import io.powerj.core.runtime.Interpreter;
 import io.powerj.core.runtime.Outcome;
-import io.powerj.core.error.PjException;
 import io.powerj.core.runtime.Session;
 import io.powerj.core.runtime.ShellIo;
 import io.powerj.core.runtime.Supervisor;
-import io.powerj.core.format.Values;
 
 /**
  * Read-execute loop of the shell: reads a line with JLine (history, Ctrl+R…), executes it
@@ -62,7 +64,8 @@ public final class Repl {
         this.colors = interactive && colors(terminal);
         var io = new ShellIo(out, this::printError, interactive, () -> terminal.getWidth(), consoleInput(terminal),
                 colors);
-        this.interpreter = new Interpreter(session, io, Map.of("history", this::history), registry);
+        this.interpreter = new Interpreter(session, io, Map.of("history", this::history), registry,
+                new PerfMode(session, io, Profiler.discover()));
         // Completion (Tab) and input highlighting (FR-08, FR-21 to FR-26).
         var completions = new Completions(interpreter);
         completions.warmUp();

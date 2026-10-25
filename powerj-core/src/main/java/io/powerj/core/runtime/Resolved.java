@@ -1,6 +1,8 @@
-package io.powerj.core.command;
+package io.powerj.core.runtime;
 
 import java.nio.file.Path;
+
+import io.powerj.core.command.CmdletRegistry;
 
 /**
  * What a command name stands for (FR-13): the first of a built-in command, a cmdlet and a program on the

@@ -58,15 +58,7 @@ public final class StageProbe implements ExecutionObserver.StageObserver {
 
     @Override
     public String threadName() {
-        return threadName(index);
-    }
-
-    /** Start of the name of a stage thread; {@link JfrCapture} reads the stage number back from the name. */
-    static final String THREAD_PREFIX = "powerj-stage-";
-
-    /** Name of the thread of a stage that runs apart from the calling thread; the profiler attributes samples by it. */
-    public static String threadName(int index) {
-        return THREAD_PREFIX + index;
+        return ExecutionObserver.threadName(index);
     }
 
     /** The last stage of a pipeline runs in the thread that runs the shell, the others in their own thread. */
@@ -99,7 +91,7 @@ public final class StageProbe implements ExecutionObserver.StageObserver {
         startTime = Instant.now();
         startNanos = System.nanoTime();
         try {
-            return ScopedValue.where(PerfRecorder.STAGE, this).call(body::run);
+            return ScopedValue.where(ExecutionObserver.STAGE, this).call(body::run);
         } finally {
             endNanos = System.nanoTime();
             endTime = Instant.now();
@@ -136,6 +128,7 @@ public final class StageProbe implements ExecutionObserver.StageObserver {
     }
 
     /** One evaluation of a block. */
+    @Override
     public synchronized void block(String source, long nanos) {
         BlockCalls calls = blocks.computeIfAbsent(source, _ -> new BlockCalls());
         if (calls.calls == 0) {

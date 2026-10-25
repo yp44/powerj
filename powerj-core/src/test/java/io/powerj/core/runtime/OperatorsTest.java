@@ -166,12 +166,4 @@ class OperatorsTest {
         assertThatThrownBy(() -> Operators.unary(Operator.NOT, 1))
                 .hasMessage("\"!\" expects a boolean, got Integer 1");
     }
-
-    @Test
-    void describeAbbreviatesLongValues() {
-        assertThat(Operators.describe(null)).isEqualTo("null");
-        assertThat(Operators.describe("x".repeat(40))).isEqualTo("String \"" + "x".repeat(27) + "…\"");
-        assertThat(Operators.describe(12)).isEqualTo("Integer 12");
-        assertThat(Operators.describe(Duration.ofSeconds(1))).isEqualTo("Duration 1.000 s");
-    }
 }

@@ -19,6 +19,7 @@ module io.powerj.core {
     exports io.powerj.core.java to io.powerj.shell;
     exports io.powerj.core.lang to io.powerj.shell;
     exports io.powerj.core.nativeexec to io.powerj.shell;
+    exports io.powerj.core.perf to io.powerj.shell;
     exports io.powerj.core.runtime to io.powerj.shell;
 
     uses io.powerj.api.CmdletProvider;

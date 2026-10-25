@@ -14,7 +14,6 @@ import io.powerj.core.lang.Ast;
 import io.powerj.core.lang.Parser;
 import io.powerj.core.lang.ParseContext;
 import io.powerj.core.lang.RedirectedStream;
-import io.powerj.core.nativeexec.NativeRunner;
 
 /** The file a redirection names: an argument, evaluated when the statement starts. */
 class RedirectionTargetTest {

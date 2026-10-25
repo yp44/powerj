@@ -14,7 +14,6 @@ import io.powerj.core.error.PjError;
 import io.powerj.core.error.PjException;
 import io.powerj.core.i18n.Messages;
 import io.powerj.core.java.PreviewGuard;
-import io.powerj.core.nativeexec.NativeRunner;
 
 /**
  * Where the errors of a line go: the terminal, the file of a {@code 2>} redirection, or the preview that collects them

@@ -8,8 +8,7 @@ import java.lang.reflect.Proxy;
 import io.powerj.api.ScriptBlock;
 import io.powerj.core.error.PjException;
 import io.powerj.core.i18n.Messages;
-import io.powerj.core.runtime.CompiledBlock;
-import io.powerj.core.runtime.Operators;
+import io.powerj.core.format.Values;
 
 /**
  * Block {@code { … }} passed to a parameter of a functional interface type ({@code Predicate},
@@ -60,11 +59,8 @@ final class FunctionalAdapter {
     }
 
     private static Object call(ScriptBlock block, Object[] args) {
-        return switch (block) {
-            case CompiledBlock compiled -> compiled.apply(args);
-            case MethodReference reference -> reference.apply(args);
-            default -> block.invoke(args.length == 0 ? null : args[0]);
-        };
+        return block instanceof Applicable applicable ? applicable.apply(args)
+                : block.invoke(args.length == 0 ? null : args[0]);
     }
 
     /** Value of the block converted to the return type of the method (FR-50). */
@@ -75,10 +71,10 @@ final class FunctionalAdapter {
         }
         if (type == boolean.class && !(value instanceof Boolean)) {
             throw new PjException(Messages.get("block.booleanExpected", sam.getDeclaringClass().getSimpleName(),
-                    sam.getName(), Operators.describe(value)));
+                    sam.getName(), Values.describe(value)));
         }
         if (JavaInvoker.cost(type, value) == JavaInvoker.NO_MATCH) {
-            throw new PjException(Messages.get("block.wrongReturn", Operators.describe(value), type.getSimpleName(),
+            throw new PjException(Messages.get("block.wrongReturn", Values.describe(value), type.getSimpleName(),
                     sam.getDeclaringClass().getSimpleName(), sam.getName()));
         }
         return JavaInvoker.convert(type, value);

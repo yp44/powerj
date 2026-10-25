@@ -1,8 +1,7 @@
-package io.powerj.core.command;
+package io.powerj.core.runtime;
 
 import java.util.List;
 
-import io.powerj.core.runtime.Session;
 
 /** Built-in shell command ({@code cd}, {@code pwd}, {@code which}, {@code exit}, {@code history}…). */
 @FunctionalInterface

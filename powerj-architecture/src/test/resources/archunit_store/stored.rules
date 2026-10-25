@@ -1,6 +1,5 @@
 #
 #Sun Oct 25 22:34:36 UTC 2026
-Layered\ architecture\ considering\ only\ dependencies\ in\ layers,\ consisting\ of\nlayer\ 'Base'\ ('io.powerj.core.error..',\ 'io.powerj.core.i18n..',\ 'io.powerj.core.lang..')\nlayer\ 'Services'\ ('io.powerj.core.format..',\ 'io.powerj.core.java..',\ 'io.powerj.core.nativeexec..')\nlayer\ 'Command'\ ('io.powerj.core.command..')\nlayer\ 'Runtime'\ ('io.powerj.core.runtime..')\nlayer\ 'Plugged\ in'\ ('io.powerj.core.perf..',\ 'io.powerj.core.assist..')\nwhere\ layer\ 'Plugged\ in'\ may\ not\ be\ accessed\ by\ any\ layer\nwhere\ layer\ 'Runtime'\ may\ only\ be\ accessed\ by\ layers\ ['Plugged\ in']\nwhere\ layer\ 'Command'\ may\ only\ be\ accessed\ by\ layers\ ['Runtime',\ 'Plugged\ in']\nwhere\ layer\ 'Services'\ may\ only\ be\ accessed\ by\ layers\ ['Command',\ 'Runtime',\ 'Plugged\ in']=0a1046a3-ca1e-4f4b-9587-f252b87bc658
 fields\ that\ are\ static\ should\ be\ final=cf65444f-fa1d-4ab3-b9bb-bd0e45b347dc
 no\ classes\ that\ reside\ in\ a\ package\ 'io.powerj.core.assist..'\ should\ depend\ on\ classes\ that\ have\ fully\ qualified\ name\ 'io.powerj.core.runtime.Interpreter'=cdc8027e-2dbe-409b-85ae-ea2a847c0753
 no\ classes\ that\ reside\ in\ a\ package\ 'io.powerj.shell..'\ should\ depend\ on\ classes\ that\ reside\ in\ a\ package\ 'io.powerj.cmdlets..'=b4c92b57-ef83-4683-b136-7ea0e9ef1230

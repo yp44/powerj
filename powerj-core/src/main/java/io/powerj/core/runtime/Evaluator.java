@@ -17,6 +17,8 @@ import io.powerj.core.format.ValueUnroller;
 import io.powerj.core.format.Values;
 import io.powerj.core.i18n.Messages;
 import io.powerj.core.java.CallPolicy;
+import io.powerj.core.java.ClassRef;
+import io.powerj.core.java.PackageRef;
 import io.powerj.core.java.JavaClasses;
 import io.powerj.core.java.JavaInvoker;
 import io.powerj.core.java.MethodReference;
@@ -46,17 +48,6 @@ public final class Evaluator {
     /** {@code null} value in {@link #LOCALS}. */
     static final Object NULL = new Object();
 
-    /** Class referenced in an expression ({@code Math}, {@code java.util.List}). */
-    public record ClassRef(Class<?> type) {
-        @Override
-        public String toString() {
-            return type.getName();
-        }
-    }
-
-    /** Start of a qualified name that is not (yet) a class: {@code java}, {@code java.util}. */
-    record PackageRef(String name) { }
-
     /** Runs the pipeline of a subexpression {@code ( … )} and returns its values. */
     @FunctionalInterface
     interface PipelineRunner {
@@ -76,7 +67,7 @@ public final class Evaluator {
         this.session = session;
         this.runner = runner;
         this.parseContext = parseContext;
-        this.policy = new CallPolicy(session);
+        this.policy = new CallPolicy(session::requestExit);
     }
 
     /** Value of the expression; a name that denotes neither a value nor a class is an error. */
@@ -262,7 +253,7 @@ public final class Evaluator {
         if (JavaInvoker.cost(type, value) != JavaInvoker.NO_MATCH) {
             return JavaInvoker.convert(type, value);
         }
-        throw new PjException(Messages.get("cast.failed", Operators.describe(value), type.getSimpleName()));
+        throw new PjException(Messages.get("cast.failed", Values.describe(value), type.getSimpleName()));
     }
 
     // --- Variables and strings ---
@@ -307,7 +298,7 @@ public final class Evaluator {
         if (index instanceof Integer || index instanceof Long || index instanceof Short || index instanceof Byte) {
             return PropertyAccess.index(target, ((Number) index).intValue());
         }
-        throw new PjException(Messages.get("index.integerExpected", Operators.describe(index)));
+        throw new PjException(Messages.get("index.integerExpected", Values.describe(index)));
     }
 
     /**

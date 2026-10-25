@@ -113,6 +113,7 @@ class PerfTest {
     private final StringWriter out = new StringWriter();
     private final List<String> errors = Collections.synchronizedList(new ArrayList<>());
     private Session session;
+    private PerfMode perfMode;
     private Interpreter interpreter;
 
     @BeforeEach
@@ -122,8 +123,9 @@ class PerfTest {
         cmdlets.add(new Numbers());
         cmdlets.add(new Slow());
         cmdlets.add(new Work());
-        interpreter = new Interpreter(session, new ShellIo(new PrintWriter(out, true), errors::add, false), Map.of(),
-                CmdletRegistry.of(cmdlets));
+        var io = new ShellIo(new PrintWriter(out, true), errors::add, false);
+        perfMode = new PerfMode(session, io, Profiler.discover());
+        interpreter = new Interpreter(session, io, Map.of(), CmdletRegistry.of(cmdlets), perfMode);
         interpreter.perfMode(true);
     }
 
@@ -426,7 +428,7 @@ class PerfTest {
 
     @Test
     void withoutTheProfilerTheLineIsMeasuredWithTheCountersOnly() throws Exception {
-        interpreter.perfProfiler(false);
+        perfMode.profiling(false);
         String text = run("numbers 2 | work -c 100 | count");
         assertThat(last().recording()).isNull();
         assertThat(last().hot()).isEmpty();

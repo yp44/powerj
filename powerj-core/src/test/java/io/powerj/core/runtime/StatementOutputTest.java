@@ -15,7 +15,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import io.powerj.core.error.PjException;
-import io.powerj.core.nativeexec.NativeRunner;
 import io.powerj.core.perf.PerfRecorder;
 import io.powerj.core.support.FakeCmdlets;
 

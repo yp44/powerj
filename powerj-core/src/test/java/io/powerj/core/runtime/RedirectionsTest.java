@@ -14,7 +14,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import io.powerj.core.error.PjException;
-import io.powerj.core.nativeexec.NativeRunner;
 
 /** The redirections of a statement and the context a stage runs in (Phase 2.2). */
 class RedirectionsTest {

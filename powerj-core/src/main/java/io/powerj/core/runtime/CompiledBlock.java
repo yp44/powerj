@@ -5,12 +5,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CancellationException;
 
-import io.powerj.api.ScriptBlock;
+import io.powerj.core.java.Applicable;
 import io.powerj.core.error.PjException;
 import io.powerj.core.i18n.Messages;
 import io.powerj.core.lang.Ast.Expression;
-import io.powerj.core.perf.PerfRecorder;
-import io.powerj.core.perf.StageProbe;
 
 /**
  * Parsed block or lambda, ready to be evaluated for each pipeline object or called by Java (FR-33b).
@@ -21,7 +19,7 @@ import io.powerj.core.perf.StageProbe;
  *                   ({@code f -> … anyMatch(e -> f.name.endsWith(e))})
  */
 public record CompiledBlock(String source, List<String> parameters, Expression body, Evaluator evaluator,
-                     Map<String, Object> captured) implements ScriptBlock {
+                     Map<String, Object> captured) implements Applicable {
 
     /**
      * @throws PjException          if the evaluation fails (message intended for the user)
@@ -33,6 +31,7 @@ public record CompiledBlock(String source, List<String> parameters, Expression b
     }
 
     /** Calls the block with the arguments received from Java (or the pipeline object). */
+    @Override
     public Object apply(Object[] args) {
         if (parameters == null) {
             if (args.length > 1) {
@@ -56,7 +55,7 @@ public record CompiledBlock(String source, List<String> parameters, Expression b
         if (Thread.currentThread().isInterrupted()) {
             throw new CancellationException();
         }
-        StageProbe probe = PerfRecorder.STAGE.isBound() ? PerfRecorder.STAGE.get() : null;
+        ExecutionObserver.StageObserver probe = ExecutionObserver.STAGE.isBound() ? ExecutionObserver.STAGE.get() : null;
         long start = probe == null ? 0 : System.nanoTime();
         try {
             return ScopedValue.where(Evaluator.CURRENT, current).where(Evaluator.LOCALS, locals)

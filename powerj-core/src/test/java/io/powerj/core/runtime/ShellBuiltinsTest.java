@@ -1,4 +1,4 @@
-package io.powerj.core.command;
+package io.powerj.core.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -17,10 +17,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import io.powerj.core.command.CmdletRegistry;
+import io.powerj.core.command.ModuleLoader;
 import io.powerj.core.error.PjException;
 import io.powerj.core.nativeexec.CommandResolver;
-import io.powerj.core.runtime.Session;
-import io.powerj.core.runtime.ShellIo;
 import io.powerj.core.support.FakeCmdlets;
 
 /** {@code which}, {@code import}, {@code mod-load} and {@code mod-list}, built from the parts of the interpreter. */

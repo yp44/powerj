@@ -30,9 +30,6 @@ import io.powerj.core.runtime.Pipe;
  */
 public final class PerfRecorder implements ExecutionObserver, ExecutionObserver.PipelineObserver {
 
-    /** Probe of the stage the current thread runs, seen by the blocks it evaluates. */
-    public static final ScopedValue<StageProbe> STAGE = ScopedValue.newInstance();
-
     /** What the JVM counted up to a moment. */
     private record JvmCounters(long gcCount, long gcMillis, long classes, long jitMillis) {
 

@@ -1,4 +1,4 @@
-package io.powerj.core.command;
+package io.powerj.core.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -14,13 +14,12 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import io.powerj.core.assist.Help;
+import io.powerj.core.command.CmdletRegistry;
+import io.powerj.core.command.Help;
 import io.powerj.core.java.CallPolicy;
+import io.powerj.core.java.ClassRef;
 import io.powerj.core.java.JavaClasses;
 import io.powerj.core.java.MethodReference;
-import io.powerj.core.runtime.Evaluator;
-import io.powerj.core.runtime.Session;
-import io.powerj.core.runtime.StandardInput;
 import io.powerj.core.support.FakeCmdlets;
 import io.powerj.core.support.InvokerFixture;
 
@@ -37,7 +36,7 @@ class BuiltinsAndJavaNamesTest {
     }
 
     private CallPolicy policy() {
-        return new CallPolicy(session());
+        return new CallPolicy(session()::requestExit);
     }
 
     /** The built-in commands of a shell, in the order of its overview. */
@@ -61,7 +60,7 @@ class BuiltinsAndJavaNamesTest {
 
     @Test
     void helpOnJavaClassesOfEveryKind() {
-        assertThat(help(new Evaluator.ClassRef(Math.class)).getFirst()).isEqualTo("class java.lang.Math");
+        assertThat(help(new ClassRef(Math.class)).getFirst()).isEqualTo("class java.lang.Math");
         assertThat(Help.javaClass(Deprecated.class).getFirst()).isEqualTo("annotation java.lang.Deprecated");
         assertThat(Help.javaClass(Runnable.class).getFirst()).isEqualTo("interface java.lang.Runnable");
         assertThat(Help.javaClass(DayOfWeek.class).getFirst()).isEqualTo("enum java.time.DayOfWeek");

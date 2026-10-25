@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.function.Consumer;
 
 import io.powerj.core.nativeexec.NativeRun;
-import io.powerj.core.perf.StageProbe;
 
 /**
  * What the execution tells whoever measures it (perf mode, FR-76): the pipelines, their stages, the pipes between
@@ -12,6 +11,17 @@ import io.powerj.core.perf.StageProbe;
  * runs a pipeline never asks whether a line is measured: it always reports, and the observer decides what to do.
  */
 public interface ExecutionObserver {
+
+    /** Start of the name of a stage thread; the profiler reads the stage number back from the name. */
+    String THREAD_PREFIX = "powerj-stage-";
+
+    /** The stage the current thread runs, seen by the blocks it evaluates (so that they are attributed to it). */
+    ScopedValue<StageObserver> STAGE = ScopedValue.newInstance();
+
+    /** Name of the thread of a stage that runs apart from the calling thread; the profiler attributes samples by it. */
+    static String threadName(int index) {
+        return THREAD_PREFIX + index;
+    }
 
     /** Nobody measures. */
     ExecutionObserver NONE = new ExecutionObserver() {
@@ -98,6 +108,10 @@ public interface ExecutionObserver {
         /** Runs the stage, timing it. */
         boolean run(Body body) throws InterruptedException;
 
+        /** One evaluation of a block of this stage took {@code nanos}. */
+        default void block(String source, long nanos) {
+        }
+
         /** The stage was timed from outside (a single native command): it lasted {@code nanos}. */
         void measured(long nanos);
 
@@ -117,7 +131,7 @@ public interface ExecutionObserver {
 
             @Override
             public String threadName() {
-                return StageProbe.threadName(position);
+                return ExecutionObserver.threadName(position);
             }
 
             @Override

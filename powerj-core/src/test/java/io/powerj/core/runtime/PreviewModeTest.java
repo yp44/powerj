@@ -17,13 +17,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
-import io.powerj.core.command.Builtin;
 import io.powerj.core.command.CmdletRegistry;
-import io.powerj.core.command.CommandResolution;
 import io.powerj.core.error.PjException;
 import io.powerj.core.lang.ParseContext;
 import io.powerj.core.nativeexec.CommandResolver;
-import io.powerj.core.nativeexec.NativeRunner;
 import io.powerj.core.support.PreviewableItems;
 
 /** What the preview decides by itself, on top of the executor it drives (PreviewTest covers it end to end). */

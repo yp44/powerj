@@ -1,4 +1,4 @@
-package io.powerj.core.command;
+package io.powerj.core.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -19,9 +19,8 @@ import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
 import io.powerj.api.ScriptBlock;
+import io.powerj.core.command.CmdletRegistry;
 import io.powerj.core.error.PjException;
-import io.powerj.core.runtime.Session;
-import io.powerj.core.runtime.Source;
 
 /** How a cmdlet is run: option binding, the begin/process/end contract, errors, the input (review C-30). */
 class CmdletRunnerTest {

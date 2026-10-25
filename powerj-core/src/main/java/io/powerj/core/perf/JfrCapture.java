@@ -23,6 +23,7 @@ import jdk.jfr.consumer.RecordingFile;
 import io.powerj.api.AllocStat;
 import io.powerj.api.GcStat;
 import io.powerj.api.HotMethod;
+import io.powerj.core.runtime.ExecutionObserver;
 
 /**
  * Java Flight Recorder recording of one measured line (FR-76, part B): where the stages spend their time
@@ -33,8 +34,8 @@ final class JfrCapture implements Profiler.Recording {
 
     private static final Logger LOG = Logger.getLogger(JfrCapture.class.getName());
 
-    /** The stage threads are named by {@link StageProbe#threadName}. */
-    private static final Pattern STAGE_THREAD = Pattern.compile(Pattern.quote(StageProbe.THREAD_PREFIX) + "(\\d+)");
+    /** The stage threads are named by {@link ExecutionObserver#threadName}. */
+    private static final Pattern STAGE_THREAD = Pattern.compile(Pattern.quote(ExecutionObserver.THREAD_PREFIX) + "(\\d+)");
     /** Rows kept per stage. */
     private static final int TOP = 20;
 

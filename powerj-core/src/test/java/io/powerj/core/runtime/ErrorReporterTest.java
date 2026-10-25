@@ -19,7 +19,6 @@ import org.junit.jupiter.api.io.TempDir;
 import io.powerj.core.error.PjError;
 import io.powerj.core.error.PjException;
 import io.powerj.core.java.PreviewGuard;
-import io.powerj.core.nativeexec.NativeRunner;
 
 /** Where the errors of a line go, and what is remembered about them. */
 class ErrorReporterTest {

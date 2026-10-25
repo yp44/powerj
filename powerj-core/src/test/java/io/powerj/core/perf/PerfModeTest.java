@@ -19,6 +19,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import io.powerj.core.lang.Ast;
 import io.powerj.core.lang.Parser;
+import io.powerj.core.runtime.LineMeasuring;
 import io.powerj.core.runtime.ExecutionObserver;
 import io.powerj.core.runtime.Session;
 import io.powerj.core.runtime.ShellIo;
@@ -96,7 +97,7 @@ class PerfModeTest {
         return Parser.parse(line, _ -> false);
     }
 
-    private PerfMode.Measurement start(String line) {
+    private LineMeasuring.Measurement start(String line) {
         return mode.start(line, script(line), System.nanoTime(), 0);
     }
 
@@ -104,7 +105,7 @@ class PerfModeTest {
     void nothingIsMeasuredWhileTheModeIsOff() {
         var measurement = start("items");
 
-        assertThat(measurement).isSameAs(PerfMode.Measurement.NONE);
+        assertThat(measurement).isSameAs(LineMeasuring.Measurement.NONE);
         assertThat(measurement.observer()).isSameAs(ExecutionObserver.NONE);
         measurement.finish(false);
         assertThat(session.perfReports()).isEmpty();
@@ -151,12 +152,12 @@ class PerfModeTest {
     void anEmptyLineABackgroundLineAndThePerfCommandAreNotMeasured() {
         mode.on(true);
 
-        assertThat(start("")).isSameAs(PerfMode.Measurement.NONE);
-        assertThat(start("sleep 1 &")).isSameAs(PerfMode.Measurement.NONE);
-        assertThat(start("perf")).isSameAs(PerfMode.Measurement.NONE);
-        assertThat(start("perf --last")).isSameAs(PerfMode.Measurement.NONE);
-        assertThat(start("items | perf")).isNotSameAs(PerfMode.Measurement.NONE); // only the first command counts
-        assertThat(start("^perf")).isNotSameAs(PerfMode.Measurement.NONE); // a program called perf is measured
+        assertThat(start("")).isSameAs(LineMeasuring.Measurement.NONE);
+        assertThat(start("sleep 1 &")).isSameAs(LineMeasuring.Measurement.NONE);
+        assertThat(start("perf")).isSameAs(LineMeasuring.Measurement.NONE);
+        assertThat(start("perf --last")).isSameAs(LineMeasuring.Measurement.NONE);
+        assertThat(start("items | perf")).isNotSameAs(LineMeasuring.Measurement.NONE); // only the first command counts
+        assertThat(start("^perf")).isNotSameAs(LineMeasuring.Measurement.NONE); // a program called perf is measured
     }
 
     @Test
@@ -167,7 +168,7 @@ class PerfModeTest {
         start("items").finish(false);
 
         assertThat(mode.on()).isFalse();
-        assertThat(start("items")).isSameAs(PerfMode.Measurement.NONE);
+        assertThat(start("items")).isSameAs(LineMeasuring.Measurement.NONE);
     }
 
     @Test

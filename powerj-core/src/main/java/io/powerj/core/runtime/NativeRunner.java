@@ -1,4 +1,4 @@
-package io.powerj.core.nativeexec;
+package io.powerj.core.runtime;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -24,11 +24,10 @@ import io.powerj.core.error.PjError;
 import io.powerj.core.error.PjException;
 import io.powerj.core.format.OutputFormatter;
 import io.powerj.core.i18n.Messages;
-import io.powerj.core.runtime.ExecutionContext;
-import io.powerj.core.runtime.Pipe;
-import io.powerj.core.runtime.Session;
-import io.powerj.core.runtime.ShellIo;
-import io.powerj.core.runtime.Source;
+import io.powerj.core.nativeexec.ExecutableKind;
+import io.powerj.core.nativeexec.NativeEncoding;
+import io.powerj.core.nativeexec.NativeRun;
+import io.powerj.core.nativeexec.Platform;
 
 /**
  * Runs a native command (specification §3.10). Streams remain streams: stdout and stderr are

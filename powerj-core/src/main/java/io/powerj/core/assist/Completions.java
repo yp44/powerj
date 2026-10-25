@@ -27,7 +27,7 @@ import java.util.regex.Pattern;
 
 import io.powerj.core.command.CmdletRegistry;
 import io.powerj.core.command.OptionBinder;
-import io.powerj.core.command.Resolved;
+import io.powerj.core.runtime.Resolved;
 import io.powerj.core.error.PjException;
 import io.powerj.core.i18n.Messages;
 import io.powerj.core.java.JavaClasses;

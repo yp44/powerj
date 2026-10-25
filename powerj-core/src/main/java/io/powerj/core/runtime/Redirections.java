@@ -12,7 +12,6 @@ import io.powerj.core.format.Values;
 import io.powerj.core.i18n.Messages;
 import io.powerj.core.lang.Ast;
 import io.powerj.core.lang.RedirectedStream;
-import io.powerj.core.nativeexec.NativeRunner;
 
 /**
  * The files of a statement's redirections: {@code >} / {@code >>} for the values, {@code 2>} / {@code 2>>} for the

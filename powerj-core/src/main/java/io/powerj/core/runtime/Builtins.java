@@ -1,4 +1,4 @@
-package io.powerj.core.command;
+package io.powerj.core.runtime;
 
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
@@ -6,12 +6,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
 
+import io.powerj.core.command.CmdletRegistry;
+import io.powerj.core.command.ModuleLoader;
 import io.powerj.core.error.PjException;
 import io.powerj.core.format.Values;
 import io.powerj.core.i18n.Messages;
 import io.powerj.core.nativeexec.Platform;
-import io.powerj.core.runtime.Session;
-import io.powerj.core.runtime.ShellIo;
 
 /**
  * Built-in commands: {@code cd}, {@code pwd}, {@code exit} (specification FR-04, FR-04b), {@code which} (FR-13),

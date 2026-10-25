@@ -8,6 +8,7 @@ import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 
 import io.powerj.core.java.PreviewGuard;
+import io.powerj.core.runtime.ExecutionObserver;
 import io.powerj.core.runtime.ExecutionObserver.PipelineObserver;
 import io.powerj.core.runtime.ExecutionObserver.StageObserver;
 import io.powerj.core.runtime.MeasuredPipe;
@@ -30,8 +31,8 @@ class ExecutionObserverTest {
 
     @Test
     void anUnmeasuredStageStillHasTheNameOfItsPosition() {
-        assertThat(PipelineObserver.NONE.stage(1, "a", false).threadName()).isEqualTo(StageProbe.threadName(1));
-        assertThat(PipelineObserver.NONE.stage(4, "b", true).threadName()).isEqualTo(StageProbe.threadName(4));
+        assertThat(PipelineObserver.NONE.stage(1, "a", false).threadName()).isEqualTo(ExecutionObserver.threadName(1));
+        assertThat(PipelineObserver.NONE.stage(4, "b", true).threadName()).isEqualTo(ExecutionObserver.threadName(4));
     }
 
     @Test
@@ -75,9 +76,9 @@ class ExecutionObserverTest {
         first.exited();
         StageObserver c = recorder.pipelineEntered().stage(1, "c", false); // the second statement: position 1 again
 
-        assertThat(a.threadName()).isEqualTo(StageProbe.threadName(1));
-        assertThat(b.threadName()).isEqualTo(StageProbe.threadName(2));
-        assertThat(c.threadName()).isEqualTo(StageProbe.threadName(3)); // the profiler reads the stage back from it
+        assertThat(a.threadName()).isEqualTo(ExecutionObserver.threadName(1));
+        assertThat(b.threadName()).isEqualTo(ExecutionObserver.threadName(2));
+        assertThat(c.threadName()).isEqualTo(ExecutionObserver.threadName(3)); // the profiler reads the stage back from it
     }
 
     @Test
