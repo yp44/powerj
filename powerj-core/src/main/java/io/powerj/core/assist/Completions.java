@@ -9,16 +9,11 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
-import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
@@ -27,7 +22,6 @@ import java.util.regex.Pattern;
 
 import io.powerj.core.command.CmdletRegistry;
 import io.powerj.core.command.OptionBinder;
-import io.powerj.core.runtime.Resolved;
 import io.powerj.core.error.PjException;
 import io.powerj.core.i18n.Messages;
 import io.powerj.core.java.JavaClasses;
@@ -36,8 +30,6 @@ import io.powerj.core.java.JavaInvoker;
 import io.powerj.core.java.Members;
 import io.powerj.core.java.PreviewPolicy;
 import io.powerj.core.java.PropertyAccess;
-import io.powerj.core.lang.Ast;
-import io.powerj.core.lang.ExpressionParser;
 import io.powerj.core.nativeexec.NativeCommands;
 import io.powerj.core.nativeexec.Platform;
 import io.powerj.core.runtime.CommandCatalog;
@@ -75,11 +67,11 @@ public final class Completions {
     }
 
     private static final Set<String> KEYWORDS = Set.of("true", "false", "null", "now", "new");
-    private static final Pattern LAMBDA_PARAM = Pattern.compile("\\s*([\\p{L}_][\\p{L}\\p{N}_]*)\\s*->");
     private static final int MAX_FILES = 500;
     private static final Pattern ASSIGNMENT = Pattern.compile("\\$[\\p{L}_][\\p{L}\\p{N}_]*\\s*=(?!=)\\s*");
 
     private final CommandCatalog catalog;
+    private final TypeInference types;
     /** Preview mode (FR-66): only what can run in a preview is offered. */
     private volatile boolean previewMode;
     private final JavaIndex index;
@@ -91,11 +83,11 @@ public final class Completions {
 
     Completions(CommandCatalog catalog, JavaIndex index, NativeCommands natives) {
         this.catalog = catalog;
+        this.types = new TypeInference(catalog);
         this.index = index;
         this.natives = natives;
     }
 
-    /** Prepares, in the background, the index of the classes imported by default. */
     /**
      * Preview mode (FR-66): commands are limited to the cmdlets declared {@code preview = true} (no built-in command,
      * no native program) and Java methods to those of the preview set.
@@ -104,6 +96,7 @@ public final class Completions {
         this.previewMode = on;
     }
 
+    /** Prepares, in the background, the index of the classes imported by default. */
     public void warmUp() {
         index.warmUp(JavaClasses.DEFAULT_IMPORTS);
     }
@@ -114,32 +107,11 @@ public final class Completions {
 
     // --- Context analysis ---
 
-    private enum FrameKind { COMMAND, BLOCK, EXPRESSION }
-
-    /** Nesting level at the cursor: command, block { }, or expression parentheses. */
-    private static final class Frame {
-        final FrameKind kind;
-        final int start;
-        final Frame parent;
-        final List<Integer> stageStarts = new ArrayList<>();
-
-        Frame(FrameKind kind, int start, Frame parent) {
-            this.kind = kind;
-            this.start = start;
-            this.parent = parent;
-            stageStarts.add(start);
-        }
-
-        int stageStart() {
-            return stageStarts.getLast();
-        }
-    }
-
     /** Context at the cursor. */
-    private record Context(Frame frame, boolean inString, int stringStart) { }
+    record Context(Frame frame, boolean inString, int stringStart) { }
 
-    private static Context analyze(String line, int cursor) {
-        Frame frame = new Frame(FrameKind.COMMAND, 0, null);
+    static Context analyze(String line, int cursor) {
+        Frame frame = new Frame(Frame.Kind.COMMAND, 0, null);
         int i = 0;
         while (i < cursor) {
             char c = line.charAt(i);
@@ -152,11 +124,11 @@ public final class Completions {
                     i = end;
                     continue;
                 }
-                case '{' -> frame = new Frame(FrameKind.BLOCK, i + 1, frame);
+                case '{' -> frame = new Frame(Frame.Kind.BLOCK, i + 1, frame);
                 case '(', '[' -> {
-                    boolean command = frame.kind == FrameKind.COMMAND && c == '('
+                    boolean command = frame.kind == Frame.Kind.COMMAND && c == '('
                             && (i == 0 || !Character.isJavaIdentifierPart(line.charAt(i - 1)));
-                    frame = new Frame(command ? FrameKind.COMMAND : FrameKind.EXPRESSION, i + 1, frame);
+                    frame = new Frame(command ? Frame.Kind.COMMAND : Frame.Kind.EXPRESSION, i + 1, frame);
                 }
                 case '}', ')', ']' -> {
                     if (frame.parent != null) {
@@ -164,7 +136,7 @@ public final class Completions {
                     }
                 }
                 case '|' -> {
-                    if (frame.kind == FrameKind.COMMAND) {
+                    if (frame.kind == Frame.Kind.COMMAND) {
                         if (i + 1 < cursor && line.charAt(i + 1) == '|') {
                             frame.stageStarts.clear(); // ||: new statement
                             i++;
@@ -173,17 +145,17 @@ public final class Completions {
                     }
                 }
                 case ';' -> {
-                    if (frame.kind == FrameKind.COMMAND) {
+                    if (frame.kind == Frame.Kind.COMMAND) {
                         frame.stageStarts.clear();
                         frame.stageStarts.add(i + 1);
                     }
                 }
                 case '&' -> {
-                    if (frame.kind == FrameKind.COMMAND && i + 1 < cursor && line.charAt(i + 1) == '&') {
+                    if (frame.kind == Frame.Kind.COMMAND && i + 1 < cursor && line.charAt(i + 1) == '&') {
                         frame.stageStarts.clear();
                         frame.stageStarts.add(i + 2);
                         i++;
-                    } else if (frame.kind == FrameKind.COMMAND && isBackground(line, i, cursor)) {
+                    } else if (frame.kind == Frame.Kind.COMMAND && isBackground(line, i, cursor)) {
                         frame.stageStarts.clear(); // &: background, new statement (FR-75)
                         frame.stageStarts.add(i + 1);
                     }
@@ -232,7 +204,7 @@ public final class Completions {
         Context context = analyze(line, cursor);
         Frame frame = context.frame();
         if (context.inString()) {
-            if (frame.kind == FrameKind.COMMAND && !isHead(line, frame, context.stringStart())) {
+            if (frame.kind == Frame.Kind.COMMAND && !isHead(line, frame, context.stringStart())) {
                 return paths(line, context.stringStart(), cursor);
             }
             return Result.none(cursor);
@@ -245,34 +217,34 @@ public final class Completions {
         char before = identStart > 0 ? line.charAt(identStart - 1) : '\0';
 
         if (before == '$') {
-            return variables(identStart - 1, "$" + fragment, frame.kind != FrameKind.COMMAND);
+            return variables(identStart - 1, "$" + fragment, frame.kind != Frame.Kind.COMMAND);
         }
         if (before == ':' && identStart >= 2 && line.charAt(identStart - 2) == ':') {
             String receiver = receiverText(line, identStart - 2);
-            return new Result(identStart, fragment, methodReferences(typeOf(receiver, scope(line, frame))));
+            return new Result(identStart, fragment, methodReferences(types.typeOf(receiver, types.scope(line, frame))));
         }
-        boolean head = frame.kind == FrameKind.COMMAND && isHead(line, frame, identStart);
+        boolean head = frame.kind == Frame.Kind.COMMAND && isHead(line, frame, identStart);
         if (before == '.') {
             boolean spread = identStart >= 2 && line.charAt(identStart - 2) == '*';
             int dot = spread ? identStart - 2 : identStart - 1;
             String receiver = receiverText(line, dot);
-            boolean receiverAtHead = frame.kind == FrameKind.COMMAND && isHead(line, frame, dot - receiver.length());
+            boolean receiverAtHead = frame.kind == Frame.Kind.COMMAND && isHead(line, frame, dot - receiver.length());
             if (receiverAtHead) {
                 head = true;
             }
-            if (frame.kind != FrameKind.COMMAND || head || isExpressionReceiver(receiver)
+            if (frame.kind != Frame.Kind.COMMAND || head || isExpressionReceiver(receiver)
                     || isExpressionStage(line, frame, dot)) {
-                TypeInfo type = typeOf(receiver, scope(line, frame));
+                TypeInfo type = types.typeOf(receiver, types.scope(line, frame));
                 if (spread) {
-                    type = elementOf(type);
+                    type = TypeInference.elementOf(type);
                 }
                 List<Candidate> members = members(type);
-                if (!members.isEmpty() || frame.kind != FrameKind.COMMAND || head) {
+                if (!members.isEmpty() || frame.kind != Frame.Kind.COMMAND || head) {
                     return new Result(identStart, fragment, members);
                 }
             }
         }
-        if (frame.kind != FrameKind.COMMAND || isExpressionStage(line, frame, identStart)) {
+        if (frame.kind != Frame.Kind.COMMAND || isExpressionStage(line, frame, identStart)) {
             return identifiers(line, frame, identStart, fragment);
         }
         if (head) {
@@ -389,7 +361,7 @@ public final class Completions {
             wordStart--;
         }
         String word = line.substring(wordStart, cursor);
-        List<String> words = splitWords(line.substring(frame.stageStart(), wordStart));
+        List<String> words = LineText.splitWords(line.substring(frame.stageStart(), wordStart));
         String command = words.getFirst();
         boolean forceNative = command.startsWith("^");
         String name = forceNative ? command.substring(1) : command;
@@ -421,19 +393,6 @@ public final class Completions {
 
     private static boolean isArgumentBoundary(char c) {
         return Character.isWhitespace(c) || Character.isSpaceChar(c) || c == '|' || c == ';' || c == '(' || c == '>';
-    }
-
-    private static List<String> splitWords(String text) {
-        List<String> words = new ArrayList<>();
-        for (String w : text.strip().split("[\\s\\u00a0\\u202f]+")) {
-            if (!w.isEmpty()) {
-                words.add(w);
-            }
-        }
-        if (words.isEmpty()) {
-            words.add("");
-        }
-        return words;
     }
 
     private static boolean isPathList(OptionBinder.OptionSpec spec) {
@@ -600,7 +559,7 @@ public final class Completions {
     /** In an expression: lambda parameters, imported classes, keywords. */
     private Result identifiers(String line, Frame frame, int start, String fragment) {
         List<Candidate> candidates = new ArrayList<>();
-        Scope scope = scope(line, frame);
+        Scope scope = types.scope(line, frame);
         scope.parameters().keySet().forEach(p -> candidates.add(new Candidate(p, p, Messages.get("completion.parameter"), false)));
         String before = line.substring(Math.max(0, start - 4), start);
         if (before.endsWith("new ")) {
@@ -625,272 +584,6 @@ public final class Completions {
             }
         }
         return List.copyOf(names);
-    }
-
-    // --- Types ---
-
-    /** What an expression denotes, inferred without executing it. */
-    private sealed interface TypeInfo {
-        record Instance(Class<?> type, Object value) implements TypeInfo { }
-
-        /** List whose element type is known ({@code (ls)}). */
-        record ListOf(Class<?> element) implements TypeInfo { }
-
-        record Static(Class<?> type) implements TypeInfo { }
-
-        record Package(String name) implements TypeInfo { }
-
-        record Unknown() implements TypeInfo { }
-    }
-
-    /**
-     * Types known in a block: {@code $_} and lambda parameters.
-     *
-     * @param sample {@link io.powerj.api.Row} with the columns declared by an upstream cmdlet ({@code select}, FR-69),
-     *               or {@code null}
-     */
-    private record Scope(Class<?> current, io.powerj.api.Row sample, Map<String, Class<?>> parameters) { }
-
-    private Scope scope(String line, Frame frame) {
-        Map<String, Class<?>> parameters = new LinkedHashMap<>();
-        Class<?> current = null;
-        io.powerj.api.Row sample = null;
-        for (Frame f = frame; f != null; f = f.parent) {
-            if (f.kind != FrameKind.BLOCK) {
-                continue;
-            }
-            Class<?> type = f.parent != null && f.parent.kind == FrameKind.COMMAND ? upstreamType(line, f.parent) : null;
-            if (current == null) {
-                current = type;
-                if (type == io.powerj.api.Row.class) {
-                    sample = upstreamColumns(line, f.parent);
-                }
-            }
-            Matcher param = LAMBDA_PARAM.matcher(line).region(f.start, line.length());
-            if (param.lookingAt()) {
-                parameters.putIfAbsent(param.group(1), type == null ? Object.class : type);
-            }
-        }
-        return new Scope(current, sample, parameters);
-    }
-
-    /**
-     * Row with the columns that the cmdlet of the stage before the current one declares from its arguments
-     * ({@code Cmdlet.columns}, e.g. {@code select}), looking through the stages that let objects through unchanged;
-     * values {@code null}. {@code null} if no columns are known.
-     */
-    private io.powerj.api.Row upstreamColumns(String line, Frame command) {
-        List<Integer> starts = command.stageStarts;
-        for (int k = starts.size() - 2; k >= 0; k--) {
-            String stage = line.substring(starts.get(k), starts.get(k + 1) - 1).strip();
-            String name = splitWords(stage).getFirst();
-            var cmdlet = catalog.cmdlet(name);
-            if (cmdlet.isEmpty()) {
-                return null;
-            }
-            if (cmdlet.get().passThrough()) {
-                continue;
-            }
-            List<String> names;
-            try {
-                names = cmdlet.get().cmdlet().columns(stage.substring(name.length()));
-            } catch (RuntimeException e) {
-                return null; // a module's cmdlet must never break completion
-            }
-            if (names == null || names.isEmpty()) {
-                return null;
-            }
-            Map<String, Object> columns = new LinkedHashMap<>();
-            names.forEach(column -> columns.put(column, null));
-            return io.powerj.api.Row.of(columns);
-        }
-        return null;
-    }
-
-    /** Type of the objects received by the current stage: output of the previous cmdlet (FR-24). */
-    private Class<?> upstreamType(String line, Frame command) {
-        List<Integer> starts = command.stageStarts;
-        for (int k = starts.size() - 2; k >= 0; k--) {
-            String stage = line.substring(starts.get(k), starts.get(k + 1) - 1).strip();
-            String name = splitWords(stage).getFirst();
-            if (name.startsWith("^")) {
-                return String.class;
-            }
-            switch (catalog.resolve(name)) {
-                case Resolved.CmdletCall(var cmdlet) -> {
-                    Class<?> output = cmdlet.output();
-                    if (output != Object.class) {
-                        return output;
-                    }
-                    if (cmdlet.passThrough()) {
-                        continue; // where, sort…: the objects go through unchanged
-                    }
-                    return null;
-                }
-                case Resolved.NativeCall _ -> {
-                    return String.class;
-                }
-                case Resolved.BuiltinCall _, Resolved.Unknown _ -> {
-                    return null;
-                }
-            }
-        }
-        return null;
-    }
-
-    private TypeInfo typeOf(String receiver, Scope scope) {
-        if (receiver.isBlank()) {
-            return new TypeInfo.Unknown();
-        }
-        Ast.Expression expression;
-        try {
-            expression = ExpressionParser.parse(receiver, session().java()::isStaticReference);
-        } catch (RuntimeException e) {
-            return new TypeInfo.Unknown();
-        }
-        return typeOf(expression, scope);
-    }
-
-    private TypeInfo typeOf(Ast.Expression expression, Scope scope) {
-        return switch (expression) {
-            case Ast.VariableExpression(var name, var accessors) when accessors.isEmpty() -> variableType(name, scope);
-            case Ast.Name(var name) -> {
-                if (scope.parameters().containsKey(name)) {
-                    Class<?> type = scope.parameters().get(name);
-                    yield type == io.powerj.api.Row.class && scope.sample() != null
-                            ? new TypeInfo.Instance(type, scope.sample()) : instance(type);
-                }
-                yield session().java().simpleClass(name).<TypeInfo>map(TypeInfo.Static::new)
-                        .orElse(new TypeInfo.Package(name));
-            }
-            case Ast.Get(var target, var name) -> member(typeOf(target, scope), name);
-            case Ast.Invoke(var target, var method, var arguments) -> invocation(typeOf(target, scope), method, arguments.size());
-            case Ast.At(var target, var index) -> elementOf(typeOf(target, scope), index);
-            case Ast.SpreadGet(var target, var name) -> {
-                TypeInfo element = member(elementOf(typeOf(target, scope)), name);
-                yield element instanceof TypeInfo.Instance(var type, _) ? new TypeInfo.ListOf(type) : new TypeInfo.Unknown();
-            }
-            case Ast.New(var type, _) -> session().java().find(type).<TypeInfo>map(c -> instance(c))
-                    .orElse(new TypeInfo.Unknown());
-            case Ast.Cast(var type, _) -> session().java().find(type).<TypeInfo>map(c -> instance(c))
-                    .orElse(new TypeInfo.Unknown());
-            case Ast.StringExpression _ -> instance(String.class);
-            case Ast.Literal(var value) -> value == null ? new TypeInfo.Unknown() : new TypeInfo.Instance(value.getClass(), value);
-            case Ast.SubExpression(var pipeline) -> pipelineType(pipeline);
-            case Ast.ListLiteral _ -> instance(List.class);
-            case Ast.Now() -> instance(Instant.class);
-            default -> new TypeInfo.Unknown();
-        };
-    }
-
-    private TypeInfo variableType(String name, Scope scope) {
-        if (name.equals("_")) {
-            if (scope.sample() != null) {
-                return new TypeInfo.Instance(io.powerj.api.Row.class, scope.sample());
-            }
-            return scope.current() == null ? new TypeInfo.Unknown() : instance(scope.current());
-        }
-        try {
-            Object value = session().variable(name);
-            return value == null ? new TypeInfo.Unknown() : new TypeInfo.Instance(value.getClass(), value);
-        } catch (PjException e) {
-            return new TypeInfo.Unknown();
-        }
-    }
-
-    /** {@code (ls)}: list of the outputs of the last cmdlet of the pipeline. */
-    private TypeInfo pipelineType(Ast.Pipeline pipeline) {
-        if (pipeline.stages().getLast().body() instanceof Ast.Command(var name, var forceNative, _)) {
-            if (forceNative) {
-                return new TypeInfo.ListOf(String.class);
-            }
-            var cmdlet = catalog.cmdlet(name);
-            if (cmdlet.isPresent() && cmdlet.get().output() != Object.class) {
-                return new TypeInfo.ListOf(cmdlet.get().output());
-            }
-        }
-        return new TypeInfo.Unknown();
-    }
-
-    private static TypeInfo instance(Class<?> type) {
-        return new TypeInfo.Instance(type, null);
-    }
-
-    private TypeInfo member(TypeInfo target, String name) {
-        return switch (target) {
-            case TypeInfo.Static(var type) -> {
-                Optional<Field> field = JavaClasses.staticField(type, name);
-                if (field.isPresent()) {
-                    yield instance(field.get().getType());
-                }
-                yield JavaClasses.nested(type, name).<TypeInfo>map(TypeInfo.Static::new).orElse(new TypeInfo.Unknown());
-            }
-            case TypeInfo.Package(var prefix) -> {
-                String qualified = prefix + "." + name;
-                yield session().java().find(qualified).<TypeInfo>map(TypeInfo.Static::new)
-                        .orElse(new TypeInfo.Package(qualified));
-            }
-            case TypeInfo.Instance(var type, var value) -> {
-                // The real value only where reading it does nothing (C-23); otherwise the signature decides.
-                Object property = value == null ? null : PropertyAccess.peek(value, name);
-                yield property == null ? propertyType(type, name) : new TypeInfo.Instance(property.getClass(), property);
-            }
-            case TypeInfo.ListOf _, TypeInfo.Unknown _ -> new TypeInfo.Unknown();
-        };
-    }
-
-    private static TypeInfo propertyType(Class<?> type, String name) {
-        if (type.isRecord()) {
-            for (RecordComponent c : type.getRecordComponents()) {
-                if (c.getName().equalsIgnoreCase(name)) {
-                    return instance(c.getType());
-                }
-            }
-        }
-        return Members.getter(type, name).<TypeInfo>map(m -> instance(m.getReturnType()))
-                .or(() -> Members.field(type, name).map(f -> instance(f.getType())))
-                .orElse(new TypeInfo.Unknown());
-    }
-
-    private static TypeInfo invocation(TypeInfo target, String method, int arity) {
-        List<Method> candidates = switch (target) {
-            case TypeInfo.Static(var type) -> Arrays.stream(type.getMethods())
-                    .filter(m -> Modifier.isStatic(m.getModifiers()) && m.getName().equals(method)).toList();
-            case TypeInfo.Instance(var type, _) -> JavaInvoker.instanceMethods(type).getOrDefault(method, List.of());
-            case TypeInfo.ListOf _ -> JavaInvoker.instanceMethods(List.class).getOrDefault(method, List.of());
-            default -> List.of();
-        };
-        return candidates.stream()
-                .filter(m -> m.getParameterCount() == arity || m.isVarArgs())
-                .findFirst()
-                .or(() -> candidates.stream().findFirst())
-                .<TypeInfo>map(m -> m.getReturnType() == void.class ? new TypeInfo.Unknown() : instance(m.getReturnType()))
-                .orElse(new TypeInfo.Unknown());
-    }
-
-    private static TypeInfo elementOf(TypeInfo target) {
-        return elementOf(target, null);
-    }
-
-    /** Element of a list, of an array ({@code $f[0]}) or target of a {@code *.}. */
-    private static TypeInfo elementOf(TypeInfo target, Ast.Expression index) {
-        return switch (target) {
-            case TypeInfo.ListOf(var element) -> instance(element);
-            case TypeInfo.Instance(var type, var value) when value instanceof List<?> list && !list.isEmpty() -> {
-                Object element = list.getFirst();
-                if (index instanceof Ast.Literal(var position) && position instanceof Integer i) {
-                    int at = i < 0 ? list.size() + i : i;
-                    if (at >= 0 && at < list.size()) {
-                        element = list.get(at);
-                    }
-                }
-                yield element == null ? new TypeInfo.Unknown() : new TypeInfo.Instance(element.getClass(), element);
-            }
-            case TypeInfo.Instance(var type, _) when type.isArray() -> instance(type.componentType());
-            case TypeInfo.Instance(var type, var value) when !(value instanceof Collection<?>) && index == null ->
-                    target; // *. on a single value: the value itself
-            default -> new TypeInfo.Unknown();
-        };
     }
 
     // --- Members ---
