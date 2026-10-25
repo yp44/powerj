@@ -27,23 +27,29 @@ final class CmdletRunner {
     }
 
     /**
-     * @param input    objects received from the pipeline, or {@code null} for the first stage
+     * What a cmdlet is connected to.
+     *
+     * @param input  objects received from the pipeline, or {@code null} for the first stage
+     * @param output receives each produced object
+     * @param errors receives the non-blocking errors
+     */
+    record Connections(Source input, Consumer<Object> output, Consumer<String> errors) { }
+
+    /**
      * @param compiler compiles the text of a block ({@link CmdletContext#compile})
-     * @param sink     receives each produced object
      * @return {@code true} if no error was reported
      */
     static boolean run(CmdletRegistry.Registered registered, List<Object> args, Session session,
-                       Consumer<String> errors, Consumer<Object> sink, Source input,
-                       Function<String, ScriptBlock> compiler) throws Exception {
+                       Connections connections, Function<String, ScriptBlock> compiler) throws Exception {
         List<Object> remaining = new ArrayList<>(args);
         OnError onError = extractOnError(registered.name(), remaining);
         Record params = OptionBinder.bind(registered.name(), registered.parameters(), remaining);
         if (PreviewGuard.active() && !previewable(registered, params)) {
             PreviewGuard.deny(Messages.get("preview.off.cmdletOptions", registered.name()));
         }
-        var context = new Context(registered.name(), session, errors, sink, onError, compiler, input != null);
+        var context = new Context(registered.name(), session, connections, onError, compiler);
         try (context) { // releases the state of the execution, however it ends (review C-01)
-            invoke(registered, params, context, input);
+            invoke(registered, params, context, connections.input());
         } catch (PjException | CancellationException | InterruptedException e) {
             throw e;
         } catch (IllegalArgumentException e) {
@@ -126,15 +132,15 @@ final class CmdletRunner {
         /** State of the execution by kind, in order of creation (guarded by itself). */
         private final Map<Class<?>, Object> states = new LinkedHashMap<>();
 
-        Context(String command, Session session, Consumer<String> errors, Consumer<Object> sink, OnError onError,
-                Function<String, ScriptBlock> compiler, boolean hasInput) {
+        Context(String command, Session session, Connections connections, OnError onError,
+                Function<String, ScriptBlock> compiler) {
             this.command = command;
             this.session = session;
-            this.errors = errors;
-            this.sink = sink;
+            this.errors = connections.errors();
+            this.sink = connections.output();
             this.onError = onError;
             this.compiler = compiler;
-            this.hasInput = hasInput;
+            this.hasInput = connections.input() != null;
         }
 
         @Override

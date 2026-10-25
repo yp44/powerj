@@ -86,6 +86,11 @@ structures, functions) can be built on it. The work is organised in phases (revi
   completion no longer treats a cmdlet as such when a built-in command of the same name runs first. `help` lists the
   built-in commands the interpreter has, not a second list kept in `Help`.
 
+- **The parameters that always travelled together are one object** (step 2.2): `ExecutionContext` and `Redirections`.
+  No method of the execution has more than five parameters any more (there were eleven).
+- The frozen ArchUnit rules no longer fail when a refactoring only changes the signature of a method already in a cycle, or
+  the tally of its report.
+
 ### Examined, not changed
 - **The seven `Messages` classes stay** (C-10, step 1.4). Replacing them with one helper in `powerj-api` was tried on a
   two-module experiment: `ResourceBundle.getBundle(…, module)` called from another module fails unless the owner of the

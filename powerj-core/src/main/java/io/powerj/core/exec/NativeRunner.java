@@ -66,22 +66,27 @@ public final class NativeRunner {
         }
     }
 
-    public Result run(Path executable, List<String> args, Session session, ShellIo io, boolean capture,
-                      Optional<FileTarget> stdout, Optional<FileTarget> stderr) throws InterruptedException {
-        return run(executable, args, session, io, capture, stdout, stderr, false, io.interactive());
-    }
-
     /**
-     * @param errorsToOutput {@code 2>&1}: stderr joins stdout
-     * @param inheritInput   the process reads the shell's standard input directly
+     * Runs one native command alone in its pipeline.
+     *
+     * @param command the program, its arguments, and {@code 2>&1} (stderr joins stdout)
+     * @param context the surroundings: {@code capture} reads the output as lines, the redirections give the files of
+     *                {@code >} and {@code 2>}, {@code inheritInput} lets the process read the shell's standard input
      */
-    public Result run(Path executable, List<String> args, Session session, ShellIo io, boolean capture,
-                      Optional<FileTarget> stdout, Optional<FileTarget> stderr, boolean errorsToOutput,
-                      boolean inheritInput) throws InterruptedException {
-        List<String> command = new ArrayList<>(args.size() + 1);
-        command.add(executable.toString());
-        command.addAll(args);
-        var builder = new ProcessBuilder(command).directory(session.currentDirectory().toFile());
+    Result run(Command command, ExecutionContext context) throws InterruptedException {
+        Path executable = command.executable();
+        List<String> args = command.args();
+        Session session = context.session();
+        ShellIo io = context.io();
+        boolean capture = context.capture();
+        Optional<FileTarget> stdout = context.redirections().out();
+        Optional<FileTarget> stderr = context.redirections().err();
+        boolean errorsToOutput = command.errorsToOutput();
+        boolean inheritInput = context.inheritInput();
+        List<String> line = new ArrayList<>(args.size() + 1);
+        line.add(executable.toString());
+        line.addAll(args);
+        var builder = new ProcessBuilder(line).directory(session.currentDirectory().toFile());
         builder.environment().clear();
         builder.environment().putAll(session.environmentSnapshot());
         Charset charset = encoding.forProgram(executable, session.environment());
@@ -107,7 +112,7 @@ public final class NativeRunner {
             io.console().pause();
         }
         try {
-            return start(builder, executable, args, io, capture, detached, charset);
+            return start(builder, command, context, detached, charset);
         } finally {
             if (console) {
                 io.console().resume();
@@ -115,8 +120,12 @@ public final class NativeRunner {
         }
     }
 
-    private Result start(ProcessBuilder builder, Path executable, List<String> args, ShellIo io, boolean capture,
-                         boolean detached, Charset charset) throws InterruptedException {
+    private Result start(ProcessBuilder builder, Command command, ExecutionContext context, boolean detached,
+                         Charset charset) throws InterruptedException {
+        Path executable = command.executable();
+        List<String> args = command.args();
+        ShellIo io = context.io();
+        boolean capture = context.capture();
         long start = System.nanoTime();
         Process process;
         try {
@@ -163,17 +172,25 @@ public final class NativeRunner {
      * Runs native commands connected to one another (FR-37): bytes pass directly from one process
      * to the next, without decoding.
      *
-     * @param input        objects to write to the first process's stdin (displayed form), or {@code null}
-     * @param inheritInput without {@code input}: the first process reads the shell's standard input
-     * @param output       next stage, which receives the lines of the last process; {@code null} if the group
-     *                     ends the pipeline (the lines then go to {@code sink}, or to the terminal / file)
-     * @param errors       destination of the error lines when they are not inherited
-     * @param stderrFile   file of {@code 2>} (in append mode: it is shared by all stages)
+     * @param context the surroundings; {@code inheritInput}: without {@code input}, the first process reads the shell's
+     *                standard input; {@code sink}: where the lines of the last process go when the group ends the
+     *                pipeline (or the terminal / file); {@code errors}: where the error lines go when they are not
+     *                inherited; the file of {@code 2>} is in append mode, shared by all stages
+     * @param input   objects to write to the first process's stdin (displayed form), or {@code null}
+     * @param output  next stage, which receives the lines of the last process; {@code null} if the group ends the
+     *                pipeline
      * @return metadata of each process, in order
      */
-    List<NativeRun> runGroup(List<Command> commands, Session session, ShellIo io, Source input, boolean inheritInput,
-                             Pipe output, Consumer<Object> sink, boolean capture, Optional<FileTarget> stdout,
-                             Optional<FileTarget> stderrFile, Consumer<String> errors) throws InterruptedException {
+    List<NativeRun> runGroup(List<Command> commands, ExecutionContext context, Source input, Pipe output)
+            throws InterruptedException {
+        Session session = context.session();
+        ShellIo io = context.io();
+        boolean inheritInput = context.inheritInput();
+        Consumer<Object> sink = context.sink();
+        boolean capture = context.capture();
+        Optional<FileTarget> stdout = context.redirections().out();
+        Optional<FileTarget> stderrFile = context.redirections().err();
+        Consumer<String> errors = context.errors();
         List<ProcessBuilder> builders = new ArrayList<>(commands.size());
         for (int i = 0; i < commands.size(); i++) {
             Command command = commands.get(i);
@@ -207,7 +224,7 @@ public final class NativeRunner {
             io.console().pause();
         }
         try {
-            return startGroup(builders, commands, session, io, input, output, sink, errors);
+            return startGroup(builders, commands, context, input, output);
         } finally {
             if (console) {
                 io.console().resume();
@@ -215,9 +232,12 @@ public final class NativeRunner {
         }
     }
 
-    private List<NativeRun> startGroup(List<ProcessBuilder> builders, List<Command> commands, Session session,
-                                       ShellIo io, Source input, Pipe output, Consumer<Object> sink,
-                                       Consumer<String> errors) throws InterruptedException {
+    private List<NativeRun> startGroup(List<ProcessBuilder> builders, List<Command> commands, ExecutionContext context,
+                                       Source input, Pipe output) throws InterruptedException {
+        Session session = context.session();
+        ShellIo io = context.io();
+        Consumer<Object> sink = context.sink();
+        Consumer<String> errors = context.errors();
         long start = System.nanoTime();
         List<Process> processes;
         try {
@@ -289,11 +309,14 @@ public final class NativeRunner {
      * Java cannot start a process in another group, so the program is started by {@code sh}, which ignores the
      * signals and replaces itself with the program ({@code exec}: the pid is the program's).
      *
-     * @param stderrFile file of {@code 2>} (in append mode: it is shared by all stages)
+     * @param context the surroundings; the file of {@code 2>} is in append mode, shared by all stages
      * @return the processes, in order
      */
-    List<Process> startBackground(List<Command> commands, Session session, ShellIo io, Optional<FileTarget> stdout,
-                                  Optional<FileTarget> stderrFile) {
+    List<Process> startBackground(List<Command> commands, ExecutionContext context) {
+        Session session = context.session();
+        ShellIo io = context.io();
+        Optional<FileTarget> stdout = context.redirections().out();
+        Optional<FileTarget> stderrFile = context.redirections().err();
         List<ProcessBuilder> builders = new ArrayList<>(commands.size());
         for (int i = 0; i < commands.size(); i++) {
             Command command = commands.get(i);

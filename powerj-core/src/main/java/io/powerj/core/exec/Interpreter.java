@@ -387,20 +387,21 @@ public final class Interpreter {
         try {
             errTarget = redirect(statement.pipeline(), Token.Stream.ERR);
             Optional<NativeRunner.FileTarget> outTarget = redirect(statement.pipeline(), Token.Stream.OUT);
+            var redirections = new Redirections(outTarget, errTarget);
             if (statement.background()) {
-                return background(statement.pipeline(), outTarget, errTarget);
+                return background(statement.pipeline(), redirections);
             }
             if (statement.assignTo().isPresent()) {
                 if (outTarget.isPresent()) {
                     throw new PjException(Messages.get("redirect.assignment"));
                 }
                 List<Object> values = new ArrayList<>();
-                boolean succeeded = pipeline(statement.pipeline(), values::add, true, Optional.empty(), errTarget);
+                boolean succeeded = pipeline(statement.pipeline(), values::add, true, Redirections.errors(errTarget));
                 session.setVariable(statement.assignTo().get(), Evaluator.single(values));
                 return succeeded;
             }
             try (var output = new Output(outTarget)) {
-                return pipeline(statement.pipeline(), output::accept, false, outTarget, errTarget);
+                return pipeline(statement.pipeline(), output::accept, false, redirections);
             }
         } catch (PjException e) {
             blockingError = true;
@@ -413,14 +414,15 @@ public final class Interpreter {
      * {@code cmd &} (FR-75): starts the native commands of the pipeline without waiting for them, and records the job.
      * {@code $last} describes the last process, with no exit code, as for a detached application (FR-39).
      */
-    private boolean background(Ast.Pipeline pipeline, Optional<NativeRunner.FileTarget> outTarget,
-                               Optional<NativeRunner.FileTarget> errTarget) throws InterruptedException {
+    private boolean background(Ast.Pipeline pipeline, Redirections redirections) throws InterruptedException {
         List<Segment> segments = segments(pipeline.stages());
         if (segments.size() != 1 || !(segments.getFirst() instanceof NativeSegment(var commands))) {
             throw new PjException(Messages.get("background.nativeOnly"));
         }
         long start = System.nanoTime();
-        List<Process> processes = nativeRunner.startBackground(commands, session, io, outTarget, shared(errTarget));
+        var context = new ExecutionContext(session, io, null, false, redirections.withSharedErrors(), io.errors(),
+                false);
+        List<Process> processes = nativeRunner.startBackground(commands, context);
         String text = String.join(" | ", commands.stream().map(Interpreter::commandText).toList());
         Job job = session.jobs().add(text, processes);
         NativeRunner.Command last = commands.getLast();
@@ -485,7 +487,7 @@ public final class Interpreter {
         boolean more = false;
         try {
             guard.call(() -> pipeline(statement.pipeline(), value -> previewValue(value, values, limit), true,
-                    Optional.empty(), Optional.empty()));
+                    Redirections.NONE));
         } catch (PreviewFull _) {
             more = true;
         } catch (InterruptedException | CancellationException e) {
@@ -585,8 +587,7 @@ public final class Interpreter {
      * @return success: that of the last stage, and no blocking error in the others
      */
     private boolean pipeline(Ast.Pipeline pipeline, Consumer<Object> sink, boolean capture,
-                             Optional<NativeRunner.FileTarget> outTarget, Optional<NativeRunner.FileTarget> errTarget)
-            throws InterruptedException {
+                             Redirections redirections) throws InterruptedException {
         // Perf mode (FR-76): only the outermost pipeline of the line is measured; the others count as "resolve".
         PerfRecorder current = recorder;
         PerfRecorder perf = current != null && !PreviewGuard.active() && current.enterPipeline() ? current : null;
@@ -596,7 +597,7 @@ public final class Interpreter {
             if (perf != null) {
                 perf.addResolve(System.nanoTime() - resolveStart);
             }
-            return run(segments, sink, capture, outTarget, errTarget, perf);
+            return run(segments, sink, capture, redirections, perf);
         } finally {
             if (perf != null) {
                 perf.exitPipeline();
@@ -604,10 +605,9 @@ public final class Interpreter {
         }
     }
 
-    private boolean run(List<Segment> segments, Consumer<Object> sink, boolean capture,
-                        Optional<NativeRunner.FileTarget> outTarget, Optional<NativeRunner.FileTarget> errTarget,
+    private boolean run(List<Segment> segments, Consumer<Object> sink, boolean capture, Redirections redirections,
                         PerfRecorder perf) throws InterruptedException {
-        Consumer<String> errors = synchronizedErrors(errorSink(errTarget));
+        Consumer<String> errors = synchronizedErrors(errorSink(redirections.err()));
         int n = segments.size();
         List<StageProbe> probes = new ArrayList<>(n);
         for (Segment segment : segments) {
@@ -623,8 +623,8 @@ public final class Interpreter {
             long start = System.nanoTime();
             NativeRunner.Result result;
             try {
-                result = nativeRunner.run(command.executable(), command.args(), session, io, capture, outTarget,
-                        errTarget, command.errorsToOutput(), inheritsInput());
+                result = nativeRunner.run(command, new ExecutionContext(session, io, sink, capture, redirections,
+                        errors, inheritsInput()));
             } finally {
                 if (probe != null) {
                     probe.measured(System.nanoTime() - start);
@@ -637,11 +637,13 @@ public final class Interpreter {
             result.capturedLines().forEach(sink);
             return result.run().succeeded();
         }
-        Optional<NativeRunner.FileTarget> sharedErrors = shared(errTarget);
+        // The last stage's surroundings; the others write the errors file too but have no destination for values.
+        var last = new ExecutionContext(session, io, sink, capture, redirections.withSharedErrors(), errors,
+                inheritsInput());
         if (n == 1) {
-            return segment(segments.getFirst(), standardInput, null, sink, capture, outTarget, sharedErrors, errors,
-                    probes.getFirst());
+            return segment(segments.getFirst(), standardInput, null, last, probes.getFirst());
         }
+        var intermediate = last.forIntermediateStage();
 
         List<Pipe> pipes = new ArrayList<>(n - 1);
         for (int i = 0; i < n - 1; i++) {
@@ -662,7 +664,7 @@ public final class Interpreter {
             threads.add(Thread.ofVirtual().name(threadName).unstarted(PreviewGuard.propagate(() -> {
                 output.onAbort(Thread.currentThread()::interrupt);
                 try {
-                    segment(segment, input, output, null, false, Optional.empty(), sharedErrors, errors, probe);
+                    segment(segment, input, output, intermediate, probe);
                     output.close();
                 } catch (InterruptedException | CancellationException e) {
                     closeQuietly(output);
@@ -687,8 +689,7 @@ public final class Interpreter {
         Pipe lastInput = pipes.getLast();
         boolean succeeded;
         try {
-            succeeded = segment(segments.getLast(), lastInput, null, sink, capture, outTarget, sharedErrors, errors,
-                    probes.getLast());
+            succeeded = segment(segments.getLast(), lastInput, null, last, probes.getLast());
         } finally {
             lastInput.abort();
             joinAll(threads);
@@ -700,24 +701,21 @@ public final class Interpreter {
     }
 
     /** Runs a segment; {@code output} is the queue to the next stage, or {@code null} at the end of the pipeline. */
-    private boolean segment(Segment segment, Source input, Pipe output, Consumer<Object> sink, boolean capture,
-                            Optional<NativeRunner.FileTarget> outTarget, Optional<NativeRunner.FileTarget> errTarget,
-                            Consumer<String> errors, StageProbe probe) throws InterruptedException {
+    private boolean segment(Segment segment, Source input, Pipe output, ExecutionContext context, StageProbe probe)
+            throws InterruptedException {
         if (probe != null) {
-            return probe.run(() -> runSegment(segment, input, output, sink, capture, outTarget, errTarget, errors,
-                    probe));
+            return probe.run(() -> runSegment(segment, input, output, context, probe));
         }
-        return runSegment(segment, input, output, sink, capture, outTarget, errTarget, errors, null);
+        return runSegment(segment, input, output, context, null);
     }
 
     /** @param measuring probe that receives the native processes of the stage, or {@code null} */
-    private boolean runSegment(Segment segment, Source input, Pipe output, Consumer<Object> sink, boolean capture,
-                               Optional<NativeRunner.FileTarget> outTarget, Optional<NativeRunner.FileTarget> errTarget,
-                               Consumer<String> errors, StageProbe measuring) throws InterruptedException {
+    private boolean runSegment(Segment segment, Source input, Pipe output, ExecutionContext context,
+                               StageProbe measuring) throws InterruptedException {
         return switch (segment) {
             case ObjectSegment(var stage, _) -> {
                 try {
-                    yield stage.run(input, output != null ? output::putUnrolled : sink, errors);
+                    yield stage.run(input, output != null ? output::putUnrolled : context.sink(), context.errors());
                 } catch (InterruptedException | RuntimeException e) {
                     throw e;
                 } catch (Exception e) {
@@ -725,8 +723,7 @@ public final class Interpreter {
                 }
             }
             case NativeSegment(var commands) -> {
-                List<NativeRun> runs = nativeRunner.runGroup(commands, session, io, input, inheritsInput(), output,
-                        sink, capture, outTarget, errTarget, errors);
+                List<NativeRun> runs = nativeRunner.runGroup(commands, context, input, output);
                 if (measuring != null) {
                     measuring.natives(runs);
                 }
@@ -865,7 +862,8 @@ public final class Interpreter {
     private boolean runCmdlet(CmdletRegistry.Registered cmdlet, List<Object> args, Source input,
                               Consumer<Object> output, Consumer<String> errors) throws Exception {
         try {
-            return CmdletRunner.run(cmdlet, args, session, errors, output, input, this::compile);
+            return CmdletRunner.run(cmdlet, args, session, new CmdletRunner.Connections(input, output, errors),
+                    this::compile);
         } catch (PjException | InterruptedException | CancellationException e) {
             throw e;
         } catch (Exception e) {
@@ -889,19 +887,6 @@ public final class Interpreter {
     /** Does the first process read the shell's standard input directly? */
     private boolean inheritsInput() {
         return io.interactive() || inheritStandardInput;
-    }
-
-    /** {@code 2>} shared by several processes: the file is truncated once, then each one appends to it. */
-    private static Optional<NativeRunner.FileTarget> shared(Optional<NativeRunner.FileTarget> target) {
-        if (target.isEmpty() || target.get().append()) {
-            return target;
-        }
-        try {
-            Files.writeString(target.get().file(), "", StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new PjException(PjError.of(Messages.get("file.writeFailed", target.get().file(), e.getMessage()), e));
-        }
-        return Optional.of(new NativeRunner.FileTarget(target.get().file(), true));
     }
 
     private static Consumer<String> synchronizedErrors(Consumer<String> errors) {
@@ -1004,7 +989,7 @@ public final class Interpreter {
         }
         List<Object> values = new ArrayList<>();
         Optional<NativeRunner.FileTarget> errTarget = redirect(pipeline, Token.Stream.ERR);
-        pipeline(pipeline, values::add, true, Optional.empty(), errTarget);
+        pipeline(pipeline, values::add, true, Redirections.errors(errTarget));
         return values;
     }
 

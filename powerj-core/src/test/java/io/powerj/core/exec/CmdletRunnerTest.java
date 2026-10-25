@@ -96,8 +96,8 @@ class CmdletRunnerTest {
                 return "$_";
             }
         };
-        return CmdletRunner.run(registered, new ArrayList<>(List.of(args)), session, errors::add, output::add, input,
-                _ -> compiled);
+        return CmdletRunner.run(registered, new ArrayList<>(List.of(args)), session,
+                new CmdletRunner.Connections(input, output::add, errors::add), _ -> compiled);
     }
 
     @Test
@@ -150,8 +150,9 @@ class CmdletRunnerTest {
         List<String> seen = new ArrayList<>();
         Typed.seen = seen;
 
-        boolean succeeded = CmdletRunner.run(registered, new ArrayList<>(), session, errors::add, output::add,
-                new RecordingSource("text", 42, "more"), _ -> null);
+        boolean succeeded = CmdletRunner.run(registered, new ArrayList<>(), session,
+                new CmdletRunner.Connections(new RecordingSource("text", 42, "more"), output::add, errors::add),
+                _ -> null);
 
         assertThat(seen).containsExactly("text", "more");
         assertThat(errors).singleElement().asString().contains("Integer").contains("String");
