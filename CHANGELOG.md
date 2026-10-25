@@ -43,11 +43,16 @@ structures, functions) can be built on it. The work is organised in phases (revi
   thread is `volatile`, the environment is a synchronized map, and a native command starts from an immutable
   snapshot of it. The automatic variables (`$?`, `$exit`, `$last`…) are an `enum`, not a `switch` on strings.
 
+- **A cmdlet's per-run state belongs to the run, and is released when the run ends** (C-01, step 1.3). A cmdlet is one
+  object shared by every command that uses it, so 23 of them kept their state in tables keyed by the context or by the
+  (value-compared) parameters: a lock for every object, a leak when the command was cancelled, a collision between two
+  `where` stages with equal parameters. `CmdletContext.state(Class, Supplier)` (additive, `default`) gives each run
+  its own state; the runner closes the states that are `AutoCloseable` when the run ends, normally or not (Ctrl+C
+  included). The 23 tables are gone. `grid` closes the window of a command that was cancelled before it handed it over.
+
 ### Planned (review §8)
-- **Phase 1 (continued).** A malformed `config.properties` no longer prevents startup; cmdlets get an
-  execution-scoped state in `CmdletContext` (`begin`/`process`/`end` always paired); Ctrl+C is no longer swallowed by
-  `to-json`; `sort` uses a total order; destructive commands resolve symbolic links and no longer ignore case on
-  case-sensitive file systems.
+- **Phase 1 (continued).** Ctrl+C is no longer swallowed by `to-json`; `sort` uses a total order; destructive
+  commands resolve symbolic links and no longer ignore case on case-sensitive file systems.
 - **Phase 2 — `Interpreter` split** into a command resolution, a pipeline executor, redirections, and
   observer-based perf and preview modes.
 - **Phase 3 — packages, modules and API.** `core.exec` is split in eight packages with qualified exports, the

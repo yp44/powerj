@@ -1360,6 +1360,9 @@ public interface CmdletContext<O> {
     ScriptBlock compile(String expression);
     default void stopInput() { }        // reads no more objects: the previous stage is stopped (FR-68b)
     default Optional<Path> configDirectory() { return Optional.empty(); }  // configuration folder (§8)
+    // State of this execution: same object from begin, process and end, a new one for the next run; closed by the
+    // shell when the run is over, however it ends, if it is AutoCloseable. `end` is not called after an error.
+    default <S> S state(Class<S> type, Supplier<? extends S> initial) { throw new UnsupportedOperationException(); }
 }
 
 // Immutable ordered Map of named columns, output of select (FR-69); sizeColumns(): columns shown as sizes

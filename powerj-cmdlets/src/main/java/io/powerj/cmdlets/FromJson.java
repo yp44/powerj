@@ -1,9 +1,6 @@
 package io.powerj.cmdlets;
 
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-import java.util.WeakHashMap;
 
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
@@ -28,20 +25,23 @@ public final class FromJson implements Cmdlet<FromJson.Params, Object, Object> {
     private record State(PipelineText text, JsonSplitter splitter) {
     }
 
-    private final Map<CmdletContext<?>, State> states = Collections.synchronizedMap(new WeakHashMap<>());
+    private static State state(Params p, CmdletContext<Object> context) {
+        return context.state(State.class, () -> {
+            if (!context.hasInput()) {
+                throw new IllegalArgumentException(Messages.get("from-json.input.expected"));
+            }
+            return new State(new PipelineText(p.property(), context, "from-json.not.text"), new JsonSplitter());
+        });
+    }
 
     @Override
     public void begin(Params p, CmdletContext<Object> context) {
-        if (!context.hasInput()) {
-            throw new IllegalArgumentException(Messages.get("from-json.input.expected"));
-        }
-        states.put(context, new State(new PipelineText(p.property(), context, "from-json.not.text"),
-                new JsonSplitter()));
+        state(p, context); // refuses a command that has no input before anything is read
     }
 
     @Override
     public void process(Params p, Object input, CmdletContext<Object> context) {
-        State state = states.get(context);
+        State state = state(p, context);
         String text = state.text().text(input, context);
         if (text != null) {
             emit(state.splitter().feed(text), context);
@@ -50,7 +50,7 @@ public final class FromJson implements Cmdlet<FromJson.Params, Object, Object> {
 
     @Override
     public void end(Params p, CmdletContext<Object> context) {
-        emit(states.remove(context).splitter().finish(), context);
+        emit(state(p, context).splitter().finish(), context);
     }
 
     private static void emit(List<JsonSplitter.Result> results, CmdletContext<Object> context) {

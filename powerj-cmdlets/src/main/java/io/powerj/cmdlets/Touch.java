@@ -7,10 +7,7 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.time.Instant;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-import java.util.WeakHashMap;
 
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
@@ -36,12 +33,10 @@ public final class Touch implements Cmdlet<Touch.Params, Object, Object> {
             String property) {
     }
 
-    private final Map<CmdletContext<?>, PipelineFiles> files = Collections.synchronizedMap(new WeakHashMap<>());
-
     @Override
     public void begin(Params p, CmdletContext<Object> context) {
         FileOps.Arguments arguments = FileOps.arguments(p.paths(), p.property(), context);
-        files.put(context, new PipelineFiles(p.property(), arguments.block(), context, FileOps.KEYS));
+        context.state(PipelineFiles.class, () -> new PipelineFiles(p.property(), arguments.block(), context, FileOps.KEYS));
         if (arguments.words().isEmpty() && !context.hasInput()) {
             throw new IllegalArgumentException(Messages.get("fileops.path.expected", "touch"));
         }
@@ -59,15 +54,10 @@ public final class Touch implements Cmdlet<Touch.Params, Object, Object> {
 
     @Override
     public void process(Params p, Object input, CmdletContext<Object> context) {
-        Path path = files.get(context).file(input, context);
+        Path path = ExecutionState.begun(context, PipelineFiles.class).file(input, context);
         if (path != null) {
             touch(p, path.toAbsolutePath().normalize(), context);
         }
-    }
-
-    @Override
-    public void end(Params p, CmdletContext<Object> context) {
-        files.remove(context);
     }
 
     private static void touch(Params p, Path path, CmdletContext<Object> context) {

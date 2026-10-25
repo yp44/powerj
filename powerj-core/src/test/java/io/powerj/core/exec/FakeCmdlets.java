@@ -129,6 +129,37 @@ final class FakeCmdlets {
         }
     }
 
+    /** Passes the objects through and holds a resource that the shell must close, whatever happens to the command. */
+    @CmdletInfo(name = "hold", category = "Test", summary = "Holds a resource", examples = "items | hold")
+    static final class Hold implements Cmdlet<Hold.Params, Object, Object> {
+
+        record Params() { }
+
+        /** Resources held and not yet closed. */
+        static final java.util.concurrent.atomic.AtomicInteger OPEN = new java.util.concurrent.atomic.AtomicInteger();
+
+        private static final class Resource implements AutoCloseable {
+            Resource() {
+                OPEN.incrementAndGet();
+            }
+
+            @Override
+            public void close() {
+                OPEN.decrementAndGet();
+            }
+        }
+
+        @Override
+        public void begin(Params params, CmdletContext<Object> context) {
+            context.state(Resource.class, Resource::new);
+        }
+
+        @Override
+        public void process(Params params, Object input, CmdletContext<Object> context) {
+            context.emit(input);
+        }
+    }
+
     /** Mini {@code map}: applies a block or a method reference to each object. */
     @CmdletInfo(name = "eval-each", category = "Test", summary = "Transforms", examples = "items | eval-each Item::name")
     static final class EvalEach implements Cmdlet<EvalEach.Params, Object, Object> {
@@ -176,6 +207,7 @@ final class FakeCmdlets {
     }
 
     static List<Cmdlet<?, ?, ?>> all() {
-        return List.of(new Items(), new Filter(), new Pick(), new Count(), new Eval(), new Infinite(), new EvalEach(), new Take());
+        return List.of(new Items(), new Filter(), new Pick(), new Count(), new Eval(), new Infinite(), new EvalEach(), new Take(),
+                new Hold());
     }
 }

@@ -1,8 +1,5 @@
 package io.powerj.cmdlets;
 
-import java.util.Collections;
-import java.util.Map;
-import java.util.WeakHashMap;
 import java.util.concurrent.CancellationException;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -79,8 +76,6 @@ public final class Range implements Cmdlet<Range.Params, Object, Object> {
         }
     }
 
-    private final Map<CmdletContext<?>, State> states = Collections.synchronizedMap(new WeakHashMap<>());
-
     @Override
     public void begin(Params p, CmdletContext<Object> context) {
         if (p.include() && p.exclude()) {
@@ -92,8 +87,7 @@ public final class Range implements Cmdlet<Range.Params, Object, Object> {
         if (p.repeat() && !(from instanceof Match || from instanceof Condition)) {
             throw new IllegalArgumentException(Messages.get("range.repeat.position"));
         }
-        var state = new State(from, to);
-        states.put(context, state);
+        State state = context.state(State.class, () -> new State(from, to));
         long first = from instanceof Position(long n) ? n : 1;
         if (to instanceof Position(long n) && n < first) {
             state.done = true; // --to before --from: nothing to emit
@@ -103,7 +97,7 @@ public final class Range implements Cmdlet<Range.Params, Object, Object> {
 
     @Override
     public void process(Params p, Object input, CmdletContext<Object> context) {
-        State state = states.get(context);
+        State state = ExecutionState.begun(context, State.class);
         state.index++;
         if (state.done) {
             return; // the input was stopped
@@ -143,11 +137,6 @@ public final class Range implements Cmdlet<Range.Params, Object, Object> {
             return;
         }
         context.emit(input);
-    }
-
-    @Override
-    public void end(Params p, CmdletContext<Object> context) {
-        states.remove(context);
     }
 
     private static void close(State state, Params p, CmdletContext<Object> context) {

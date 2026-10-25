@@ -2,7 +2,6 @@ package io.powerj.cmdlets;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -11,7 +10,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.WeakHashMap;
 import java.util.concurrent.CancellationException;
 import java.util.stream.BaseStream;
 
@@ -68,8 +66,6 @@ public final class Join implements Cmdlet<Join.Params, Object, Row> {
     private record State(ScriptBlock leftKey, Map<Object, List<Object>> index, String dropped, List<String> columns) {
     }
 
-    private final Map<CmdletContext<?>, State> states = Collections.synchronizedMap(new WeakHashMap<>());
-
     @Override
     public void begin(Params p, CmdletContext<Row> context) {
         ScriptBlock right = side(p.right(), "join.right.expected");
@@ -111,8 +107,8 @@ public final class Join implements Cmdlet<Join.Params, Object, Row> {
             }
         }
         String dropped = p.key() instanceof String property && !property.contains(".") ? property : null;
-        State state = new State(leftKey, index, dropped, columns == null ? List.of() : columns);
-        states.put(context, state);
+        List<String> rightColumns = columns == null ? List.of() : columns;
+        State state = context.state(State.class, () -> new State(leftKey, index, dropped, rightColumns));
         if (left != null) {
             for (Object object : objects(left, "--left")) {
                 join(state, p, object, context);
@@ -122,12 +118,7 @@ public final class Join implements Cmdlet<Join.Params, Object, Row> {
 
     @Override
     public void process(Params p, Object input, CmdletContext<Row> context) {
-        join(states.get(context), p, input, context);
-    }
-
-    @Override
-    public void end(Params p, CmdletContext<Row> context) {
-        states.remove(context);
+        join(ExecutionState.begun(context, State.class), p, input, context);
     }
 
     private static void join(State state, Params p, Object left, CmdletContext<Row> context) {

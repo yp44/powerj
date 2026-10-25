@@ -1,10 +1,8 @@
 package io.powerj.cmdlets;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CancellationException;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
 import io.powerj.api.Cmdlet;
@@ -40,17 +38,22 @@ public final class Where implements Cmdlet<Where.Params, Object, Object> {
     private static final Pattern LITERAL = Pattern.compile(
             "-?\\d+(\\.\\d+)?(L|b|kb|mb|gb|tb|ms|s|m|h|d)?|true|false|null", Pattern.CASE_INSENSITIVE);
 
-    /** Condition of each running execution: the same cmdlet can be used in several pipelines at once. */
-    private final Map<Params, ScriptBlock> conditions = new ConcurrentHashMap<>();
+    /** The condition of this execution, compiled once. */
+    private record Compiled(ScriptBlock condition) {
+    }
+
+    private static ScriptBlock compiled(Params p, CmdletContext<Object> context) {
+        return context.state(Compiled.class, () -> new Compiled(condition(p.condition(), context))).condition();
+    }
 
     @Override
     public void begin(Params p, CmdletContext<Object> context) {
-        conditions.put(p, condition(p.condition(), context));
+        compiled(p, context); // compiles the condition before anything is read
     }
 
     @Override
     public void process(Params p, Object input, CmdletContext<Object> context) {
-        ScriptBlock condition = conditions.computeIfAbsent(p, key -> condition(key.condition(), context));
+        ScriptBlock condition = compiled(p, context);
         boolean keep;
         try {
             keep = condition.test(input);
@@ -64,11 +67,6 @@ public final class Where implements Cmdlet<Where.Params, Object, Object> {
         if (keep) {
             context.emit(input);
         }
-    }
-
-    @Override
-    public void end(Params p, CmdletContext<Object> context) {
-        conditions.remove(p);
     }
 
     /** Block given as is, or block compiled from the short form. */

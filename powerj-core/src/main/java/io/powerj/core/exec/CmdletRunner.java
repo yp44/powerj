@@ -2,12 +2,16 @@ package io.powerj.core.exec;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CancellationException;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
@@ -38,7 +42,7 @@ final class CmdletRunner {
             PreviewGuard.deny(Messages.get("preview.off.cmdletOptions", registered.name()));
         }
         var context = new Context(registered.name(), session, errors, sink, onError, compiler, input != null);
-        try {
+        try (context) { // releases the state of the execution, however it ends (review C-01)
             invoke(registered, params, context, input);
         } catch (PjException | CancellationException | InterruptedException e) {
             throw e;
@@ -107,8 +111,8 @@ final class CmdletRunner {
         return result;
     }
 
-    /** Context provided to the cmdlet. */
-    private static final class Context implements CmdletContext<Object> {
+    /** Context provided to the cmdlet; closing it closes the state of the execution. */
+    private static final class Context implements CmdletContext<Object>, AutoCloseable {
 
         private final String command;
         private final Session session;
@@ -119,6 +123,8 @@ final class CmdletRunner {
         private final boolean hasInput;
         private boolean hadErrors;
         private volatile boolean inputStopped;
+        /** State of the execution by kind, in order of creation (guarded by itself). */
+        private final Map<Class<?>, Object> states = new LinkedHashMap<>();
 
         Context(String command, Session session, Consumer<String> errors, Consumer<Object> sink, OnError onError,
                 Function<String, ScriptBlock> compiler, boolean hasInput) {
@@ -186,6 +192,46 @@ final class CmdletRunner {
         @Override
         public void stopInput() {
             inputStopped = true;
+        }
+
+        @Override
+        public <S> S state(Class<S> type, Supplier<? extends S> initial) {
+            synchronized (states) {
+                Object state = states.get(type);
+                if (state == null) {
+                    state = Objects.requireNonNull(initial.get(), "the initial state of " + type.getName());
+                    states.put(type, state);
+                }
+                return type.cast(state);
+            }
+        }
+
+        /** Closes the states that can be, last created first; the first failure is thrown, the others added to it. */
+        @Override
+        public void close() throws Exception {
+            List<Object> created;
+            synchronized (states) {
+                created = new ArrayList<>(states.values());
+                states.clear();
+            }
+            Collections.reverse(created);
+            Exception failure = null;
+            for (Object state : created) {
+                if (state instanceof AutoCloseable closeable) {
+                    try {
+                        closeable.close();
+                    } catch (Exception e) {
+                        if (failure == null) {
+                            failure = e;
+                        } else {
+                            failure.addSuppressed(e);
+                        }
+                    }
+                }
+            }
+            if (failure != null) {
+                throw failure;
+            }
         }
 
         @Override

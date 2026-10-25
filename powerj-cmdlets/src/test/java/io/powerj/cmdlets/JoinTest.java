@@ -55,13 +55,14 @@ class JoinTest {
         return Row.of(values);
     }
 
-    private List<Row> join(Join.Params params, Object... inputs) {
+    private List<Row> join(Join.Params params, Object... inputs) throws Exception {
         var join = new Join();
         join.begin(params, context);
         for (Object input : inputs) {
             join.process(params, input, context);
         }
         join.end(params, context);
+        context.closeStates();
         return context.emitted;
     }
 
@@ -70,7 +71,7 @@ class JoinTest {
     }
 
     @Test
-    void innerJoinMultipliesTheLeftObjectsByTheirMatches() {
+    void innerJoinMultipliesTheLeftObjectsByTheirMatches() throws Exception {
         var countries = List.of(row("code", "FR", "country", "France"), row("code", "IT", "country", "Italy"),
                 row("code", "ES", "country", "Spain"));
         var zips = List.of(row("code", "FR", "zip", "75001"), row("code", "FR", "zip", "69001"),
@@ -85,7 +86,7 @@ class JoinTest {
     }
 
     @Test
-    void leftAndRightKeysMayDifferAndBeBlocks() {
+    void leftAndRightKeysMayDifferAndBeBlocks() throws Exception {
         var right = List.of(row("zipcode", "fr", "city", "Paris"));
         var params = new Join.Params(side(right), null, null, "statezip",
                 block("upper", r -> ((String) ((Row) r).get("zipcode")).toUpperCase()), false);
@@ -94,14 +95,14 @@ class JoinTest {
     }
 
     @Test
-    void rightKeyDefaultsToTheLeftKey() {
+    void rightKeyDefaultsToTheLeftKey() throws Exception {
         var params = new Join.Params(side(List.of(row("id", 1, "b", "x"))), null, null, "id", null, false);
         List<Row> rows = join(params, row("id", 1, "a", "y"));
         assertThat(rows.getFirst().keySet()).containsExactly("id", "a", "right_id", "b");
     }
 
     @Test
-    void outerKeepsTheLeftObjectsWithoutMatch() {
+    void outerKeepsTheLeftObjectsWithoutMatch() throws Exception {
         var right = List.of(row("id", "1", "b", "x"));
         var params = new Join.Params(side(right), null, "id", null, null, true);
         List<Row> rows = join(params, row("id", "1", "a", "p"), row("id", "2", "a", "q"));
@@ -109,27 +110,27 @@ class JoinTest {
     }
 
     @Test
-    void outerWithAnEmptyRightSideKeepsOnlyTheLeftColumns() {
+    void outerWithAnEmptyRightSideKeepsOnlyTheLeftColumns() throws Exception {
         var params = new Join.Params(side(List.of()), null, "id", null, null, true);
         assertThat(join(params, row("id", "1", "a", "p"))).containsExactly(row("id", "1", "a", "p"));
     }
 
     @Test
-    void nullKeysNeverMatchAndIntegralNumbersAreComparedByValue() {
+    void nullKeysNeverMatchAndIntegralNumbersAreComparedByValue() throws Exception {
         var right = List.of(row("id", null, "b", "n"), row("id", 1L, "b", "x"));
         List<Row> rows = join(byKey(right, "id"), row("id", null, "a", "m"), row("id", 1, "a", "y"));
         assertThat(rows).containsExactly(row("id", 1, "a", "y", "b", "x"));
     }
 
     @Test
-    void collidingRightColumnsArePrefixed() {
+    void collidingRightColumnsArePrefixed() throws Exception {
         var right = List.of(row("id", "1", "name", "right"));
         List<Row> rows = join(byKey(right, "id"), row("id", "1", "name", "left"));
         assertThat(rows).containsExactly(row("id", "1", "name", "left", "right_name", "right"));
     }
 
     @Test
-    void recordsAndPlainValuesAreJoinedAndSizesKept() {
+    void recordsAndPlainValuesAreJoinedAndSizesKept() throws Exception {
         var file = new FileEntry("a.txt", 2048, Instant.EPOCH, Path.of("/tmp/a.txt"), false, "txt");
         var right = new Object[] {row("name", "a.txt", "owner", "me")};
         List<Row> rows = join(byKey(right, "name"), file);
@@ -144,7 +145,7 @@ class JoinTest {
     }
 
     @Test
-    void atTheHeadOfAPipelineTheLeftSideIsABlock() {
+    void atTheHeadOfAPipelineTheLeftSideIsABlock() throws Exception {
         context.hasInput = false;
         var params = new Join.Params(side(List.of(row("id", "1", "b", "x"))),
                 side(Arrays.asList(row("id", "1", "a", "y"), row("id", "2", "a", "z"))), "id", null, null, false);
@@ -152,7 +153,7 @@ class JoinTest {
     }
 
     @Test
-    void keyErrorsSkipTheObject() {
+    void keyErrorsSkipTheObject() throws Exception {
         var params = new Join.Params(side(List.of(row("id", "1"))), null, null,
                 block("boom", v -> {
                     throw new IllegalStateException("boom");

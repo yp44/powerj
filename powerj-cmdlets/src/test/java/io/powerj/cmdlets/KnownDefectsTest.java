@@ -51,7 +51,7 @@ class KnownDefectsTest {
 
     @Disabled("C-16, fixed in Phase 1.6: TimSort rejects an inconsistent comparator")
     @Test
-    void sortingMixedValuesNeverFailsWithAContractViolation() {
+    void sortingMixedValuesNeverFailsWithAContractViolation() throws Exception {
         var context = new TestContext<Object>(Path.of("."));
         context.hasInput = true;
         var sort = new Sort();
@@ -68,6 +68,7 @@ class KnownDefectsTest {
             sort.process(params, input, context);
         }
         sort.end(params, context);
+        context.closeStates();
 
         assertThat(context.emitted).hasSize(400);
     }
@@ -95,10 +96,10 @@ class KnownDefectsTest {
         }
     }
 
-    // --- C-01: where keeps its state in a map keyed by the (value-compared) parameters ---
+    // --- C-01: where kept its state in a map keyed by the (value-compared) parameters ---
 
     @Test
-    void twoWhereStagesWithEqualParametersStillFilterAfterTheFirstEnds() {
+    void twoWhereStagesWithEqualParametersAreIndependent() throws Exception {
         var even = block(value -> ((Integer) value) % 2 == 0);
         var params = new Where.Params(List.of(even)); // equal for both stages: the same record, the same block
         var where = new Where();
@@ -106,16 +107,18 @@ class KnownDefectsTest {
         var second = new TestContext<Object>(Path.of("."));
 
         where.begin(params, first);
-        where.begin(params, second); // overwrites the entry of the first stage
+        where.begin(params, second);
         where.process(params, 1, first);
         where.process(params, 2, first);
-        where.end(params, first); // removes the entry that the second stage is using
+        where.end(params, first);
+        first.closeStates();
         where.process(params, 3, second);
         where.process(params, 4, second);
         where.end(params, second);
+        second.closeStates();
 
-        // The collision exists but is masked by the computeIfAbsent of process(): the result is right. The
-        // review (C-01) keeps the real costs: a lock per object, no cleanup when end() is skipped.
+        // The collision of the old table was masked by a computeIfAbsent, so the result was right; it is now
+        // impossible: each execution holds its own state.
         assertThat(first.emitted).containsExactly(2);
         assertThat(second.emitted).containsExactly(4);
     }

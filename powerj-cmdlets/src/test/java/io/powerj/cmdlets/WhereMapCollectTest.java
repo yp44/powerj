@@ -43,7 +43,7 @@ class WhereMapCollectTest {
         };
     }
 
-    private List<Object> where(List<Object> condition, Object... inputs) {
+    private List<Object> where(List<Object> condition, Object... inputs) throws Exception {
         var where = new Where();
         var params = new Where.Params(condition);
         where.begin(params, context);
@@ -51,17 +51,18 @@ class WhereMapCollectTest {
             where.process(params, input, context);
         }
         where.end(params, context);
+        context.closeStates();
         return context.emitted;
     }
 
     @Test
-    void whereKeepsTheObjectsForWhichTheBlockIsTrue() {
+    void whereKeepsTheObjectsForWhichTheBlockIsTrue() throws Exception {
         var even = block("$_ % 2 == 0", n -> (Integer) n % 2 == 0);
         assertThat(where(List.of(even), 1, 2, 3, 4)).containsExactly(2, 4);
     }
 
     @Test
-    void whereEvaluationErrorsSkipTheObject() {
+    void whereEvaluationErrorsSkipTheObject() throws Exception {
         var failing = block("$_.x", n -> {
             throw new IllegalStateException("no property x");
         });
@@ -92,7 +93,7 @@ class WhereMapCollectTest {
     }
 
     @Test
-    void shortFormValuesBecomeJavaLiterals() {
+    void shortFormValuesBecomeJavaLiterals() throws Exception {
         where(List.of("size", ">", "10kb"));
         where(List.of("dir", "==", true));
         where(Arrays.asList("ext", "!=", null));
@@ -144,7 +145,7 @@ class WhereMapCollectTest {
     }
 
     @Test
-    void collectGathersEverythingIntoOneList() {
+    void collectGathersEverythingIntoOneList() throws Exception {
         var collect = new Collect();
         var params = new Collect.Params();
         TestContext<Collected> collected = new TestContext<>(Path.of("."));

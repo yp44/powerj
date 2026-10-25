@@ -1,13 +1,11 @@
 package io.powerj.cmdlets;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.WeakHashMap;
 import java.util.concurrent.CancellationException;
 import java.util.regex.Pattern;
 
@@ -62,12 +60,13 @@ public final class Select implements Cmdlet<Select.Params, Object, Row> {
         }
     }
 
-    private final Map<CmdletContext<?>, State> states = Collections.synchronizedMap(new WeakHashMap<>());
+    private static State state(Params p, CmdletContext<Row> context) {
+        return context.state(State.class, () -> new State(columns(p.columns(), context)));
+    }
 
     @Override
     public void begin(Params p, CmdletContext<Row> context) {
-        State state = new State(columns(p.columns(), context));
-        states.put(context, state);
+        State state = state(p, context);
         if (!context.hasInput()) {
             // Head of a pipeline: a single row, its blocks evaluated once with no current object.
             state.sizeColumns = Set.of();
@@ -77,7 +76,7 @@ public final class Select implements Cmdlet<Select.Params, Object, Row> {
 
     @Override
     public void process(Params p, Object input, CmdletContext<Row> context) {
-        State state = states.get(context);
+        State state = state(p, context);
         if (state.sizeColumns == null) {
             state.sizeColumns = sizeColumns(state.columns, input);
         }
@@ -101,11 +100,6 @@ public final class Select implements Cmdlet<Select.Params, Object, Row> {
             values.put(column.name(), value);
         }
         return Row.of(values, state.sizeColumns);
-    }
-
-    @Override
-    public void end(Params p, CmdletContext<Row> context) {
-        states.remove(context);
     }
 
     /** Column names of the arguments, by the naming rules of {@link #columns(List, CmdletContext)}, for completion. */

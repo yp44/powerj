@@ -55,6 +55,7 @@ class FileOpsTest {
             cmdlet.process(params, input, context);
         }
         cmdlet.end(params, context);
+        context.closeStates();
         return context.emitted;
     }
 

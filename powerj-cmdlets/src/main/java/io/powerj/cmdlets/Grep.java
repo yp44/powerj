@@ -13,7 +13,6 @@ import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -87,13 +86,13 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
     /** Bytes read to recognize a binary file (one containing a NUL byte), skipped. */
     private static final int BINARY_PROBE = 8192;
 
-    /** State of each running execution: the same cmdlet can be used in several pipelines at once. */
-    private final Map<Params, Search> searches = Collections.synchronizedMap(new IdentityHashMap<>());
+    private static Search search(Params params, CmdletContext<Object> context) {
+        return context.state(Search.class, () -> new Search(params, context));
+    }
 
     @Override
     public void begin(Params params, CmdletContext<Object> context) {
-        Search search = new Search(params, context);
-        searches.put(params, search);
+        Search search = search(params, context);
         if (!params.paths().isEmpty()) {
             List<Path> roots = new ArrayList<>();
             for (String argument : params.paths()) {
@@ -108,7 +107,7 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
 
     @Override
     public void process(Params params, Object input, CmdletContext<Object> context) {
-        Search search = searches.computeIfAbsent(params, p -> new Search(p, context));
+        Search search = search(params, context);
         Path file = params.property() == null ? FileArguments.file(input, context) : null;
         if (file == null) {
             search.filter(input, context);
@@ -116,11 +115,6 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
             // a directory received without -r is skipped: ls -r already emits its files
             search.files(List.of(file), context);
         }
-    }
-
-    @Override
-    public void end(Params params, CmdletContext<Object> context) {
-        searches.remove(params);
     }
 
     private static void report(WalkError error, CmdletContext<?> context) {

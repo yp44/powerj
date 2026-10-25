@@ -49,13 +49,14 @@ class SortTest {
         };
     }
 
-    private List<Object> sort(Sort.Params params, Object... inputs) {
+    private List<Object> sort(Sort.Params params, Object... inputs) throws Exception {
         var sort = new Sort();
         sort.begin(params, context);
         for (Object input : inputs) {
             sort.process(params, input, context);
         }
         sort.end(params, context);
+        context.closeStates();
         return context.emitted;
     }
 
@@ -71,31 +72,31 @@ class SortTest {
     }
 
     @Test
-    void sortsTheObjectsThemselves() {
+    void sortsTheObjectsThemselves() throws Exception {
         assertThat(sort(params(false, false), "pear", "apple", "fig")).containsExactly("apple", "fig", "pear");
     }
 
     @Test
-    void comparesNumbersByValueWhateverTheirClass() {
+    void comparesNumbersByValueWhateverTheirClass() throws Exception {
         assertThat(sort(params(false, false), 10L, 3, 10.5, new BigDecimal("2.5"), (short) -1))
                 .containsExactly((short) -1, new BigDecimal("2.5"), 3, 10L, 10.5);
         assertThat(context.errors).isEmpty();
     }
 
     @Test
-    void descendingOrder() {
+    void descendingOrder() throws Exception {
         assertThat(sort(params(true, false), 1, 3, 2)).containsExactly(3, 2, 1);
     }
 
     @Test
-    void ignoreCase() {
+    void ignoreCase() throws Exception {
         assertThat(sort(params(false, false), "b", "B", "a")).containsExactly("B", "a", "b");
         context.emitted.clear();
         assertThat(sort(params(false, true), "b", "B", "a")).containsExactly("a", "b", "B");
     }
 
     @Test
-    void isStableInBothDirections() {
+    void isStableInBothDirections() throws Exception {
         var a = new Item("a", 1);
         var b = new Item("b", 2);
         var c = new Item("c", 1);
@@ -106,7 +107,7 @@ class SortTest {
     }
 
     @Test
-    void propertyKeyOnFileEntries() {
+    void propertyKeyOnFileEntries() throws Exception {
         var big = file("big.bin", 2048, false);
         var small = file("small.txt", 10, false);
         var docs = file("docs", 0, true);
@@ -114,7 +115,7 @@ class SortTest {
     }
 
     @Test
-    void propertyPath() {
+    void propertyPath() throws Exception {
         var b = file("b.txt", 1, false);
         var a = file("a.txt", 2, false);
         context.compiler = source -> {
@@ -125,13 +126,13 @@ class SortTest {
     }
 
     @Test
-    void blockKey() {
+    void blockKey() throws Exception {
         assertThat(sort(params(false, false, block("$_.length()", s -> ((String) s).length())), "ccc", "a", "bb"))
                 .containsExactly("a", "bb", "ccc");
     }
 
     @Test
-    void severalKeysBreakTies() {
+    void severalKeysBreakTies() throws Exception {
         var src = file("src", 0, true);
         var docs = file("docs", 0, true);
         var readme = file("README.md", 5, false);
@@ -141,7 +142,7 @@ class SortTest {
     }
 
     @Test
-    void nullComesFirstAscendingAndLastDescending() {
+    void nullComesFirstAscendingAndLastDescending() throws Exception {
         assertThat(sort(params(false, false), "b", null, "a")).containsExactly(null, "a", "b");
         context.emitted.clear();
         assertThat(sort(params(true, false), "b", null, "a")).containsExactly("b", "a", null);
@@ -152,13 +153,13 @@ class SortTest {
     }
 
     @Test
-    void mixedTypesAreSortedByTextWithOneError() {
+    void mixedTypesAreSortedByTextWithOneError() throws Exception {
         assertThat(sort(params(false, false), "b", 2, "a", 1)).containsExactly(1, 2, "a", "b");
         assertThat(context.errors).hasSize(1).first().asString().contains("cannot compare");
     }
 
     @Test
-    void aFailingKeySkipsTheObject() {
+    void aFailingKeySkipsTheObject() throws Exception {
         var key = block("$_.boom", s -> {
             if (s.equals("x")) {
                 throw new IllegalStateException("boom");
@@ -178,7 +179,7 @@ class SortTest {
     }
 
     @Test
-    void emptyInputEmitsNothing() {
+    void emptyInputEmitsNothing() throws Exception {
         assertThat(sort(params(false, false, "size"))).isEmpty();
     }
 }

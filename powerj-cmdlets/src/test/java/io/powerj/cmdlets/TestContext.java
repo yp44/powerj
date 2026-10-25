@@ -94,4 +94,22 @@ final class TestContext<O> implements CmdletContext<O> {
     public ScriptBlock compile(String expression) {
         return compiler.apply(expression);
     }
+
+    /** State of the execution, by kind (what {@code CmdletRunner} offers a cmdlet in the shell). */
+    private final Map<Class<?>, Object> states = new java.util.LinkedHashMap<>();
+
+    @Override
+    public <S> S state(Class<S> type, java.util.function.Supplier<? extends S> initial) {
+        return type.cast(states.computeIfAbsent(type, _ -> initial.get()));
+    }
+
+    /** Closes the states that can be, as the shell does when the execution is over. */
+    void closeStates() throws Exception {
+        for (Object state : states.values().stream().toList().reversed()) {
+            if (state instanceof AutoCloseable closeable) {
+                closeable.close();
+            }
+        }
+        states.clear();
+    }
 }

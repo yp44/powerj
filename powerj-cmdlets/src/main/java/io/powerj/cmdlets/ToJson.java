@@ -1,8 +1,5 @@
 package io.powerj.cmdlets;
 
-import java.util.Collections;
-import java.util.Map;
-import java.util.WeakHashMap;
 
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
@@ -43,20 +40,24 @@ public final class ToJson implements Cmdlet<ToJson.Params, Object, String> {
         }
     }
 
-    private final Map<CmdletContext<?>, State> states = Collections.synchronizedMap(new WeakHashMap<>());
+    private static State state(Params p, CmdletContext<String> context) {
+        return context.state(State.class, () -> {
+            if (p.depth() != null && p.depth() < 1) {
+                throw new IllegalArgumentException(Messages.get("to-json.depth.invalid", p.depth()));
+            }
+            int depth = p.depth() == null ? DEFAULT_DEPTH : p.depth();
+            return new State(new JsonWriter(!p.compact() && !p.lines(), depth));
+        });
+    }
 
     @Override
     public void begin(Params p, CmdletContext<String> context) {
-        if (p.depth() != null && p.depth() < 1) {
-            throw new IllegalArgumentException(Messages.get("to-json.depth.invalid", p.depth()));
-        }
-        int depth = p.depth() == null ? DEFAULT_DEPTH : p.depth();
-        states.put(context, new State(new JsonWriter(!p.compact() && !p.lines(), depth)));
+        state(p, context); // validates the depth before anything is read
     }
 
     @Override
     public void process(Params p, Object input, CmdletContext<String> context) {
-        State state = states.get(context);
+        State state = state(p, context);
         StringBuilder value = new StringBuilder();
         try {
             state.writer.write(input, value, p.lines() ? 0 : 1);
@@ -79,7 +80,7 @@ public final class ToJson implements Cmdlet<ToJson.Params, Object, String> {
 
     @Override
     public void end(Params p, CmdletContext<String> context) {
-        State state = states.remove(context);
+        State state = state(p, context);
         if (p.lines()) {
             return;
         }

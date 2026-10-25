@@ -210,6 +210,37 @@ class PipelineTest {
         Waits.until("the producer stops", () -> FakeCmdlets.Infinite.RUNNING.get() == producersBefore);
     }
 
+    /** Review C-01: the state of a stage is released when the command ends, however it ends. */
+    @Test
+    void theStateOfAStageIsReleasedWhenTheCommandEndsNormally() throws Exception {
+        int before = FakeCmdlets.Hold.OPEN.get();
+
+        assertThat(run("items | hold | count")).isEqualTo("3\n");
+
+        assertThat(FakeCmdlets.Hold.OPEN.get()).isEqualTo(before);
+    }
+
+    @Test
+    @Timeout(20)
+    void theStateOfAStageIsReleasedWhenCtrlCCancelsTheCommand() throws Exception {
+        int before = FakeCmdlets.Hold.OPEN.get();
+        int producersBefore = FakeCmdlets.Infinite.RUNNING.get();
+        Thread runner = Thread.ofPlatform().start(() -> {
+            try {
+                interpreter.execute("infinite | hold | count");
+            } catch (Throwable ignored) {
+                // Ctrl+C: the outcome is checked by ctrlCStopsTheWholePipeline
+            }
+        });
+        Waits.until("the stage holds its resource", () -> FakeCmdlets.Hold.OPEN.get() == before + 1);
+        Waits.until("the producer runs", () -> FakeCmdlets.Infinite.RUNNING.get() == producersBefore + 1);
+
+        runner.interrupt();
+        runner.join();
+
+        Waits.until("the resource is closed", () -> FakeCmdlets.Hold.OPEN.get() == before);
+    }
+
     // --- Native commands (Linux / macOS) ---
 
     @Test

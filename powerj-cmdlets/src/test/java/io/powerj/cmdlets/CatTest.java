@@ -47,7 +47,7 @@ class CatTest {
         return params(List.of(paths), out, null, null);
     }
 
-    private List<Object> run(Cat.Params params, Object... inputs) {
+    private List<Object> run(Cat.Params params, Object... inputs) throws Exception {
         var cat = new Cat();
         context.hasInput = inputs.length > 0;
         cat.begin(params, context);
@@ -55,32 +55,33 @@ class CatTest {
             cat.process(params, input, context);
         }
         cat.end(params, context);
+        context.closeStates();
         return context.emitted;
     }
 
-    private List<CatLine> numbered(Cat.Params params, Object... inputs) {
+    private List<CatLine> numbered(Cat.Params params, Object... inputs) throws Exception {
         return run(params, inputs).stream().map(CatLine.class::cast).toList();
     }
 
     @Test
-    void linesByDefaultAStringPerLineWithoutEndOfLine() {
+    void linesByDefaultAStringPerLineWithoutEndOfLine() throws Exception {
         assertThat(run(params(Out.NONE, "a.txt"))).containsExactly("first", "second", "third");
         assertThat(context.errors).isEmpty();
     }
 
     @Test
-    void severalFilesOneAfterTheOther() {
+    void severalFilesOneAfterTheOther() throws Exception {
         assertThat(run(params(Out.LINES, "a.txt", "b.txt"))).containsExactly("first", "second", "third", "un", "deux");
     }
 
     @Test
-    void emptyFileGivesNoLine() {
+    void emptyFileGivesNoLine() throws Exception {
         assertThat(run(params(Out.LINES, "empty.txt"))).isEmpty();
         assertThat(context.errors).isEmpty();
     }
 
     @Test
-    void numberedLinesGoOnFromOneFileToTheNext() {
+    void numberedLinesGoOnFromOneFileToTheNext() throws Exception {
         List<CatLine> lines = numbered(params(Out.NUMBERED, "a.txt", "empty.txt", "b.txt"));
         assertThat(lines).extracting(CatLine::line).containsExactly(1, 2, 3, 4, 5);
         assertThat(lines).extracting(CatLine::text).containsExactly("first", "second", "third", "un", "deux");
@@ -91,36 +92,36 @@ class CatTest {
     }
 
     @Test
-    void textIsOneStringWithTheFilesConcatenatedAsIs() {
+    void textIsOneStringWithTheFilesConcatenatedAsIs() throws Exception {
         assertThat(run(params(Out.TEXT, "a.txt", "b.txt"))).containsExactly("first\nsecond\nthird\nun\r\ndeux");
     }
 
     @Test
-    void contentIsOneRecordWithTheNumberOfCharacters() {
+    void contentIsOneRecordWithTheNumberOfCharacters() throws Exception {
         List<Object> out = run(params(Out.CONTENT, "b.txt", "a.txt"));
         String expected = "un\r\ndeuxfirst\nsecond\nthird\n";
         assertThat(out).containsExactly(new CatContent(expected.length(), expected));
     }
 
     @Test
-    void contentOfAnEmptyFileIsEmpty() {
+    void contentOfAnEmptyFileIsEmpty() throws Exception {
         assertThat(run(params(Out.CONTENT, "empty.txt"))).containsExactly(new CatContent(0, ""));
     }
 
     @Test
-    void wildcardsInNameOrder() {
+    void wildcardsInNameOrder() throws Exception {
         assertThat(run(params(Out.LINES, "?.txt"))).containsExactly("first", "second", "third", "un", "deux");
         assertThat(context.errors).isEmpty();
     }
 
     @Test
-    void wildcardWithoutMatchIsNonBlocking() {
+    void wildcardWithoutMatchIsNonBlocking() throws Exception {
         assertThat(run(params(Out.LINES, "*.xml", "b.txt"))).containsExactly("un", "deux");
         assertThat(context.errors).containsExactly("no file matches *.xml");
     }
 
     @Test
-    void missingFileAndDirectoryAreNonBlocking() {
+    void missingFileAndDirectoryAreNonBlocking() throws Exception {
         assertThat(run(params(Out.LINES, "missing.txt", "dir", "b.txt"))).containsExactly("un", "deux");
         assertThat(context.errors).containsExactly(
                 "not found: " + tmp.resolve("missing.txt").toAbsolutePath(),
@@ -128,14 +129,14 @@ class CatTest {
     }
 
     @Test
-    void undecodableFileSuggestsEncodingAndAddsNothingToTheContent() {
+    void undecodableFileSuggestsEncodingAndAddsNothingToTheContent() throws Exception {
         assertThat(run(params(Out.TEXT, "latin.txt", "b.txt"))).containsExactly("un\r\ndeux");
         assertThat(context.errors).containsExactly("cannot read " + tmp.resolve("latin.txt").toAbsolutePath()
                 + ": not readable as UTF-8 text (choose the charset with --encoding)");
     }
 
     @Test
-    void encodingReadsOtherCharsets() {
+    void encodingReadsOtherCharsets() throws Exception {
         assertThat(run(params(List.of("latin.txt"), Out.NONE, "ISO-8859-1", null))).containsExactly("café");
         assertThat(context.errors).isEmpty();
     }
@@ -156,7 +157,7 @@ class CatTest {
     }
 
     @Test
-    void linesIsTheDefaultOutput() {
+    void linesIsTheDefaultOutput() throws Exception {
         assertThat(run(params(Out.LINES, "a.txt"))).containsExactly("first", "second", "third");
     }
 
@@ -167,7 +168,7 @@ class CatTest {
     }
 
     @Test
-    void pipelineStringsPathsFilesAndFileEntriesAreReadAsArguments() {
+    void pipelineStringsPathsFilesAndFileEntriesAreReadAsArguments() throws Exception {
         FileEntry entry = new FileEntry("b.txt", 8, Instant.EPOCH, tmp.resolve("b.txt"), false, "txt");
         List<CatLine> lines = numbered(params(Out.NUMBERED), "a.txt", Path.of("empty.txt"),
                 tmp.resolve("notes.md").toFile(), entry);
@@ -177,26 +178,26 @@ class CatTest {
     }
 
     @Test
-    void numberingGoesOnFromTheArgumentsToThePipelineObjects() {
+    void numberingGoesOnFromTheArgumentsToThePipelineObjects() throws Exception {
         List<CatLine> lines = numbered(params(Out.NUMBERED, "b.txt"), "a.txt");
         assertThat(lines).extracting(CatLine::line).containsExactly(1, 2, 3, 4, 5);
         assertThat(lines).extracting(CatLine::text).containsExactly("un", "deux", "first", "second", "third");
     }
 
     @Test
-    void pipelineContentIsEmittedOnceAtTheEnd() {
+    void pipelineContentIsEmittedOnceAtTheEnd() throws Exception {
         assertThat(run(params(Out.TEXT), "b.txt", "a.txt")).containsExactly("un\r\ndeuxfirst\nsecond\nthird\n");
     }
 
     @Test
-    void directoriesListedByLsAreSkipped() {
+    void directoriesListedByLsAreSkipped() throws Exception {
         FileEntry dir = new FileEntry("dir", 0, Instant.EPOCH, tmp.resolve("dir"), true, "");
         assertThat(run(params(Out.LINES), dir, "b.txt")).containsExactly("un", "deux");
         assertThat(context.errors).isEmpty();
     }
 
     @Test
-    void otherObjectsWithoutPropertyAreSkippedWithAnError() {
+    void otherObjectsWithoutPropertyAreSkippedWithAnError() throws Exception {
         assertThat(run(params(Out.LINES), 42, "b.txt")).containsExactly("un", "deux");
         assertThat(context.errors).containsExactly(
                 "not a file: 42 (name the property that gives the file with --property)");
@@ -220,7 +221,7 @@ class CatTest {
     }
 
     @Test
-    void propertyGivesTheFileOfOtherObjects() {
+    void propertyGivesTheFileOfOtherObjects() throws Exception {
         property("path", o -> ((GrepMatch) o).path());
         var match = new GrepMatch(tmp.resolve("b.txt"), 1, "un", List.of(), List.of(), Map.of());
         List<Object> out = run(params(List.of(), Out.LINES, null, "path"), match);
@@ -228,14 +229,14 @@ class CatTest {
     }
 
     @Test
-    void propertyStringIsAPathRelativeToTheCurrentDirectory() {
+    void propertyStringIsAPathRelativeToTheCurrentDirectory() throws Exception {
         property("value", o -> ((EnvVar) o).value());
         List<Object> out = run(params(List.of(), Out.LINES, null, "value"), new EnvVar("F", "a.txt"));
         assertThat(out).containsExactly("first", "second", "third");
     }
 
     @Test
-    void propertyThatIsNotAFileSkipsTheObject() {
+    void propertyThatIsNotAFileSkipsTheObject() throws Exception {
         property("line", o -> ((GrepMatch) o).line());
         var match = new GrepMatch(tmp.resolve("b.txt"), 1, "un", List.of(), List.of(), Map.of());
         assertThat(run(params(List.of(), Out.LINES, null, "line"), match)).isEmpty();

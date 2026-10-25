@@ -6,7 +6,6 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.WeakHashMap;
 import java.util.concurrent.CancellationException;
 
 import io.powerj.api.Cmdlet;
@@ -51,16 +50,19 @@ public final class GroupCmdlet implements Cmdlet<GroupCmdlet.Params, Object, Gro
     private record State(List<ScriptBlock> keys, Map<Object, Bucket> buckets) {
     }
 
-    private final Map<CmdletContext<?>, State> states = Collections.synchronizedMap(new WeakHashMap<>());
+    private static State state(Params p, CmdletContext<Group> context) {
+        return context.state(State.class,
+                () -> new State(Keys.blocks(p.keys(), context, "group.key.invalid"), new LinkedHashMap<>()));
+    }
 
     @Override
     public void begin(Params p, CmdletContext<Group> context) {
-        states.put(context, new State(Keys.blocks(p.keys(), context, "group.key.invalid"), new LinkedHashMap<>()));
+        state(p, context); // compiles the keys before anything is read
     }
 
     @Override
     public void process(Params p, Object input, CmdletContext<Group> context) {
-        State state = states.get(context);
+        State state = state(p, context);
         Object key;
         try {
             key = key(state.keys(), input);
@@ -79,7 +81,7 @@ public final class GroupCmdlet implements Cmdlet<GroupCmdlet.Params, Object, Gro
 
     @Override
     public void end(Params p, CmdletContext<Group> context) {
-        State state = states.remove(context);
+        State state = state(p, context);
         for (Bucket bucket : state.buckets().values()) {
             context.emit(new Group(bucket.key, bucket.count, Collections.unmodifiableList(bucket.items)));
         }

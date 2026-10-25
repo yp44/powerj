@@ -98,6 +98,45 @@ class GridCmdletTest {
     }
 
     @Test
+    void theWindowOfACommandThatDidNotFinishIsClosedWithIt() throws Exception {
+        RecordingOpener opener = new RecordingOpener();
+        GridCmdlet grid = new GridCmdlet(opener);
+        TestContext<Object> context = new TestContext<>();
+        grid.begin(NO_OPTIONS, context);
+        grid.process(NO_OPTIONS, new Person("Ada", 36), context);
+        assertThat(opener.live().isClosed()).isFalse();
+
+        context.closeStates(); // what the shell does when the command is cancelled or fails: end() was never reached
+
+        assertThat(opener.live().isClosed()).isTrue();
+    }
+
+    @Test
+    void theWindowOfAFinishedCommandOutlivesIt() throws Exception {
+        RecordingOpener opener = new RecordingOpener();
+        TestContext<Object> context = new TestContext<>();
+        run(new GridCmdlet(opener), NO_OPTIONS, context, new Person("Ada", 36));
+
+        context.closeStates(); // what the shell does when the command is over
+
+        assertThat(opener.live().isClosed()).isFalse();
+    }
+
+    @Test
+    void aCommandThatNeverOpenedAWindowHasNothingToClose() throws Exception {
+        TestContext<Object> context = new TestContext<>();
+        new GridCmdlet(new RecordingOpener()).begin(NO_OPTIONS, context);
+
+        context.closeStates();
+    }
+
+    @Test
+    void processNeedsBegin() {
+        assertThatThrownBy(() -> new GridCmdlet(new RecordingOpener()).process(NO_OPTIONS, "x", new TestContext<>()))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("begin was not called");
+    }
+
+    @Test
     void objectsOfSeveralTypesShareTheTable() throws Exception {
         RecordingOpener opener = new RecordingOpener();
         run(new GridCmdlet(opener), NO_OPTIONS, new TestContext<>(), new Person("Ada", 36), "text", Map.of("k", 1));

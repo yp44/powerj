@@ -51,6 +51,7 @@ public abstract interface io.powerj.api.CmdletContext<O>
   public abstract java.util.Optional<java.lang.Object> io.powerj.api.CmdletContext.variable(java.lang.String)
   public abstract void io.powerj.api.CmdletContext.emit(O)
   public abstract void io.powerj.api.CmdletContext.error(java.lang.String)
+  public default <S> S io.powerj.api.CmdletContext.state(java.lang.Class<S>,java.util.function.Supplier<? extends S>)
   public default boolean io.powerj.api.CmdletContext.hasInput()
   public default java.util.List<io.powerj.api.PerfReport> io.powerj.api.CmdletContext.perfReports()
   public default java.util.Optional<java.nio.file.Path> io.powerj.api.CmdletContext.configDirectory()

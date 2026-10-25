@@ -11,7 +11,6 @@ import java.util.Map;
 import java.util.concurrent.CancellationException;
 import java.util.function.Consumer;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -36,6 +35,7 @@ class CmdletRunnerTest {
         final List<String> calls = new ArrayList<>();
         Consumer<CmdletContext<String>> onBegin = _ -> { };
         java.util.function.BiConsumer<Object, CmdletContext<String>> onProcess = (_, _) -> { };
+        Consumer<CmdletContext<String>> onEnd = _ -> { };
         CmdletContext<String> context;
 
         @Override
@@ -54,6 +54,7 @@ class CmdletRunnerTest {
         @Override
         public void end(Params p, CmdletContext<String> context) {
             calls.add("end");
+            onEnd.accept(context);
         }
     }
 
@@ -289,17 +290,228 @@ class CmdletRunnerTest {
         }
     }
 
-    /** Review C-01: without {@code try/finally}, a cmdlet that fails in {@code process} never gets {@code end()}. */
-    @Disabled("C-01, fixed in Phase 1.3: CmdletRunner must call end() (or close the execution) in a finally")
+    // --- The state of an execution (review C-01) ---
+
+    /** A state that records being closed in the log of the probe. */
+    private static class Resource implements AutoCloseable {
+
+        private final List<String> log;
+        private final String name;
+        Exception closeFailure;
+
+        Resource(List<String> log, String name) {
+            this.log = log;
+            this.name = name;
+        }
+
+        @Override
+        public void close() throws Exception {
+            log.add("close " + name);
+            if (closeFailure != null) {
+                throw closeFailure;
+            }
+        }
+    }
+
+    private static final class First extends Resource {
+        First(List<String> log) {
+            super(log, "first");
+        }
+    }
+
+    private static final class Second extends Resource {
+        Second(List<String> log) {
+            super(log, "second");
+        }
+    }
+
+    /** Not closeable: the runner just lets it go. */
+    private record Counter(int[] value) { }
+
+    private static void begin(Probe probe, Consumer<CmdletContext<String>> action) {
+        probe.onBegin = action;
+    }
+
     @Test
-    void endIsCalledEvenWhenProcessFails() {
+    void theStateIsTheSameForBeginProcessAndEnd() throws Exception {
         Probe probe = new Probe();
+        List<Object> seen = new ArrayList<>();
+        probe.onBegin = context -> context.state(Counter.class, () -> new Counter(new int[1]));
+        probe.onProcess = (_, context) -> seen.add(context.state(Counter.class, () -> {
+            throw new AssertionError("the state of begin must be found");
+        }).value()[0]++);
+        probe.onEnd = context -> seen.add("total " + context.state(Counter.class, () -> {
+            throw new AssertionError("the state of begin must be found");
+        }).value()[0]);
+
+        run(probe, new RecordingSource("a", "b", "c"), "w");
+
+        assertThat(seen).containsExactly(0, 1, 2, "total 3");
+    }
+
+    @Test
+    void everyExecutionHasItsOwnState() throws Exception {
+        Probe probe = new Probe(); // one cmdlet object, two runs with equal parameters
+        List<Object> states = new ArrayList<>();
+        probe.onBegin = context -> states.add(context.state(Counter.class, () -> new Counter(new int[1])));
+
+        run(probe, null, "w");
+        run(probe, null, "w");
+
+        assertThat(states).hasSize(2).doesNotHaveDuplicates();
+        assertThat(states.get(0)).isNotSameAs(states.get(1));
+    }
+
+    @Test
+    void severalKindsOfStateAreIndependent() throws Exception {
+        Probe probe = new Probe();
+        List<Object> seen = new ArrayList<>();
+        probe.onBegin = context -> {
+            seen.add(context.state(First.class, () -> new First(probe.calls)));
+            seen.add(context.state(Second.class, () -> new Second(probe.calls)));
+            seen.add(context.state(First.class, () -> {
+                throw new AssertionError("already made");
+            }));
+        };
+
+        run(probe, null, "w");
+
+        assertThat(seen.get(0)).isNotSameAs(seen.get(1)).isSameAs(seen.get(2));
+    }
+
+    @Test
+    void theStateIsClosedAfterEnd() throws Exception {
+        Probe probe = new Probe();
+        begin(probe, context -> context.state(First.class, () -> new First(probe.calls)));
+
+        run(probe, new RecordingSource("a"), "w");
+
+        assertThat(probe.calls).containsExactly("begin w", "process a", "end", "close first");
+    }
+
+    @Test
+    void theStatesAreClosedLastCreatedFirst() throws Exception {
+        Probe probe = new Probe();
+        begin(probe, context -> {
+            context.state(First.class, () -> new First(probe.calls));
+            context.state(Second.class, () -> new Second(probe.calls));
+        });
+
+        run(probe, null, "w");
+
+        assertThat(probe.calls).containsExactly("begin w", "end", "close second", "close first");
+    }
+
+    /**
+     * Review C-01: a cmdlet that fails in {@code process} used to leave its state behind. {@code end()} is not called
+     * then, because it is where the results are emitted ({@code sort}, {@code count}…) and an error must not produce
+     * any; the state is closed instead.
+     */
+    @Test
+    void theStateIsClosedEvenWhenProcessFails() {
+        Probe probe = new Probe();
+        begin(probe, context -> context.state(First.class, () -> new First(probe.calls)));
         probe.onProcess = (_, _) -> {
             throw new IllegalStateException("failure in process");
         };
 
         assertThatThrownBy(() -> run(probe, new RecordingSource("a"), "w")).isInstanceOf(IllegalStateException.class);
 
-        assertThat(probe.calls).endsWith("end");
+        assertThat(probe.calls).containsExactly("begin w", "process a", "close first");
+    }
+
+    @Test
+    void theStateIsClosedWhenBeginFails() {
+        Probe probe = new Probe();
+        probe.onBegin = context -> {
+            context.state(First.class, () -> new First(probe.calls));
+            throw new IllegalArgumentException("bad option");
+        };
+
+        assertThatThrownBy(() -> run(probe, null, "w")).isInstanceOf(PjException.class).hasMessageContaining("bad option");
+
+        assertThat(probe.calls).containsExactly("begin w", "close first");
+    }
+
+    @Test
+    void theStateIsClosedWhenTheCommandIsCancelled() {
+        Probe probe = new Probe();
+        begin(probe, context -> context.state(First.class, () -> new First(probe.calls)));
+        probe.onProcess = (_, _) -> {
+            throw new CancellationException();
+        };
+
+        assertThatThrownBy(() -> run(probe, new RecordingSource("a"), "w")).isInstanceOf(CancellationException.class);
+
+        assertThat(probe.calls).containsExactly("begin w", "process a", "close first");
+    }
+
+    @Test
+    void theStateIsClosedWhenEndFails() {
+        Probe probe = new Probe();
+        begin(probe, context -> context.state(First.class, () -> new First(probe.calls)));
+        probe.onEnd = _ -> {
+            throw new IllegalStateException("failure in end");
+        };
+
+        assertThatThrownBy(() -> run(probe, null, "w")).isInstanceOf(IllegalStateException.class);
+
+        assertThat(probe.calls).containsExactly("begin w", "end", "close first");
+    }
+
+    @Test
+    void aFailureToCloseDoesNotHideTheFailureOfTheCmdlet() {
+        Probe probe = new Probe();
+        var closeFailure = new java.io.IOException("cannot close");
+        probe.onBegin = context -> context.state(First.class, () -> {
+            var resource = new First(probe.calls);
+            resource.closeFailure = closeFailure;
+            return resource;
+        });
+        probe.onProcess = (_, _) -> {
+            throw new IllegalStateException("failure in process");
+        };
+
+        assertThatThrownBy(() -> run(probe, new RecordingSource("a"), "w")).isInstanceOf(IllegalStateException.class)
+                .hasSuppressedException(closeFailure);
+    }
+
+    @Test
+    void aFailureToCloseIsReportedWhenTheCmdletSucceeded() {
+        Probe probe = new Probe();
+        var closeFailure = new java.io.IOException("cannot close");
+        probe.onBegin = context -> context.state(First.class, () -> {
+            var resource = new First(probe.calls);
+            resource.closeFailure = closeFailure;
+            return resource;
+        });
+
+        assertThatThrownBy(() -> run(probe, null, "w")).isSameAs(closeFailure);
+    }
+
+    @Test
+    void everyStateIsClosedEvenIfOneFailsToClose() {
+        Probe probe = new Probe();
+        probe.onBegin = context -> {
+            context.state(First.class, () -> new First(probe.calls));
+            context.state(Second.class, () -> {
+                var resource = new Second(probe.calls);
+                resource.closeFailure = new java.io.IOException("cannot close");
+                return resource;
+            });
+        };
+
+        assertThatThrownBy(() -> run(probe, null, "w")).isInstanceOf(java.io.IOException.class);
+
+        assertThat(probe.calls).containsExactly("begin w", "end", "close second", "close first");
+    }
+
+    @Test
+    void aStateMustExist() {
+        Probe probe = new Probe();
+        probe.onBegin = context -> context.state(Counter.class, () -> null);
+
+        assertThatThrownBy(() -> run(probe, null, "w")).isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("Counter");
     }
 }

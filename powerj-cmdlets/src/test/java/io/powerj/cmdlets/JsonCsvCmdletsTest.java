@@ -28,6 +28,7 @@ class JsonCsvCmdletsTest {
                 cmdlet.process(params, input, context);
             }
             cmdlet.end(params, context);
+            context.closeStates();
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {

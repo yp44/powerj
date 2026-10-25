@@ -2,10 +2,7 @@ package io.powerj.cmdlets;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-import java.util.WeakHashMap;
 
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
@@ -45,16 +42,14 @@ public final class Remove implements Cmdlet<Remove.Params, Object, Object> {
     private record State(PipelineFiles files, ProtectedPaths protectedPaths, int parallelism) {
     }
 
-    private final Map<CmdletContext<?>, State> states = Collections.synchronizedMap(new WeakHashMap<>());
-
     @Override
     public void begin(Params p, CmdletContext<Object> context) {
         FileOps.Arguments arguments = FileOps.arguments(p.paths(), p.property(), context);
         int parallelism = FileOps.parallelism(p.parallel());
-        var state = new State(new PipelineFiles(p.property(), arguments.block(), context, FileOps.KEYS),
+        State state = context.state(State.class, () -> new State(
+                new PipelineFiles(p.property(), arguments.block(), context, FileOps.KEYS),
                 p.allowProtected() ? null : ProtectedPaths.load(context.configDirectory(), context.environment(),
-                        context.currentDirectory()), parallelism);
-        states.put(context, state);
+                        context.currentDirectory()), parallelism));
         if (arguments.words().isEmpty() && !context.hasInput()) {
             throw new IllegalArgumentException(Messages.get("fileops.path.expected", "rm"));
         }
@@ -67,16 +62,11 @@ public final class Remove implements Cmdlet<Remove.Params, Object, Object> {
 
     @Override
     public void process(Params p, Object input, CmdletContext<Object> context) {
-        State state = states.get(context);
+        State state = ExecutionState.begun(context, State.class);
         Path path = state.files().file(input, context);
         if (path != null) {
             remove(p, state, path.toAbsolutePath().normalize(), context);
         }
-    }
-
-    @Override
-    public void end(Params p, CmdletContext<Object> context) {
-        states.remove(context);
     }
 
     private static void remove(Params p, State state, Path path, CmdletContext<Object> context) {

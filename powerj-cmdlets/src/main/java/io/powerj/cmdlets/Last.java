@@ -1,9 +1,6 @@
 package io.powerj.cmdlets;
 
 import java.util.ArrayDeque;
-import java.util.Collections;
-import java.util.Map;
-import java.util.WeakHashMap;
 
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
@@ -27,18 +24,22 @@ public final class Last implements Cmdlet<Last.Params, Object, Object> {
     private record State(int count, ArrayDeque<Object> objects) {
     }
 
-    /** Last objects received, per execution. */
-    private final Map<CmdletContext<?>, State> states = Collections.synchronizedMap(new WeakHashMap<>());
+    /** Last objects received. */
+    private static State state(Params p, CmdletContext<Object> context) {
+        return context.state(State.class, () -> {
+            int count = First.count(p.count());
+            return new State(count, new ArrayDeque<>(Math.min(count, 1024)));
+        });
+    }
 
     @Override
     public void begin(Params p, CmdletContext<Object> context) {
-        int count = First.count(p.count());
-        states.put(context, new State(count, new ArrayDeque<>(Math.min(count, 1024))));
+        state(p, context); // validates the count before anything is read
     }
 
     @Override
     public void process(Params p, Object input, CmdletContext<Object> context) {
-        State state = states.get(context);
+        State state = state(p, context);
         if (state.count() == 0) {
             return;
         }
@@ -51,8 +52,7 @@ public final class Last implements Cmdlet<Last.Params, Object, Object> {
 
     @Override
     public void end(Params p, CmdletContext<Object> context) {
-        State state = states.remove(context);
-        for (Object value : state.objects()) {
+        for (Object value : state(p, context).objects()) {
             context.emit(value == NULL ? null : value);
         }
     }
