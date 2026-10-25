@@ -30,6 +30,9 @@
         <maven.compiler.release>${java.release}</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <!-- Fixed timestamp of the archives built by the Maven plugins (reproducible builds); set to the release date
+             when a version is released. The zip files of powerj-dist and powerj-fx are made by Ant and are not covered. -->
+        <project.build.outputTimestamp>2026-10-25T00:00:00Z</project.build.outputTimestamp>
 
         <junit.version>5.13.4</junit.version>
         <assertj.version>3.27.4</assertj.version>
@@ -77,6 +80,11 @@
             </dependency>
             <dependency>
                 <groupId>org.jline</groupId>
+                <artifactId>jline-terminal</artifactId>
+                <version>${jline.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.jline</groupId>
                 <artifactId>jline-terminal-ffm</artifactId>
                 <version>${jline.version}</version>
             </dependency>
@@ -106,7 +114,16 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
-                    <version>3.14.0</version>
+                    <version>3.15.0</version>
+                    <configuration>
+                        <!-- All javac lint categories are reported (review C-32). They are warnings for now: the baseline is
+                             in docs/quality/lint-baseline.md; the build will fail on new ones once it is clean. A module that
+                             sets its own compilerArgs must use combine.children="append". -->
+                        <showWarnings>true</showWarnings>
+                        <compilerArgs>
+                            <arg>-Xlint:all</arg>
+                        </compilerArgs>
+                    </configuration>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
@@ -149,6 +166,17 @@
                     <artifactId>maven-clean-plugin</artifactId>
                     <version>3.5.0</version>
                 </plugin>
+                <!-- Not used by the build, but bound by the default lifecycle: pinned for requirePluginVersions. -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-deploy-plugin</artifactId>
+                    <version>3.1.2</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-site-plugin</artifactId>
+                    <version>3.12.1</version>
+                </plugin>
                 <plugin>
                     <groupId>org.jacoco</groupId>
                     <artifactId>jacoco-maven-plugin</artifactId>
@@ -177,6 +205,12 @@
                                     <version>[${java.release},)</version>
                                     <message>PowerJ requires JDK ${java.release} or newer.</message>
                                 </requireJavaVersion>
+                                <!-- Review C-32: reproducible dependency and plugin resolution. -->
+                                <dependencyConvergence/>
+                                <requirePluginVersions>
+                                    <banSnapshots>true</banSnapshots>
+                                </requirePluginVersions>
+                                <banDuplicatePomDependencyVersions/>
                             </rules>
                         </configuration>
                     </execution>

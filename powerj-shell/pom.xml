@@ -26,6 +26,12 @@
             <groupId>org.jline</groupId>
             <artifactId>jline-reader</artifactId>
         </dependency>
+        <!-- Used directly (Main, Repl: Terminal, TerminalBuilder, AttributedString…): declared, not only inherited from
+             jline-reader. -->
+        <dependency>
+            <groupId>org.jline</groupId>
+            <artifactId>jline-terminal</artifactId>
+        </dependency>
         <!-- Native terminal (Windows console, Unix pty) through the FFM API, without JNI. -->
         <dependency>
             <groupId>org.jline</groupId>

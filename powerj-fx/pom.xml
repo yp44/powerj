@@ -82,7 +82,7 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
-                    <compilerArgs>
+                    <compilerArgs combine.children="append">
                         <arg>--module-version</arg>
                         <arg>${project.version}</arg>
                     </compilerArgs>

@@ -2,7 +2,7 @@
  * Built-in PowerJ cmdlets.
  */
 module io.powerj.cmdlets {
-    requires io.powerj.api;
+    requires transitive io.powerj.api;
     requires io.powerj.fs;
 
     exports io.powerj.cmdlets;
