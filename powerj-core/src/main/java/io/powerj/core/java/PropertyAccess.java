@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import io.powerj.api.Row;
 import io.powerj.core.error.PjError;
 import io.powerj.core.error.PjException;
 import io.powerj.core.i18n.Messages;
@@ -44,7 +45,7 @@ public final class PropertyAccess {
         if (target instanceof Map<?, ?> map) {
             return map.get(name);
         }
-        var direct = directProperty(target, name);
+        var direct = directProperty(target, name, false);
         if (direct.found()) {
             return direct.value();
         }
@@ -67,6 +68,28 @@ public final class PropertyAccess {
                         String.join(Messages.get("property.hint.separator"), hints)));
     }
 
+    /**
+     * The value of a property, read only where reading it cannot do anything: a key of a map of the JDK or a
+     * {@link Row}, a record component, a public field, a getter that {@link PreviewPolicy} knows to be pure. Any
+     * other getter is not called. For completion, which promises to run no method: {@code null} means that the
+     * property is null or cannot be read without risk, and the caller then goes by the signature.
+     */
+    public static Object peek(Object target, String name) {
+        try {
+            if (target instanceof Map<?, ?> map) {
+                return plainMap(map) ? map.get(name) : null;
+            }
+            var direct = directProperty(target, name, true);
+            return direct.found() ? direct.value() : null;
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    private static boolean plainMap(Map<?, ?> map) {
+        return map instanceof Row || "java.base".equals(map.getClass().getModule().getName());
+    }
+
     /** Readable name: {@code List} rather than an internal JDK class ({@code UnmodifiableRandomAccessList}). */
     private static String typeName(Object value) {
         return switch (value) {
@@ -81,7 +104,8 @@ public final class PropertyAccess {
         static final Lookup MISSING = new Lookup(false, null);
     }
 
-    private static Lookup directProperty(Object target, String name) {
+    /** {@code pureOnly}: a getter that {@link PreviewPolicy} does not allow is left alone, as if it was not there. */
+    private static Lookup directProperty(Object target, String name, boolean pureOnly) {
         Class<?> type = target.getClass();
         try {
             if (type.isRecord()) {
@@ -95,6 +119,9 @@ public final class PropertyAccess {
             }
             var getter = Members.getter(type, name);
             if (getter.isPresent()) {
+                if (pureOnly && !PreviewPolicy.allows(getter.get())) {
+                    return Lookup.MISSING;
+                }
                 PreviewGuard.checkCall(getter.get()); // record components above are always read (FR-66)
                 return new Lookup(true, getter.get().invoke(target));
             }

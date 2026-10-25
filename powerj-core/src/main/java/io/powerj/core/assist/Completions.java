@@ -46,7 +46,9 @@ import io.powerj.core.runtime.Session;
 /**
  * Tab completion (specification FR-21 to FR-25, FR-24b): commands, cmdlet options and values,
  * paths, variables, object members and Java API. Runs no command and calls no method:
- * types are inferred from variables, cmdlet output types and Java signatures.
+ * types are inferred from variables, cmdlet output types and Java signatures. The one thing read from a value
+ * is what {@link PropertyAccess#peek} reads: map keys, record components, public fields and the getters that the
+ * preview policy knows to be pure.
  */
 public final class Completions {
 
@@ -829,15 +831,9 @@ public final class Completions {
                         .orElse(new TypeInfo.Package(qualified));
             }
             case TypeInfo.Instance(var type, var value) -> {
-                if (value != null) {
-                    try {
-                        Object property = PropertyAccess.property(value, name); // getter: read with no expected side effect
-                        yield property == null ? propertyType(type, name) : new TypeInfo.Instance(property.getClass(), property);
-                    } catch (RuntimeException e) {
-                        yield new TypeInfo.Unknown();
-                    }
-                }
-                yield propertyType(type, name);
+                // The real value only where reading it does nothing (C-23); otherwise the signature decides.
+                Object property = value == null ? null : PropertyAccess.peek(value, name);
+                yield property == null ? propertyType(type, name) : new TypeInfo.Instance(property.getClass(), property);
             }
             case TypeInfo.ListOf _, TypeInfo.Unknown _ -> new TypeInfo.Unknown();
         };
