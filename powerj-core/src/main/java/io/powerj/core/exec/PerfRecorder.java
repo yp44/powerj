@@ -5,6 +5,7 @@ import java.lang.management.CompilationMXBean;
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryType;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -126,7 +127,7 @@ final class PerfRecorder {
     }
 
     /** @param recording file of the profiler's recording, or {@code null} */
-    PerfReport finish(int line, boolean cancelled, JfrData profile, java.nio.file.Path recording) {
+    PerfReport finish(int line, boolean cancelled, JfrData profile, Path recording) {
         stop();
         long total = endNanos - beginNanos;
         List<StageProbe> probes = probes();

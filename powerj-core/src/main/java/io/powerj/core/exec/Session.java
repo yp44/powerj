@@ -1,17 +1,20 @@
 package io.powerj.core.exec;
 
+import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.List;
-import java.nio.file.InvalidPathException;
-import java.nio.file.Path;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.SortedSet;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -177,8 +180,8 @@ public final class Session {
     }
 
     /** Names of the defined and automatic variables, sorted (completion). */
-    public java.util.SortedSet<String> variableNames() {
-        var names = new java.util.TreeSet<>(variables.keySet());
+    public SortedSet<String> variableNames() {
+        var names = new TreeSet<>(variables.keySet());
         names.addAll(AutomaticVariable.names());
         return names;
     }
@@ -239,7 +242,7 @@ public final class Session {
             if (dropped.recording() != null) {
                 try {
                     Files.deleteIfExists(dropped.recording());
-                } catch (java.io.IOException _) {
+                } catch (IOException _) {
                     // a temporary file: removed at exit
                 }
             }

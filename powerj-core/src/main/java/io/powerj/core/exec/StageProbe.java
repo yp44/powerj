@@ -59,9 +59,12 @@ final class StageProbe {
         return index;
     }
 
+    /** Start of the name of a stage thread; {@link JfrCapture} reads the stage number back from the name. */
+    static final String THREAD_PREFIX = "powerj-stage-";
+
     /** Name of the thread of a stage that runs apart from the calling thread; the profiler attributes samples by it. */
     static String threadName(int index) {
-        return "powerj-etape-" + index;
+        return THREAD_PREFIX + index;
     }
 
     /** The last stage of a pipeline runs in the thread that runs the shell, the others in their own thread. */
@@ -91,7 +94,7 @@ final class StageProbe {
         startTime = Instant.now();
         startNanos = System.nanoTime();
         try {
-            return java.lang.ScopedValue.where(PerfRecorder.STAGE, this).call(body::run);
+            return ScopedValue.where(PerfRecorder.STAGE, this).call(body::run);
         } finally {
             endNanos = System.nanoTime();
             endTime = Instant.now();

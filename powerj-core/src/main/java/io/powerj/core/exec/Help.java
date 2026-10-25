@@ -1,9 +1,13 @@
 package io.powerj.core.exec;
 
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 import io.powerj.api.CmdletInfo;
 
@@ -67,19 +71,19 @@ final class Help {
         lines.add(kind + " " + type.getName() + (type.getSuperclass() != null && type.getSuperclass() != Object.class
                 && !type.isEnum() && !type.isRecord() ? " extends " + type.getSuperclass().getSimpleName() : ""));
         List<String> constructors = new ArrayList<>();
-        if (!type.isInterface() && !java.lang.reflect.Modifier.isAbstract(type.getModifiers())) {
+        if (!type.isInterface() && !Modifier.isAbstract(type.getModifiers())) {
             for (var c : type.getConstructors()) {
                 constructors.add("new " + JavaInvoker.signature(c));
             }
         }
-        java.util.Set<String> statics = new java.util.TreeSet<>();
-        java.util.Set<String> instance = new java.util.TreeSet<>();
+        Set<String> statics = new TreeSet<>();
+        Set<String> instance = new TreeSet<>();
         for (var m : type.getMethods()) {
             if (!JavaClasses.accessible(m.getDeclaringClass()) && !Members.isAccessible(m.getDeclaringClass())) {
                 continue;
             }
             String line = JavaInvoker.signature(m) + " → " + m.getReturnType().getSimpleName();
-            if (java.lang.reflect.Modifier.isStatic(m.getModifiers())) {
+            if (Modifier.isStatic(m.getModifiers())) {
                 if (m.getDeclaringClass() == type) {
                     statics.add(line);
                 }
@@ -87,9 +91,9 @@ final class Help {
                 instance.add(line);
             }
         }
-        java.util.Set<String> fields = new java.util.TreeSet<>();
+        Set<String> fields = new TreeSet<>();
         for (var f : type.getFields()) {
-            boolean isStatic = java.lang.reflect.Modifier.isStatic(f.getModifiers());
+            boolean isStatic = Modifier.isStatic(f.getModifiers());
             fields.add((isStatic ? "static " : "") + f.getName() + " : " + f.getType().getSimpleName());
         }
         section(lines, Messages.get("help.section.constructors"), constructors);
@@ -99,7 +103,7 @@ final class Help {
         return lines;
     }
 
-    private static void section(List<Object> lines, String title, java.util.Collection<String> entries) {
+    private static void section(List<Object> lines, String title, Collection<String> entries) {
         if (!entries.isEmpty()) {
             lines.add("");
             lines.add(title);

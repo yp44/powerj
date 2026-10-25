@@ -9,8 +9,12 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -355,7 +359,7 @@ public final class Completions {
                 importedClasses().forEach(c -> candidates.add(new Candidate(c, c, Messages.get("completion.javaClass"), false)));
             }
         }
-        for (String name : preview ? java.util.Set.<String>of() : natives.names(session().environment())) {
+        for (String name : preview ? Set.<String>of() : natives.names(session().environment())) {
             candidates.add(new Candidate(name, name + " " + Messages.get("completion.tag.native"),
                     Messages.get("completion.program"), true));
         }
@@ -539,7 +543,7 @@ public final class Completions {
         } catch (IOException | SecurityException e) {
             return Result.none(cursor);
         }
-        candidates.sort(java.util.Comparator.comparing(Candidate::value));
+        candidates.sort(Comparator.comparing(Candidate::value));
         return new Result(start, text, candidates);
     }
 
@@ -754,7 +758,7 @@ public final class Completions {
             case Ast.Literal(var value) -> value == null ? new TypeInfo.Unknown() : new TypeInfo.Instance(value.getClass(), value);
             case Ast.SubExpression(var pipeline) -> pipelineType(pipeline);
             case Ast.ListLiteral _ -> instance(List.class);
-            case Ast.Now() -> instance(java.time.Instant.class);
+            case Ast.Now() -> instance(Instant.class);
             default -> new TypeInfo.Unknown();
         };
     }
@@ -836,7 +840,7 @@ public final class Completions {
 
     private static TypeInfo invocation(TypeInfo target, String method, int arity) {
         List<Method> candidates = switch (target) {
-            case TypeInfo.Static(var type) -> java.util.Arrays.stream(type.getMethods())
+            case TypeInfo.Static(var type) -> Arrays.stream(type.getMethods())
                     .filter(m -> Modifier.isStatic(m.getModifiers()) && m.getName().equals(method)).toList();
             case TypeInfo.Instance(var type, _) -> JavaInvoker.instanceMethods(type).getOrDefault(method, List.of());
             case TypeInfo.ListOf _ -> JavaInvoker.instanceMethods(List.class).getOrDefault(method, List.of());
@@ -903,7 +907,7 @@ public final class Completions {
                 candidates.add(new Candidate(m.name(), m.name() + " : " + m.type(), m.kind().toString(), false));
             }
         }
-        Set<String> components = new java.util.HashSet<>();
+        Set<String> components = new HashSet<>();
         if (type.isRecord()) {
             for (RecordComponent c : type.getRecordComponents()) {
                 components.add(c.getName());

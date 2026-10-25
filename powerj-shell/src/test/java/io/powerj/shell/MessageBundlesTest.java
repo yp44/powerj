@@ -113,4 +113,40 @@ class MessageBundlesTest {
         }
         assertThat(problems).isEmpty();
     }
+
+    private static final Pattern LITERAL_KEY = Pattern.compile("Messages\\.get\\(\"([\\w.\\-]+)\"\\s*[,)]");
+
+    /**
+     * A key written as a literal in {@code Messages.get("…")} is defined in a bundle of its module. Removing a key that
+     * looked unused, because the code that uses it is not where the others are, would show the key itself to the user
+     * (it happened while a message was being factored out).
+     */
+    @Test
+    void everyKeyUsedAsALiteralIsDefined() throws IOException {
+        List<String> problems = new ArrayList<>();
+        int checked = 0;
+        for (Path resources : resourceDirs()) {
+            Set<String> defined = new TreeSet<>();
+            try (Stream<Path> files = Files.walk(resources)) {
+                for (Path bundle : files.filter(f -> f.getFileName().toString().equals("messages_en.properties")).toList()) {
+                    defined.addAll(load(bundle).stringPropertyNames());
+                }
+            }
+            Path sources = resources.resolveSibling("java");
+            assertThat(sources).as("sources next to " + resources).isDirectory();
+            try (Stream<Path> files = Files.walk(sources)) {
+                for (Path source : files.filter(f -> f.toString().endsWith(".java")).toList()) {
+                    Matcher keys = LITERAL_KEY.matcher(Files.readString(source));
+                    while (keys.find()) {
+                        checked++;
+                        if (!defined.contains(keys.group(1))) {
+                            problems.add(ROOT.relativize(source) + ": key " + keys.group(1) + " is not defined");
+                        }
+                    }
+                }
+            }
+        }
+        assertThat(checked).as("literal keys found in the sources").isGreaterThan(300);
+        assertThat(problems).isEmpty();
+    }
 }

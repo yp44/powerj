@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import io.powerj.core.lang.Accessor;
 
@@ -67,7 +68,7 @@ public final class PropertyAccess {
     private static String typeName(Object value) {
         return switch (value) {
             case List<?> _ -> "List";
-            case java.util.Set<?> _ -> "Set";
+            case Set<?> _ -> "Set";
             case Collection<?> _ -> "Collection";
             default -> value.getClass().getSimpleName();
         };

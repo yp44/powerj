@@ -1,5 +1,7 @@
 package io.powerj.cmdlets;
 
+import java.lang.reflect.Array;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -191,7 +193,7 @@ public final class Join implements Cmdlet<Join.Params, Object, Row> {
         switch (value) {
             case null -> {
             }
-            case java.nio.file.Path path -> objects.add(path);
+            case Path path -> objects.add(path);
             case Collection<?> items -> objects.addAll(items);
             case Iterable<?> items -> items.forEach(objects::add);
             case BaseStream<?, ?> stream -> {
@@ -202,8 +204,8 @@ public final class Join implements Cmdlet<Join.Params, Object, Row> {
             case Iterator<?> iterator -> iterator.forEachRemaining(objects::add);
             case Optional<?> optional -> optional.ifPresent(objects::add);
             case Object array when array.getClass().isArray() -> {
-                for (int i = 0; i < java.lang.reflect.Array.getLength(array); i++) {
-                    objects.add(java.lang.reflect.Array.get(array, i));
+                for (int i = 0; i < Array.getLength(array); i++) {
+                    objects.add(Array.get(array, i));
                 }
             }
             default -> objects.add(value);

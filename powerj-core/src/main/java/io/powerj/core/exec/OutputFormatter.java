@@ -10,8 +10,11 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 import io.powerj.api.Bytes;
 import io.powerj.api.Display;
@@ -52,13 +55,13 @@ public final class OutputFormatter implements AutoCloseable {
      * @param type      declared type of the values (right alignment of numbers)
      * @param highlight accessor of the {@code List<Span>} component of a {@link Highlight} column, or {@code null}
      */
-    private record Column(String name, java.util.function.Function<Object, Object> reader, Class<?> type, boolean bytes,
+    private record Column(String name, Function<Object, Object> reader, Class<?> type, boolean bytes,
                           Method highlight) { }
 
     /** Row of a table: the text of the cells and, for each one, the parts to highlight ({@code null}: none). */
     private record Row(String[] cells, List<List<Span>> highlights) {
         Row(String[] cells) {
-            this(cells, java.util.Collections.nCopies(cells.length, null));
+            this(cells, Collections.nCopies(cells.length, null));
         }
     }
 
@@ -345,7 +348,7 @@ public final class OutputFormatter implements AutoCloseable {
         }
         var result = new StringBuilder();
         int position = 0;
-        for (Span span : spans.stream().sorted(java.util.Comparator.comparingInt(Span::start)).toList()) {
+        for (Span span : spans.stream().sorted(Comparator.comparingInt(Span::start)).toList()) {
             int start = Math.max(span.start(), position);
             int end = Math.min(span.end(), limit);
             if (start >= end) {

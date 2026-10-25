@@ -146,7 +146,7 @@ final class Previewer {
                 worker.interrupt(); // the running evaluation is out of date
             }
             if (text != null && worker == null) {
-                worker = Thread.ofPlatform().name("powerj-apercu").daemon().stackSize(STACK_SIZE).start(this::work);
+                worker = Thread.ofPlatform().name("powerj-preview").daemon().stackSize(STACK_SIZE).start(this::work);
             }
             lock.notifyAll();
         }

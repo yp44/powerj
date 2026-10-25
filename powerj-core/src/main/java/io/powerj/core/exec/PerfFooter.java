@@ -3,6 +3,9 @@ package io.powerj.core.exec;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import io.powerj.api.PerfReport;
 import io.powerj.api.StageStat;
@@ -63,10 +66,10 @@ final class PerfFooter {
     private static String hot(PerfReport report) {
         int stage = report.stages().stream().filter(StageStat::bottleneck).mapToInt(StageStat::index).findFirst()
                 .orElseGet(() -> report.hot().stream().filter(h -> h.stage() > 0)
-                        .collect(java.util.stream.Collectors.groupingBy(io.powerj.api.HotMethod::stage,
-                                java.util.stream.Collectors.summingLong(io.powerj.api.HotMethod::samples)))
-                        .entrySet().stream().max(java.util.Map.Entry.comparingByValue())
-                        .map(java.util.Map.Entry::getKey).orElse(0));
+                        .collect(Collectors.groupingBy(io.powerj.api.HotMethod::stage,
+                                Collectors.summingLong(io.powerj.api.HotMethod::samples)))
+                        .entrySet().stream().max(Map.Entry.comparingByValue())
+                        .map(Map.Entry::getKey).orElse(0));
         List<String> methods = report.hot().stream().filter(h -> h.stage() == stage).limit(3)
                 .map(h -> shortMethod(h.method()) + " " + Math.round(h.percent()) + "%").toList();
         if (methods.isEmpty()) {
@@ -98,7 +101,7 @@ final class PerfFooter {
             return "-";
         }
         if (value >= 1_000_000) {
-            return String.format(java.util.Locale.ROOT, "%.1fM", value / 1e6);
+            return String.format(Locale.ROOT, "%.1fM", value / 1e6);
         }
         if (value >= 10_000) {
             return (value / 1000) + "k";

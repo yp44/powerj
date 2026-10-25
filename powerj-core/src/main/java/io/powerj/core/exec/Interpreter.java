@@ -2,17 +2,26 @@ package io.powerj.core.exec;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import io.powerj.core.lang.Ast;
 import io.powerj.core.lang.Ast.Argument;
@@ -91,7 +100,7 @@ public final class Interpreter {
         builtins.put("mod-load", this::modLoad);
         builtins.put("mod-list", this::modList);
         builtins.putAll(extraBuiltins);
-        this.modules = new ModuleLoader(registry, java.util.Collections.unmodifiableSet(builtins.keySet()));
+        this.modules = new ModuleLoader(registry, Collections.unmodifiableSet(builtins.keySet()));
     }
 
     /** Consent asked before loading a module that uses native code (FR-77); none by default: it is not loaded. */
@@ -147,8 +156,8 @@ public final class Interpreter {
     public enum CommandKind { BUILTIN, CMDLET, NATIVE, UNKNOWN }
 
     /** Names of the built-in commands. */
-    public java.util.Set<String> builtinNames() {
-        return java.util.Collections.unmodifiableSet(builtins.keySet());
+    public Set<String> builtinNames() {
+        return Collections.unmodifiableSet(builtins.keySet());
     }
 
     /** Java static names, and the commands whose cmdlet declares the short form {@code where size > 1mb}. */
@@ -178,7 +187,7 @@ public final class Interpreter {
      * Non-interactive mode (FR-04d): the standard input lines feed the first stage that reads
      * objects, and native commands at the head of the pipeline read standard input directly.
      */
-    public void useStandardInput(java.util.Iterator<String> lines) {
+    public void useStandardInput(Iterator<String> lines) {
         this.standardInput = Source.of(lines);
         this.inheritStandardInput = true;
     }
@@ -220,7 +229,7 @@ public final class Interpreter {
                     session.recordSuccess(succeeded);
                 }
             }
-        } catch (InterruptedException | java.util.concurrent.CancellationException e) {
+        } catch (InterruptedException | CancellationException e) {
             cancelled = true;
             throw e;
         } finally {
@@ -328,8 +337,8 @@ public final class Interpreter {
             file.toFile().deleteOnExit();
             return file;
         } catch (IOException | RuntimeException e) {
-            java.util.logging.Logger.getLogger(Interpreter.class.getName())
-                    .log(java.util.logging.Level.WARNING, "No file for the profiler's recording", e);
+            Logger.getLogger(Interpreter.class.getName())
+                    .log(Level.WARNING, "No file for the profiler's recording", e);
             return null;
         }
     }
@@ -413,7 +422,7 @@ public final class Interpreter {
         Job job = session.jobs().add(text, processes);
         NativeRunner.Command last = commands.getLast();
         session.recordNative(new NativeRun(last.executable(), last.args(), job.pid(), null,
-                java.time.Duration.ofNanos(System.nanoTime() - start)));
+                Duration.ofNanos(System.nanoTime() - start)));
         if (io.interactive()) {
             io.out().println(Messages.get("background.started", job.id(), job.pid()));
             io.out().flush();
@@ -431,7 +440,7 @@ public final class Interpreter {
     }
 
     /** Stops a preview that has received enough values. */
-    private static final class PreviewFull extends java.util.concurrent.CancellationException { }
+    private static final class PreviewFull extends CancellationException { }
 
     /**
      * Preview mode (FR-66): evaluates the line as {@link #execute} would, but only with what changes nothing — cmdlets
@@ -469,14 +478,14 @@ public final class Interpreter {
             return new PreviewResult.Off(Messages.get("preview.off.redirection"));
         }
         var guard = new PreviewGuard();
-        List<Object> values = java.util.Collections.synchronizedList(new ArrayList<>());
+        List<Object> values = Collections.synchronizedList(new ArrayList<>());
         boolean more = false;
         try {
             guard.call(() -> pipeline(statement.pipeline(), value -> previewValue(value, values, limit), true,
                     Optional.empty(), Optional.empty()));
         } catch (PreviewFull _) {
             more = true;
-        } catch (InterruptedException | java.util.concurrent.CancellationException e) {
+        } catch (InterruptedException | CancellationException e) {
             if (guard.reason() == null) {
                 more = true; // cancelled by the caller (time limit): what has arrived is shown
             }
@@ -497,7 +506,7 @@ public final class Interpreter {
             shown = new ArrayList<>(values.subList(0, Math.min(limit, values.size())));
             more |= values.size() > limit;
         }
-        var text = new java.io.StringWriter();
+        var text = new StringWriter();
         try {
             guard.call(() -> {
                 var formatter = new OutputFormatter(new PrintWriter(text), width, colors);
@@ -505,7 +514,7 @@ public final class Interpreter {
                 formatter.close();
                 return null;
             });
-        } catch (java.util.concurrent.CancellationException | PjException e) {
+        } catch (CancellationException | PjException e) {
             if (guard.reason() != null) {
                 return new PreviewResult.Off(guard.reason());
             }
@@ -639,7 +648,7 @@ public final class Interpreter {
                 probes.get(i + 1).input(pipes.get(i));
             }
         }
-        var blockingErrors = new java.util.concurrent.atomic.AtomicBoolean();
+        var blockingErrors = new AtomicBoolean();
         List<Thread> threads = new ArrayList<>(n - 1);
         for (int i = 0; i < n - 1; i++) {
             Segment segment = segments.get(i);
@@ -652,7 +661,7 @@ public final class Interpreter {
                 try {
                     segment(segment, input, output, null, false, Optional.empty(), sharedErrors, errors, probe);
                     output.close();
-                } catch (InterruptedException | java.util.concurrent.CancellationException e) {
+                } catch (InterruptedException | CancellationException e) {
                     closeQuietly(output);
                 } catch (PjException e) {
                     blockingErrors.set(true);
@@ -660,8 +669,8 @@ public final class Interpreter {
                     closeQuietly(output);
                 } catch (Throwable t) {
                     blockingErrors.set(true);
-                    java.util.logging.Logger.getLogger(Interpreter.class.getName())
-                            .log(java.util.logging.Level.SEVERE, "Internal error in a pipeline stage", t);
+                    Logger.getLogger(Interpreter.class.getName())
+                            .log(Level.SEVERE, "Internal error in a pipeline stage", t);
                     errors.accept(Messages.get("error.internal", t));
                     closeQuietly(output);
                 } finally {
@@ -855,7 +864,7 @@ public final class Interpreter {
                               Consumer<Object> output, Consumer<String> errors) throws Exception {
         try {
             return CmdletRunner.run(cmdlet, args, session, errors, output, input, this::compile);
-        } catch (PjException | InterruptedException | java.util.concurrent.CancellationException e) {
+        } catch (PjException | InterruptedException | CancellationException e) {
             throw e;
         } catch (Exception e) {
             throw new PjException(PjError.of(Messages.get("command.error", cmdlet.name(), e), e));
@@ -871,7 +880,7 @@ public final class Interpreter {
             throw new IllegalArgumentException(e.getMessage(), e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new java.util.concurrent.CancellationException();
+            throw new CancellationException();
         }
     }
 
@@ -905,7 +914,7 @@ public final class Interpreter {
     private static void closeQuietly(Pipe pipe) {
         try {
             pipe.close();
-        } catch (java.util.concurrent.CancellationException _) {
+        } catch (CancellationException _) {
             // pipeline already stopped
         }
     }
@@ -913,7 +922,7 @@ public final class Interpreter {
     /** Waits for the stages to finish (stopped if needed), without letting itself be interrupted. */
     private static void joinAll(List<Thread> threads) {
         boolean interrupted = Thread.interrupted();
-        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(JOIN_SECONDS);
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(JOIN_SECONDS);
         for (Thread thread : threads) {
             while (thread.isAlive()) {
                 long remaining = deadline - System.nanoTime();
@@ -921,7 +930,7 @@ public final class Interpreter {
                     break; // stage blocked in a non-interruptible call: abandoned (FR-57)
                 }
                 try {
-                    thread.join(java.time.Duration.ofNanos(remaining));
+                    thread.join(Duration.ofNanos(remaining));
                 } catch (InterruptedException _) {
                     interrupted = true;
                 }
@@ -1044,7 +1053,7 @@ public final class Interpreter {
         if (!session.debug()) {
             return error.message();
         }
-        var trace = new java.io.StringWriter();
+        var trace = new StringWriter();
         cause.printStackTrace(new PrintWriter(trace));
         return error.message() + System.lineSeparator() + trace.toString().stripTrailing();
     }

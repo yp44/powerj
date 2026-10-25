@@ -18,7 +18,6 @@ import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
 import io.powerj.fs.FileWalker;
 import io.powerj.fs.Globs;
-import io.powerj.fs.WalkError;
 
 /** {@code ls}: lists files as {@link FileEntry} objects (specification FR-35). */
 @CmdletInfo(name = "ls", preview = true, category = "Files", summary = "Lists files and directories",
@@ -53,9 +52,7 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
         if (params.dirs() && params.files()) {
             throw new IllegalArgumentException(Messages.get("ls.dirs.files.incompatible"));
         }
-        if (params.parallel() != null && params.parallel() < 1) {
-            throw new IllegalArgumentException(Messages.get("ls.parallel.invalid", params.parallel()));
-        }
+        FileOps.parallelism(params.parallel()); // refuses a count below 1 before anything is listed
         Optional<PathMatcher> filter = Optional.ofNullable(params.filter()).map(Globs::matcher);
         List<String> paths = params.paths().isEmpty() ? List.of(".") : params.paths();
         for (String path : paths) {
@@ -92,7 +89,7 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
         List<FileEntry> matches = new ArrayList<>();
         walker(params, 1, 1).walk(base,
                 (path, attributes) -> pattern.matches(path.getFileName()) ? entry(path, attributes) : null,
-                matches::add, error -> report(error, context));
+                matches::add, error -> FileArguments.report(error, context));
         for (FileEntry match : matches) {
             if (keep(match, params, filter)) {
                 context.emit(match);
@@ -108,26 +105,18 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
 
     /** Lazy walk (FR-35): each entry is emitted as soon as it is read; symbolic links are not followed. */
     private void listDirectory(Path dir, Params params, Optional<PathMatcher> filter, CmdletContext<FileEntry> context) {
-        int parallelism = params.parallel() == null ? 1 : params.parallel();
+        int parallelism = FileOps.parallelism(params.parallel());
         walker(params, params.recurse() ? Integer.MAX_VALUE : 1, parallelism).walk(dir, Ls::entry, entry -> {
             if (keep(entry, params, filter)) {
                 context.emit(entry);
             }
-        }, error -> report(error, context));
+        }, error -> FileArguments.report(error, context));
     }
 
     /** With {@code parallelism > 1}, the order of the entries is free (FR-35). */
     private static FileWalker walker(Params params, int maxDepth, int parallelism) {
         return FileWalker.builder().maxDepth(maxDepth).includeHidden(params.all()).order(DIRECTORIES_FIRST)
                 .parallelism(parallelism).build();
-    }
-
-    private static void report(WalkError error, CmdletContext<FileEntry> context) {
-        context.error(switch (error.kind()) {
-            case ACCESS_DENIED -> Messages.get("ls.access.denied", error.path());
-            case NOT_FOUND -> Messages.get("ls.not.found", error.path());
-            case IO -> Messages.get("ls.read.failed", error.path(), error.message());
-        });
     }
 
     private static boolean keep(FileEntry entry, Params params, Optional<PathMatcher> filter) {

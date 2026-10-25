@@ -4,9 +4,11 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZonedDateTime;
 import java.time.temporal.Temporal;
-import java.util.Date;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -104,8 +106,8 @@ final class ValueOrder implements Comparator<Object> {
         return switch (value) {
             case Instant i -> i;
             case Date d -> d.toInstant();
-            case java.time.ZonedDateTime z -> z.toInstant();
-            case java.time.OffsetDateTime o -> o.toInstant();
+            case ZonedDateTime z -> z.toInstant();
+            case OffsetDateTime o -> o.toInstant();
             default -> null;
         };
     }

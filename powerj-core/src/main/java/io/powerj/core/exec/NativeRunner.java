@@ -1,9 +1,14 @@
 package io.powerj.core.exec;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -11,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -31,7 +37,7 @@ public final class NativeRunner {
     private static final long GRACE_SECONDS = 2;
 
     /** Standard input of a background command: nothing to read. */
-    private static final java.io.File NULL_DEVICE = new java.io.File(Platform.isWindows() ? "NUL" : "/dev/null");
+    private static final File NULL_DEVICE = new File(Platform.isWindows() ? "NUL" : "/dev/null");
 
     /** Target file of a redirection. */
     public record FileTarget(Path file, boolean append) {
@@ -325,8 +331,8 @@ public final class NativeRunner {
 
     /** Writes the objects received to the process's stdin, in their displayed form (FR-37). */
     private static void writeObjects(Source input, Process process, Charset charset, ShellIo io) {
-        var writer = new java.io.PrintWriter(new java.io.BufferedWriter(
-                new java.io.OutputStreamWriter(process.getOutputStream(), charset)));
+        var writer = new PrintWriter(new BufferedWriter(
+                new OutputStreamWriter(process.getOutputStream(), charset)));
         var formatter = new OutputFormatter(writer, io.width().getAsInt());
         boolean complete = false;
         try {
@@ -338,7 +344,7 @@ public final class NativeRunner {
                 }
             }
             complete = true;
-        } catch (InterruptedException | java.util.concurrent.CancellationException _) {
+        } catch (InterruptedException | CancellationException _) {
             // pipeline stopped
         } finally {
             if (complete) {
@@ -358,7 +364,7 @@ public final class NativeRunner {
                 while ((line = reader.readLine()) != null) {
                     sink.accept(line);
                 }
-            } catch (IOException | java.util.concurrent.CancellationException _) {
+            } catch (IOException | CancellationException _) {
                 // process stopped, or next stage closed: end of reading
             }
         });
@@ -385,7 +391,7 @@ public final class NativeRunner {
         return Duration.ofNanos(System.nanoTime() - startNanos);
     }
 
-    private static void closeQuietly(java.io.OutputStream stream) {
+    private static void closeQuietly(OutputStream stream) {
         try {
             stream.close();
         } catch (IOException _) {

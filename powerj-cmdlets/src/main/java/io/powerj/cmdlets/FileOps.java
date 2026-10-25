@@ -11,6 +11,7 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BiConsumer;
 import java.util.regex.PatternSyntaxException;
 
 import io.powerj.api.CmdletContext;
@@ -66,7 +67,7 @@ final class FileOps {
      * {@code rm README*} must not remove {@code readme.md} on Linux or macOS, as in a shell there (review C-22).
      * {@code ls readme* | rm} is the way to ask for the other rule, with the list in plain sight.
      */
-    static final boolean WILDCARDS_IGNORE_CASE = System.getProperty("os.name", "").startsWith("Windows");
+    static final boolean WILDCARDS_IGNORE_CASE = HostOs.WINDOWS;
 
     /** Paths of an argument: the path itself, or the matches of a wildcard on its last element. */
     static List<Path> expand(String argument, CmdletContext<?> context) {
@@ -138,7 +139,7 @@ final class FileOps {
      * cannot be read or removed is reported. Returns {@code true} if everything was removed.
      */
     static boolean deleteTree(Path root, int parallelism, boolean dryRun, boolean describe, CmdletContext<?> context,
-                              java.util.function.BiConsumer<Path, FileEntry> removed) {
+                              BiConsumer<Path, FileEntry> removed) {
         return FileTrees.delete(root, parallelism, dryRun,
                 entry -> removed.accept(entry.path(),
                         describe ? FileEntries.of(entry.path(), entry.attributes()) : null),

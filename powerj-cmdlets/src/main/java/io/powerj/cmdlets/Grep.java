@@ -28,7 +28,6 @@ import io.powerj.api.Option;
 import io.powerj.api.ScriptBlock;
 import io.powerj.api.Span;
 import io.powerj.fs.FileWalker;
-import io.powerj.fs.WalkError;
 
 /**
  * {@code grep}: searches a regular expression ({@link Pattern} syntax) in files, or filters the pipeline
@@ -96,7 +95,7 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
         if (!params.paths().isEmpty()) {
             List<Path> roots = new ArrayList<>();
             for (String argument : params.paths()) {
-                roots.addAll(FileArguments.expand(argument, params.all(), context, error -> report(error, context),
+                roots.addAll(FileArguments.expand(argument, params.all(), context, error -> FileArguments.report(error, context),
                         "grep.no.match"));
             }
             search.files(roots, context);
@@ -117,14 +116,6 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
         }
     }
 
-    private static void report(WalkError error, CmdletContext<?> context) {
-        context.error(switch (error.kind()) {
-            case ACCESS_DENIED -> Messages.get("grep.access.denied", error.path());
-            case NOT_FOUND -> Messages.get("grep.not.found", error.path());
-            case IO -> Messages.get("grep.read.failed", error.path(), error.message());
-        });
-    }
-
     /** One execution of {@code grep}: compiled pattern and settings of the walk. */
     private static final class Search {
 
@@ -139,9 +130,7 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
         private final FileWalker walker;
 
         Search(Params params, CmdletContext<?> context) {
-            if (params.parallel() != null && params.parallel() < 1) {
-                throw new IllegalArgumentException(Messages.get("grep.parallel.invalid", params.parallel()));
-            }
+            int parallelism = FileOps.parallelism(params.parallel());
             if (params.maxDepth() != null && params.maxDepth() < 1) {
                 throw new IllegalArgumentException(Messages.get("grep.maxDepth.invalid", params.maxDepth()));
             }
@@ -161,7 +150,7 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
             int maxDepth = params.maxDepth() != null ? params.maxDepth()
                     : params.recurse() ? Integer.MAX_VALUE : 1;
             walker = FileWalker.builder().maxDepth(maxDepth).includeHidden(params.all()).order(FileArguments.BY_NAME)
-                    .parallelism(params.parallel() == null ? 1 : params.parallel()).build();
+                    .parallelism(parallelism).build();
         }
 
         private static ScriptBlock property(String name, CmdletContext<?> context) {
@@ -174,7 +163,7 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
         /** Searches the files below the roots; the lines of a file are emitted together, in order. */
         void files(List<Path> roots, CmdletContext<Object> context) {
             walker.walk(roots, this::search, matches -> matches.forEach(context::emit),
-                    error -> report(error, context));
+                    error -> FileArguments.report(error, context));
         }
 
         /** Lets the object through if its text (or that of its property) matches. */

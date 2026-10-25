@@ -1,5 +1,7 @@
 package io.powerj.core.exec;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /** Result of {@link Interpreter#preview} (FR-66). */
@@ -19,7 +21,7 @@ public sealed interface PreviewResult {
      */
     record Values(List<Object> values, List<String> lines, boolean more, int errors) implements PreviewResult {
         public Values {
-            values = java.util.Collections.unmodifiableList(new java.util.ArrayList<>(values));
+            values = Collections.unmodifiableList(new ArrayList<>(values));
             lines = List.copyOf(lines);
         }
     }

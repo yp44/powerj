@@ -1,7 +1,9 @@
 package io.powerj.core.exec;
 
+import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.Linker;
+import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SymbolLookup;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
@@ -38,8 +40,8 @@ final class WindowsConsole {
 
     private static int call(String function) throws Throwable {
         Linker linker = Linker.nativeLinker();
-        SymbolLookup kernel32 = SymbolLookup.libraryLookup("kernel32", java.lang.foreign.Arena.global());
-        Optional<java.lang.foreign.MemorySegment> symbol = kernel32.find(function);
+        SymbolLookup kernel32 = SymbolLookup.libraryLookup("kernel32", Arena.global());
+        Optional<MemorySegment> symbol = kernel32.find(function);
         if (symbol.isEmpty()) {
             return 0;
         }

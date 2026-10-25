@@ -3,6 +3,7 @@ package io.powerj.cmdlets;
 import java.lang.reflect.Array;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
@@ -82,7 +83,7 @@ final class JsonWriter {
     /** A map, record, collection, array or stream; a {@code Path}, though {@code Iterable}, is a scalar. */
     static boolean isContainer(Object value) {
         return value instanceof Map<?, ?> || value instanceof Record
-                || (value instanceof Iterable<?> && !(value instanceof java.nio.file.Path))
+                || (value instanceof Iterable<?> && !(value instanceof Path))
                 || value instanceof Iterator<?> || value instanceof BaseStream<?, ?> || value.getClass().isArray();
     }
 

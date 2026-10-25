@@ -1,5 +1,6 @@
 package io.powerj.fx.model;
 
+import java.io.File;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.RecordComponent;
@@ -18,6 +19,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.CancellationException;
 
@@ -60,7 +63,7 @@ public final class ObjectReader {
     public Reading read(Object object) {
         return switch (object) {
             case Row row -> fromMap(object, row, row.sizeColumns());
-            case Map<?, ?> map -> fromMap(object, map, java.util.Set.of());
+            case Map<?, ?> map -> fromMap(object, map, Set.of());
             case Record record -> fromProperties(object, recordColumns(record.getClass()));
             case null -> scalar(null);
             default -> isScalar(object) ? scalar(object) : fromBean(object);
@@ -75,7 +78,7 @@ public final class ObjectReader {
         return new Reading(List.of(column), new GridRow(object, values), Map.of());
     }
 
-    private Reading fromMap(Object source, Map<?, ?> map, java.util.Set<String> sizeColumns) {
+    private Reading fromMap(Object source, Map<?, ?> map, Set<String> sizeColumns) {
         List<ColumnSpec> columns = new ArrayList<>();
         Map<String, Object> values = new LinkedHashMap<>();
         for (Map.Entry<?, ?> entry : map.entrySet()) {
@@ -156,7 +159,7 @@ public final class ObjectReader {
 
     /** One column per public getter, by name. */
     private List<ColumnSpec> beanColumns(Class<?> type) {
-        Map<String, ColumnSpec> byName = new java.util.TreeMap<>();
+        Map<String, ColumnSpec> byName = new TreeMap<>();
         for (Method method : type.getMethods()) {
             String property = property(method);
             if (property != null) {
@@ -192,7 +195,7 @@ public final class ObjectReader {
         return object instanceof CharSequence || object instanceof Number || object instanceof Boolean
                 || object instanceof Character || object instanceof Enum<?> || object instanceof Temporal
                 || object instanceof TemporalAmount || object instanceof Date || object instanceof Path
-                || object instanceof java.io.File || object instanceof URI || object instanceof URL
+                || object instanceof File || object instanceof URI || object instanceof URL
                 || object instanceof UUID;
     }
 }

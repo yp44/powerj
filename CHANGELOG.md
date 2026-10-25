@@ -77,6 +77,13 @@ structures, functions) can be built on it. The work is organised in phases (revi
 - **Wildcards of `rm`, `cp`, `mv` and `touch` respect case** except on Windows (C-22, step 1.7): `rm README*` no longer
   removes `readme.md` on Linux and macOS. `ls readme* | rm` gives the other rule. `ls`, `grep` and `cat` are unchanged.
 
+### Changed (Phase 1, hygiene)
+- Thread names are English: `powerj-command`, `powerj-preview`, `powerj-stage-N` (the profiler reads the stage number from
+  the last one, through a shared constant now).
+- Fully qualified names written inline are imports (94 places), `cmdlets` reads `os.name` in one place, `ls`, `cat` and
+  `grep` share their report of walk errors and `ls`, `grep` the check of `--parallel`.
+- A new test fails when `Messages.get("key")` names a key that no bundle of the module defines.
+
 ### Examined, not changed
 - **The seven `Messages` classes stay** (C-10, step 1.4). Replacing them with one helper in `powerj-api` was tried on a
   two-module experiment: `ResourceBundle.getBundle(…, module)` called from another module fails unless the owner of the
@@ -84,7 +91,7 @@ structures, functions) can be built on it. The work is organised in phases (revi
   class is the minimal form that works with JPMS, and the model `examples/greet` gives to module authors.
 
 ### Planned (review §8)
-- **Phase 1 (end).** Hygiene: shared helpers, English thread names, imports.
+- **End of Phase 1.** Report of the phase in the review (§12), then Phase 2: the `Interpreter` split.
 - **Phase 2 — `Interpreter` split** into a command resolution, a pipeline executor, redirections, and
   observer-based perf and preview modes.
 - **Phase 3 — packages, modules and API.** `core.exec` is split in eight packages with qualified exports, the

@@ -202,7 +202,7 @@ class PipelineTest {
             }
         });
         // The stages are virtual threads, which Thread.getAllStackTraces() does not list: the old check "no thread named
-        // powerj-etape* is left" could never fail. The producer says itself whether it still runs.
+        // powerj-stage* is left" could never fail. The producer says itself whether it still runs.
         Waits.until("the producer runs", () -> FakeCmdlets.Infinite.RUNNING.get() == producersBefore + 1);
         runner.interrupt();
         runner.join();

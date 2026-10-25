@@ -16,7 +16,6 @@ import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
-import io.powerj.fs.WalkError;
 
 /**
  * {@code cat}: reads files, as lines or as a whole content (specification FR-65).
@@ -76,7 +75,7 @@ public final class Cat implements Cmdlet<Cat.Params, Object, Object> {
         Reading reading = reading(params, context);
         if (!params.paths().isEmpty()) {
             for (String argument : params.paths()) {
-                for (Path file : FileArguments.expand(argument, false, context, error -> report(error, context),
+                for (Path file : FileArguments.expand(argument, false, context, error -> FileArguments.report(error, context),
                         "cat.no.match")) {
                     reading.read(file, context);
                 }
@@ -101,14 +100,6 @@ public final class Cat implements Cmdlet<Cat.Params, Object, Object> {
     @Override
     public void end(Params params, CmdletContext<Object> context) {
         reading(params, context).finish(context);
-    }
-
-    private static void report(WalkError error, CmdletContext<?> context) {
-        context.error(switch (error.kind()) {
-            case ACCESS_DENIED -> Messages.get("cat.access.denied", error.path());
-            case NOT_FOUND -> Messages.get("cat.not.found", error.path());
-            case IO -> Messages.get("cat.read.failed", error.path(), error.message());
-        });
     }
 
     /** One execution of {@code cat}: settings, line counter and content gathered. */

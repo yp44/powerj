@@ -11,10 +11,6 @@ import java.util.Locale;
  */
 final class RealPaths {
 
-    /** Names are compared without regard to case where the usual file systems ignore it. */
-    private static final boolean IGNORES_CASE = System.getProperty("os.name", "").startsWith("Windows")
-            || System.getProperty("os.name", "").startsWith("Mac");
-
     private RealPaths() {
     }
 
@@ -68,6 +64,6 @@ final class RealPaths {
 
     /** The form in which two paths are compared: in lower case where file names ignore case. */
     static Path compared(Path path) {
-        return IGNORES_CASE ? Path.of(path.toString().toLowerCase(Locale.ROOT)) : path;
+        return HostOs.NAMES_IGNORE_CASE ? Path.of(path.toString().toLowerCase(Locale.ROOT)) : path;
     }
 }

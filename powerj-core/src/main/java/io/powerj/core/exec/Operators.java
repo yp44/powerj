@@ -2,8 +2,9 @@ package io.powerj.core.exec;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.time.Duration;
+import java.math.MathContext;
 import java.time.DateTimeException;
+import java.time.Duration;
 import java.time.temporal.Temporal;
 import java.util.Objects;
 
@@ -129,7 +130,7 @@ final class Operators {
                     case ADD -> x.add(y);
                     case SUB -> x.subtract(y);
                     case MUL -> x.multiply(y);
-                    case DIV -> x.divide(y, java.math.MathContext.DECIMAL128);
+                    case DIV -> x.divide(y, MathContext.DECIMAL128);
                     default -> x.remainder(y);
                 };
             }

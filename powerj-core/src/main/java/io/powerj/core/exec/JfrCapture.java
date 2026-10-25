@@ -35,7 +35,7 @@ final class JfrCapture {
     private static final Logger LOG = Logger.getLogger(JfrCapture.class.getName());
 
     /** The stage threads are named by {@link StageProbe#threadName}. */
-    private static final Pattern STAGE_THREAD = Pattern.compile("powerj-etape-(\\d+)");
+    private static final Pattern STAGE_THREAD = Pattern.compile(Pattern.quote(StageProbe.THREAD_PREFIX) + "(\\d+)");
     /** Rows kept per stage. */
     private static final int TOP = 20;
 

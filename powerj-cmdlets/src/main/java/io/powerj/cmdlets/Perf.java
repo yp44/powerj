@@ -5,6 +5,7 @@ import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import io.powerj.api.Cmdlet;
@@ -62,7 +63,7 @@ public final class Perf implements Cmdlet<Perf.Params, Void, Object> {
         List<PerfReport> selected;
         if (p.all() || view == View.LINES && p.line() == null) {
             selected = new ArrayList<>(kept);
-            java.util.Collections.reverse(selected);
+            Collections.reverse(selected);
         } else {
             // The number of a line is the one of the line column: it does not go back when old lines are dropped.
             int n = p.line() == null ? kept.getFirst().line() : p.line();

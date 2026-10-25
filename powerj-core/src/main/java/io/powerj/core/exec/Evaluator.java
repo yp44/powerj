@@ -3,9 +3,11 @@ package io.powerj.core.exec;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CancellationException;
+import java.util.stream.BaseStream;
 
 import io.powerj.core.lang.Ast;
 import io.powerj.core.lang.Ast.Expression;
@@ -225,7 +227,7 @@ final class Evaluator {
             return value == NULL ? null : value;
         }
         Object value = session.variable(name);
-        if (value instanceof java.util.stream.BaseStream<?, ?> || value instanceof java.util.Iterator<?>) {
+        if (value instanceof BaseStream<?, ?> || value instanceof Iterator<?>) {
             // A stream or an iterator can be read only once: the preview would use it up (FR-66).
             PreviewGuard.deny(Messages.get("preview.off.readOnce", name));
         }

@@ -2,6 +2,7 @@ package io.powerj.core.lang;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -138,7 +139,7 @@ public final class ExpressionParser {
         if (parameters.isEmpty()) {
             return staticNames;
         }
-        Set<String> names = new java.util.HashSet<>(parameters);
+        Set<String> names = new HashSet<>(parameters);
         Predicate<String> statics = staticNames;
         if (staticNames instanceof Names(var outer, var outerParameters)) {
             names.addAll(outerParameters);

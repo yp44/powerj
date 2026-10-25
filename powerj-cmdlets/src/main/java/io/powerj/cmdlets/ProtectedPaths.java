@@ -30,9 +30,6 @@ public final class ProtectedPaths {
     /** Name of the file in the configuration folder. */
     public static final String FILE_NAME = "protected-paths";
 
-    private static final boolean WINDOWS = System.getProperty("os.name", "").startsWith("Windows");
-    private static final boolean MAC = System.getProperty("os.name", "").startsWith("Mac");
-
     private final List<Path> paths;
     /** The current folder as written and with its links resolved (being in a link to a folder is being in it). */
     private final List<Path> currentDirectories;
@@ -60,13 +57,13 @@ public final class ProtectedPaths {
         FileSystems.getDefault().getRootDirectories().forEach(root -> entries.add(root.toString()));
         entries.add("~");
         entries.add(configDirectory == null ? "~/.powerj" : configDirectory.toAbsolutePath().normalize().toString());
-        if (WINDOWS) {
+        if (HostOs.WINDOWS) {
             entries.addAll(List.of("C:\\Windows", "C:\\Program Files", "C:\\Program Files (x86)", "C:\\ProgramData",
                     "C:\\Users"));
         } else {
             entries.addAll(List.of("/bin", "/boot", "/dev", "/etc", "/home", "/lib", "/opt", "/proc", "/root", "/sbin",
                     "/sys", "/usr", "/var"));
-            if (MAC) {
+            if (HostOs.MAC) {
                 entries.addAll(List.of("/Applications", "/Library", "/System", "/Users"));
             }
         }

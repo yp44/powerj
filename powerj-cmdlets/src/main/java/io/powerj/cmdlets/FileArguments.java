@@ -63,6 +63,15 @@ final class FileArguments {
         return matches;
     }
 
+    /** Reports a failure of the walk of a folder as a non-blocking error (shared by {@code ls}, {@code cat}, {@code grep}). */
+    static void report(WalkError error, CmdletContext<?> context) {
+        context.error(switch (error.kind()) {
+            case ACCESS_DENIED -> Messages.get("files.access.denied", error.path());
+            case NOT_FOUND -> Messages.get("files.not.found", error.path());
+            case IO -> Messages.get("files.read.failed", error.path(), error.message());
+        });
+    }
+
     /** File designated by a pipeline object ({@link FileEntry}, {@link Path}, {@link File}), or {@code null}. */
     static Path file(Object input, CmdletContext<?> context) {
         return switch (input) {

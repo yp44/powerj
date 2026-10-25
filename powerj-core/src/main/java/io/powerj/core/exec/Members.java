@@ -6,6 +6,8 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.RecordComponent;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -157,7 +159,7 @@ public final class Members {
                             new Member(property, Kind.PROPERTY, simple(m.getGenericReturnType().getTypeName())));
                 }
                 String signature = m.getName() + "(" + String.join(", ",
-                        java.util.Arrays.stream(m.getGenericParameterTypes()).map(p -> simple(p.getTypeName())).toList()) + ")";
+                        Arrays.stream(m.getGenericParameterTypes()).map(p -> simple(p.getTypeName())).toList()) + ")";
                 if (seenMethods.add(signature)) {
                     methods.add(new Member(signature, Kind.METHOD, simple(m.getGenericReturnType().getTypeName())));
                 }
@@ -170,7 +172,7 @@ public final class Members {
             }
         }
         List<Member> all = new ArrayList<>(properties.values());
-        methods.sort(java.util.Comparator.comparing(Member::name));
+        methods.sort(Comparator.comparing(Member::name));
         all.addAll(methods);
         return all;
     }

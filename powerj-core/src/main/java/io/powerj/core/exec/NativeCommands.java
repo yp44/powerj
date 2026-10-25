@@ -5,6 +5,7 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -80,6 +81,6 @@ public final class NativeCommands {
                 // unreadable directory: ignored
             }
         }
-        return java.util.Collections.unmodifiableSortedSet((TreeSet<String>) names);
+        return Collections.unmodifiableSortedSet((TreeSet<String>) names);
     }
 }

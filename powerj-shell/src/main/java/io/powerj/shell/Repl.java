@@ -113,7 +113,7 @@ public final class Repl {
     }
 
     /** Loads third-party modules (§4.4); warnings are displayed below the banner. */
-    public void loadModules(java.nio.file.Path dir) {
+    public void loadModules(Path dir) {
         moduleWarnings = interpreter.loadModules(dir);
     }
 

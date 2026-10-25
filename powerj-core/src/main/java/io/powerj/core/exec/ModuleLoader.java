@@ -5,13 +5,16 @@ import java.lang.module.Configuration;
 import java.lang.module.FindException;
 import java.lang.module.ModuleFinder;
 import java.lang.module.ModuleReference;
-import java.lang.module.ResolvedModule;
 import java.lang.module.ResolutionException;
+import java.lang.module.ResolvedModule;
+import java.net.URI;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
@@ -58,7 +61,7 @@ public final class ModuleLoader {
 
     /** Policy asked before loading a module that declares {@value #NATIVE_ACCESS_ATTRIBUTE} (none by default). */
     public void nativeAccess(NativeAccessPolicy policy) {
-        this.nativeAccess = java.util.Objects.requireNonNull(policy, "policy");
+        this.nativeAccess = Objects.requireNonNull(policy, "policy");
     }
 
     /** Loads each jar and each subdirectory of {@code dir}; a missing directory loads nothing. */
@@ -196,7 +199,7 @@ public final class ModuleLoader {
     }
 
     /** {@code true} if the jar at {@code location} has {@code Enable-Native-Access: true} in its manifest. */
-    private static boolean declaresNativeAccess(java.net.URI location) {
+    private static boolean declaresNativeAccess(URI location) {
         try (JarFile jar = new JarFile(Path.of(location).toFile())) {
             Manifest manifest = jar.getManifest();
             return manifest != null
@@ -213,6 +216,6 @@ public final class ModuleLoader {
     }
 
     private static boolean isJar(Path path) {
-        return Files.isRegularFile(path) && path.getFileName().toString().toLowerCase(java.util.Locale.ROOT).endsWith(".jar");
+        return Files.isRegularFile(path) && path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".jar");
     }
 }
