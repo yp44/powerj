@@ -7,7 +7,7 @@
     <parent>
         <groupId>io.powerj</groupId>
         <artifactId>powerj-parent</artifactId>
-        <version>0.1.0-SNAPSHOT</version>
+        <version>0.2.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>powerj-dist</artifactId>
@@ -73,7 +73,7 @@
                         <artifactId>build-helper-maven-plugin</artifactId>
                         <version>3.6.1</version>
                         <executions>
-                            <!-- jpackage requires a numeric version (0.1.0, without -SNAPSHOT). -->
+                            <!-- jpackage requires a numeric version (0.2.0, without -SNAPSHOT). -->
                             <execution>
                                 <id>parse-version</id>
                                 <goals>

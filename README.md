@@ -380,7 +380,7 @@ Unit and integration tests use JUnit 5 and AssertJ: lexer, parser, option bindin
 
 ## Status and roadmap
 
-PowerJ is in active development (version `0.1.0-SNAPSHOT`). Implemented so far:
+PowerJ is in active development (version `0.2.0-SNAPSHOT`). Implemented so far:
 
 - REPL with line editing, persistent history and Ctrl+R; native commands, `cd`, chaining, background commands (`&`, `jobs`), variables, redirections; non-interactive mode;
 - object pipeline with the `ls`, `where`, `map`, `sort`, `first`, `last`, `range`, `select`, `count`, `measure`, `group`, `join`, `mkdir`, `touch`, `cp`, `mv`, `rm`, `to-json`, `from-json`, `to-csv`, `from-csv`, `ps`, `kill`, `collect`, `env`, `grep`, `cat` and `perf` cmdlets, and a parallel file walker;

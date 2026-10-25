@@ -26,7 +26,7 @@ In addition: the **`greet-module`** artifact contains `greet.jar`, the example m
 | 4 | `greet -n Yves \| where { g -> g.message.contains("Yves") }` | One object; `greet` is highlighted in green (cmdlet). |
 | 5 | `greet -n Yves -c 3 \| map { g -> g.message }` | Three lines `Hello Yves!`. |
 | 6 | `help greet` | Generated help: summary `Greets someone`, `Options:` with `-n, --name` `(required)` and `-c, --count`, `Output: Greeting (name, message, at)`, `Module: com.example.greet`, `Examples:`. |
-| 7 | `mod-list` | Table `name version cmdlets source`: `io.powerj.cmdlets … [ls, where, map, collect, env] (built-in)` and `com.example.greet 0.1.0-SNAPSHOT [greet] C:\Users\…\greet.jar`. |
+| 7 | `mod-list` | Table `name version cmdlets source`: `io.powerj.cmdlets … [ls, where, map, collect, env] (built-in)` and `com.example.greet 0.2.0-SNAPSHOT [greet] C:\Users\…\greet.jar`. |
 | 8 | `which greet` | `greet → cmdlet (com.example.greet)`. |
 | 9 | `new com.example.greet.Greeting("a", "b", null)` | Error `class not found: com.example.greet.Greeting`: a module's classes are not exposed to Java. |
 | 10 | `greet` | Error `greet: missing required option: --name`. |

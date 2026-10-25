@@ -18,7 +18,7 @@ unzip powerj-fx/target/powerj-fx-*.zip -d ~/.powerj/modules/      # creates ~/.p
 
 | # | Action | Expected result |
 |---|---|---|
-| 1 | Start `powerj`, then `mod-list` | A line `io.powerj.fx  0.1.0-SNAPSHOT  [grid]` with the folder as its source. No warning at startup. |
+| 1 | Start `powerj`, then `mod-list` | A line `io.powerj.fx  0.2.0-SNAPSHOT  [grid]` with the folder as its source. No warning at startup. |
 | 2 | `help grid` | `grid — Shows the objects in a window`, the example `ls -r \| grid`, `Module: io.powerj.fx`. |
 | 3 | `ls \| grid` | A window titled `PowerJ grid` opens with a table (columns of the terminal table of `ls`); **the prompt is back at once**. See phase 2 below for the details of the table. |
 | 4 | `ls \| grid ; ls / \| grid` | Two windows, the prompt is back. Closing one leaves the other open. |
