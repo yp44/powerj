@@ -123,7 +123,19 @@ structures, functions) can be built on it. The work is organised in phases (revi
 - **The layers of the core have no debt left** (step 3.2): the rule that checks them, and the one that forbids cycles
   between the packages, run unfrozen. The interpreter receives the perf mode through `LineMeasuring` instead of
   building it; `Help` is a command; the engine of cmdlets and of native commands is part of the runtime.
-- Compiler warnings: 72 → 35.
+- **Tab completion no longer calls the getters of your objects** (step 3.3): typing `$x.property.` read the property of
+  the real value through its getter, so a getter with a side effect (a lazy loader, `getInputStream()`) ran while you
+  typed. It now reads only what cannot do anything: map keys, record components, public fields and the getters that
+  the preview policy knows to be pure; every other getter is typed by its signature.
+- **A string with an interpolation of strings of its own is one string** for the parser, the highlighting and the
+  completion (step 3.3): in `git commit -m "on $(f("y")) done"` the highlighting cut the string at the inner quote, and a
+  `}`, `|` or `;` inside the inner string closed a block or started a stage for the completion.
+- **`Completions` is split** (1,006 → 173 lines) into the code that decides what the cursor is on and six classes that
+  suggest (commands, arguments, paths, names, members, packages); the inference of types has its own class. Completion and
+  highlighting read the commands through a `CommandCatalog`, no longer through the concrete `Interpreter`, and the
+  architecture rule that says so is no longer frozen. The preview policy is an ordered list of rules (`PreviewRule`),
+  tested one by one.
+- Compiler warnings: 72 → 32.
 
 ### Examined, not changed
 - **The seven `Messages` classes stay** (C-10, step 1.4). Replacing them with one helper in `powerj-api` was tried on a

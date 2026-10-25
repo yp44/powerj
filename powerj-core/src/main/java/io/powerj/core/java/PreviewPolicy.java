@@ -1,12 +1,14 @@
 package io.powerj.core.java;
 
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Executable;
 import java.lang.reflect.Method;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import io.powerj.core.java.PreviewRule.Verdict;
 
 /**
  * Fixed set of the Java methods and constructors allowed in preview mode (FR-66): those that only compute a value
@@ -85,41 +87,55 @@ public final class PreviewPolicy {
             java.util.LinkedHashMap.class, java.util.TreeMap.class, java.util.HashSet.class,
             java.util.LinkedHashSet.class, java.util.TreeSet.class, java.util.ArrayDeque.class, Object.class);
 
-    private PreviewPolicy() {
+    /**
+     * The rules in the order they are read. A refusal comes before an allowance that it must overrule (a parallel
+     * stream is in an allowed package); the last rule is the only one that lets a method through on its name alone.
+     */
+    private static final List<PreviewRule> STANDARD_RULES = List.of(
+            // Only the JDK: a method of a third-party module is never allowed.
+            PreviewRule.when(e -> !"java.base".equals(e.getDeclaringClass().getModule().getName()), Verdict.REFUSE),
+            // A constructor is allowed for a value or an empty collection, and refused for anything else.
+            PreviewRule.constructorsOf(CONSTRUCTIBLE),
+            PreviewRule.when(e -> PARALLEL.contains(e.getName()), Verdict.REFUSE),
+            PreviewRule.when(e -> OBJECT_METHODS.contains(e.getName())
+                    || PURE_TYPES.contains(e.getDeclaringClass())
+                    || PURE_PACKAGES.contains(e.getDeclaringClass().getPackageName()), Verdict.ALLOW),
+            // A Path only computes paths; register() starts watching a folder.
+            PreviewRule.decidesFor(java.nio.file.Path.class, name -> !name.equals("register")),
+            PreviewRule.decidesFor(java.nio.file.Files.class, FILES::contains),
+            PreviewRule.decidesFor(java.util.Arrays.class, ARRAYS::contains),
+            PreviewRule.decidesFor(java.util.Collections.class, COLLECTIONS::contains),
+            PreviewRule.decidesFor(Class.class, CLASS::contains),
+            PreviewRule.when(e -> READ_COLLECTION.contains(e.getName())
+                    && COLLECTION_TYPES.stream().anyMatch(t -> t.isAssignableFrom(e.getDeclaringClass())), Verdict.ALLOW));
+
+    private static final PreviewPolicy STANDARD = new PreviewPolicy(STANDARD_RULES);
+
+    private final List<PreviewRule> rules;
+
+    PreviewPolicy(List<PreviewRule> rules) {
+        this.rules = List.copyOf(rules);
     }
 
     /** {@code true} if this method or constructor may run in preview mode. */
     public static boolean allows(Executable executable) {
-        Class<?> owner = executable.getDeclaringClass();
-        if (!"java.base".equals(owner.getModule().getName())) {
-            return false;
+        return STANDARD.permits(executable);
+    }
+
+    /** What the first rule that has an opinion says; a method that no rule allows is refused. */
+    boolean permits(Executable executable) {
+        for (PreviewRule rule : rules) {
+            switch (rule.judge(executable)) {
+                case ALLOW -> {
+                    return true;
+                }
+                case REFUSE -> {
+                    return false;
+                }
+                case ABSTAIN -> { }
+            }
         }
-        if (executable instanceof Constructor<?>) {
-            return CONSTRUCTIBLE.contains(owner);
-        }
-        String name = executable.getName();
-        if (PARALLEL.contains(name)) {
-            return false;
-        }
-        if (OBJECT_METHODS.contains(name) || PURE_TYPES.contains(owner) || PURE_PACKAGES.contains(owner.getPackageName())) {
-            return true;
-        }
-        if (owner == java.nio.file.Path.class) {
-            return !name.equals("register"); // a Path only computes paths; register() starts watching a folder
-        }
-        if (owner == java.nio.file.Files.class) {
-            return FILES.contains(name);
-        }
-        if (owner == java.util.Arrays.class) {
-            return ARRAYS.contains(name);
-        }
-        if (owner == java.util.Collections.class) {
-            return COLLECTIONS.contains(name);
-        }
-        if (owner == Class.class) {
-            return CLASS.contains(name);
-        }
-        return READ_COLLECTION.contains(name) && COLLECTION_TYPES.stream().anyMatch(t -> t.isAssignableFrom(owner));
+        return false;
     }
 
     /** {@code Files.delete}, {@code new FileWriter}: name shown in the reason of a stopped preview. */
