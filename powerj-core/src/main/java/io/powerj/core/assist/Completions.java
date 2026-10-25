@@ -40,7 +40,7 @@ import io.powerj.core.lang.Ast;
 import io.powerj.core.lang.ExpressionParser;
 import io.powerj.core.nativeexec.NativeCommands;
 import io.powerj.core.nativeexec.Platform;
-import io.powerj.core.runtime.Interpreter;
+import io.powerj.core.runtime.CommandCatalog;
 import io.powerj.core.runtime.Session;
 
 /**
@@ -79,18 +79,18 @@ public final class Completions {
     private static final int MAX_FILES = 500;
     private static final Pattern ASSIGNMENT = Pattern.compile("\\$[\\p{L}_][\\p{L}\\p{N}_]*\\s*=(?!=)\\s*");
 
-    private final Interpreter interpreter;
+    private final CommandCatalog catalog;
     /** Preview mode (FR-66): only what can run in a preview is offered. */
     private volatile boolean previewMode;
     private final JavaIndex index;
     private final NativeCommands natives;
 
-    public Completions(Interpreter interpreter) {
-        this(interpreter, new JavaIndex(), new NativeCommands());
+    public Completions(CommandCatalog catalog) {
+        this(catalog, new JavaIndex(), new NativeCommands());
     }
 
-    Completions(Interpreter interpreter, JavaIndex index, NativeCommands natives) {
-        this.interpreter = interpreter;
+    Completions(CommandCatalog catalog, JavaIndex index, NativeCommands natives) {
+        this.catalog = catalog;
         this.index = index;
         this.natives = natives;
     }
@@ -109,7 +109,7 @@ public final class Completions {
     }
 
     private Session session() {
-        return interpreter.session();
+        return catalog.session();
     }
 
     // --- Context analysis ---
@@ -361,11 +361,11 @@ public final class Completions {
         List<Candidate> candidates = new ArrayList<>();
         boolean preview = previewMode;
         if (!before.equals("^")) {
-            for (String builtin : preview ? List.<String>of() : new TreeSet<>(interpreter.builtinNames())) {
+            for (String builtin : preview ? List.<String>of() : new TreeSet<>(catalog.builtinNames())) {
                 candidates.add(new Candidate(builtin, builtin + " " + Messages.get("completion.tag.builtin"),
                         Messages.get("completion.builtin"), true));
             }
-            for (var cmdlet : interpreter.registry().all()) {
+            for (var cmdlet : catalog.cmdlets()) {
                 if (preview && !cmdlet.preview()) {
                     continue;
                 }
@@ -393,7 +393,7 @@ public final class Completions {
         String command = words.getFirst();
         boolean forceNative = command.startsWith("^");
         String name = forceNative ? command.substring(1) : command;
-        var cmdlet = forceNative ? Optional.<CmdletRegistry.Registered>empty() : interpreter.resolution().cmdlet(name);
+        var cmdlet = forceNative ? Optional.<CmdletRegistry.Registered>empty() : catalog.cmdlet(name);
 
         if (name.equals("import")) {
             return imports(wordStart, word);
@@ -413,7 +413,7 @@ public final class Completions {
                         || isPathList(s) || s.isList() && s.component().getGenericType().getTypeName().contains("String")));
             return pathPositional ? paths(line, wordStart, cursor) : Result.none(cursor);
         }
-        if (interpreter.builtinNames().contains(name) && !name.equals("cd")) {
+        if (catalog.builtinNames().contains(name) && !name.equals("cd")) {
             return Result.none(cursor);
         }
         return paths(line, wordStart, cursor); // cd and native commands: paths (FR-25)
@@ -684,7 +684,7 @@ public final class Completions {
         for (int k = starts.size() - 2; k >= 0; k--) {
             String stage = line.substring(starts.get(k), starts.get(k + 1) - 1).strip();
             String name = splitWords(stage).getFirst();
-            var cmdlet = interpreter.resolution().cmdlet(name);
+            var cmdlet = catalog.cmdlet(name);
             if (cmdlet.isEmpty()) {
                 return null;
             }
@@ -716,7 +716,7 @@ public final class Completions {
             if (name.startsWith("^")) {
                 return String.class;
             }
-            switch (interpreter.resolution().resolve(name, session())) {
+            switch (catalog.resolve(name)) {
                 case Resolved.CmdletCall(var cmdlet) -> {
                     Class<?> output = cmdlet.output();
                     if (output != Object.class) {
@@ -804,7 +804,7 @@ public final class Completions {
             if (forceNative) {
                 return new TypeInfo.ListOf(String.class);
             }
-            var cmdlet = interpreter.resolution().cmdlet(name);
+            var cmdlet = catalog.cmdlet(name);
             if (cmdlet.isPresent() && cmdlet.get().output() != Object.class) {
                 return new TypeInfo.ListOf(cmdlet.get().output());
             }

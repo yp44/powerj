@@ -26,6 +26,7 @@ import org.junit.jupiter.api.io.CleanupMode;
 import org.junit.jupiter.api.io.TempDir;
 
 import io.powerj.api.CmdletProvider;
+import io.powerj.core.runtime.CommandKind;
 import io.powerj.core.runtime.Interpreter;
 import io.powerj.core.runtime.Session;
 import io.powerj.core.runtime.ShellIo;
@@ -88,9 +89,9 @@ class ModuleLoaderTest {
     @Test
     void modLoadAddsCmdletsWhileRunning() throws Exception {
         hello(tmp.resolve("hello.jar"), "org.test.hello", "hello");
-        assertThat(interpreter.commandKind("hello")).isEqualTo(Interpreter.CommandKind.UNKNOWN);
+        assertThat(interpreter.commandKind("hello")).isEqualTo(CommandKind.UNKNOWN);
         assertThat(run("mod-load hello.jar")).isEqualTo("hello\n");
-        assertThat(interpreter.commandKind("hello")).isEqualTo(Interpreter.CommandKind.CMDLET);
+        assertThat(interpreter.commandKind("hello")).isEqualTo(CommandKind.CMDLET);
         assertThat(run("(hello -n A).message")).isEqualTo("Hello A\n");
         run("mod-load hello.jar");
         assertThat(errors).containsExactly("hello.jar: module org.test.hello already loaded", "mod-load: hello.jar not loaded");
@@ -168,7 +169,7 @@ class ModuleLoaderTest {
                 "native.jar: not loaded, module org.test.nat uses native code and no answer is recorded "
                         + "(set modules.nativeAccess.org.test.nat=true in config.properties to allow it)",
                 "mod-load: native.jar not loaded");
-        assertThat(interpreter.commandKind("nat")).isEqualTo(Interpreter.CommandKind.UNKNOWN);
+        assertThat(interpreter.commandKind("nat")).isEqualTo(CommandKind.UNKNOWN);
     }
 
     @Test
@@ -180,7 +181,7 @@ class ModuleLoaderTest {
         assertThat(errors).first().asString().isEqualTo(
                 "native.jar: not loaded, native access refused for module org.test.nat "
                         + "(modules.nativeAccess.org.test.nat=false in config.properties)");
-        assertThat(interpreter.commandKind("nat")).isEqualTo(Interpreter.CommandKind.UNKNOWN);
+        assertThat(interpreter.commandKind("nat")).isEqualTo(CommandKind.UNKNOWN);
         assertThat(policy.asked).containsExactly("org.test.nat");
     }
 
@@ -230,7 +231,7 @@ class ModuleLoaderTest {
         Files.createDirectories(tmp.resolve("modules2"));
         hello(tmp.resolve("modules2").resolve("native2.jar"), "org.test.nat2", "nat2", NATIVE);
         assertThat(interpreter.loadModules(tmp.resolve("modules2"))).isEmpty();
-        assertThat(interpreter.commandKind("nat2")).isEqualTo(Interpreter.CommandKind.CMDLET);
+        assertThat(interpreter.commandKind("nat2")).isEqualTo(CommandKind.CMDLET);
     }
 
     @Test

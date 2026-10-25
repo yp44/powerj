@@ -132,11 +132,11 @@ class ArchitectureTest {
         check(slices().matching("io.powerj.core.(*)..").should().beFreeOfCycles());
     }
 
-    /** [C-06] The completion reads the commands through a narrow interface, never the interpreter itself (step 3.3). */
+    /** [C-06] The completion reads the commands through {@code CommandCatalog}, never the interpreter itself. */
     @Test
     void assistDoesNotUseTheConcreteInterpreter() {
-        check(freeze(noClasses().that().resideInAPackage("io.powerj.core.assist..")
-                .should().dependOnClassesThat().haveFullyQualifiedName("io.powerj.core.runtime.Interpreter")));
+        check(noClasses().that().resideInAPackage("io.powerj.core.assist..")
+                .should().dependOnClassesThat().haveFullyQualifiedName("io.powerj.core.runtime.Interpreter"));
     }
 
     /** [C-09] The shell has no business with the cmdlets' classes: {@code ProtectedPaths} should live elsewhere. */

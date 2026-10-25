@@ -10,7 +10,7 @@ import java.util.function.Predicate;
 
 import io.powerj.core.lang.ExpressionParser;
 import io.powerj.core.lang.Lexer;
-import io.powerj.core.runtime.Interpreter;
+import io.powerj.core.runtime.CommandKind;
 
 /**
  * Splits an input line into spans to highlight (specification FR-08): built-in command or cmdlet, native
@@ -29,11 +29,11 @@ public final class Highlights {
     }
 
     /**
-     * @param commands    kind of a command name ({@link Interpreter#commandKind})
+     * @param commands    kind of a command name ({@link io.powerj.core.runtime.CommandCatalog#commandKind})
      * @param staticNames Java names denoting a class or a static field (so as not to highlight them as an
      *                    unknown command)
      */
-    public static List<Span> of(String line, Function<String, Interpreter.CommandKind> commands,
+    public static List<Span> of(String line, Function<String, CommandKind> commands,
                                 Predicate<String> staticNames) {
         List<Span> spans = new ArrayList<>();
         Deque<Character> nesting = new ArrayDeque<>();

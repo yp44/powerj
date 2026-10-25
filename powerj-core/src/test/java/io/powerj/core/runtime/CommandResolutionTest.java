@@ -111,12 +111,12 @@ class CommandResolutionTest {
 
     @Test
     void theKindOfACommandFollowsTheResolution() {
-        assertThat(interpreter.commandKind("cd")).isEqualTo(Interpreter.CommandKind.BUILTIN);
-        assertThat(interpreter.commandKind("items")).isEqualTo(Interpreter.CommandKind.CMDLET);
-        assertThat(interpreter.commandKind("tool")).isEqualTo(Interpreter.CommandKind.NATIVE);
-        assertThat(interpreter.commandKind("^items")).isEqualTo(Interpreter.CommandKind.NATIVE);
-        assertThat(interpreter.commandKind("nosuch")).isEqualTo(Interpreter.CommandKind.UNKNOWN);
-        assertThat(interpreter.commandKind("^")).isEqualTo(Interpreter.CommandKind.UNKNOWN);
+        assertThat(interpreter.commandKind("cd")).isEqualTo(CommandKind.BUILTIN);
+        assertThat(interpreter.commandKind("items")).isEqualTo(CommandKind.CMDLET);
+        assertThat(interpreter.commandKind("tool")).isEqualTo(CommandKind.NATIVE);
+        assertThat(interpreter.commandKind("^items")).isEqualTo(CommandKind.NATIVE);
+        assertThat(interpreter.commandKind("nosuch")).isEqualTo(CommandKind.UNKNOWN);
+        assertThat(interpreter.commandKind("^")).isEqualTo(CommandKind.UNKNOWN);
     }
 
     @Test

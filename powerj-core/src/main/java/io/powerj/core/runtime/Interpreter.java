@@ -2,6 +2,7 @@ package io.powerj.core.runtime;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -32,7 +33,7 @@ import io.powerj.core.nativeexec.CommandResolver;
  * of a command (FR-13): built-in command, cmdlet, program on the {@code PATH}; {@code ^name} forces the
  * program.
  */
-public final class Interpreter {
+public final class Interpreter implements CommandCatalog {
 
     private final Session session;
     private final ShellIo io;
@@ -108,6 +109,7 @@ public final class Interpreter {
         return modules.loadAll(dir).stream().flatMap(r -> r.warnings().stream()).toList();
     }
 
+    @Override
     public Session session() {
         return session;
     }
@@ -116,12 +118,25 @@ public final class Interpreter {
         return registry;
     }
 
-    /** Kind of a command, for highlighting and completion (FR-08, FR-21). */
-    public enum CommandKind { BUILTIN, CMDLET, NATIVE, UNKNOWN }
-
     /** Names of the built-in commands. */
+    @Override
     public Set<String> builtinNames() {
         return resolution.builtinNames();
+    }
+
+    @Override
+    public Collection<CmdletRegistry.Registered> cmdlets() {
+        return registry.all();
+    }
+
+    @Override
+    public Optional<CmdletRegistry.Registered> cmdlet(String name) {
+        return resolution.cmdlet(name);
+    }
+
+    @Override
+    public Resolved resolve(String name) {
+        return resolution.resolve(name, session);
     }
 
     /** What a command name stands for (FR-13): the rule that execution, {@code which}, highlighting and completion share. */
@@ -140,6 +155,7 @@ public final class Interpreter {
     }
 
     /** Resolves a command name as execution would (FR-13), without launching anything. */
+    @Override
     public CommandKind commandKind(String name) {
         return switch (resolution.resolve(name, session)) {
             case Resolved.BuiltinCall _ -> CommandKind.BUILTIN;

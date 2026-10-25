@@ -9,17 +9,17 @@ import org.junit.jupiter.api.Test;
 
 import io.powerj.core.assist.Highlights.Kind;
 import io.powerj.core.assist.Highlights.Span;
-import io.powerj.core.runtime.Interpreter;
+import io.powerj.core.runtime.CommandKind;
 
 /** Input highlighting (FR-08). */
 class HighlightsTest {
 
     private static List<Span> of(String line) {
         return Highlights.of(line, name -> switch (name) {
-            case "ls", "where", "map" -> Interpreter.CommandKind.CMDLET;
-            case "cd" -> Interpreter.CommandKind.BUILTIN;
-            case "git", "^ls" -> Interpreter.CommandKind.NATIVE;
-            default -> Interpreter.CommandKind.UNKNOWN;
+            case "ls", "where", "map" -> CommandKind.CMDLET;
+            case "cd" -> CommandKind.BUILTIN;
+            case "git", "^ls" -> CommandKind.NATIVE;
+            default -> CommandKind.UNKNOWN;
         }, Set.of("Math.PI")::contains);
     }
 

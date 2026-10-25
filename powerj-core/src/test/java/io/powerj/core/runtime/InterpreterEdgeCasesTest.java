@@ -42,11 +42,11 @@ class InterpreterEdgeCasesTest {
 
     @Test
     void commandKinds() {
-        assertThat(interpreter.commandKind("cd")).isEqualTo(Interpreter.CommandKind.BUILTIN);
-        assertThat(interpreter.commandKind("items")).isEqualTo(Interpreter.CommandKind.CMDLET);
-        assertThat(interpreter.commandKind("^items")).isEqualTo(Interpreter.CommandKind.UNKNOWN);
-        assertThat(interpreter.commandKind("^cd")).isEqualTo(Interpreter.CommandKind.UNKNOWN);
-        assertThat(interpreter.commandKind("^")).isEqualTo(Interpreter.CommandKind.UNKNOWN);
+        assertThat(interpreter.commandKind("cd")).isEqualTo(CommandKind.BUILTIN);
+        assertThat(interpreter.commandKind("items")).isEqualTo(CommandKind.CMDLET);
+        assertThat(interpreter.commandKind("^items")).isEqualTo(CommandKind.UNKNOWN);
+        assertThat(interpreter.commandKind("^cd")).isEqualTo(CommandKind.UNKNOWN);
+        assertThat(interpreter.commandKind("^")).isEqualTo(CommandKind.UNKNOWN);
     }
 
     @Test

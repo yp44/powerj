@@ -12,7 +12,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -54,9 +53,8 @@ class KnownDefectsTest {
         }
     }
 
-    // --- C-23: Tab completion reads the properties of the real values of the variables ---
+    // --- C-23: Tab completion must not call the getters of the real values of the variables (fixed in Phase 3.3) ---
 
-    @Disabled("C-23, fixed in Phase 3.3: complete from the declared types, or run the getters under PreviewGuard")
     @Test
     void completionCallsNoGetter() {
         var lazy = new Lazy();
