@@ -11,6 +11,7 @@ import java.util.regex.Pattern;
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
+import io.powerj.api.ColumnProvider;
 import io.powerj.api.Option;
 import io.powerj.api.Row;
 import io.powerj.api.ScriptBlock;
@@ -32,7 +33,7 @@ import io.powerj.api.UsageException;
                 "ls -r | select path.fileName size | sort size -d | first 5",
                 "env | select name len={ $_.value.length() } | sort len -d | first 3",
                 "select content={ (cat file.txt) } other={ (cat another.txt) }"})
-public final class Select implements Cmdlet<Select.Params, Object, Row> {
+public final class Select implements Cmdlet<Select.Params, Object, Row>, ColumnProvider {
 
     /** Parameters of {@code select}. */
     public record Params(
@@ -97,7 +98,7 @@ public final class Select implements Cmdlet<Select.Params, Object, Row> {
 
     /** Column names of the arguments, by the naming rules of {@link #columns(List, CmdletContext)}, for completion. */
     @Override
-    public List<String> columns(String arguments) {
+    public List<String> columnsOf(String arguments) {
         List<String> tokens = new ArrayList<>(); // words, and "{" for a block
         int i = 0;
         while (i < arguments.length()) {

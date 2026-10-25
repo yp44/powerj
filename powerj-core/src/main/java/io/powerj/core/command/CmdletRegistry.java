@@ -16,7 +16,9 @@ import java.util.logging.Logger;
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.CmdletProvider;
+import io.powerj.api.ColumnProvider;
 import io.powerj.api.Language;
+import io.powerj.api.Previewable;
 import io.powerj.core.i18n.Messages;
 
 /**
@@ -34,6 +36,26 @@ public final class CmdletRegistry {
 
         public String name() {
             return info.name();
+        }
+
+        /**
+         * Preview mode (FR-66): may the cmdlet run in a preview with these parameters? Asks the {@link Previewable}
+         * capability, or the deprecated {@code Cmdlet.previewable} of a cmdlet written before it.
+         */
+        @SuppressWarnings({"unchecked", "deprecation", "removal"})
+        public boolean previewable(Record params) {
+            return cmdlet instanceof Previewable<?> capable ? ((Previewable<Record>) capable).canPreview(params)
+                    : ((Cmdlet<Record, ?, ?>) cmdlet).previewable(params);
+        }
+
+        /**
+         * Columns that the rows of the cmdlet will have, read from the text of its arguments: the {@link ColumnProvider}
+         * capability, or the deprecated {@code Cmdlet.columns} of a cmdlet written before it. Empty when none is known.
+         */
+        @SuppressWarnings({"deprecation", "removal"})
+        public List<String> columns(String arguments) {
+            return cmdlet instanceof ColumnProvider provider ? provider.columnsOf(arguments)
+                    : cmdlet.columns(arguments);
         }
 
         /** Summary in the current language ({@code <name>.summary} of the provider's messages, FR-61). */

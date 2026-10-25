@@ -232,7 +232,7 @@ class PerfTest {
 
     @Test
     void savingIsNotAllowedInAPreview() {
-        assertThat(new Perf().previewable(new Perf.Params(null, null, false, null))).isTrue();
-        assertThat(new Perf().previewable(new Perf.Params(null, null, false, Path.of("x.jfr")))).isFalse();
+        assertThat(new Perf().canPreview(new Perf.Params(null, null, false, null))).isTrue();
+        assertThat(new Perf().canPreview(new Perf.Params(null, null, false, Path.of("x.jfr")))).isFalse();
     }
 }

@@ -92,6 +92,9 @@ public final class io.powerj.api.Collected<T> extends java.util.AbstractList<T> 
   public int io.powerj.api.Collected.size()
   public io.powerj.api.Collected(java.util.Collection<? extends T>)
 
+public abstract interface io.powerj.api.ColumnProvider
+  public abstract java.util.List<java.lang.String> io.powerj.api.ColumnProvider.columnsOf(java.lang.String)
+
 public abstract @interface io.powerj.api.Display extends java.lang.annotation.Annotation retention=RUNTIME
   public abstract java.lang.String[] io.powerj.api.Display.columns()
 
@@ -237,6 +240,9 @@ public final record io.powerj.api.PhaseStat
   public io.powerj.api.PhaseStat(int,java.lang.String,java.time.Duration)
   public java.lang.String io.powerj.api.PhaseStat.name()
   public java.time.Duration io.powerj.api.PhaseStat.time()
+
+public abstract interface io.powerj.api.Previewable<P extends java.lang.Record>
+  public abstract boolean io.powerj.api.Previewable.canPreview(P)
 
 public final class io.powerj.api.Row extends java.util.AbstractMap<java.lang.String, java.lang.Object>
   public boolean io.powerj.api.Row.containsKey(java.lang.Object)

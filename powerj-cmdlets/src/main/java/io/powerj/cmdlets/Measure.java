@@ -12,6 +12,7 @@ import io.powerj.api.Attempt;
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
+import io.powerj.api.ColumnProvider;
 import io.powerj.api.Option;
 import io.powerj.api.Row;
 import io.powerj.api.ScriptBlock;
@@ -29,7 +30,7 @@ import io.powerj.api.ScriptBlock;
         summary = "Counts and sums the objects or a property, with average, minimum and maximum",
         examples = {"ls -r | measure size", "ls | measure modified", "env | measure { $_.value.length() }",
                 "(ls -r | measure size).sum", "List.of(3, 1, 2) | measure"})
-public final class Measure implements Cmdlet<Measure.Params, Object, Row> {
+public final class Measure implements Cmdlet<Measure.Params, Object, Row>, ColumnProvider {
 
     /** Parameters of {@code measure}. */
     public record Params(
@@ -113,7 +114,7 @@ public final class Measure implements Cmdlet<Measure.Params, Object, Row> {
 
     /** The columns of the row emitted by {@link #end}, whatever the arguments. */
     @Override
-    public List<String> columns(String arguments) {
+    public List<String> columnsOf(String arguments) {
         return List.of("count", "sum", "average", "min", "max");
     }
 

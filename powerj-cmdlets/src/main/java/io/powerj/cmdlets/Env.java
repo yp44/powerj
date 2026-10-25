@@ -7,13 +7,14 @@ import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
+import io.powerj.api.Previewable;
 import io.powerj.api.UsageException;
 
 /** {@code env}: session environment variables (specification FR-36b). */
 @CmdletInfo(name = "env", preview = true, category = "System", summary = "Shows or changes the session environment variables",
         examples = {"env", "env PATH", "env --set MAVEN_OPTS=-Xmx2g", "env --append PATH C:\\tools", "env --unset MAVEN_OPTS",
                 "(env PATH).value"})
-public final class Env implements Cmdlet<Env.Params, Void, EnvVar> {
+public final class Env implements Cmdlet<Env.Params, Void, EnvVar>, Previewable<Env.Params> {
 
     /** Parameters of {@code env}. */
     public record Params(
@@ -33,7 +34,7 @@ public final class Env implements Cmdlet<Env.Params, Void, EnvVar> {
 
     /** Only reading is previewed (FR-66): {@code --set}, {@code --unset}, {@code --append}, {@code --prepend} change the session. */
     @Override
-    public boolean previewable(Params p) {
+    public boolean canPreview(Params p) {
         return count(p.set(), p.unset(), p.append(), p.prepend()) == 0;
     }
 

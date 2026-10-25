@@ -41,11 +41,11 @@ class TypeInferenceTest {
     }
 
     @CmdletInfo(name = "pick", summary = "Chooses columns")
-    static final class Pick implements Cmdlet<Pick.Params, Object, Row> {
+    static final class Pick implements Cmdlet<Pick.Params, Object, Row>, io.powerj.api.ColumnProvider {
         record Params() { }
 
         @Override
-        public List<String> columns(String arguments) {
+        public List<String> columnsOf(String arguments) {
             return List.of(arguments.strip().split("\\s+"));
         }
     }

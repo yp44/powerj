@@ -13,6 +13,7 @@ import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
 import io.powerj.api.PerfReport;
+import io.powerj.api.Previewable;
 import io.powerj.api.UsageException;
 
 /**
@@ -21,7 +22,7 @@ import io.powerj.api.UsageException;
 @CmdletInfo(name = "perf", preview = true, category = "System", summary = "Shows what perf mode measured",
         examples = {"perf", "perf | sort active -d | first 1", "perf 2 --view blocks", "perf --view jvm --all",
                 "perf --view lines | sort total -d | first 5", "perf --view hot", "perf --save ~/slow.jfr"})
-public final class Perf implements Cmdlet<Perf.Params, Void, Object> {
+public final class Perf implements Cmdlet<Perf.Params, Void, Object>, Previewable<Perf.Params> {
 
     /** What {@code perf} lists. */
     public enum View { STAGES, BLOCKS, NATIVES, PHASES, JVM, LINES, HOT, GC, ALLOC }
@@ -40,7 +41,7 @@ public final class Perf implements Cmdlet<Perf.Params, Void, Object> {
 
     /** Writing a file is a side effect: not in a preview. */
     @Override
-    public boolean previewable(Params p) {
+    public boolean canPreview(Params p) {
         return p.save() == null;
     }
 

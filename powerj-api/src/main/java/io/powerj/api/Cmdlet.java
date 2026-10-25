@@ -30,7 +30,12 @@ public interface Cmdlet<P extends Record, I, O> {
      * Preview mode (FR-66), for a cmdlet declared with {@link CmdletInfo#preview()}: {@code false} if these
      * parameters would change something ({@code env --set}), and the preview stops instead of running the cmdlet.
      * Called after the options are bound, before {@link #begin}.
+     *
+     * @deprecated implement {@link Previewable} instead: the contract of a cmdlet stays {@code begin}, {@code process}
+     *             and {@code end}, and what is optional is a separate interface. Still honoured when the cmdlet does
+     *             not implement it.
      */
+    @Deprecated(since = "0.2", forRemoval = true)
     default boolean previewable(P params) {
         return true;
     }
@@ -41,7 +46,9 @@ public interface Cmdlet<P extends Record, I, O> {
      * Called on text that may be incomplete or invalid: it must not fail. Default: none known.
      *
      * @param arguments text following the command name in the stage, as typed
+     * @deprecated implement {@link ColumnProvider} instead. Still honoured when the cmdlet does not implement it.
      */
+    @Deprecated(since = "0.2", forRemoval = true)
     default List<String> columns(String arguments) {
         return List.of();
     }

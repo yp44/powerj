@@ -86,12 +86,12 @@ class PreviewTest {
 
     /** Previewable only without {@code --set}. */
     @CmdletInfo(name = "setting", preview = true, summary = "Shows or changes a setting")
-    static final class Setting implements Cmdlet<Setting.Params, Void, String> {
+    static final class Setting implements Cmdlet<Setting.Params, Void, String>, io.powerj.api.Previewable<Setting.Params> {
 
         record Params(@Option String set) { }
 
         @Override
-        public boolean previewable(Params params) {
+        public boolean canPreview(Params params) {
             return params.set() == null;
         }
 

@@ -51,7 +51,7 @@ public final class CmdletRunner {
         List<Object> remaining = new ArrayList<>(args);
         OnError onError = extractOnError(registered.name(), remaining);
         Record params = OptionBinder.bind(registered.name(), registered.parameters(), remaining);
-        if (PreviewGuard.active() && !previewable(registered, params)) {
+        if (PreviewGuard.active() && !registered.previewable(params)) {
             PreviewGuard.deny(Messages.get("preview.off.cmdletOptions", registered.name()));
         }
         var context = new Context(registered.name(), session, connections, onError, compiler);
@@ -89,11 +89,6 @@ public final class CmdletRunner {
             }
         }
         cmdlet.end((P) params, typedContext);
-    }
-
-    @SuppressWarnings("unchecked")
-    private static <P extends Record> boolean previewable(CmdletRegistry.Registered registered, Record params) {
-        return ((Cmdlet<P, ?, ?>) registered.cmdlet()).previewable((P) params);
     }
 
     private static OnError extractOnError(String command, List<Object> args) {

@@ -83,7 +83,7 @@ final class TypeInference {
             }
             List<String> names;
             try {
-                names = cmdlet.get().cmdlet().columns(stage.substring(name.length()));
+                names = cmdlet.get().columns(stage.substring(name.length()));
             } catch (RuntimeException e) {
                 return null; // a module's cmdlet must never break completion
             }
