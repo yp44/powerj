@@ -28,7 +28,7 @@ structures, functions) can be built on it. The work is organised in phases (revi
 - Tests wait for a state or a signal instead of a duration; the thread-leak check of the Ctrl+C pipeline test, which
   could not fail, now can.
 
-### Fixed (Phase 1, targeted fixes — in progress)
+### Fixed (Phase 1, targeted fixes — done)
 - **`System.exit` can no longer end the shell by another road** (review C-12, step 1.1). The guard used to be written for
   the direct call only; `[0] | map System::exit` or `Method.invoke` ended the JVM. It is now a `CallPolicy` consulted by
   `JavaInvoker`, the one place every Java call goes through. `System.exit("x")` now reports the usual "no overload"
@@ -39,23 +39,20 @@ structures, functions) can be built on it. The work is organised in phases (revi
   stops the consent for native modules from being asked.
 - **`Session` can be read by the stages of a pipeline while it changes** (C-13, step 1.2). Copying the environment or
   listing the variables while another thread changed them threw `ConcurrentModificationException` (reproduced by a
-  stress test: 343,385 failures in 472,431 copies of the environment over two seconds). Variables are in a concurrent map, the state written by the command
-  thread is `volatile`, the environment is a synchronized map, and a native command starts from an immutable
-  snapshot of it. The automatic variables (`$?`, `$exit`, `$last`…) are an `enum`, not a `switch` on strings.
-
+  stress test: 343,385 failures in 472,431 copies of the environment over two seconds). Variables are in a concurrent
+  map, the state written by the command thread is `volatile`, the environment is a synchronized map, and a native
+  command starts from an immutable snapshot of it. The automatic variables (`$?`, `$exit`, `$last`…) are an `enum`, not a `switch` on strings.
 - **A cmdlet's per-run state belongs to the run, and is released when the run ends** (C-01, step 1.3). A cmdlet is one
   object shared by every command that uses it, so 23 of them kept their state in tables keyed by the context or by the
   (value-compared) parameters: a lock for every object, a leak when the command was cancelled, a collision between two
   `where` stages with equal parameters. `CmdletContext.state(Class, Supplier)` (additive, `default`) gives each run
   its own state; the runner closes the states that are `AutoCloseable` when the run ends, normally or not (Ctrl+C
   included). The 23 tables are gone. `grid` closes the window of a command that was cancelled before it handed it over.
-
 - **A stream unrolled by `*.` is closed** (C-07, step 1.5): `Files.lines(p)*.length()` leaked a file descriptor. The rule
   for turning a value into the objects it stands for was written four times; it is now `ValueUnroller`, with one
   explicit mode for each place that differs (between stages, display, targets of `*.`).
 - **`import` can no longer block a lookup of a class name** (C-14, step 1.5). A name lookup and `import` took two locks
   in opposite orders: a stress test deadlocked every time. The imports are now an immutable snapshot with its own cache.
-
 - **Ctrl+C is no longer taken for an error by `to-json`** (C-15, step 1.6). `CancellationException` is an
   `IllegalStateException`, and `to-json` caught the latter around code that checks for cancellation: the command went
   on. It now catches a dedicated `Unreadable` type, so a cancellation cannot be swallowed there; `grid` and
@@ -67,7 +64,6 @@ structures, functions) can be built on it. The work is organised in phases (revi
 - **Ctrl+C stops `grep` and `range` on a regular expression that backtracks for ever** (C-18, step 1.6, partly): the
   matcher reads its input through a `CharSequence` that checks the interrupt flag. The `/regex/` filter of `grid` is not
   covered yet (Phase 5).
-
 - **Protected paths are compared as the file system sees them** (C-21, step 1.7). `alias/..`, an alias of `/home`, a
   protected entry that is a link: `Path.normalize` knew none of that. Links and `..` of the folders above a target are
   resolved before comparing, case is ignored on macOS too, and copying a folder into itself is detected through a link.
@@ -91,7 +87,7 @@ structures, functions) can be built on it. The work is organised in phases (revi
   class is the minimal form that works with JPMS, and the model `examples/greet` gives to module authors.
 
 ### Planned (review §8)
-- **End of Phase 1.** Report of the phase in the review (§12), then Phase 2: the `Interpreter` split.
+Phase 1 is done (report in the review, §12).
 - **Phase 2 — `Interpreter` split** into a command resolution, a pipeline executor, redirections, and
   observer-based perf and preview modes.
 - **Phase 3 — packages, modules and API.** `core.exec` is split in eight packages with qualified exports, the

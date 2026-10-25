@@ -316,7 +316,7 @@ Principes : (1) **aucune étape ne change le comportement observable** hors corr
 | 0.6 | Couverture **par module** (`jacoco:check` dans chaque module, seuil initial = valeur actuelle) | Aucun module ne peut baisser |
 | 0.7 | CI : Dependabot, CodeQL, actions par SHA, `timeout-minutes`/`concurrency`, `outputTimestamp`, découpage en jobs (build / smoke-linux / smoke-windows / fx-xvfb), scripts `ci/smoke/*.sh`, `distributionSha256Sum` | Durée CI ≤ durée actuelle grâce au parallélisme |
 
-### Phase 1 — Correctifs à fort levier, faible risque *(≈ 11 j ; **en cours, voir § 12**)*
+### Phase 1 — Correctifs à fort levier, faible risque *(≈ 11 j ; **réalisée le 25/10/2026, voir § 12** — les écarts avec ce tableau y sont expliqués)*
 
 | Étape | Défaut | Action |
 |---|---|---|
@@ -389,17 +389,17 @@ Charge totale indicative : ≈ 64 j-dev (≈ 13 semaines à un développeur, ≈
 | Plus grosse classe de production | 1 156 l. | ≤ 500 l. |
 | Cycles de packages | ≥ 2 (`lang`↔`exec`, intra-`lang`) | 0 (ArchUnit) |
 | Classes publiques de `core.exec` exportées | 32 | 0 (exports qualifiés) |
-| Tables d'état par exécution dans les cmdlets | 23 | 0 |
+| Tables d'état par exécution dans les cmdlets | 23 | 0 — **atteint** (Phase 1.3) |
 | Copies de la règle de résolution de commande | 4 | 1 |
 | `if (perf != null)` dans l'exécution | 19 | 0 |
-| Copies de « dérouler une valeur » | 4 | 1 |
+| Copies de « dérouler une valeur » | 4 | 1 — **atteint** (Phase 1.5) |
 | Copies de `Messages` | 7 | 7 (minimum JPMS, voir § 12.1, étape 1.4) ; `Language.current` injecté en Phase 4 |
 | `Thread.sleep` à la place d'un état, en test | 16 (sur 27) | 0 — **atteint** (reste 1 volontaire, commenté) |
 | Couverture minimale | agrégée (80 %) | ≥ 80 % lignes/branches **par module** |
 | Score de mutation (`lang`, `runtime`) | non mesuré | ≥ 60 % |
 | Ruptures d'API non intentionnelles | non contrôlées | 0 (japicmp) |
-| Contournements connus du garde-fou `System.exit` | ≥ 2 | 0 (tests rouges → verts) |
-| Constats 🔴 ouverts | 4 | 0 après Phase 2 |
+| Contournements connus du garde-fou `System.exit` | ≥ 2 | 0 — **atteint** (Phase 1.1 : référence de méthode et réflexion) |
+| Constats 🔴 ouverts | 4 | 0 après Phase 2 — **un seul reste : C-02** (`Interpreter`) ; C-01, C-11, C-12 corrigés en Phase 1 |
 
 ---
 
@@ -472,7 +472,7 @@ Pour geler les violations d'une **nouvelle** règle ArchUnit : `freeze.store.def
 
 *Note d'environnement* : dans le bac à sable de cette analyse, `mvnw` ne pouvait pas télécharger Maven (`wget` ne passe pas le proxy) ; la même distribution (empreinte vérifiée contre la somme publiée) a été installée par `curl`. Ce n'est pas un défaut du dépôt.
 
-## 12. Phase 1 : correctifs ciblés (en cours)
+## 12. Phase 1 : correctifs ciblés (réalisée le 25/10/2026)
 
 Chaque étape est un commit : le défaut est corrigé, le test rouge de la Phase 0 est réactivé dans le même commit, `./mvnw verify` reste vert.
 
@@ -488,3 +488,32 @@ Chaque étape est un commit : le défaut est corrigé, le test rouge de la Phase
 | 1.6 C-15, C-16, C-18 | ✅ (C-18 partiel) | **C-15** : `to-json` prenait Ctrl+C pour un objet illisible (confirmé par le test de la Phase 0, réactivé). Cause : `catch (IllegalStateException)` autour d'un code qui lève `CancellationException`, qui *est* une `ISE`. Correctif à la racine : `Properties.Unreadable` (sous-type dédié de `ISE`) est la seule chose que `to-json` et `to-csv` attrapent, donc l'annulation ne peut plus être avalée par construction ; un accesseur de record qui lève une annulation la laisse passer ; `ObjectReader` (grid) la relance au lieu d'afficher « propriété illisible ». Le contrat est écrit dans la Javadoc de `emit` et de `ScriptBlock.invoke`. **C-16** : `SortComparator` est un ordre **total** (null < nombres, `NaN` en dernier, infinités aux extrémités < chaînes < comparables par classe < reste par texte) ; `SortComparatorTest` vérifie l'antisymétrie et la transitivité sur tous les triplets d'un jeu de 34 valeurs de toutes natures, et un tri de 5 000 valeurs mêlées ne lève plus l'exception `TimSort` (les deux tests rouges de la Phase 0 sont réactivés). **C-18** : `InterruptibleText` fait lire l'entrée du `Matcher` par un `charAt` qui regarde l'indicateur d'interruption (toutes les 1 024 lectures) ; utilisé dans `Grep` (3 sites) et `Range`. Tests : un `grep` et un `range` bloqués sur `(.*a){30}` s'arrêtent à l'interruption ; **sans l'enveloppe, le thread reste bloqué** (vérifié par mutation). Surcoût mesuré sur 200 000 lignes de 80 caractères : dans le bruit (144–224 ms contre 171–245 ms) | **`CancelledException` dédiée et `ScriptBlock.tryInvoke` reportés à 3.4** : le premier remplace `CancellationException` dans une centaine d'endroits dont le contrat public de `emit`, et ne se fait pas sans cycle de dépréciation ; la correction ci-dessus supprime le bug sans toucher l'API. **Le filtre `/regex/` de `grid` (thread FX) n'est pas traité** : il lui faut un délai, un état d'erreur dans l'interface et des textes, ce qui relève du travail sur `GridView` de la Phase 5. Le cas classique `(a+)+$` ne bloque plus sur un JDK récent (le test utilise `(.*a){30}`). Le changement de `sort` est visible : des valeurs de types mêlés sortent par type, non plus par leur texte (`List.of("b", 2, "a", 1)` donne toujours `1 2 a b`), et le message d'erreur change |
 | 1.7 C-21, C-22 | ✅ (en partie) | **C-21** : `RealPaths` compare les chemins tels que le système de fichiers les voit — les liens et les `..` des dossiers au-dessus de la cible sont résolus *avant* de normaliser (un premier jet normalisait d'abord et le test `dotDotAfterALinkIsTheParentOfWhatTheLinkPointsTo` l'a pris en défaut : `area/q/alias/..` redevenait `area/q`) ; l'élément lui-même n'est pas suivi (supprimer un lien supprime le lien) ; une entrée protégée qui est un lien protège aussi sa cible (`/etc` → `/private/etc`) ; le dossier courant est comparé tel qu'écrit *et* résolu ; la casse est ignorée sous Windows **et macOS**. `Transfer` utilise la même comparaison pour « même fichier » et « dans lui-même ». `mv` sans `-f` n'utilise plus `ATOMIC_MOVE` (un `rename` remplace sans rien dire, y compris un fichier apparu depuis la vérification) ; avec `-f` rien ne change. `perf --save` ne remplace plus un fichier existant. La Javadoc de `ProtectedPaths` dit enfin ce qu'elle garantit : un garde-fou contre l'erreur, pas un contrôle d'accès (le *contenu* d'un dossier protégé ne l'est pas). **C-22** : les jokers de `rm`, `cp`, `mv`, `touch` respectent la casse partout sauf sous Windows ; un joker invalide (`a[*`) est une erreur lisible. Tests : 9 pour les liens (`ProtectedPathsTest`, `FileOpsTest`, avec `assume` si les liens symboliques sont indisponibles), `GlobsTest`, `mv` appelé directement comme si le fichier était apparu après la vérification, `perf --save`. Mutation : avec la clé lexicale, le test des liens échoue | **Pas d'option `--ignore-case` sur `rm`, `cp`, `mv`, `touch`** (le plan en prévoyait une) : chacune ajoutait un champ à un record de paramètres construit en position dans les tests et l'API des auteurs de modules, pour un besoin qu'`ls <joker> \| rm` couvre, liste à l'appui. `ls`, `grep`, `cat` gardent leur règle documentée (insensible à la casse). **Non traités** : la fenêtre entre « vérifier » et « supprimer » dans `FileTrees` (parcours par `newDirectoryStream` qui suit les liens, pas de `SecureDirectoryStream`) — c'est une réécriture de `powerj-fs`, pas un correctif ; les noms 8.3, `\\?\` et jonctions Windows, non testables ici (la CI Windows exécute les tests, aucun ne les cible). `Globs.isPattern` ne reconnaît toujours que `*` et `?` |
 | 1.8 hygiène (C-27, C-36 a, b) | ✅ (en partie) | **Noms qualifiés en ligne** : 94 remplacés par des imports dans 41 fichiers, par un script qui n'importe que sans conflit (type de même nom déjà importé, du même package, ou déclaré dans le fichier) ; il a laissé tel quel `PreviewPolicy`, dont la table de types autorisés gagne à nommer le package de chacun. Compilation et build verts, sans autre changement. **Noms de threads** : `powerj-commande`, `powerj-apercu`, `powerj-etape-N` deviennent `powerj-command`, `powerj-preview`, `powerj-stage-N` ; `JfrCapture`, qui relit le numéro d'étape dans le nom, utilise désormais la constante `StageProbe.THREAD_PREFIX` au lieu d'une copie du texte. **`cmdlets`** : `HostOs` est le seul endroit qui lit `os.name` (il y en avait quatre) ; `FileArguments.report(WalkError, …)` remplace trois copies (`ls`, `cat`, `grep`) ; la validation de `-p` de `ls` et `grep` réutilise `FileOps.parallelism`. Neuf clés de message supprimées, remplacées par trois. **Garde-fou nouveau** : `MessageBundlesTest.everyKeyUsedAsALiteralIsDefined` — j'ai supprimé par erreur deux clés que `Cat` utilisait encore, et seul un test fonctionnel l'a vu ; le test détecte maintenant toute clé littérale sans définition (vérifié par mutation) | **Non fait** : `Platform` injectable et le partage `Platform`/`HomeDirectory` entre `core` et `cmdlets` — les deux modules ne se connaissent pas, le partage demande un type dans `api` ou `fs`, donc une décision d'API (3.4/4.1) ; `Where.PROPERTY`/`Where.abbreviate` utilisés depuis 23 endroits (un petit type utilitaire à extraire) ; `FileOps.report(WalkError)` garde son libellé propre (« `{0} : {1}` » pour les erreurs d'E/S) et reste la quatrième copie ; OpenRewrite (le script de remplacement l'a remplacé sans nouvelle dépendance de build) ; les messages anglais en dur hors bundles (`SortSpec`, `ColumnChoice`, `JavaFxPlatform`, `HistoryExpander`) et les dossiers `docs/recettes` — la politique de langue relève de la Phase 5 |
+
+### 12.2 Bilan de la phase
+
+| | Avant (fin de Phase 0) | Après |
+|---|---|---|
+| Tests | 1 288 (11 ignorés, dont 9 rouges) | 1 387 (3 ignorés : C-23 prévu en 3.3, deux tests de liens de `fs` qui s'ignorent sans droit de créer des liens) |
+| Commits de la phase | — | 11 (8 étapes, 2 correctifs de CI Windows, 1 note) |
+| Défauts **confirmés par exécution** | C-01, C-07, C-11, C-12, C-15, C-16, C-23 | + **C-13** (`ConcurrentModificationException` : 343 385 échecs sur 472 431 copies de l'environnement en 2 s), **C-14** (interblocage 3 fois sur 3, le constat était « non déterministe »), C-18 (`grep` bloqué sur `(.*a){30}`) |
+| Défauts **corrigés** | — | C-01, C-07, C-11, C-12, C-13, C-14, C-15, C-16, C-18 (`grep`, `range`), C-21, C-22, C-27 (en partie), C-36 (a)(b) |
+| Constats **révisés par l'exécution** | — | C-10 (le helper partagé est impossible sans `opens` dans chaque module), C-01 (`end()` n'est pas appelé après un échec : décision d'API, pas oubli), C-14 (non déterministe → déterministe) |
+
+Ce que la phase a appris, au-delà des correctifs :
+
+1. **Trois fois, le premier jet était faux et un test l’a dit.** `RealPaths` normalisait avant de résoudre les liens (le défaut même qu'il corrigeait) ; deux clés de message encore utilisées ont été supprimées par erreur ; le test d'annulation de `grep` ne bloquait pas parce que le JDK récent reconnaît `(a+)+$`. Le garde-fou est le test écrit *avant* le correctif et vérifié par mutation (neutraliser le correctif doit le faire échouer), pas la relecture.
+2. **Windows est la plateforme prioritaire (NFR-03) et la seule qui a trouvé deux défauts de test** : les guillemets d'un argument de ligne de commande disparaissent, `alias\..` est réduit comme du texte, les noms 8.3 (`RUNNER~1`) faussent une comparaison lexicale. La CI Windows est un contrôle indispensable, pas un doublon de la CI Linux.
+3. **Le périmètre « sans changement visible » a tenu, sauf là où le défaut *est* le comportement** : message d'erreur de `System.exit("x")`, texte de l'erreur de `sort` sur types mêlés, jokers de `rm`/`cp`/`mv`/`touch` sensibles à la casse hors Windows, `perf --save` qui ne remplace plus. Chacun est dans le `CHANGELOG`.
+
+### 12.3 Ce que la phase laisse ouvert (et où c'est repris)
+
+| Reste | Pourquoi | Repris en |
+|---|---|---|
+| Filtre `/regex/` de `grid` sur le thread FX (C-18) | demande un délai, un état d'erreur dans l'interface et des textes | 5 (`GridView`) |
+| `CancelledException` dédiée, `ScriptBlock.tryInvoke` (C-15) | touche le contrat public de `emit` en une centaine d'endroits | 3.4 |
+| `Language.current` statique (C-10) | un `Locale` par `Session`/`Environment` | 4.1 |
+| `Platform` injectable, `Platform`/`HomeDirectory` partagés entre `core` et `cmdlets` | demande un type dans `api` ou `fs` | 3.4 / 4.1 |
+| Fenêtre « vérifier puis supprimer » dans `FileTrees` ; noms 8.3, `\\?\` et jonctions Windows (C-21) | réécriture de `powerj-fs` avec `SecureDirectoryStream` ; non testable hors Windows | 5 |
+| C-23 : la complétion appelle les getters | typage par signature | 3.3 |
+| C-02 : `Interpreter` | c'est la Phase 2 | 2 |
+
