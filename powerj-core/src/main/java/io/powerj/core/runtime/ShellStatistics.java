@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-import io.powerj.api.PerfReport;
+import io.powerj.api.perf.PerfReport;
 import io.powerj.core.nativeexec.NativeRun;
 
 /**

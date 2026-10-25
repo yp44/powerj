@@ -20,7 +20,7 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
- * Snapshot of the public surface of {@code io.powerj.api}, the only package a third-party module compiles against
+ * Snapshot of the public surface of {@code io.powerj.api} and its sub-packages, what a third-party module compiles against
  * (review C-32, Phase 0.4). It stands in for japicmp until a release exists to compare with.
  * <p>
  * Any change of the public or protected API makes this test fail: that is the point. Look at the difference, decide
@@ -62,15 +62,16 @@ class ApiSurfaceTest {
     @Test
     void theSnapshotCoversEveryClassOfThePackage() throws Exception {
         assertThat(classNames()).isNotEmpty().contains("io.powerj.api.Cmdlet", "io.powerj.api.CmdletContext",
-                "io.powerj.api.Option", "io.powerj.api.Row");
+                "io.powerj.api.Option", "io.powerj.api.Row", "io.powerj.api.perf.PerfReport");
     }
 
     private static List<String> classNames() throws IOException {
-        try (Stream<Path> files = Files.list(CLASSES)) {
-            return files.map(f -> f.getFileName().toString())
-                    .filter(n -> n.endsWith(".class") && !n.equals("module-info.class")
-                            && !n.equals("package-info.class"))
-                    .map(n -> "io.powerj.api." + n.substring(0, n.length() - ".class".length()))
+        try (Stream<Path> files = Files.walk(CLASSES)) {
+            return files.map(CLASSES::relativize).map(Path::toString)
+                    .filter(n -> n.endsWith(".class") && !n.endsWith("module-info.class")
+                            && !n.endsWith("package-info.class"))
+                    .map(n -> "io.powerj.api." + n.substring(0, n.length() - ".class".length())
+                            .replace(java.io.File.separatorChar, '.'))
                     .sorted()
                     .toList();
         }

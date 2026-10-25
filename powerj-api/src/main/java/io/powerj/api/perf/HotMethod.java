@@ -1,6 +1,8 @@
-package io.powerj.api;
+package io.powerj.api.perf;
 
 import java.util.Objects;
+
+import io.powerj.api.Display;
 
 /**
  * A method that the profiler found running in a stage, produced by {@code perf --view hot} (specification FR-76, part B).

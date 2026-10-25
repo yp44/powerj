@@ -10,16 +10,16 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
-import io.powerj.api.AllocStat;
-import io.powerj.api.BlockStat;
-import io.powerj.api.GcStat;
-import io.powerj.api.HotMethod;
-import io.powerj.api.JvmStat;
-import io.powerj.api.LineStat;
-import io.powerj.api.NativeStat;
-import io.powerj.api.PerfReport;
-import io.powerj.api.PhaseStat;
-import io.powerj.api.StageStat;
+import io.powerj.api.perf.AllocStat;
+import io.powerj.api.perf.BlockStat;
+import io.powerj.api.perf.GcStat;
+import io.powerj.api.perf.HotMethod;
+import io.powerj.api.perf.JvmStat;
+import io.powerj.api.perf.LineStat;
+import io.powerj.api.perf.NativeStat;
+import io.powerj.api.perf.PerfReport;
+import io.powerj.api.perf.PhaseStat;
+import io.powerj.api.perf.StageStat;
 
 class PerfTest {
 

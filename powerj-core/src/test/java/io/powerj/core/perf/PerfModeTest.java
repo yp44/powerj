@@ -19,8 +19,8 @@ import org.junit.jupiter.api.io.TempDir;
 
 import io.powerj.core.lang.Ast;
 import io.powerj.core.lang.Parser;
-import io.powerj.core.runtime.LineMeasuring;
 import io.powerj.core.runtime.ExecutionObserver;
+import io.powerj.core.runtime.LineMeasuring;
 import io.powerj.core.runtime.Session;
 import io.powerj.core.runtime.ShellIo;
 
@@ -231,7 +231,7 @@ class PerfModeTest {
 
     @Test
     void aMeasuredLineIsRecordedAndItsDataGoesIntoTheReport() {
-        fake.data = new JfrData(List.of(new io.powerj.api.HotMethod(1, 1, "a.B.run", 7, 70.0)), List.of(), List.of());
+        fake.data = new JfrData(List.of(new io.powerj.api.perf.HotMethod(1, 1, "a.B.run", 7, 70.0)), List.of(), List.of());
         withFakeProfiler().on(true);
         fake.calls.clear();
 

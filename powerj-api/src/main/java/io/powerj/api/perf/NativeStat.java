@@ -1,7 +1,9 @@
-package io.powerj.api;
+package io.powerj.api.perf;
 
 import java.time.Duration;
 import java.util.Objects;
+
+import io.powerj.api.Display;
 
 /**
  * Measure of a native process, produced by {@code perf --view natives}.

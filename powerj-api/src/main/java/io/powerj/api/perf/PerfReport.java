@@ -1,9 +1,11 @@
-package io.powerj.api;
+package io.powerj.api.perf;
 
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
+
+import io.powerj.api.Display;
 
 /**
  * Everything measured while a line ran in perf mode (specification FR-76), kept by the session and read by

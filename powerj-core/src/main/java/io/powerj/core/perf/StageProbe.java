@@ -8,9 +8,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
-import io.powerj.api.BlockStat;
-import io.powerj.api.NativeStat;
-import io.powerj.api.StageStat;
+import io.powerj.api.perf.BlockStat;
+import io.powerj.api.perf.NativeStat;
+import io.powerj.api.perf.StageStat;
 import io.powerj.core.nativeexec.NativeRun;
 import io.powerj.core.runtime.ExecutionObserver;
 import io.powerj.core.runtime.MeasuredPipe;

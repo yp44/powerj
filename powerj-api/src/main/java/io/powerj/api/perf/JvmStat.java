@@ -1,7 +1,10 @@
-package io.powerj.api;
+package io.powerj.api.perf;
 
 import java.time.Duration;
 import java.util.Objects;
+
+import io.powerj.api.Bytes;
+import io.powerj.api.Display;
 
 /**
  * What the JVM did while a line ran, produced by {@code perf --view jvm}.

@@ -7,8 +7,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import io.powerj.api.PerfReport;
-import io.powerj.api.StageStat;
+import io.powerj.api.perf.PerfReport;
+import io.powerj.api.perf.StageStat;
 import io.powerj.core.format.OutputFormatter;
 import io.powerj.core.format.Values;
 import io.powerj.core.i18n.Messages;
@@ -69,8 +69,8 @@ final class PerfFooter {
     private static String hot(PerfReport report) {
         int stage = report.stages().stream().filter(StageStat::bottleneck).mapToInt(StageStat::index).findFirst()
                 .orElseGet(() -> report.hot().stream().filter(h -> h.stage() > 0)
-                        .collect(Collectors.groupingBy(io.powerj.api.HotMethod::stage,
-                                Collectors.summingLong(io.powerj.api.HotMethod::samples)))
+                        .collect(Collectors.groupingBy(io.powerj.api.perf.HotMethod::stage,
+                                Collectors.summingLong(io.powerj.api.perf.HotMethod::samples)))
                         .entrySet().stream().max(Map.Entry.comparingByValue())
                         .map(Map.Entry::getKey).orElse(0));
         List<String> methods = report.hot().stream().filter(h -> h.stage() == stage).limit(3)

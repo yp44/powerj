@@ -1,7 +1,9 @@
-package io.powerj.api;
+package io.powerj.api.perf;
 
 import java.time.Duration;
 import java.util.Objects;
+
+import io.powerj.api.Display;
 
 /**
  * Measure of one stage of a pipeline, produced by {@code perf} (specification FR-76).

@@ -270,6 +270,20 @@ class CmdletRunnerTest {
     }
 
     @Test
+    void theContextOffersThePerfReportsOfTheSessionAsAServiceAndNothingElse() throws Exception {
+        Probe probe = new Probe();
+        List<Object> seen = new ArrayList<>();
+        probe.onBegin = context -> {
+            seen.add(context.service(io.powerj.api.perf.PerfReports.class).map(r -> r.reports().size()).orElse(-1));
+            seen.add(context.service(Runnable.class).isPresent());
+        };
+
+        run(probe, null, "w");
+
+        assertThat(seen).containsExactly(0, false);
+    }
+
+    @Test
     void anyOtherExceptionReachesTheCaller() {
         Probe probe = new Probe();
         probe.onBegin = _ -> {

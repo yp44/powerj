@@ -20,8 +20,8 @@ import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
-import io.powerj.api.PerfReport;
-import io.powerj.api.StageStat;
+import io.powerj.api.perf.PerfReport;
+import io.powerj.api.perf.StageStat;
 import io.powerj.core.command.CmdletRegistry;
 import io.powerj.core.format.Values;
 import io.powerj.core.nativeexec.Platform;
@@ -456,7 +456,7 @@ class PerfTest {
     @Test
     void aRecordingIsDeletedWhenItsReportIsNoLongerKept() throws Exception {
         var first = java.nio.file.Files.createTempFile(tmp, "line-", ".jfr");
-        var jvm = new io.powerj.api.JvmStat(1, 0, Duration.ZERO, 0, 0, Duration.ZERO);
+        var jvm = new io.powerj.api.perf.JvmStat(1, 0, Duration.ZERO, 0, 0, Duration.ZERO);
         for (int i = 1; i <= ShellStatistics.MAX_PERF_REPORTS + 1; i++) {
             session.addPerfReport(new PerfReport(i, "l", Duration.ZERO, false, List.of(), List.of(), List.of(), List.of(),
                     jvm, List.of(), List.of(), List.of(), i == 1 ? first : null));

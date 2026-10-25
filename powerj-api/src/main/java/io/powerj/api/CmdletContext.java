@@ -1,7 +1,6 @@
 package io.powerj.api;
 
 import java.nio.file.Path;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -128,9 +127,12 @@ public interface CmdletContext<O> {
     }
 
     /**
-     * The lines measured in perf mode (specification FR-76), most recent first; empty when none was measured.
+     * A service that the shell offers for what only a few cmdlets need, so that the contract of every cmdlet does not
+     * grow with it ({@code context.service(PerfReports.class)}, in {@code io.powerj.api.perf}).
+     *
+     * @return the service, or empty if this shell does not offer it
      */
-    default List<PerfReport> perfReports() {
-        return List.of();
+    default <S> Optional<S> service(Class<S> type) {
+        return Optional.empty();
     }
 }

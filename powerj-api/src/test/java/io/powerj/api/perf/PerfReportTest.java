@@ -1,4 +1,4 @@
-package io.powerj.api;
+package io.powerj.api.perf;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;

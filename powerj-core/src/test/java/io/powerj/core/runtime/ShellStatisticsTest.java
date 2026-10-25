@@ -11,8 +11,8 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import io.powerj.api.JvmStat;
-import io.powerj.api.PerfReport;
+import io.powerj.api.perf.JvmStat;
+import io.powerj.api.perf.PerfReport;
 import io.powerj.core.nativeexec.NativeRun;
 
 /** What the shell remembers about what happened. */

@@ -1,6 +1,9 @@
-package io.powerj.api;
+package io.powerj.api.perf;
 
 import java.util.Objects;
+
+import io.powerj.api.Bytes;
+import io.powerj.api.Display;
 
 /**
  * What a stage allocated, per type, produced by {@code perf --view alloc} (specification FR-76, part B). The profiler

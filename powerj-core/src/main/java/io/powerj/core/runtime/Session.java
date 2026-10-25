@@ -8,7 +8,7 @@ import java.util.OptionalInt;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
-import io.powerj.api.PerfReport;
+import io.powerj.api.perf.PerfReport;
 import io.powerj.core.java.JavaClasses;
 import io.powerj.core.nativeexec.NativeRun;
 

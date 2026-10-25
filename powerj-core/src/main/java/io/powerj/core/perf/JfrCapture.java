@@ -20,9 +20,9 @@ import jdk.jfr.consumer.RecordedFrame;
 import jdk.jfr.consumer.RecordedThread;
 import jdk.jfr.consumer.RecordingFile;
 
-import io.powerj.api.AllocStat;
-import io.powerj.api.GcStat;
-import io.powerj.api.HotMethod;
+import io.powerj.api.perf.AllocStat;
+import io.powerj.api.perf.GcStat;
+import io.powerj.api.perf.HotMethod;
 import io.powerj.core.runtime.ExecutionObserver;
 
 /**

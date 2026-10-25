@@ -51,7 +51,7 @@ class CmdletContextTest {
     void theOptionalCapabilitiesAreAbsentByDefault() {
         assertThat(MINIMAL.hasInput()).isFalse();
         assertThat(MINIMAL.configDirectory()).isEmpty();
-        assertThat(MINIMAL.perfReports()).isEmpty();
+        assertThat(MINIMAL.service(io.powerj.api.perf.PerfReports.class)).isEmpty();
         MINIMAL.stopInput(); // no effect, no failure
     }
 

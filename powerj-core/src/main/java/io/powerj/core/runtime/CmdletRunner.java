@@ -16,6 +16,7 @@ import java.util.function.Supplier;
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.ScriptBlock;
+import io.powerj.api.perf.PerfReports;
 import io.powerj.core.command.CmdletRegistry;
 import io.powerj.core.command.OptionBinder;
 import io.powerj.core.error.PjError;
@@ -258,8 +259,9 @@ public final class CmdletRunner {
         }
 
         @Override
-        public List<io.powerj.api.PerfReport> perfReports() {
-            return session.perfReports();
+        public <S> Optional<S> service(Class<S> type) {
+            return type == PerfReports.class ? Optional.of(type.cast((PerfReports) session::perfReports))
+                    : Optional.empty();
         }
     }
 }

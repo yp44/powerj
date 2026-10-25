@@ -12,12 +12,12 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import io.powerj.api.BlockStat;
-import io.powerj.api.JvmStat;
-import io.powerj.api.NativeStat;
-import io.powerj.api.PerfReport;
-import io.powerj.api.PhaseStat;
-import io.powerj.api.StageStat;
+import io.powerj.api.perf.BlockStat;
+import io.powerj.api.perf.JvmStat;
+import io.powerj.api.perf.NativeStat;
+import io.powerj.api.perf.PerfReport;
+import io.powerj.api.perf.PhaseStat;
+import io.powerj.api.perf.StageStat;
 import io.powerj.core.java.PreviewGuard;
 import io.powerj.core.runtime.ExecutionObserver;
 import io.powerj.core.runtime.MeasuredPipe;

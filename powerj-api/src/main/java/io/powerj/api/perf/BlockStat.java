@@ -1,7 +1,9 @@
-package io.powerj.api;
+package io.powerj.api.perf;
 
 import java.time.Duration;
 import java.util.Objects;
+
+import io.powerj.api.Display;
 
 /**
  * Measure of a {@code { }} block evaluated in a stage, produced by {@code perf --view blocks}. Blocks called by other

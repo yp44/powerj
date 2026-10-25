@@ -80,11 +80,12 @@ final class TestContext<O> implements CmdletContext<O> {
     }
 
     /** Lines measured in perf mode, most recent first. */
-    List<io.powerj.api.PerfReport> perfReports = List.of();
+    List<io.powerj.api.perf.PerfReport> perfReports = List.of();
 
     @Override
-    public List<io.powerj.api.PerfReport> perfReports() {
-        return perfReports;
+    public <S> Optional<S> service(Class<S> type) {
+        return type == io.powerj.api.perf.PerfReports.class
+                ? Optional.of(type.cast((io.powerj.api.perf.PerfReports) () -> perfReports)) : Optional.empty();
     }
 
     /** Number of calls to {@link #stopInput()}. */

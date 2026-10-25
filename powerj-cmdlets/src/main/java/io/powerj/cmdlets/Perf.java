@@ -12,9 +12,10 @@ import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
-import io.powerj.api.PerfReport;
 import io.powerj.api.Previewable;
 import io.powerj.api.UsageException;
+import io.powerj.api.perf.PerfReport;
+import io.powerj.api.perf.PerfReports;
 
 /**
  * {@code perf}: what was measured in perf mode (Alt+P), as records to process in a pipeline (specification FR-76).
@@ -57,7 +58,7 @@ public final class Perf implements Cmdlet<Perf.Params, Void, Object>, Previewabl
         if (p.save() != null && (p.view() != null || p.all())) {
             throw new UsageException(Messages.get("perf.save.exclusive"));
         }
-        List<PerfReport> kept = context.perfReports();
+        List<PerfReport> kept = context.service(PerfReports.class).map(PerfReports::reports).orElse(List.of());
         if (kept.isEmpty()) {
             context.error(Messages.get("perf.none"));
             return;
