@@ -26,7 +26,8 @@ class ExitGuardTest {
     private static Result run(String line) throws IOException, InterruptedException {
         String javaBin = ProcessHandle.current().info().command().orElse("java");
         Process process = new ProcessBuilder(javaBin, "-cp", System.getProperty("java.class.path"),
-                "-Dpowerj.language=en", "--enable-native-access=ALL-UNNAMED", GuardProbe.class.getName(), line)
+                "-Dpowerj.language=en", "--enable-native-access=ALL-UNNAMED", GuardProbe.class.getName(),
+                java.util.Base64.getEncoder().encodeToString(line.getBytes(StandardCharsets.UTF_8)))
                 .redirectErrorStream(true).start();
         String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).lines()
                 .filter(text -> !text.startsWith("Picked up ")) // JAVA_TOOL_OPTIONS of the machine, not ours
