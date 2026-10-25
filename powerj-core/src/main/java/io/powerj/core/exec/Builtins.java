@@ -2,9 +2,15 @@ package io.powerj.core.exec;
 
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Supplier;
 
-/** Basic built-in commands: {@code cd}, {@code pwd}, {@code exit} (specification FR-04, FR-04b). */
+/**
+ * Built-in commands: {@code cd}, {@code pwd}, {@code exit} (specification FR-04, FR-04b), {@code which} (FR-13),
+ * {@code import} (FR-47) and {@code mod-load}, {@code mod-list} (FR-77). The last three need a part of the
+ * interpreter; they are built from it.
+ */
 final class Builtins {
 
     private Builtins() {
@@ -50,6 +56,69 @@ final class Builtins {
         };
         session.requestExit(code);
         return List.of();
+    }
+
+    /** {@code which name…}: what each name stands for, as execution would resolve it (FR-13). */
+    static Builtin which(Supplier<CommandResolution> resolution) {
+        return (names, session) -> {
+            if (names.isEmpty()) {
+                throw new PjException(Messages.get("which.nameExpected"));
+            }
+            List<Object> lines = new ArrayList<>();
+            for (Object value : names) {
+                String name = Values.text(value);
+                lines.add(switch (resolution.get().resolve(name, session)) {
+                    case Resolved.BuiltinCall _ -> Messages.get("which.builtin", name);
+                    case Resolved.CmdletCall(var cmdlet) -> Messages.get("which.cmdlet", name, cmdlet.module());
+                    case Resolved.NativeCall(var path) -> Messages.get("which.native", name, path);
+                    case Resolved.Unknown(var program, var forcedNative) -> throw new PjException(Messages.get(
+                            forcedNative ? "which.programNotFound" : "which.notFound", forcedNative ? program : name));
+                });
+            }
+            return lines;
+        };
+    }
+
+    /** {@code import java.security.*}, {@code import javax.crypto.Cipher}; without arguments: active imports (FR-47). */
+    static List<Object> importClasses(List<Object> args, Session session) {
+        if (args.isEmpty()) {
+            return List.copyOf(session.java().imports());
+        }
+        for (Object arg : args) {
+            session.java().addImport(Values.text(arg));
+        }
+        return List.of();
+    }
+
+    /** {@code mod-load <path.jar>}: loads a module at runtime. */
+    static Builtin modLoad(ModuleLoader modules, ShellIo io) {
+        return (args, session) -> {
+            if (args.isEmpty()) {
+                throw new PjException(Messages.get("module.load.pathExpected"));
+            }
+            List<Object> loaded = new ArrayList<>();
+            for (Object arg : args) {
+                String text = Values.text(arg);
+                Path path = session.currentDirectory().resolve(text); // ~ already expanded (FR-62)
+                ModuleLoader.Result result = modules.load(path);
+                result.warnings().forEach(io.errors());
+                if (result.cmdlets().isEmpty() && !result.warnings().isEmpty()) {
+                    throw new PjException(Messages.get("module.load.notLoaded", path.getFileName()));
+                }
+                loaded.addAll(result.cmdlets());
+            }
+            return loaded;
+        };
+    }
+
+    /** {@code mod-list}: loaded modules and their cmdlets. */
+    static Builtin modList(CmdletRegistry registry) {
+        return (args, _) -> {
+            if (!args.isEmpty()) {
+                throw new PjException(Messages.get("module.list.noArguments"));
+            }
+            return List.copyOf(registry.modules());
+        };
     }
 
     private static Path parse(String path) {
