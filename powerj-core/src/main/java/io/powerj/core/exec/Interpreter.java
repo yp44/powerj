@@ -1,11 +1,8 @@
 package io.powerj.core.exec;
 
-import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -15,8 +12,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CancellationException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import io.powerj.core.lang.Ast;
 import io.powerj.core.lang.Ast.Statement;
@@ -43,20 +38,9 @@ public final class Interpreter {
     private final Evaluator evaluator;
     private final ErrorReporter reporter;
     private final PipelineExecutor executor;
-    /**
-     * Variable of the session environment ({@code env --set} in {@code profile.pj}): when it is {@code 1}, the perf mode
-     * ends by itself after the next measured line (FR-76).
-     */
-    static final String PERF_AUTOEXIT_VARIABLE = "POWERJ_PERF_AUTOEXIT";
-
-    /** Perf mode (FR-76): each line executed is measured, and a summary is printed after it. */
-    private volatile boolean perfMode;
+    private final PerfMode perf;
     /** Who measures the line being executed. */
     private volatile ExecutionObserver observer = ExecutionObserver.NONE;
-    /** The profiler records each measured line (FR-76, part B); only a test or a runtime without it turns it off. */
-    private volatile boolean perfProfiler = true;
-    /** Folder of the profiler's recordings, created at the first one. */
-    private Path recordings;
 
     /**
      * @param extraBuiltins built-in commands provided by the shell (e.g. {@code history})
@@ -72,6 +56,7 @@ public final class Interpreter {
         this.registry = registry;
         this.evaluator = new Evaluator(session, this::capture, this::syntax);
         this.reporter = new ErrorReporter(session, io);
+        this.perf = new PerfMode(session, io);
         // The order is the one of the overview printed by `help`; the shell's own commands come before `exit`.
         builtins.put("cd", Builtins::cd);
         builtins.put("pwd", Builtins::pwd);
@@ -190,15 +175,8 @@ public final class Interpreter {
         long begin = System.nanoTime();
         Ast.Script script = Parser.parse(line, syntax());
         long parsed = System.nanoTime() - begin;
-        PerfRecorder perf = null;
-        JfrCapture capture = null;
-        if (perfMode && measurable(script)) {
-            long started = System.nanoTime();
-            capture = startProfiler();
-            // Starting the profiler is not part of the line.
-            perf = new PerfRecorder(line, begin + (System.nanoTime() - started), parsed);
-        }
-        observer = perf == null ? ExecutionObserver.NONE : perf;
+        PerfMode.Measurement measurement = perf.start(line, script, begin, parsed);
+        observer = measurement.observer();
         boolean cancelled = false;
         try {
             boolean succeeded = true;
@@ -221,149 +199,22 @@ public final class Interpreter {
             throw e;
         } finally {
             observer = ExecutionObserver.NONE;
-            if (perf != null) {
-                printPerf(perf, capture, cancelled);
-            }
+            measurement.finish(cancelled);
         }
     }
 
     /** Perf mode (FR-76): {@code true} while the lines executed are measured. */
     public boolean perfMode() {
-        return perfMode;
+        return perf.on();
     }
 
     public void perfMode(boolean on) {
-        if (on) {
-            PerfRecorder.warmUp();
-            if (perfProfiler && PerfJfr.available()) {
-                Path file = recordingFile();
-                if (file != null) {
-                    JfrCapture.warmUp(file);
-                }
-            }
-        }
-        perfMode = on;
+        perf.on(on);
     }
 
     /** Without the profiler, a line is measured with the counters only. */
     void perfProfiler(boolean on) {
-        perfProfiler = on;
-    }
-
-    private JfrCapture startProfiler() {
-        if (!perfProfiler || !PerfJfr.available()) {
-            return null;
-        }
-        Path file = recordingFile();
-        return file == null ? null : JfrCapture.start(file, samplePeriod(), allocThrottle());
-    }
-
-    /** Value of each variable the warning was last given for: one warning per value, not one per line. */
-    private String warnedPeriod;
-    private String warnedThrottle;
-
-    /**
-     * Limit of the profiler's allocation samples, from {@code POWERJ_PERF_JFR_ALLOCTHROTTLE} in the session environment
-     * ({@code 100/s}, {@code off}), or {@code null} for the profiler's default. A value that is not a rate is
-     * reported, and the default is used.
-     */
-    private String allocThrottle() {
-        String value = session.environment().get(PerfJfr.ALLOC_THROTTLE_VARIABLE);
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        boolean warn = !value.equals(warnedThrottle);
-        warnedThrottle = value;
-        try {
-            return PerfJfr.parseAllocThrottle(value);
-        } catch (IllegalArgumentException _) {
-            if (warn) {
-                io.errors().accept(Messages.get("perf.allocThrottle.invalid", PerfJfr.ALLOC_THROTTLE_VARIABLE, value));
-            }
-            return null;
-        }
-    }
-
-    /**
-     * Sampling period of the profiler, from {@code POWERJ_PERF_JFR_SAMPLEPERIOD} in the session environment, so that
-     * {@code env --set} (in {@code profile.pj} too) changes it from the next line. A value that is not a duration is
-     * reported, and the default is used; a period under 1 ms, which the profiler cannot do, becomes 1 ms.
-     */
-    private Duration samplePeriod() {
-        String value = session.environment().get(PerfJfr.SAMPLE_PERIOD_VARIABLE);
-        if (value == null || value.isBlank()) {
-            return PerfJfr.DEFAULT_SAMPLE_PERIOD;
-        }
-        boolean warn = !value.equals(warnedPeriod);
-        warnedPeriod = value;
-        try {
-            Duration period = PerfJfr.parseSamplePeriod(value);
-            if (period.compareTo(PerfJfr.MINIMUM_SAMPLE_PERIOD) < 0) {
-                if (warn) {
-                    io.errors().accept(Messages.get("perf.samplePeriod.floor", PerfJfr.SAMPLE_PERIOD_VARIABLE, value));
-                }
-                return PerfJfr.MINIMUM_SAMPLE_PERIOD;
-            }
-            return period;
-        } catch (IllegalArgumentException _) {
-            if (warn) {
-                io.errors().accept(Messages.get("perf.samplePeriod.invalid", PerfJfr.SAMPLE_PERIOD_VARIABLE, value));
-            }
-            return PerfJfr.DEFAULT_SAMPLE_PERIOD;
-        }
-    }
-
-    /** A new file for a recording, in a folder that goes away with the shell. */
-    private synchronized Path recordingFile() {
-        try {
-            if (recordings == null) {
-                recordings = Files.createTempDirectory("powerj-perf-");
-                recordings.toFile().deleteOnExit();
-            }
-            Path file = Files.createTempFile(recordings, "line-", ".jfr");
-            file.toFile().deleteOnExit();
-            return file;
-        } catch (IOException | RuntimeException e) {
-            Logger.getLogger(Interpreter.class.getName())
-                    .log(Level.WARNING, "No file for the profiler's recording", e);
-            return null;
-        }
-    }
-
-    /** A line is measured unless it is empty, runs in the background, or starts with {@code perf}. */
-    private static boolean measurable(Ast.Script script) {
-        if (script.steps().isEmpty()) {
-            return false;
-        }
-        for (Ast.Step step : script.steps()) {
-            if (step.statement().background()) {
-                return false;
-            }
-        }
-        List<Ast.Stage> first = script.steps().getFirst().statement().pipeline().stages();
-        return first.isEmpty() || !(first.getFirst().body() instanceof Ast.Command(var name, var forceNative, _)
-                && !forceNative && name.equals("perf"));
-    }
-
-    /** Keeps the report of the line and prints its summary, even for a cancelled line. */
-    private void printPerf(PerfRecorder perf, JfrCapture capture, boolean cancelled) {
-        boolean interrupted = Thread.interrupted(); // a cancelled line must still print: keep the flag for later
-        try {
-            perf.stop(); // before reading the recording: that work is not the line's
-            int number = session.nextPerfLine();
-            var report = capture == null ? perf.finish(number, cancelled)
-                    : perf.finish(number, cancelled, capture.finish(number, perf.probes()), capture.file());
-            session.addPerfReport(report);
-            PerfFooter.lines(report, io.colors()).forEach(io.out()::println);
-            io.out().flush();
-        } finally {
-            if ("1".equals(session.environment().getOrDefault(PERF_AUTOEXIT_VARIABLE, "").strip())) {
-                perfMode = false; // the summary is printed: the mode ends, the next prompt shows it
-            }
-            if (interrupted) {
-                Thread.currentThread().interrupt();
-            }
-        }
+        perf.profiler(on);
     }
 
     private boolean statement(Statement statement) throws InterruptedException {

@@ -94,6 +94,11 @@ structures, functions) can be built on it. The work is organised in phases (revi
 - **The output of a statement and its redirections have their own classes** (step 2.4): `StatementOutput` writes the
   values to the terminal or to the file of `>`, `Redirections.target` evaluates the file a redirection names.
   `Interpreter` is down to 545 lines.
+- **Perf mode no longer runs through the execution code** (step 2.5): the execution reports to an `ExecutionObserver`
+  (a neutral one when nothing is measured), `Pipe` has no measuring branch (`MeasuredPipe` counts), and `PerfMode`
+  owns the mode, the profiler settings and the report. `Interpreter` is down to 396 lines.
+- **The profiler's recordings are removed by one hook at exit** instead of a `deleteOnExit` per measured line, which
+  made the JVM remember every line of a long session.
 - The frozen ArchUnit rules no longer fail when a refactoring only changes the signature of a method already in a cycle, the
   tally of its report, or which of the (many) `exec` classes that use the syntax tree the report happens to list. The
   dependency that closes the `exec`/`lang` cycle (`lang` reaching into `exec`) is still compared line by line.
