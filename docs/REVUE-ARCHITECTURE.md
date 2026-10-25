@@ -1,0 +1,412 @@
+# Revue critique de PowerJ — état des lieux, orientations et plan de refactoring
+
+> Document rédigé en français à la demande du commanditaire (le reste de la documentation du dépôt est en anglais — voir C-36).
+> Analyse du 24/10/2026 sur le commit `5ace592` (`main` à cette date). Document d'analyse : aucun code n'a été modifié pour le produire.
+
+## Synthèse (à lire en premier)
+
+PowerJ est un shell interactif orienté objet (esprit PowerShell) en Java 25 : 9 modules Maven/JPMS, ≈ 39 000 lignes de Java (≈ 23 000 de production, ≈ 16 000 de test, 1 080 tests), 163 commits en 18 jours, une spécification de 1 962 lignes et 47 fiches de plan/recette.
+
+**Verdict.** Le projet est *anormalement discipliné pour son âge* — spécification traçable, tests nombreux, Java moderne utilisé à bon escient, méthodes courtes, graphe de modules sain. Mais sa vitesse de croissance a laissé des **dettes structurelles** qui deviendront coûteuses dès la v2 (structures de contrôle, fonctions) : un contrat d'extension sans « objet d'exécution », un `Interpreter` qui absorbe tout, un package `core.exec` fourre-tout entièrement exporté, des préoccupations transverses (perf, aperçu, i18n) câblées à la main, et **aucun garde-fou automatique** (analyse statique, tests d'architecture, compatibilité d'API) hormis la couverture.
+
+**Les dix constats qui comptent** (détail en § 4, plan en § 8) :
+
+| # | Constat | Gravité | Phase |
+|---|---|---|---|
+| C-01 | `Cmdlet` n'a pas d'état d'exécution ; 23 cmdlets le contournent de 3 façons ; `end()` n'est pas appelé en cas d'erreur/annulation | 🔴 | 1.3 |
+| C-02 | `Interpreter` = classe-Dieu de 1 156 lignes, 12 responsabilités | 🔴 | 2 |
+| C-12 | Le garde-fou `System.exit` est contournable (`System::exit`, réflexion) — contredit « the shell never crashes » | 🔴 | 1.1 |
+| C-11 | Un `config.properties` mal formé (ex. chemin Windows `C:\users`) fait planter le démarrage | 🔴 | 1.2 |
+| C-03 | La règle de résolution des commandes existe en 4 copies ; le type scellé `Resolved` promis par la spec n'existe pas | 🟠 | 2.1 |
+| C-04/05 | `core.exec` : 53 classes, 32 publiques, tout exporté ; cycles de packages | 🟠 | 3 |
+| C-08 | 10 types de perf et des détails de complétion/aperçu dans l'API publique | 🟠 | 3.4 |
+| C-15 | `CancellationException` est une `IllegalStateException` : Ctrl+C est avalé (bug réel dans `to-json`) | 🟠 | 1.6 |
+| C-21/22 | `ProtectedPaths` lexical ; les globs de `rm`/`cp`/`mv` ignorent la casse même sous Linux | 🟠 | 1.7 |
+| C-32 | Aucune analyse statique, ArchUnit, japicmp, mutation ; couverture seulement agrégée | 🟠 | 0 |
+
+**Ce qu'il faut préserver** : la séparation `cmdlets ⇏ core`, le contrat « record de paramètres + `@Option` », les types scellés + `switch` exhaustifs, la traçabilité `FR-xx`, les tests de fumée sur le lanceur packagé, le découpage model/view de `powerj-fx`.
+
+**Ordre recommandé** : Phase 0 (filets : ArchUnit gelé, tests de caractérisation, lint) → Phase 1 (7 correctifs à fort levier) → Phase 2 (démonter l'`Interpreter`) → Phase 3 (packages/API) → Phase 4 (composition/shell), la Phase 5 (industrialisation, docs) courant en parallèle. Charge indicative ≈ 64 jours-développeur.
+
+---
+
+## 1. Méthode et limites
+
+- **Lecture directe** (mes propres lectures, ligne à ligne) : `README.md`, `docs/SPECIFICATION.md` (architecture, §3.14, §5, §6, §10), tous les `pom.xml` et `module-info.java`, `ci.yml`, l'API publique, `Interpreter`, `Session`, `Supervisor`, `Pipe`, `CmdletRunner`, `CmdletRegistry`, `Evaluator` (interceptions), `MethodReference`, `Repl`, `Main`, `ShellConfig`, `Previewer`, `ProtectedPaths`, `Globs`, `SortComparator`, `Transfer`, `ToJson`, `Sort`, `First`, `Where`, `GridCmdlet`, `JavaClasses` (verrous), `Completions` (plan et `member`).
+- **Trois audits parallèles** (core ; api+cmdlets+fs ; shell+fx+build+CI+docs) relisant les ≈ 320 fichiers, puis **recoupés** : j'ai vérifié moi-même chaque constat lourd. Un constat que je n'ai *pas* relu est marqué **†**. Quand un audit a surévalué (ex. « `rm` casse la casse » ne vaut que via l'expansion de glob), le texte est celui que j'ai pu établir.
+- **Métriques** calculées par script ; un premier calcul de longueur de méthode, faussé par des littéraux `'{'`, a été écarté et refait.
+- **Limites** : analyse *statique*. Rien n'a été compilé ni exécuté (mode lecture seule). Les comportements déduits sont marqués **[à confirmer par test]** ; chacun devient un test rouge dans la phase correspondante.
+
+## 2. Le projet en chiffres
+
+| Module | Fichiers main/test | Lignes main | Lignes test | Ratio | Rôle |
+|---|---|---|---|---|---|
+| `powerj-api` | 25 / 0 | 806 | 0 | 0,00 | Contrat d'extension public (SPI) |
+| `powerj-fs` | 5 / 2 | 1 054 | 533 | 0,51 | Parcours/copie/suppression d'arbres |
+| `powerj-core` | 67 / 30 | 10 757 | 5 060 | 0,47 | Lexer, parser, interpréteur, pipeline, interop Java, complétion, natif, perf |
+| `powerj-cmdlets` | 55 / 23 | 5 367 | 4 099 | 0,76 | 28 cmdlets intégrées |
+| `powerj-fx` | 43 / 22 | 3 149 | 3 594 | 1,14 | Fenêtre `grid` (JavaFX, optionnel) |
+| `powerj-shell` | 21 / 23 | 2 044 | 2 790 | 1,36 | `Main`, REPL JLine, profil, aperçu, perf |
+| **Total** | **216 / 100** | **23 177** | **16 076** | **0,69** | 1 080 tests (333 core, 273 cmdlets, 265 fx, 177 shell, 32 fs) |
+
+Autres mesures : 1 338 méthodes de production dont **moins de 2 % dépassent 50 lignes** (max 95 : `Highlights.of`, puis `Interpreter.run` 94, `OptionBinder.bind` 90) ; 0 `TODO/FIXME` réel ; 10 `@SuppressWarnings` (tous `unchecked/rawtypes`) ; 1 seul champ statique mutable (`Language.current`) ; 2 `System.exit`, tous deux dans `Main` ; 11 `catch (Exception|Throwable)` et ≈ 37 `catch (RuntimeException)`, presque tous commentés ; 47 `synchronized` ; 27 `Thread.sleep` et 11 `@Timeout` dans les tests ; 134 noms pleinement qualifiés « en ligne » alors qu'un import suffirait.
+
+---
+
+## 3. Ce qui est bien fait (à préserver)
+
+1. **Modularité JPMS réelle et dans le bon sens.** `api` et `fs` n'ont aucune dépendance ; `cmdlets` ne dépend que de `api` et `fs` — **jamais de `core`** ; `fx` ne dépend que de `api`. Les commandes intégrées se comportent donc exactement comme un module tiers (`BuiltinCmdlets` est publié via `provides … CmdletProvider`). C'est la décision d'architecture la plus saine du projet.
+2. **Contrat d'extension élégant.** Un cmdlet = un *record* de paramètres annoté `@Option` + `Cmdlet<P,I,O>` : l'`OptionBinder`, la complétion, l'aide et l'affichage tabulaire en sont déduits. Découverte par `ServiceLoader`, **un `ModuleLayer` par module tiers** (isolation des dépendances), consentement explicite pour l'accès natif, défaut « refusé » (`NativeAccessPolicy.NONE`). Évolution compatible par méthodes `default` (`hasInput`, `stopInput`, `configDirectory` ajoutés sans casse).
+3. **Java moderne utilisé quand il apporte quelque chose.** 14 hiérarchies `sealed` + 102 records ; `Evaluator.eval` (`Evaluator.java:69-112`) est un `switch` exhaustif sans `default` : ajouter un nœud d'AST casse la compilation. Threads virtuels pour les étages, `ScopedValue` (jamais `ThreadLocal`) pour `$_` et le contexte d'aperçu, variables anonymes `_`, FFM via JLine.
+4. **Discipline de taille des méthodes.** Le problème du projet n'est pas la méthode trop longue : c'est la **classe et le package trop larges** (C-02, C-04).
+5. **Robustesse de l'exécution.** `Supervisor` (résultat `Outcome` scellé à 4 cas, réserve mémoire rechargée après `OutOfMemoryError`, abandon au 2ᵉ Ctrl+C, pile de 16 Mo) ; `Pipe` à file bornée (256) avec propagation d'arrêt en cascade idempotente ; `joinAll` et `printPerf` préservent le drapeau d'interruption ; `NativeRunner.destroyTree` tue les descendants avec période de grâce.
+6. **Sécurité de base correcte côté natif.** Processus lancés par liste d'arguments (jamais via un shell), environnement explicite (`environment().clear()` puis `putAll`, `NativeRunner.java:79`), introspection Java limitée aux types publics exportés des modules `java.*` (`JavaClasses.java:158-172`).
+7. **Chaîne de qualité exigeante pour un projet jeune.** JaCoCo agrégé avec seuil 80 % lignes **et** branches appliqué par le build ; tests d'hygiène atypiques et précieux (`NoHardcodedFrenchTest`, `MessageBundlesTest`, unicité des imports par défaut) ; tests forcés en anglais ; **tests de fumée du lanceur packagé** Linux *et* Windows, dont une vraie fenêtre JavaFX sous xvfb (`ci.yml:116-142`) ; `permissions: contents: read`.
+8. **i18n propre.** Bundles EN/FR en parité exacte de clés dans chacun des cinq modules (vérifiée par `MessageBundlesTest`), journal toujours en anglais, langue résolue selon une priorité documentée.
+9. **Documentation et traçabilité hors norme.** Chaque fonctionnalité a un identifiant `FR-xx` cité dans le code, les commits, le plan et la recette de validation. Les fiches de plan consignent les « décisions prises avec l'utilisateur » : c'est de fait un journal d'ADR.
+10. **`powerj-fx` bien architecturé.** Séparation `model` / `view` / `runtime` avec des **ports** (`FxPlatform`, `Scheduler`, `WindowOpener`, `PropertyReader`) : seuls 2 fichiers du `model` touchent `javafx.base`, aucun les contrôles ; file `LiveTable` bornée (20 000), drainage par lots sur le thread FX, démarrage JavaFX en échec mémorisé ; seuil de couverture de 90 % hors `view`.
+11. **Parseurs JSON/CSV maison mais sérieux.** Zéro dépendance, profondeur limitée à 1 000 (`JsonParser.java:19`, testé `JsonTest.java:144`), nombres stricts, erreurs positionnées ligne/colonne, flux JSON-Lines.
+12. **`FileWalker` bien conçu.** Builder validé, contrat « consommateurs dans le thread appelant », contre-pression, annulation par interruption, liens jamais suivis, erreurs en valeurs (`WalkError`) ; tests paramétrés séquentiel/parallèle.
+13. **Opérations fichiers prudentes.** `NOFOLLOW_LINKS` systématique, `preview = false` par défaut, `--dry-run` sur chaque cmdlet mutante, `ProtectedPaths` relu à chaque commande, `--allow-protected` explicite.
+14. **Testabilité du shell.** `TestTerminal` pilote le vrai JLine en mémoire ; `PowerJHome.resolve(Map, Path)` est pure ; points d'injection package-private (`Interpreter(…, CommandResolver, NativeRunner)`) ; doubles réels sans framework de mock (`FakeCmdlets`).
+15. **Consentement natif bien pensé.** `[y/N]` par défaut, jamais demandé hors terminal, écriture par fichier temporaire qui préserve les commentaires (`ConfigFile.java:62-66`).
+
+---
+
+## 4. Ce qui est mal fait — registre des constats
+
+Légende : 🔴 **critique** (contredit une promesse du produit, ou bloque l'évolution) · 🟠 **majeur** (dette structurelle qui coûte à chaque itération) · 🟡 **mineur** (hygiène) · **†** relevé par audit, non relu par moi · **[à confirmer]** déduit de la lecture, non exécuté.
+
+### 4.1 Architecture et conception
+
+**C-01 🔴 Le contrat `Cmdlet` n'a ni état d'exécution ni garantie de fermeture.**
+Les cmdlets sont des singletons (`BuiltinCmdlets.java:15-20`), mais la plupart ont besoin d'un état *par exécution* (tri : liste accumulée ; `first` : compteur ; `join` : table…). Comme `begin/process/end` ne reçoivent que `(params, context)`, chaque cmdlet bâtit sa propre table, de trois façons incompatibles :
+
+| Contournement | Où | Nb |
+|---|---|---|
+| `Collections.synchronizedMap(new WeakHashMap<CmdletContext<?>, State>())` | `Sort.java:49`, `First.java:28`, `Count.java:21`, `Join.java:71`, `Select.java:65`, … **et `GridCmdlet`** | 19 + 1 |
+| `Collections.synchronizedMap(new IdentityHashMap<Params, …>())` — références fortes | `Cat.java:74`, `Grep.java:91` | 2 |
+| `new ConcurrentHashMap<Params, ScriptBlock>()` — clé = **record comparé par valeur** | `Where.java:44` | 1 |
+
+Aggravant : `CmdletRunner.invoke` appelle `begin`, la boucle `process` puis `end` **sans `try/finally`** (`CmdletRunner.java:57-74`) — si un `process` échoue ou si Ctrl+C survient, `end()` n'est jamais appelé et l'état n'est jamais libéré. Conséquences : (1) **verrou de table pris à chaque objet** sur le chemin chaud ; (2) `Where` : deux étages `ls | where size > 1mb | where size > 1mb` ont des `Params` égaux et se marchent dessus (le premier `end` supprime l'entrée du second, masqué par un `computeIfAbsent` de rattrapage, `Where.java:52`) **[à confirmer]** ; (3) **fuite probable dans `GridCmdlet`** : la valeur (`Execution` → `ObjectReader` → `ScriptReader`) référence fortement sa clé (`GridCmdlet.java:60, 171-176`), donc une `WeakHashMap` ne la collecte jamais si `end()` n'a pas été appelé ; (4) `Cat` et `Grep` fuient franchement sur annulation ; (5) chaque auteur tiers copiera ce schéma. C'est un défaut de **SPI**, donc le plus cher à corriger plus tard. → **1.3**
+
+**C-02 🔴 `Interpreter` (1 156 lignes) est une classe-Dieu.** 2ᵉ fichier de production le plus modifié (22 commits), 57 méthodes, 17 champs, 9 types imbriqués, dépendant de 28 des 52 autres classes d'`exec`. Responsabilités : orchestration des étapes ; registre et implémentation des *builtins* (`:84-93`, `which :972`, `importClasses :962`) ; façade de chargement de modules (`:98-136`) ; planification (`segments :770`, `prepare :799`) ; exécution concurrente (`run :609`, `runSegment :716`, `joinAll :930`) ; redirections et sorties fichier (`:1023-1155`) ; tâches d'arrière-plan (`:404`) ; rapport d'erreurs (`:1051-1095`) ; **mode perf** (≈ 140 lignes + 17 champs, `:234-371`, lit `POWERJ_PERF_*`, crée des fichiers temporaires `deleteOnExit` sans borne) ; **mode aperçu** (`:445-546`) ; entrée standard ; requête de l'interface (`commandKind`). Symptômes : méthodes à **9 paramètres** (`run`, `segment`, `runSegment` : `:609, 705, 716` ; `NativeRunner.run` 9, `runGroup` 11) qui portent toujours le même paquet `sink / capture / outTarget / errTarget / errors / probe` (*data clump*) ; **19 branches `perf != null` / `probe != null`** dans le code d'exécution (`:616, 624, 631, 635, 652, 665, 708, 732…`) ; modes en champs `volatile` mutables (`:61-65`) et deux champs d'avertissement non synchronisés (`:266-267`). → **2.2 – 2.6**
+
+**C-03 🟠 La règle de résolution des commandes existe en 4 copies ; le type promis par la spec n'existe pas.** L'ordre « builtin → cmdlet → exécutable » (FR-13) est recodé dans `commandKind` (`Interpreter.java:165-175`), `prepare` (`:813-851`), `which` (`:972-994`) et `acceptsComparison` (`:160`), plus `Completions.upstreamType` ; `Help.BUILTINS` (`Help.java:17`) est une seconde source de vérité de la liste des builtins ; `CommandResolver` est mal nommée (elle ne résout que le natif). La spécification §6 annonce un `sealed interface Resolved` (`CmdletCall / NativeCall / Builtin`), des types `Node` et `Value` : **aucun n'existe** (l'AST est `Ast.Body/Argument/Expression`). → **2.1**
+
+**C-04 🟠 `core.exec` est un package fourre-tout, et tout est exporté.** 53 classes, 32 publiques, six domaines sans rapport : interpréteur (`Interpreter`, `Evaluator`, `Operators`, `Values`), interop Java (`JavaClasses`, `JavaInvoker`, `Members`, `FunctionalAdapter`, `MethodReference`, `PropertyAccess`, `JavaIndex`), exécution native (`NativeRunner`, `NativeCommands`, `NativeEncoding`, `CommandResolver`, `WindowsConsole`, `Platform`), **perf/JFR** (`PerfRecorder`, `PerfJfr`, `PerfFooter`, `JfrCapture`, `JfrData`, `StageProbe`), assistance (`Completions`, `Highlights`, `Help`), modules/jobs/E-S (`ModuleLoader`, `Jobs`, `ShellIo`, `OutputFormatter`). `module-info.java` exporte `exec` **et** `lang` en entier ; or 10 de ces classes publiques ne sont utilisées nulle part hors du module (`CommandResolver`, `ExecutableKind`, `JavaIndex`, `Members`, `ModuleLoader`, `NativeCommands`, `NativeRunner`, `OptionBinder`, `OutputFormatter`, `PropertyAccess`). Même constat côté `cmdlets` (38 publiques sur 54, tout le package exporté) et `shell` (exporte un package que personne n'utilise). Rien n'est refactorable sans casser un consommateur potentiel. → **3.1**
+
+**C-05 🟠 Cycles de packages.** (a) `lang/SyntaxException.java:3` importe `exec.PjException`, alors que `exec` importe `lang` partout (18 imports). (b) Dans `lang` : `Lexer:131` → `ExpressionParser.scan`, `ExpressionParser:484` → `Parser.pipeline`, `Parser:36` → `Lexer.tokenize`. (c) `Token.Expr(Ast.Expression)` (`Token.java:12`) contre `Ast.Redirect(Token.Stream…)` (`Ast.java:194`) : un token contient un nœud d'AST. (d) `Syntax implements Predicate<String>` sert de transport de contexte par *type-punning* (classe `Names`, `ExpressionParser:129-148`, downcast `:167`, `Parser:180`). †(b-d) → **3.2**
+
+**C-06 🟠 `Completions` (999 lignes) fait six métiers, et quatre scanners lexicaux indépendants coexistent.** `Completions` mêle analyse de la ligne en cours (`analyze`, `stringEnd`, `matchingBackward`), complétion de commandes, d'options, de chemins, de variables, de membres Java, **et un moteur d'inférence de types** (`TypeInfo`, `Scope`, `typeOf`, `member`, `elementOf` : lignes 612-880) ; il dépend de l'`Interpreter` concret (`:67`). Quatre scanners — `Lexer`, `Highlights.of`, `Completions.analyze`, `ExpressionParser.skipString/matching` — gèrent chacun la fin de chaîne (4 variantes : `ExpressionParser:808`, `Completions:184`, `Highlights:150`, `Lexer:315`) ; **seul `skipString` gère `$( … )` imbriqué** (`:816-821`) : dans `"x $(f("y"))"`, la coloration et le contexte de complétion se trompent † ; `skipBlanks`, `isWordEnd`, `isArgumentBoundary` sont dupliqués. → **3.3**
+
+**C-07 🟠 « Dérouler une valeur » est écrit 4 fois, avec dérives — dont une fuite de ressource.** `Pipe.unroll :155-177`, `OutputFormatter.accept :92-114`, `Interpreter.previewValue :520-539`, `Evaluator.elements :284-304`. `Optional` n'est déroulé que dans deux d'entre elles, `Collected` que dans `Pipe` ; surtout, **`Evaluator.elements` ne ferme pas le `BaseStream`** (`:290`, pas de `try (stream)`), contrairement à `previewValue` : `Files.lines(p)*.x` fuit un descripteur. → **1.5**
+
+**C-08 🟠 La perf contamine l'API publique, qui grossit à chaque fonctionnalité du shell.** Dix types (`AllocStat, BlockStat, GcStat, HotMethod, JvmStat, LineStat, NativeStat, PerfReport, PhaseStat, StageStat` : 266 lignes sur 806, **un tiers de l'API**) n'existent que pour le cmdlet `perf`, via `CmdletContext.perfReports()` — l'auteur tiers voit des JFR et des GC dans « la seule dépendance dont il a besoin ». `PerfReport.recording` est un chemin de fichier temporaire à durée de vie gérée sans `Closeable`. De même, `@CmdletInfo.comparison` est une astuce de parseur propre à `where`, `Cmdlet.columns(String)` oblige chaque cmdlet à re-parser ses arguments bruts (`Select.java:113-162` duplique le tokenizer), et `CmdletContext.environment()` expose la `Map` **mutable** de la session. Les `default` « qui mentent » (`hasInput()` à `false`, `perfReports()` vide) rendent silencieusement faux un mock tiers. → **3.4**
+
+**C-09 🟠 Pas de racine de composition : `Main`, `Repl`, `ScriptMode` câblent à la main.** `Main.main` résout `PowerJHome` (`Main.java:50`) puis `runScript` le **résout de nouveau** (`:106`) ; `Session` est construite deux fois à l'identique (`:104-105, 157-158`) ; `System.getenv()` lu 8 fois, `getProperty/setProperty` 13 fois ; `main` est intestable (appelle `System.exit`), `Main` n'a aucun test ; pas de `--version` ni `--help`. Le constructeur de `Repl` (`Repl.java:55-95`) *est* la racine de composition (crée `Interpreter`, `Completions`, `Previewer`, `Perfer`, installe le signal) et teste `reader instanceof LineReaderImpl / PreviewLineReader` (`:70, 75, 81`) : avec un autre `LineReader`, les fonctions sont **désactivées en silence**. `Repl` cumule huit rôles (boucle, profil `:173-214`, prompt `:241-254`, console native `:220-238`, builtin `history`, erreurs avec état `volatile errorPrefix`, consentement, modules). L'initialisation se fait en trois temps dont l'ordre est imposé à la main (`nativeAccess`, `loadModules`, `useProfile`). Le `switch (Outcome)` est écrit **trois fois** (`Repl:157-163, 193-204`, `ScriptMode:70-82`). `shell` ne dépend de `cmdlets` que pour `ProtectedPaths` (`PowerJHome.java:9`). → **4.1 – 4.5**
+
+**C-10 🟠 Messages : 7 copies conformes d'une classe + un état global.** `Messages.java` existe dans `api` (16 l.), `core.exec`, `core.lang`, `cmdlets`, `shell`, `fx`, `examples/greet` (19 l.), identiques au nom de bundle près. `Language` porte un `static volatile Locale current` mutable (lu par 262 appels), la règle « tout sauf le français donne l'anglais » (`Language.java:60-62`), un formateur maison (sans pluriel ni nombres localisés) et `resolve(4 chaînes)` — une politique du shell logée dans l'API. Le JDK offre `ResourceBundle.getBundle(String, Locale, Module)` : un helper unique suffit. → **1.4**
+
+### 4.2 Fiabilité, concurrence, sûreté
+
+**C-11 🔴 Un `config.properties` mal formé empêche le shell de démarrer. [à confirmer]** `ShellConfig.load` n'attrape que `NoSuchFileException` et `IOException` (`ShellConfig.java:40-47`) ; or `Properties.load(Reader)` lève `IllegalArgumentException` sur une séquence `\uXXXX` invalide — par exemple `x=C:\users\yves`, banal sur Windows, plateforme prioritaire (NFR-03). L'appel `Main.java:58` n'est pas gardé : trace de pile, code 1. Même défaut dans `ConfigFile.java:34-39` et `NativeAccessConsent.java:63`. `ShellConfigTest` couvre 6 cas, pas celui-ci ; la Javadoc (`ShellConfig.java:37`, « invalid values take their default ») est contredite. †(autres sites) → **1.2**
+
+**C-12 🔴 Le garde-fou `System.exit` est contournable. [à confirmer]** L'interception de FR-58 n'est écrite que dans `Evaluator.invoke` (`Evaluator.java:164-176`), par comparaison de chaînes (`type == System.class && method.equals("exit")`, `case Runtime _ when …`). Or `MethodReference.OfClass.apply` appelle **directement** `JavaInvoker.invokeStatic` (`MethodReference.java:57-59`) : `[0] | map System::exit` (ou `System::setOut`) atteint le vrai `System.exit` ; par réflexion, `System.class.getMethod("exit", int.class).invoke(null, 0)` aussi. Le seul test existant est l'appel direct (`JavaInteropTest.java:199`). La spec parle d'une « table de méthodes redirigées ou refusées » ; l'implémentation est deux `if` et un `Set`. Le bon emplacement est le **point d'étranglement** `JavaInvoker`. Et il faut le dire honnêtement : ce n'est **pas** une sandbox — le README promet « the shell never crashes » ; la doc doit parler de *garde-fou contre l'accident*. → **1.1**
+
+**C-13 🟠 `Session` : synchronisation incohérente alors que les étages la lisent en parallèle.** La Javadoc le dit (`Session.java:16-19`) ; seuls `errors` et `perfReports` sont `synchronized`. `variables` (`HashMap`), `environment` (`TreeMap` exposé mutable, copié depuis des threads virtuels par `NativeRunner.java:80, 178, 301` pendant qu'un `env --set` peut le modifier), `lastNative`, `lastSucceeded` et `exitRequest` (`Integer` non `volatile`, écrit depuis un thread d'étage par `System.exit` dans un bloc, lu par la boucle du REPL) ne le sont pas. Le `synchronized (session)` de `Interpreter.java:739-741` n'entoure pas les autres `recordNative` (`:415, 638`). Une commande « abandonnée » au 2ᵉ Ctrl+C (`Supervisor.java:78`) continue de muter `Session` pendant la suivante. `Session` mêle en outre l'état de perf (`perfReports`, `perfLines`) et un `switch` sur chaînes magiques (`"?"`, `"exit"`, `"last"`… `:159-170`). → **1.2, 2.7**
+
+**C-14 🟡 Inversion d'ordre de verrous latente dans `JavaClasses`. [à confirmer, faible probabilité]** `addImport` est `synchronized` et appelle `simpleNames.clear()` (`JavaClasses.java:60, 72`) ; `simple()` appelle `simpleNames.computeIfAbsent(name, this::lookupSimple)` qui prend `synchronized (this)` (`:175, 185`). `ConcurrentHashMap.clear()` se synchronise sur les nœuds de bin, y compris celui d'un `computeIfAbsent` en cours : un `import` concurrent d'une complétion ou d'un aperçu peut bloquer. Correctif : `get` puis `putIfAbsent`, sans calcul sous le verrou de bin. → **1.5**
+
+**C-15 🟠 Le contrat d'annulation est piégeux.** `CancellationException` hérite de `IllegalStateException` : tout `catch (RuntimeException|IllegalStateException)` avale Ctrl+C. Le code écrit **14 fois** le contournement `catch (CancellationException e) { throw e; }` — et l'oublie : `ToJson.process` attrape `IllegalStateException` (`ToJson.java:63`) alors que `JsonWriter` lève `CancellationException` (`JsonWriter.java:52`) : l'annulation est signalée « pipeline.object.skipped » avec un message nul, et le traitement continue (**bug réel**). De même `PreviewGuard.Denied` et `PreviewFull` étendent `CancellationException` (`PreviewGuard.java:18`, `Interpreter.java:434`) : un `catch (RuntimeException)` de cmdlet tiers les avale (les fakes de test doivent les re-lancer, `FakeCmdlets.java:40-44`). Le contrat de `CmdletContext.emit` ne dit rien. → type dédié + utilitaire `ScriptBlock.tryInvoke`. → **1.6**
+
+**C-16 🟡 `SortComparator` n'est pas un ordre total. [à confirmer]** Pour des types mixtes il retombe sur la comparaison de texte (`SortComparator.java:44-51`) : `3 < 20` (nombres), `20 < "25"` (texte), `"25" < 3` (texte) forment un cycle ; `TimSort` peut lever « Comparison method violates its general contract » au `end()`. → rang de type (null < nombres < chaînes < comparables de même classe < autres). → **1.6**
+
+**C-17 🟡 `Pipe` mélange transport et instrumentation.** Le flag `measured` crée deux chemins dans la méthode la plus chaude (`Pipe.java:28, 86, 122`) avec des compteurs `volatile long` incrémentés par `+=` (correct seulement par la règle « un seul écrivain »). Un *Decorator* `MeasuredPipe` laisserait le `Pipe` nominal sans branchement. → **2.5**
+
+**C-18 🟡 Ctrl+C inefficace sur une regex catastrophique.** `Grep.java:223` ne teste l'interruption que toutes les 4 096 lignes et ne passe pas de `CharSequence` interruptible au `Matcher` ; idem `Range.java:183` †, et le filtre `/regex/` de `grid` n'a aucun délai (`FilterParser.java:93-101` †) et tourne sur le thread FX (gel de l'interface). → **1.6**
+
+**C-19 🟡 Le débounce de `Previewer` est un moniteur écrit à la main.** `Object.wait/notifyAll`, quatre champs de génération, un thread « deadline » (`Previewer.java:60-230`), `catch (Throwable)` (`:196`), délais en dur (`:34-36`) : les tests attendent en temps réel. `powerj-fx` possède déjà un `Debouncer` + un port `Scheduler`. Deux solutions pour un même problème, la plus délicate étant la moins testable. → **4.4**
+
+**C-20 🟡 Incohérences de la couche shell †.** `ScriptMode.run` exécute ligne par ligne (`ScriptMode.java:56-70`) alors que `Profile` gère les commandes multi-lignes : un pipeline multi-ligne marche dans `profile.pj`, pas dans un `.pj`. `reader.readLine` peut lever `IOError` (terminal fermé), non attrapé (`Repl.java:146-156`), contre la Javadoc « never lets an exception escape ». Le gestionnaire `INT` n'est jamais restauré. `DiagnosticLog` appelle `LogManager.reset()` (global) et passe le chemin en motif `FileHandler` sans échapper `%`. `ConfigFile` et `ShellConfig` sont deux analyseurs du même format, avec lecture-modification-écriture sans verrou. → **4.3**
+
+### 4.3 Sécurité
+
+**C-21 🟠 `ProtectedPaths` et les opérations destructives : des garde-fous contre l'accident, pas une frontière de sécurité.** (a) `key()` fait `toAbsolutePath().normalize()` (`ProtectedPaths.java:131-135`), jamais `toRealPath()` : `normalize()` supprime `x/..` sans savoir que `x` est un lien ; un alias (`ln -s /home alias; rm -r alias/user`), `/proc/self/root/…`, sous macOS la casse (`/USERS/moi` : seul `WINDOWS` met en minuscules, `MAC` ne sert qu'aux valeurs par défaut), sous Windows noms 8.3, préfixes `\\?\` et jonctions †, contournent la liste. (b) La garantie documentée couvre les dossiers listés **et leurs ancêtres**, pas leur contenu (`rm -r /etc/hosts` n'est pas refusé) — la Javadoc (`:15-20`) laisse croire à plus. (c) Le contrôle lexical « into itself » de `Transfer.java:161` se contourne de même (copie récursive potentiellement sans fin †). (d) Séquence « vérifier puis agir » dans `Remove.java:83-113` → `FileTrees` : `newDirectoryStream(dir)` suit les liens ; un sous-répertoire remplacé par un lien entre le listage et la descente est parcouru † ; `SecureDirectoryStream` n'est pas utilisé. (e) `mv` : `exists(target) && !force` (`Transfer.java:165`) puis `Files.move(…, ATOMIC_MOVE)` (`:195`) : sous POSIX, `rename` remplace la cible sans erreur — un fichier apparu entre-temps est écrasé sans `-f`. (f) `Perf.java:111` écrit avec `REPLACE_EXISTING` en contournant toute protection †. → **1.7**
+
+**C-22 🟠 Les globs de `rm`, `cp`, `mv`, `mkdir`, `touch` ignorent la casse, même sous Linux.** `Globs.matcher` met motif et nom en minuscules « sur tous les systèmes » (`Globs.java:24`, documenté) ; `FileOps.expand` (`FileOps.java:66`) → `FileArguments.expand` → `Globs.matcher` : `rm README*` supprime aussi `readme.md`. Choix défendable pour `ls`, dangereux pour une commande destructive sur système sensible à la casse. De plus `Globs.isPattern` ne reconnaît que `*` et `?` alors que `matcher` interprète aussi `[]` et `{}` : un `PatternSyntaxException` brut peut remonter †. → option `--ignore-case`, défaut selon le système de fichiers. → **1.7**
+
+**C-23 🟠 La complétion exécute des getters, contre sa propre promesse. [à confirmer]** `Completions` annonce « Runs no command and calls no method » (Javadoc `:28-31`), mais `member()` appelle `PropertyAccess.property(value, name)` sur la **valeur réelle** d'une variable (`Completions.java:812`, commentaire « getter: read with no expected side effect »), hors de `PreviewGuard` (qui n'est pas consulté par `PropertyAccess.java:94`) ; les erreurs sont avalées. Un getter à effet de bord (`getInputStream()`, un getter paresseux qui ouvre une ressource) s'exécute pendant la complétion. Même famille : `PreviewPolicy` autorise `Files.walk/list/lines/readAllBytes` pendant la frappe (`:72-75`) ; un FIFO ou un énorme fichier bloque ou ralentit. → **3.3**
+
+**C-24 🟠 Modules tiers : confiance totale, sans vérification.** Tout jar de `~/.powerj/modules` est chargé au démarrage avec les droits du shell. Le consentement natif est indexé par **nom de module** seulement (`NativeAccessConsent.java:46`) : un jar remplacé conserve le consentement. `ModuleLoader` active l'accès natif pour **tout le layer** après consentement du seul module racine (`:144`), ouvre **tous** les packages à PowerJ (`:146-153`), exécute `provider.cmdlets()` au démarrage sans délai (`:164`). Ni empreinte, ni signature, ni page SECURITY. → lier le consentement au SHA-256 du jar ; documenter le modèle de menace. → **5**
+
+### 4.4 Cmdlets, données, performances
+
+**C-25 🟡 Parseurs JSON/CSV : défendables mais sans suite de conformité †.** `JsonWriter.java:58` convertit `Float` en `double` (`0.1f` → `0.10000000149011612`, alors que `CsvWriter` passe par `toString()`) ; `JsonParser.java:104` : clés dupliquées, la dernière gagne en silence ; `:256` : `1e999` devient `Infinity` et les décimaux perdent leur précision ; `:184` : `\u` isolés (demi-paires de substitution) acceptés ; `JsonSplitter` : un objet non fermé absorbe tout le flux dans un tampon non borné ; `CsvReader.java:100` : une ligne vide est ignorée, donc un enregistrement mono-colonne à valeur vide disparaît ; le BOM est un U+FEFF littéral invisible dans le source (`JsonSplitter.java:60`, `CsvReader.java:40`) ; `to-json` accumule tout le tableau en mémoire. → corpus JSONTestSuite / RFC 4180 + ADR « pourquoi pas une lib ». → **5**
+
+**C-26 🟡 Réflexion répétée à chaque ligne, sans cache par classe †.** `Properties.java:55-61` parcourt `getRecordComponents()` (qui clone le tableau) pour chaque colonne de chaque objet → `ToCsv` en O(colonnes²) par ligne ; `Join.java:156-176` idem ; `JavaInvoker.invokeStatic` n'a pas de cache (contrairement à `INSTANCE_METHODS`, `:36`) ; `PropertyAccess.directProperty` rescanne `getMethods()` à chaque accès ; `box/unbox` font un `switch` sur `getName()`. NFR-02/NFR-07 (complétion < 50 ms, 1ᵉ appel < 50 ms) ne sont vérifiées par aucun test. → `RecordShape` en `ClassValue` + JMH. → **5**
+
+**C-27 🟡 Duplication dans `cmdlets` et `fs` †.** `FileTrees.Work` (l. 274-538) recopie `FileWalker.ParallelWalk` (l. 231-386) : même `END`, `Failure`, compteur `pending`, `submit/fail/signal/deliver` (~100 lignes) ; la file `BlockingQueue<Object>` avec cast `(R) item` rend ambigu un visiteur qui renverrait un `WalkError` ; `report(WalkError)` ×4 (`Cat:112`, `FileOps:109`, `Grep:126`, `Ls:125`) ; validation de `-p` ×3 ; `"$_." + property` régénéré ×5 en texte (`Keys:27`, `Where:84`, `Grep:177`, `PipelineFiles:57`, `GridCmdlet:180`) faute d'un accesseur de propriété dans l'API ; `Where.PROPERTY` et `Where.abbreviate` utilisés 23 fois hors de `Where` (un cmdlet sert de classe utilitaire) ; `Last` dépend de `First.count`. Détection de plateforme et du dossier personnel dupliquées (`Platform.isWindows` en core ; `ProtectedPaths.WINDOWS/MAC` `:26-27` ; `Session.home` / `ProtectedPaths.home`). → **1.8**
+
+**C-28 🟡 Paramètres et enregistrement †.** Les `Params` à plus de 5 options (Grep 12, Remove 8) sont construits par constructeur positionnel — « cécité booléenne » (24 appels `Perf.Params`, 17 `Grep.Params`, 15 `Join.Params`). Les validations de `-p` et de `count` sont recopiées faute d'un `Option.min`. `BuiltinCmdlets.java:15-19` liste les 28 cmdlets à la main sans test garantissant que tout `@CmdletInfo` est enregistré (28 = 28 aujourd'hui). `CMD/module-info` : `requires io.powerj.api` devrait être `requires transitive`. Noms : `Group`/`GroupCmdlet`, `MapCmdlet`, `Properties` (masque `java.util.Properties`), `Keys`, `Sizes` trop génériques. → **3.4, 5**
+
+### 4.5 Interface graphique (`powerj-fx`)
+
+**C-29 🟠 `GridView` contredit la règle du projet, et le passage à 100 000 lignes n'est ni mesuré ni testé †.** La règle « un `if` en view appartient au model » (`docs/plans/fx-grid.md:64`) n'est qu'une convention (`javafx.controls` est visible du `model`) et `GridView` (565 lignes, exclue du seuil de couverture) la viole : `sameLook` (`:317-321`, pure), `replaceColumn` (`:289-314`), `updateStatus` (état → texte, `:541-564`), logique Esc (`:493-509`). `GridRow` recopie sa map à chaque construction et deux fois via `withPosition` (`GridRow.java:18-30`) ; `GridRow.source` est conservé même sans `--pass-thru` ; `RowSelection` crée 100 000 `BooleanProperty` sans les libérer ; le filtrage tourne sur le thread FX et reformate chaque cellule à chaque refiltrage (`FilterParser.java:103-112`) ; `FEED_BATCH = 20_000` par tick de 100 ms sur le thread FX. Estimation 400–900 octets/ligne **à mesurer**. Aucun test ni benchmark à 100 000 lignes (NFR-04 non vérifiée). Accessibilité absente (aucun `Accessible*`, erreur signalée par la couleur seule). Le profil Maven `fx-ui` sous xvfb promis par le plan est absent. → **5**
+
+### 4.6 Tests
+
+**C-30 🟠 Les classes les plus délicates n'ont aucun test direct, et la couverture est agrégée.** Aucun fichier de test ne nomme `Pipe`, `NativeRunner`, `CmdletRunner`, `ModuleLoader`, `PerfRecorder`, `StageProbe`, `Jobs`, `PreviewGuard`, `PreviewPolicy`, `NativeCommands`, `CompiledBlock`, `JavaIndex` (core) ; `Transfer`, `FileOps`, `FileArguments`, `PipelineFiles`, `PipelineText`, `Sizes` (cmdlets) ; `GridView`, `FxScheduler`, `GridWindowOpener` (fx) ; `Main` n'a aucun test ; `Completions` (999 lignes) n'est testée que de l'extérieur (`CompletionsTest` dans `shell`, 289 l., et un test de 74 l. dans core). Comme « les tests de chaque module comptent pour tous » (`SPECIFICATION.md` §10), les 80 % masquent un `core` à ratio 0,47 et un `api` à zéro test. Le seuil par package n'existe que pour `cmdlets` et `fx`, pas pour `core.exec`/`core.lang`. Aucun test d'annulation pour `grep`, `cat`, `sort` ; aucun test de lien symbolique pour `ProtectedPaths` (les tests de liens s'auto-ignorent par `assumeTrue(false)`, `FileOpsTest:206, 293`) †. → **0.2, 0.6**
+
+**C-31 🟡 Fiabilité des tests †.** 27 `Thread.sleep` pour synchroniser (`LiveTableTest` ×8 de 60 à 150 ms, `GridCmdletTest`, `PipelineTest`, `InterpreterTest`…) ; seulement 11 `@Timeout` pour 1 080 tests et aucun timeout Surefire (un test de concurrence qui bloque gèle la CI) ; 15 `assumeFalse(Platform.isWindows())` et 39 appels à des commandes Unix : les branches Windows ne sont **jamais exécutées en test unitaire** (`Platform.WINDOWS` est un `static final` non injectable) alors que Windows est la plateforme prioritaire (NFR-03) ; `PsKillTest` lance jusqu'à 3 JVM de 60 s ; `new Session(tmp, tmp, System.getenv())` rend des tests non hermétiques (`PipelineTest:37`) ; 16 classes de test réimplémentent le même pilote `begin/process/end` ; deux `TestContext` divergents (cmdlets 97 l., fx 87 l.) ; 92 assertions sur des messages anglais exacts ; `Language.set` mute un état global (`OutputFormatterTest:165`). → **0.5, 5**
+
+### 4.7 Build, CI, chaîne d'approvisionnement
+
+**C-32 🟠 Aucun garde-fou automatique de qualité hors couverture.** Pas de `-Xlint:all`/`-Werror` (`pom.xml:108-110`), ni Checkstyle/Spotless, Error Prone/SpotBugs/PMD, ni **ArchUnit** (alors que les règles d'architecture sont fortes : cmdlets ⇏ core, model fx ⇏ view, pas de français en dur — ce dernier vérifié par un test maison, `NoHardcodedFrenchTest`, aveugle aux mots sans accent et qui ne scanne que `src/main/java`), ni **japicmp** alors que `powerj-api` est un SPI public (806 lignes, 0 test, aucun `@since`), ni test de mutation, ni `dependency:analyze`. L'enforcer n'a que deux règles (`pom.xml:171-180`) : ni `dependencyConvergence`, ni `requirePluginVersions`. Les classes JLine `org.jline.terminal|utils` sont utilisées (`Main.java:23-25`) alors que seul `jline-reader` est déclaré (`powerj-shell/pom.xml:25-33`) : dépendance transitive implicite. `build-helper` est épinglé hors `pluginManagement` (`powerj-dist/pom.xml:74`). → **0.3, 0.4**
+
+**C-33 🟠 Le module « optionnel » `powerj-fx` est obligatoire pour construire et vérifier, et la distribution est mal paramétrée †.** `fx` est dans le reactor (`pom.xml:20`) et `powerj-coverage` en dépend (seuil 0,90) ; le classifier JavaFX est `linux` par défaut (`powerj-fx/pom.xml:23, 36`) : une plateforme sans artefact JavaFX ne peut pas faire `verify`, et `-pl '!powerj-fx'` casse la couverture. `dist.platform` est figé à `linux-x64` (`powerj-dist/pom.xml:29`) et `macos` sans architecture (`:62`) : les builds ARM sont mal étiquetés. Le runtime jlink dépend du JDK qui lance Maven, sans toolchain. `jpackage` reçoit `0.1.0` pour un SNAPSHOT (`:121`) : binaires indiscernables. Le zip antrun n'est pas reproductible (pas de `project.build.outputTimestamp`). → **0.7, 5**
+
+**C-34 🟠 Chaîne d'approvisionnement et release absentes.** Actions référencées par tag (`@v5`, `ci.yml:17, 19, 30, 175…`) et non par SHA ; `java-version: '25'` flottant ; pas de `distributionSha256Sum` dans `.mvn/wrapper/maven-wrapper.properties` ; pas de `timeout-minutes` ni de `concurrency` (défaut de 6 h) ; ni Dependabot/Renovate, ni CodeQL, ni SBOM, ni checksums/signature (question ouverte `SPECIFICATION.md:1958`) ; aucun tag git, aucun workflow de release. La CI est un **gros job Linux monolithique** (~150 lignes de bash dans le YAML : build + 7 tests de fumée + artefacts) ; aucun job macOS alors que le README et `powerj-dist` (profil `mac`) le promettent. → **0.7, 5**
+
+### 4.8 Documentation et cohérence
+
+**C-35 🟠 La spécification a dérivé du code, et un exigence spécifiée n'existe pas.** Statut « Pending approval », version 0.10 (`SPECIFICATION.md:5-6`) ; §1.2 dit 3 cmdlets (`:74`), §3.9 en dit 4 (`:408`), le code en livre 28 ; §5.1 liste `powerj-sample-module` et des cmdlets périmés (`:1518, 1522`) alors que le dossier est `examples/greet` ; « JLine 3 » (`:8, 1559`, `README.md:276`) alors que `pom.xml:36` pose **4.4.7** ; journal `powerj.log` (spec) contre `powerj.%g.log` (`DiagnosticLog.java:32`) ; §7 décrit une branche de release et des jobs qui n'existent pas ; l'installeur « ajoute au PATH » (`README:213`, spec `:1596`) mais `docs/recettes/etape-0.md:30` dit l'inverse et le pom n'a aucune option PATH ; §6 annonce Stream Gatherers et *module import declarations* : **0 usage** ; NFR-03 « Windows first » contre un README et une CI Linux-first ; §12.3 : `env` non barré, `find` à la fois non barré et annulé ; 10 plans embarquent des noms de branche et SHA. **Surtout, FR-16 (`native.prefer` dans `config.properties`) est spécifié, cité comme échappatoire à trois endroits (`SPECIFICATION.md:653, 819, 921`) et dans trois plans, mais n'existe pas : 0 occurrence dans le code et les tests** (idem `colors.cmdlet`) — la traçabilité FR → code est rompue sans signal, et `sort`/`rm`/`ps` masquent les natifs sans autre issue que `^`. Cause racine : la liste manuelle « 6 endroits à mettre à jour » de `cmdlet-roadmap.md`. La spec est à la fois cahier des charges et documentation d'architecture, et ne remplit plus bien ni l'un ni l'autre. → **5**
+
+**C-36 🟡 Hygiène.** (a) 134 noms qualifiés inutilement en ligne (`java.util.Collections.unmodifiableSet(…)`, `Interpreter.java:94, 150-151, 434, 472…`). (b) **Langue non gouvernée** : noms de threads français (`"powerj-commande"` `Supervisor.java:45`, `"powerj-apercu"` `Previewer.java:149`, `"powerj-etape-N"` `StageProbe.java:64`, ce dernier **analysé par `JfrCapture.java:38`** : un identifiant français sert de contrat), descriptions de `pom` (`pom.xml:13`), 19 noms d'étapes de CI, dossiers `docs/recettes` et `etape-*`, grammaire de la spec (`:1839-1882`), messages anglais en dur hors bundles (`SortSpec.java:22`, `ColumnChoice.java:41`, `JavaFxPlatform.java:27`, `HistoryExpander.java:34`). (c) `null` et `Optional` mélangés : 32 `return null`, `Optional<FileTarget>` en paramètre une douzaine de fois, `Optional<Boolean>` tri-état (`NativeAccessPolicy:26`), `CmdletProvider.messages()` renvoie `null` par défaut, `PjError(Optional<Throwable>)` lève un NPE sur `of(msg, null)`, `PjException` publique non finale avec `requireNonNull` après déréférencement. (d) Collisions de noms : `Highlights`/`Highlight`, `Span`, `OutputFormatter.Row`/`api.Row`, trois types `Result`, l'identifiant `java` qui masque le package (`Session.java()`). (e) `Jobs.list()` modifie l'état et ne garde pas les `Process` (pas de `kill`). (f) Gouvernance : ni `CONTRIBUTING`, `SECURITY`, `CHANGELOG`, ADR, C4, `.editorconfig`, `.gitattributes` (fins de ligne de `mvnw`/`mvnw.cmd`), `licenses`/`scm`/`url` dans les poms ; deux bugs connus enfouis dans `docs/plans/coverage.md` (« Found while testing »). †(c-f)
+
+---
+
+## 5. Orientations d'organisation (architecture cible)
+
+Principe directeur : **ne pas multiplier les modules avant d'avoir réglé les packages.** JPMS n'aide que si les frontières *à l'intérieur* de `core` sont d'abord nettes ; on découpe par packages, on fige les règles avec ArchUnit, et on ne promeut en module que ce qui est stable (`lang`, éventuellement `perf`).
+
+### 5.1 `powerj-core` : de 2 packages à 8 couches
+
+```text
+io.powerj.core
+├── lang        Lexer, Parser, ExpressionParser, Ast, Token, Units, SyntaxException     ← aucune dépendance interne ni vers exec
+├── command     CmdletRegistry, CmdletRunner, OptionBinder, ModuleLoader, NativeAccessPolicy,
+│               Resolved (sealed : BuiltinCall | CmdletCall | NativeCall | Unknown), CommandResolution, Builtins
+├── runtime     Interpreter (façade ≤ 300 l.), PipelineExecutor, Pipe, ExecutionContext, ExecutionObserver,
+│               Redirections, Session (SessionState + statistiques), Supervisor, Outcome, Jobs
+├── java        JavaClasses, JavaInvoker, Members, FunctionalAdapter, MethodReference,
+│               PropertyAccess, CallPolicy                                              ← interop Java isolée, point d'étranglement
+├── nativeexec  NativeRunner, NativeCommands, NativeEncoding, Platform, WindowsConsole
+├── perf        PerfRecorder, PerfJfr, JfrCapture, StageProbe, MeasuredPipe             ← branché par ExecutionObserver
+├── assist      Completions (+ CompletionProviders), TypeInference, Highlights, Help    ← lecture seule, via CommandCatalog
+└── format      OutputFormatter, ValueUnroller
+```
+
+Règles (en ArchUnit, § 7) : `lang` ne dépend de rien ; `runtime` dépend de `lang`, `command`, `java`, `nativeexec`, `format` mais **pas de `perf` ni `assist`** (ceux-ci se branchent par interface) ; `assist` dépend de `lang` et d'une interface étroite `CommandCatalog`, jamais de l'`Interpreter` concret ; `PjException/PjError` quittent `exec` (package `error`) pour casser le cycle ; **aucun cycle**. Exports : seuls `lang`, `runtime` (façade) et `command` (registre) sont publics ; le reste n'est exporté que de façon qualifiée (`exports … to io.powerj.shell`).
+
+### 5.2 `powerj-api` : un SPI plus petit et plus stable
+
+- **État d'exécution** : `CmdletContext.state(Class<S>, Supplier<S>)` (additif, `default`), puis, si le besoin de `close()` à l'annulation se confirme, une fabrique `Cmdlet.newExecution(P)` retournant un objet `begin/process/end/close` — et un `try/finally` dans le runner dans tous les cas.
+- **Perf** sortie vers `io.powerj.api.perf` (ou module `powerj-api-perf`) et plus exposée par une méthode du contrat principal : `ctx.service(PerfReports.class)` (*Extension Object*).
+- **Interfaces de capacité** à la place des `default` successifs : `Previewable` (`previewable(P)`), `ColumnProvider` (`columns(String)`), `ConfigAware`. Le contrat de base reste `begin/process/end` + état.
+- **Annulation** : `CancelledException` dédiée (pas une `IllegalStateException`) + `ScriptBlock.tryInvoke(...)` qui encapsule les 14 `catch` identiques ; `UsageException` pour les erreurs d'usage ; `ctx.property("a.b")` pour ne plus fabriquer `"$_." + name`.
+- `environment()` renvoie une vue **immuable**, avec `ctx.setEnvironment(k, v)` explicite ; `Option.min`/validateur ; `CmdletProvider.messages` en `Optional`.
+- Publier `powerj-api` avec **sa propre version** et un contrôle **japicmp** : c'est la seule partie du projet que des tiers compilent.
+
+### 5.3 Racine de composition
+
+Une classe `ShellBootstrap` (module `shell`) construit tout le graphe : `Environment` (record immuable : variables d'environnement, propriétés, `PowerJHome`, `Locale`, flux), `Session`, `CmdletRegistry`, `Interpreter`, `Completions`, `Previewer`, `Perfer`, puis `Repl`/`ScriptMode`. `Main` se réduit à `System.exit(ShellBootstrap.execute(args, Environment.system()))`, ce qui rend le démarrage testable (config corrompue, `--version`, codes de sortie). Plus aucun `System.getenv()` hors de `Main`.
+
+### 5.4 Dépôt, documentation, langue
+
+- `docs/ARCHITECTURE.md` (C4 niveaux 1-3 + règles de dépendance) et `docs/adr/NNNN-*.md` : reprendre en ADR les « décisions prises avec l'utilisateur » des fiches de plan, plus JPMS + layers, accès natif et consentement, `fx` hors distribution, JUL, JSON/CSV maison.
+- La spécification redevient un *cahier des charges fonctionnel* avec un **statut d'implémentation par FR** (implémenté / partiel / non implémenté, ex. FR-16) vérifié en CI ; le tableau des cmdlets du README est généré depuis `@CmdletInfo`.
+- **Politique de langue** écrite dans `CONTRIBUTING.md` : code, commits, CI, noms de threads, docs en anglais ; UI en EN/FR via bundles. `docs/recettes/` → `docs/acceptance/`, `etape-*` → `step-*`. Les noms de threads deviennent des constantes de l'API.
+- `CONTRIBUTING.md`, `SECURITY.md` (modèle de menace des modules tiers), `CHANGELOG.md`, `.editorconfig`, `.gitattributes`.
+
+---
+
+## 6. Design patterns : présents, manquants, à introduire
+
+### 6.1 Déjà présents (bien employés — ne pas y toucher)
+
+| Pattern | Où | Remarque |
+|---|---|---|
+| Visitor *par `sealed` + `switch`* | `Ast`, `Token`, `Outcome`, `PreviewResult`, `Prepared`/`Segment`, `TypeInfo` | Meilleur que le Visitor à double dispatch ; exhaustivité vérifiée à la compilation. |
+| Service Provider (SPI) | `CmdletProvider` + `ServiceLoader` + `ModuleLayer` par module | Cœur de l'extensibilité. |
+| Registry | `CmdletRegistry` | À rendre immuable après démarrage (copie-sur-écriture) plutôt que `synchronized`. |
+| Adapter (dynamic proxy) | `FunctionalAdapter` (lambda → interface fonctionnelle) | Bien isolé. |
+| Null Object | `NativeAccessPolicy.NONE`, `ConsoleInput.NONE` | Idiomatique ; à étendre au profilage (`NoopObserver`). |
+| Ports & Adapters | `FxPlatform`, `Scheduler`, `WindowOpener`, `PropertyReader` dans `powerj-fx` | À généraliser au shell et à `runtime`. |
+| Memento | `WindowState` / `WindowSettings` | OK. |
+| Cache par type | `ClassValue` dans `Members` | Évite les fuites de classloader : bon choix. |
+| Injection pour test | Constructeurs package-private, `FakeCmdlets` | Sans framework de mock. |
+
+### 6.2 À introduire (par ordre de rentabilité)
+
+| # | Pattern | Problème résolu | Où | Constat |
+|---|---|---|---|---|
+| 1 | **Extension Object / état scopé au contexte** (puis *Factory* d'exécution) | 23 tables d'état, `end()` non garanti | `CmdletContext.state(...)` ; `try/finally` dans `CmdletRunner` | C-01 |
+| 2 | **Policy / Guard au point d'étranglement** | `System.exit` contournable | `CallPolicy` consultée par `JavaInvoker` pour tout appel (direct, référence de méthode, réflexion) | C-12 |
+| 3 | **Parameter Object** | Méthodes à 9–11 paramètres | `ExecutionContext(sink, capture, redirections, errors, observer)` | C-02 |
+| 4 | **Sealed result `Resolved` + Chain of Responsibility** | 4 copies de la règle de résolution | `CommandResolution.resolve(name, forceNative) → Resolved` ; `which`, `commandKind`, `prepare`, `Highlights`, `Completions` en sont de simples consommateurs | C-03 |
+| 5 | **Observer / Listener d'exécution** (+ *Null Object*) | 19 `if (perf != null)` | `ExecutionObserver` (`stageStarted/Ended`, `displayed`, `pipelineEntered`) ; `PerfRecorder` en est une implémentation ; JFR derrière `ServiceLoader` (supprime le `catch LinkageError`, isole `requires static jdk.jfr`) | C-02 |
+| 6 | **Decorator** | `Pipe(measured)` à deux chemins | `MeasuredPipe` | C-17 |
+| 7 | **Strategy + Chain of Responsibility** | `Completions` à six métiers | `CompletionProvider` (commande, option, chemin, variable, membre, import) ; `TypeInference` extrait ; `CommandCatalog` | C-06 |
+| 8 | **Un seul scanner tolérant** | 4 scanners lexicaux divergents | `Lexer` en mode tolérant, réutilisé par `Highlights` et `Completions` ; `enum Symbol` à la place des chaînes `accept("||")` | C-06 |
+| 9 | **Strategy (politique de déroulage)** | `unroll` ×4, fuite de flux | `ValueUnroller(optionals, collected, closeStreams)` | C-07 |
+| 10 | **State** | Modes normal / aperçu / perf câblés par `preview.onEnter(perf::off)` (`Repl.java:85`) | `ShellMode` + `ModeController` | C-09 |
+| 11 | **Facade (vraie)** | `Interpreter` à la fois façade et implémentation | ≤ 300 lignes, délègue à `PipelineExecutor`, `Redirections`, `PerfMode`, `PreviewMode` | C-02 |
+| 12 | **Strategy numérique** | `Operators.arithmetic` : 5 `switch` identiques (`:128-177`), 67 lignes, CC ≈ 37 | `enum NumericKind` + `BinaryOperator` par opération → ≈ 25 lignes | mineur |
+| 13 | **Specification / règles composables** | Cascade de `if` de `PreviewPolicy` (`:92-123`) | Liste de `PreviewRule` | mineur |
+| 14 | **Command (sealed) pour les opérations fichiers** | `Copy/Move/Remove/Touch/MakeDirectory` répètent « entrées + arguments → opération → émission » | `sealed interface FileAction` (`describe()` pour `--dry-run`, `execute()`) + `PathPolicy` (voir C-21). Le *Template Method* par classe de base est impraticable : `CmdletRegistry` résout `P` par réflexion sur `getGenericInterfaces` (`:204-211`) ; la composition (`Transfer`, `PipelineFiles`) reste la bonne voie | C-21, C-27 |
+| 15 | **Builder / `with…`** | Cécité booléenne des `Params` | Builders ou méthodes `with…` pour les `Params` > 5 options | C-28 |
+| 16 | **Abstract Factory / helper** | 7 `Messages` | `Language.bundle(Module, String)` | C-10 |
+| 17 | **Strategy (ordre total)** | `SortComparator` | Rang de type | C-16 |
+| 18 | **Flyweight / cache de forme** | Réflexion répétée | `RecordShape` en `ClassValue` | C-26 |
+| 19 | **Command (builtins auto-descriptifs)** | `Map<String, Builtin>` mutable (`Interpreter.java:84-93`) + `Help.BUILTINS` | `Builtin` avec nom, usage, description : `Help` et `Completions` n'en savent plus rien « en dur » | C-03 |
+
+### 6.3 Ce qu'il ne faut *pas* faire
+
+- Pas de framework d'injection (Guice, Spring) : `ShellBootstrap` de ~150 lignes suffit et préserve le démarrage rapide (NFR-01).
+- Pas d'`EventBus` générique : un `ExecutionObserver` typé, appelé de façon synchrone, est plus simple à raisonner et à tester.
+- Pas de remplacement des parseurs JSON/CSV par une bibliothèque *avant* d'avoir la suite de conformité (C-25) : la décision « zéro dépendance » est défendable et la règle « toute nouvelle dépendance doit être approuvée » est saine. Si la suite révèle trop d'écarts, isoler derrière une interface `Codec`.
+- Pas de promotion en modules (`powerj-lang`, `powerj-perf`) avant que les règles de packages soient vertes et stables.
+
+---
+
+## 7. Bonnes pratiques : appliquées, partielles, absentes
+
+| # | Pratique | État | Constat / action |
+|---|---|---|---|
+| 1 | Immutabilité (records, `List.copyOf`, copies défensives) | ✅ | Très bonne. `Session` reste l'exception mutable (C-13). |
+| 2 | Types scellés + `switch` exhaustifs | ✅ | Étendre à `Resolved`, `Builtin`. |
+| 3 | Validation dans les constructeurs compacts de records | ✅/◐ | À généraliser aux records publics de l'API (`PerfReport` possède un chemin de fichier sans cycle de vie). |
+| 4 | Encapsulation (package-private par défaut) | ◐ | 32/53 classes publiques dans `core.exec`, 38/54 dans `cmdlets`, tout exporté (C-04). |
+| 5 | Pas de statique mutable ; injection de dépendances | ◐ | 1 seul statique mutable, mais c'est `Language.current` (262 lectures) ; `System.getenv` éparpillé ; `Platform.WINDOWS` non injectable. |
+| 6 | Tests unitaires + intégration | ✅/◐ | 1 080 tests ; classes critiques non testées directement (C-30). |
+| 7 | Tests paramétrés | ❌ | **0** `@ParameterizedTest` dans core (333 `@Test`), alors que `Operators`, `JavaInvoker`, `Lexer` s'y prêtent. |
+| 8 | **Tests d'architecture (ArchUnit)** | ❌ | Les règles existent dans les têtes et dans `NoHardcodedFrenchTest`. |
+| 9 | **Analyse statique** (`-Xlint`, Error Prone, SpotBugs, PMD/Checkstyle) | ❌ | Seul JaCoCo (C-32). |
+| 10 | **Formatage automatisé** (Spotless / `.editorconfig`) | ❌ | Style bien tenu à la main aujourd'hui ; ne tiendra pas avec plus de contributeurs. |
+| 11 | Compatibilité d'API (**japicmp**, SemVer, `@since`, `@Deprecated(forRemoval)`) | ❌ | `powerj-api` est un SPI : indispensable avant tout module tiers réel. |
+| 12 | Test de mutation (**PIT**) sur `lang`, `runtime`, `cmdlets`, `FilterParser` | ❌ | 80 % lignes/branches ne dit pas si les assertions sont bonnes. |
+| 13 | Couverture **par module / package** | ❌ | Agrégée seulement ; règles par package pour `cmdlets` et `fx` seulement. |
+| 14 | **Benchmarks (JMH)** pour NFR-02/04/07 | ❌ | Aucune exigence de performance n'est vérifiée automatiquement. |
+| 15 | Nullabilité explicite (JSpecify, `Optional` aux frontières) | ◐ | 32 `return null` mêlés à des `Optional` en paramètre (C-36). |
+| 16 | Journalisation | ◐ | JUL + `DiagnosticLog` maison : acceptable ; `LogManager.reset()` global ; passer à `System.Logger`. |
+| 17 | Gestion d'`InterruptedException` / annulation | ✅/◐ | Soignée dans le cœur (`joinAll`, `Pipe`) ; contrat d'annulation piégeux côté cmdlets (C-15). |
+| 18 | Build reproductible (`outputTimestamp`), toolchain, wrapper vérifié (`distributionSha256Sum`) | ❌ | Plugins épinglés ✅ ; le reste ❌ (C-33, C-34). |
+| 19 | Supply-chain : Dependabot/Renovate, CodeQL, actions par SHA, SBOM, signature | ❌ | C-34. |
+| 20 | CI en jobs parallèles + matrice OS + `timeout-minutes`/`concurrency` | ◐ | Un job Linux monolithique + un job Windows ; macOS absent ; bash dans le YAML → `ci/smoke/*.sh`. |
+| 21 | Documentation d'architecture à jour (C4, ADR) | ◐ | Spécification riche mais dérivée du code (C-35). |
+| 22 | Politique de contribution, de sécurité, de langue | ❌ | C-36. |
+| 23 | Accessibilité de l'UI | ❌ | Aucun `Accessible*` dans `fx`. |
+
+---
+
+## 8. Plan de refactoring
+
+Principes : (1) **aucune étape ne change le comportement observable** hors correctifs explicitement listés ; (2) chaque étape est un commit/PR séparé, build et tests verts, **couverture et ArchUnit ne régressent pas** ; (3) pour tout défaut, **le test rouge d'abord** (C-01 collision `Where`, C-11 config corrompue, C-12 `System::exit`, C-13 course sur `Session`, C-14 deadlock, C-15 `to-json`, C-16 tri, C-23 getters) ; (4) efforts indicatifs en jours-développeur d'un développeur qui connaît le code.
+
+### Phase 0 — Filets de sécurité *(≈ 6 j)*
+
+| Étape | Contenu | Critère de sortie |
+|---|---|---|
+| 0.1 | Tests de caractérisation de `Interpreter.execute` : table d'une soixantaine de lignes (pipelines mixtes natif/objet, redirections, `&&`/`\|\|`, erreurs bloquantes, annulation) à sortie figée | Le comportement actuel est verrouillé avant le découpage |
+| 0.2 | Tests directs de `Pipe`, `CmdletRunner`, `NativeRunner`, `ModuleLoader`, `Jobs`, `PreviewGuard`, `Transfer`/`FileOps` ; premiers tests de `powerj-api` | Ces classes ont leur `*Test` |
+| 0.3 | **ArchUnit** en `FreezingArchRule` : règles § 5.1 + cmdlets ⇏ core + fx.model ⇏ javafx.scene + pas de cycle | Violations existantes gelées, toute nouvelle fait échouer le build |
+| 0.4 | `-Xlint:all` (warning), Spotless + `.editorconfig`, Error Prone en avertissement, enforcer (`dependencyConvergence`, `requirePluginVersions`), **japicmp** sur `powerj-api` (base 0.1.0), déclarer `jline-terminal` | Build vert, rapport de warnings initial archivé |
+| 0.5 | Remplacer les 27 `Thread.sleep` par `CountDownLatch`/horloge injectable ; `@Timeout` global (`junit-platform.properties`) ; `Platform` injectable | 0 `sleep` de synchronisation ; les branches Windows deviennent testables |
+| 0.6 | Couverture **par module** (`jacoco:check` dans chaque module, seuil initial = valeur actuelle) | Aucun module ne peut baisser |
+| 0.7 | CI : Dependabot, CodeQL, actions par SHA, `timeout-minutes`/`concurrency`, `outputTimestamp`, découpage en jobs (build / smoke-linux / smoke-windows / fx-xvfb), scripts `ci/smoke/*.sh`, `distributionSha256Sum` | Durée CI ≤ durée actuelle grâce au parallélisme |
+
+### Phase 1 — Correctifs à fort levier, faible risque *(≈ 11 j)*
+
+| Étape | Défaut | Action |
+|---|---|---|
+| 1.1 | **C-12** `System.exit` contournable | Test rouge `[0] \| map System::exit` et réflexion ; `CallPolicy` consultée dans `JavaInvoker.invokeStatic/invokeVirtual/construct` ; supprimer les deux `if` de `Evaluator` ; reformuler la doc en « garde-fou contre l'accident » |
+| 1.2 | **C-11** config corrompue ; **C-13** `Session` | `ShellConfig.load`/`ConfigFile`/`NativeAccessConsent` totaux (attraper `IllegalArgumentException`, avertir, défauts) + test `x=C:\users\yves` ; `Session` : `ConcurrentHashMap`, `volatile`/`AtomicInteger`, `environmentSnapshot()` immuable pour `NativeRunner` ; `enum AutomaticVariable` à la place du `switch` sur chaînes |
+| 1.3 | **C-01** état d'exécution | `CmdletContext.state(Class, Supplier)` (default) ; **`try/finally` dans `CmdletRunner`** ; migrer les 23 cmdlets (changement mécanique) ; supprimer les 23 tables ; test `where a \| where a` ; test de non-fuite à l'annulation |
+| 1.4 | **C-10** `Messages` ×7 | `Language.bundle(Module, String)` ; supprimer 6 classes ; `Locale` injectée dans `Help`, `Completions`, `Interpreter` |
+| 1.5 | **C-07, C-14** | `ValueUnroller` unique (ferme les `BaseStream`) ; `JavaClasses` sans calcul sous verrou de bin + test de stress |
+| 1.6 | **C-15, C-16, C-18** | `CancelledException` dédiée + `ScriptBlock.tryInvoke` (supprime 14 blocs) ; correctif `to-json` ; `SortComparator` à ordre total ; `CharSequence` interruptible dans `Grep`/`Range` et `FilterParser` |
+| 1.7 | **C-21, C-22** destructif | `toRealPath` de l'ancêtre existant le plus profond, casse selon le système de fichiers réel (macOS), test des liens ; `mv` sans `ATOMIC_MOVE` quand `!force` ; glob sensible à la casse par défaut sous POSIX, `--ignore-case` ; `Perf --save` sans `REPLACE_EXISTING` silencieux |
+| 1.8 | **C-27, C-36 (a)(b)** hygiène | Imports (OpenRewrite), noms de threads en anglais (constantes dans l'API), `Platform` et `HomeDirectory` partagés, `report(WalkError)` et validation de `-p` factorisés |
+
+### Phase 2 — Démonter l'`Interpreter` *(≈ 16 j, étape-clef)*
+
+Ordre imposé par les dépendances ; chaque sous-étape ramène le build au vert, **sans jamais fusionner 2.3 et 2.5 dans la même PR**.
+
+| Étape | Action | Résultat mesurable |
+|---|---|---|
+| 2.1 | `sealed Resolved` + `CommandResolution` ; `commandKind`, `which`, `prepare`, `Highlights`, `Completions` en deviennent consommateurs ; `Builtin` auto-descriptif (supprime `Help.BUILTINS`) | La règle FR-13 n'existe plus qu'à **un** endroit (4 copies → 1) ; la spec §6 redevient vraie |
+| 2.2 | Parameter Object `ExecutionContext` | Plus aucune méthode à > 5 paramètres dans `runtime`/`nativeexec` |
+| 2.3 | Extraire `PipelineExecutor` (segments, threads, `Pipe`, `joinAll`) | `Interpreter` ≈ 800 l. |
+| 2.4 | Extraire `Redirections` + `StatementOutput` (`Output`, `write`, `append`, `shared`) | `Interpreter` ≈ 650 l. |
+| 2.5 | `ExecutionObserver` + `MeasuredPipe` ; extraire `PerfMode` (parsing `POWERJ_PERF_*`, enregistrements — `deleteOnExit` borné —, pied de page) ; JFR derrière `ServiceLoader` | 0 `if (perf != null)` dans `runtime` ; `Pipe` sans branche ; `Interpreter` ≈ 450 l. |
+| 2.6 | Extraire `PreviewMode` (`preview`, `previewValue`, `PreviewFull`) | `Interpreter` ≤ 300 l. |
+| 2.7 | `Session` : `SessionState` (cwd, env, variables) séparé de `ShellStatistics` (erreurs, perf, jobs) | Chaque classe < 150 l. |
+
+*Risque principal* : régression subtile sur annulation et arrêt en cascade. Garde-fous : tests 0.1/0.2, tests de fumée du lanceur, `PipelineTest.ctrlCStopsTheWholePipeline` (qui vérifie l'absence de fuite de threads).
+
+### Phase 3 — Packages, modules et API *(≈ 12 j)*
+
+| Étape | Action |
+|---|---|
+| 3.1 | Déplacer les classes de `core.exec` vers les 8 packages de § 5.1 (déplacements purs) ; `module-info` à exports qualifiés ; `shell` n'exporte plus rien ; `cmdlets` n'exporte plus que `BuiltinCmdlets` |
+| 3.2 | Casser les cycles : `PjException/PjError` dans `error` ; `Token` ne contient plus d'`Ast.Expression` ; `Syntax` devient un `ParseContext(staticNames, comparisonCommands)` typé ; `lang` n'a aucun import hors JDK |
+| 3.3 | `Completions` → `assist` : extraire `TypeInference`, puis les `CompletionProvider` ; un seul scanner tolérant ; **ne plus appeler de getter sur les valeurs réelles** (typer par signature, ou passer par `PreviewGuard`) ; `PreviewPolicy` en règles composables |
+| 3.4 | `powerj-api` : package `api.perf`, interfaces de capacité, `ctx.service(...)`, `UsageException`, `ctx.property(...)`, `environment()` immuable ; anciennes méthodes `@Deprecated(forRemoval = true, since = "0.2")` avec adaptateur, une version de recouvrement, japicmp en garde |
+| 3.5 | Optionnel : promouvoir `lang` en module `powerj-lang` (zéro dépendance, 1 919 l.) — seulement si 3.2 est verte et stable |
+
+### Phase 4 — Composition et shell *(≈ 7 j)*
+
+| Étape | Action |
+|---|---|
+| 4.1 | `Environment` (record) + `ShellBootstrap` ; `Main` ≤ 40 lignes, testable ; `--version`/`--help` ; un seul `Session` et un seul `PowerJHome` |
+| 4.2 | `ShellMode` (State) + `ModeController` ; suppression de `onEnter(perf::off)` |
+| 4.3 | `Repl` éclaté : `OutcomeReporter` partagé avec `ScriptMode`, `ProfileRunner` réutilisé pour les `.pj` (multi-lignes), `PromptRenderer`, `ConsoleInputAdapter` ; dépend d'une interface `LineEditor` minimale, plus de `LineReaderImpl` ; `IOError` attrapée ; gestionnaire `INT` restauré ; `ConfigFile` + `ShellConfig` fusionnés |
+| 4.4 | `LatestWinsRunner` (exécuteur à une place, `Future` annulable, `Clock` injectable) partagé par `Previewer` et `Debouncer` de `fx`, testé isolément |
+| 4.5 | Déplacer `ProtectedPaths.defaultFile` hors de `cmdlets` : `shell` ne dépend plus de `cmdlets` |
+
+### Phase 5 — Industrialisation, performance, documentation *(≈ 12 j, en parallèle dès 0.7)*
+
+`docs/ARCHITECTURE.md` + ADR ; réconciliation de la spécification (§5.1, §6, NFR-03, statut par FR, **FR-16 : implémenter `native.prefer` ou le retirer**) ; `CONTRIBUTING`, `SECURITY`, `CHANGELOG`, politique de langue ; consentement natif lié au SHA-256 du jar ; PIT (objectif ≥ 60 % sur `lang`/`runtime`) ; corpus JSONTestSuite/RFC 4180 + correctifs C-25 ; `RecordShape` + JMH pour NFR-02/07 ; `GridView` allégée (≤ 300 l., décisions déplacées vers le model), `GridRow` à tableau + index partagé, filtrage hors thread FX, fixture à 100 000 lignes, accessibilité ; sortir `fx` du chemin critique du build (profil `-Pfx`) ; `dist.platform` calculé (os/arch) ; job macOS ; première release `0.2.0` non-SNAPSHOT signée avec SBOM et `SHA256SUMS`.
+
+### Phase 6 — Préparer la v2 (structures de contrôle, fonctions) *(à planifier après la phase 3)*
+
+La v2 ajoutera `if`/`foreach`/fonctions : il faudra des **portées emboîtées** (chaîne d'environnements) à la place du `HashMap` plat de `Session`, un évaluateur d'`Ast` récursif réentrant, la gestion de `return/break`. Les étapes 1.2, 2.2, 3.2 en sont les prérequis directs ; **ne pas démarrer la v2 sur l'`Interpreter` actuel**.
+
+### Calendrier et dépendances
+
+```text
+Phase 0 ─┬─► Phase 1 ──► Phase 2 ──► Phase 3 ──► Phase 4
+         └─► Phase 5 (en parallèle dès 0.7) ─────────────────► Phase 6 (v2)
+Charge totale indicative : ≈ 64 j-dev (≈ 13 semaines à un développeur, ≈ 7 à deux).
+```
+
+### Indicateurs de réussite
+
+| Indicateur | Aujourd'hui | Cible |
+|---|---|---|
+| Taille de `Interpreter` | 1 156 l. | ≤ 300 l. |
+| Plus grosse classe de production | 1 156 l. | ≤ 500 l. |
+| Cycles de packages | ≥ 2 (`lang`↔`exec`, intra-`lang`) | 0 (ArchUnit) |
+| Classes publiques de `core.exec` exportées | 32 | 0 (exports qualifiés) |
+| Tables d'état par exécution dans les cmdlets | 23 | 0 |
+| Copies de la règle de résolution de commande | 4 | 1 |
+| `if (perf != null)` dans l'exécution | 19 | 0 |
+| Copies de « dérouler une valeur » | 4 | 1 |
+| Copies de `Messages` | 7 | 0 (helper unique) |
+| `Thread.sleep` de synchronisation en test | 27 | 0 |
+| Couverture minimale | agrégée (80 %) | ≥ 80 % lignes/branches **par module** |
+| Score de mutation (`lang`, `runtime`) | non mesuré | ≥ 60 % |
+| Ruptures d'API non intentionnelles | non contrôlées | 0 (japicmp) |
+| Contournements connus du garde-fou `System.exit` | ≥ 2 | 0 (tests rouges → verts) |
+| Constats 🔴 ouverts | 4 | 0 après Phase 2 |
+
+---
+
+## 9. Vérification
+
+Ce document est une analyse : aucun code n'est modifié, donc pas de test à exécuter pour lui-même.
+
+1. **Constats** : chaque référence `fichier:ligne` a été relue dans l'arbre à la date du 24/10/2026 (commit `5ace592`), sauf les constats marqués **†**. Les constats marqués **[à confirmer]** (C-01 collision `Where`, C-11 config corrompue, C-12 `System::exit`, C-14 verrous, C-16 tri, C-23 getters) ne sont pas des faits établis par exécution : chacun devient un test rouge à l'étape correspondante.
+2. **Chiffres** : reproductibles par `find … | wc -l`, `grep -c` et le script de mesure de méthodes (comptage d'accolades après suppression des littéraux, donc approché).
+3. **Plan** : à chaque phase, `./mvnw verify` (tests + JaCoCo), puis les tests de fumée du lanceur (`ci.yml`), puis — dès 0.3 — les règles ArchUnit. Une phase n'est terminée que si ces trois niveaux sont verts **et** que l'indicateur correspondant du tableau ci-dessus a bougé.

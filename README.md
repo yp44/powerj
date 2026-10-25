@@ -399,6 +399,7 @@ The v1 cmdlet roadmap is done ([roadmap](docs/plans/cmdlet-roadmap.md), end-to-e
 - [Specification](docs/SPECIFICATION.md): functional requirements, grammar, extension API, architecture.
 - [Acceptance checklists](docs/recettes/) for each development step, and [plans](docs/plans/) of the latest iterations.
 - [Example module `greet`](examples/greet/README.md).
+- [Architecture review](docs/REVUE-ARCHITECTURE.md) (in French): strengths, findings, target organization, design patterns and a phased refactoring plan.
 - [Module `powerj-fx` and `grid`](docs/plans/fx-grid.md): plan, decisions and [acceptance checklist](docs/recettes/fx-grid.md).
 
 Coming from PowerShell? A few equivalences (full table in [§12.4](docs/SPECIFICATION.md#124-powershell--powerj-mapping)):
