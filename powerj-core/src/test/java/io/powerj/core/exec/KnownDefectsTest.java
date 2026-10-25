@@ -65,7 +65,6 @@ class KnownDefectsTest {
 
     // --- C-07: the elements of a stream are taken without closing it ---
 
-    @Disabled("C-07, fixed in Phase 1.5: one unrolling for Pipe, OutputFormatter, preview and *., which closes streams")
     @Test
     void starDotClosesTheStreamItUnrolls() throws Exception {
         var closed = new AtomicInteger();

@@ -3,6 +3,8 @@ package io.powerj.core.exec;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -38,17 +40,30 @@ public final class JavaClasses {
         record Ambiguous(List<String> candidates) implements Lookup { }
     }
 
-    private final Set<String> packages = new LinkedHashSet<>(DEFAULT_IMPORTS);
-    /** Class imports: simple name → fully qualified name. */
-    private final Map<String, String> classImports = new ConcurrentHashMap<>();
-    private final Map<String, Lookup> simpleNames = new ConcurrentHashMap<>();
+    /**
+     * The imports in force, immutable, with the simple names resolved through them. An import creates a new one, so a
+     * name resolved with the old imports can never be seen with the new ones, and nothing is computed or cleared while
+     * holding a lock (review C-14: the lookup held the lock of a map bin and waited for the monitor of the object,
+     * while {@code addImport} held the monitor and cleared the map).
+     */
+    private record Imports(Set<String> packages, Map<String, String> classes, Map<String, Lookup> simpleNames) {
+
+        Imports {
+            packages = Collections.unmodifiableSet(packages);
+            classes = Collections.unmodifiableMap(classes);
+        }
+    }
+
+    private volatile Imports imports = new Imports(new LinkedHashSet<>(DEFAULT_IMPORTS), new LinkedHashMap<>(),
+            new ConcurrentHashMap<>());
     private final Map<String, Optional<Class<?>>> qualifiedNames = new ConcurrentHashMap<>();
 
     /** Active imports, in order: packages ({@code java.util.*}) then classes. */
-    public synchronized List<String> imports() {
+    public List<String> imports() {
+        Imports current = imports;
         List<String> all = new ArrayList<>();
-        packages.forEach(p -> all.add(p + ".*"));
-        all.addAll(classImports.values());
+        current.packages().forEach(p -> all.add(p + ".*"));
+        all.addAll(current.classes().values());
         return all;
     }
 
@@ -57,7 +72,9 @@ public final class JavaClasses {
      *
      * @throws PjException if the package or class does not exist in the Java library
      */
-    public synchronized void addImport(String target) {
+    public synchronized void addImport(String target) { // synchronized: one writer at a time; readers take no lock
+        Set<String> packages = new LinkedHashSet<>(imports.packages());
+        Map<String, String> classes = new LinkedHashMap<>(imports.classes());
         if (target.endsWith(".*")) {
             String pkg = target.substring(0, target.length() - 2);
             if (!isExportedPackage(pkg)) {
@@ -67,9 +84,9 @@ public final class JavaClasses {
         } else {
             Class<?> type = qualified(target).orElseThrow(() ->
                     new PjException(Messages.get("import.classNotFound", target)));
-            classImports.put(type.getSimpleName(), target);
+            classes.put(type.getSimpleName(), target);
         }
-        simpleNames.clear();
+        imports = new Imports(packages, classes, new ConcurrentHashMap<>());
     }
 
     /** Class designated by a simple ({@code List}) or fully qualified name ({@code java.util.List}, {@code HttpResponse.BodyHandlers}). */
@@ -172,20 +189,24 @@ public final class JavaClasses {
     }
 
     private Lookup simple(String name) {
-        return simpleNames.computeIfAbsent(name, this::lookupSimple);
+        Imports current = imports; // read once: the imports may change while the name is resolved
+        Lookup known = current.simpleNames().get(name);
+        if (known != null) {
+            return known;
+        }
+        // Computed outside the map: two threads may both do it, and they get the same answer.
+        Lookup computed = lookupSimple(current, name);
+        Lookup previous = current.simpleNames().putIfAbsent(name, computed);
+        return previous != null ? previous : computed;
     }
 
-    private Lookup lookupSimple(String name) {
-        String imported = classImports.get(name);
+    private Lookup lookupSimple(Imports current, String name) {
+        String imported = current.classes().get(name);
         if (imported != null) {
             return qualified(imported).<Lookup>map(Lookup.Found::new).orElse(new Lookup.Missing());
         }
         List<Class<?>> found = new ArrayList<>();
-        List<String> searched;
-        synchronized (this) {
-            searched = List.copyOf(packages);
-        }
-        for (String pkg : searched) {
+        for (String pkg : current.packages()) {
             qualified(pkg + "." + name).ifPresent(found::add);
         }
         return switch (found.size()) {

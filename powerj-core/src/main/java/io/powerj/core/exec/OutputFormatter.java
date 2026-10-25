@@ -1,7 +1,6 @@
 package io.powerj.core.exec;
 
 import java.io.PrintWriter;
-import java.lang.reflect.Array;
 import java.lang.reflect.Method;
 import java.lang.reflect.RecordComponent;
 import java.nio.file.Path;
@@ -90,21 +89,15 @@ public final class OutputFormatter implements AutoCloseable {
     }
 
     public void accept(Object value) {
+        if (value instanceof Path path) {
+            line(path.toString()); // a Path is also an Iterable<Path>
+            return;
+        }
+        if (ValueUnroller.unroll(value, ValueUnroller.Mode.DISPLAY, this::accept)) {
+            return; // the elements were displayed
+        }
         switch (value) {
             case null -> { }
-            case Path path -> line(path.toString()); // a Path is also an Iterable<Path>
-            case Iterable<?> items -> items.forEach(this::accept);
-            case java.util.stream.BaseStream<?, ?> stream -> { // Stream, IntStream…: elements displayed
-                try (stream) {
-                    stream.iterator().forEachRemaining(this::accept);
-                }
-            }
-            case java.util.Iterator<?> iterator -> iterator.forEachRemaining(this::accept);
-            case Object array when array.getClass().isArray() -> {
-                for (int i = 0; i < Array.getLength(array); i++) {
-                    accept(Array.get(array, i));
-                }
-            }
             case Record record -> record(record);
             case io.powerj.api.Row row -> row(row);
             case Map<?, ?> map -> map(map);

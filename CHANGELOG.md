@@ -50,6 +50,12 @@ structures, functions) can be built on it. The work is organised in phases (revi
   its own state; the runner closes the states that are `AutoCloseable` when the run ends, normally or not (Ctrl+C
   included). The 23 tables are gone. `grid` closes the window of a command that was cancelled before it handed it over.
 
+- **A stream unrolled by `*.` is closed** (C-07, step 1.5): `Files.lines(p)*.length()` leaked a file descriptor. The rule
+  for turning a value into the objects it stands for was written four times; it is now `ValueUnroller`, with one
+  explicit mode for each place that differs (between stages, display, targets of `*.`).
+- **`import` can no longer block a lookup of a class name** (C-14, step 1.5). A name lookup and `import` took two locks
+  in opposite orders: a stress test deadlocked every time. The imports are now an immutable snapshot with its own cache.
+
 ### Examined, not changed
 - **The seven `Messages` classes stay** (C-10, step 1.4). Replacing them with one helper in `powerj-api` was tried on a
   two-module experiment: `ResourceBundle.getBundle(…, module)` called from another module fails unless the owner of the

@@ -518,23 +518,9 @@ public final class Interpreter {
 
     /** Adds a value of the preview, unrolled like the display does; stops once there is more than {@code limit}. */
     private static void previewValue(Object value, List<Object> values, int limit) {
-        switch (value) {
-            case null -> { }
-            case Path path -> addPreviewValue(path, values, limit);
-            case java.util.Map<?, ?> map -> addPreviewValue(map, values, limit);
-            case Iterable<?> items -> items.forEach(item -> addPreviewValue(item, values, limit));
-            case java.util.stream.BaseStream<?, ?> stream -> {
-                try (stream) {
-                    stream.iterator().forEachRemaining(item -> addPreviewValue(item, values, limit));
-                }
-            }
-            case java.util.Iterator<?> iterator -> iterator.forEachRemaining(item -> addPreviewValue(item, values, limit));
-            case Object array when array.getClass().isArray() -> {
-                for (int i = 0; i < java.lang.reflect.Array.getLength(array); i++) {
-                    addPreviewValue(java.lang.reflect.Array.get(array, i), values, limit);
-                }
-            }
-            default -> addPreviewValue(value, values, limit);
+        if (value != null && !ValueUnroller.unroll(value, ValueUnroller.Mode.DISPLAY,
+                item -> addPreviewValue(item, values, limit))) {
+            addPreviewValue(value, values, limit);
         }
     }
 
