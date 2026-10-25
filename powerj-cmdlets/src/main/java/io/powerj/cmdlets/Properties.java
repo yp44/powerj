@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CancellationException;
 
 /**
  * Named values of an object, for {@code to-json} and {@code to-csv} (specification FR-73): the components of a
@@ -15,6 +16,18 @@ final class Properties {
 
     /** Column of an object that has no named values. */
     static final String VALUE = "value";
+
+    /**
+     * A component of a record that cannot be read. A dedicated type, so that a caller never has to catch
+     * {@link IllegalStateException}, which is also what a {@link CancellationException} is (review C-15): to-json once
+     * took Ctrl+C for an object it could not write.
+     */
+    static final class Unreadable extends IllegalStateException {
+
+        Unreadable(String message, Throwable cause) {
+            super(message, cause);
+        }
+    }
 
     private Properties() {
     }
@@ -50,7 +63,7 @@ final class Properties {
     /**
      * Value of a column of an object, {@code null} if it has none.
      *
-     * @throws IllegalStateException if a record component cannot be read
+     * @throws Unreadable if a record component cannot be read
      */
     static Object get(Object value, String column) {
         switch (value) {
@@ -85,10 +98,13 @@ final class Properties {
             accessor.trySetAccessible();
             return accessor.invoke(record);
         } catch (InvocationTargetException e) {
-            throw new IllegalStateException(Messages.get("properties.read.failed", component.getName(),
-                    e.getCause()), e.getCause());
+            if (e.getCause() instanceof CancellationException cancelled) {
+                throw cancelled; // an accessor that was interrupted: the command is being stopped
+            }
+            throw new Unreadable(Messages.get("properties.read.failed", component.getName(), e.getCause()),
+                    e.getCause());
         } catch (IllegalAccessException e) {
-            throw new IllegalStateException(Messages.get("properties.read.failed", component.getName(), e), e);
+            throw new Unreadable(Messages.get("properties.read.failed", component.getName(), e), e);
         }
     }
 }

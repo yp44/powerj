@@ -152,7 +152,7 @@ public final class Range implements Cmdlet<Range.Params, Object, Object> {
             case Position(long n) -> index == n;
             case Match(ScriptBlock property, Pattern regex) -> {
                 Object value = property.invoke(input);
-                yield value != null && regex.matcher(String.valueOf(value)).find();
+                yield value != null && regex.matcher(new InterruptibleText(String.valueOf(value))).find();
             }
             case Condition(ScriptBlock block) -> block.test(input);
         };

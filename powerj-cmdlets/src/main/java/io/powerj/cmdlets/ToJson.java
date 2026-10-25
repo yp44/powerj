@@ -61,7 +61,7 @@ public final class ToJson implements Cmdlet<ToJson.Params, Object, String> {
         StringBuilder value = new StringBuilder();
         try {
             state.writer.write(input, value, p.lines() ? 0 : 1);
-        } catch (IllegalStateException e) {
+        } catch (Properties.Unreadable e) {
             context.error(Messages.get("pipeline.object.skipped", e.getMessage(), Where.abbreviate(input)));
             return;
         }

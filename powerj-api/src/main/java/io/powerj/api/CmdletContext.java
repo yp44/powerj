@@ -16,6 +16,11 @@ public interface CmdletContext<O> {
     /**
      * Writes an object to the output stream. If the user requested cancellation (Ctrl+C), throws
      * an exception that cleanly stops the cmdlet.
+     * <p>
+     * That exception is a {@link java.util.concurrent.CancellationException}, which is an
+     * {@link IllegalStateException}: a cmdlet that catches {@code RuntimeException} or {@code IllegalStateException}
+     * around {@code emit}, {@link ScriptBlock#invoke} or anything that checks {@link #cancelled()} must let it through
+     * ({@code catch (CancellationException e) { throw e; }} first), or Ctrl+C is taken for an error and the cmdlet goes on.
      */
     void emit(O value);
 

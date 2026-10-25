@@ -9,7 +9,6 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.CancellationException;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import io.powerj.api.ScriptBlock;
@@ -37,7 +36,6 @@ class KnownDefectsTest {
 
     // --- C-16: sort compares mixed values through their text, which is not a total order ---
 
-    @Disabled("C-16, fixed in Phase 1.6: order the values by type rank, then by value")
     @Test
     void sortComparatorIsTransitive() {
         var comparator = new SortComparator(false, _ -> { });
@@ -49,7 +47,6 @@ class KnownDefectsTest {
         assertThat(cycle).as("3 < 20 < \"25\" < 3").isFalse();
     }
 
-    @Disabled("C-16, fixed in Phase 1.6: TimSort rejects an inconsistent comparator")
     @Test
     void sortingMixedValuesNeverFailsWithAContractViolation() throws Exception {
         var context = new TestContext<Object>(Path.of("."));
@@ -75,7 +72,6 @@ class KnownDefectsTest {
 
     // --- C-15: to-json takes a cancellation for an object it cannot write ---
 
-    @Disabled("C-15, fixed in Phase 1.6: ToJson must not catch IllegalStateException around code that is cancellable")
     @Test
     void toJsonDoesNotSwallowACancellation() {
         var context = new TestContext<String>(Path.of("."));

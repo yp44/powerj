@@ -53,6 +53,59 @@ class JsonCsvCmdletsTest {
         return Row.of(values);
     }
 
+    // --- A value that cannot be read is skipped; a cancellation is not an unreadable value (review C-15) ---
+
+    private record Fragile(String name, int broken) {
+        public int broken() {
+            throw new IllegalStateException("cannot read broken");
+        }
+    }
+
+    private record Interrupted(String name, int slow) {
+        public int slow() {
+            throw new java.util.concurrent.CancellationException();
+        }
+    }
+
+    @Test
+    void toJsonSkipsAnObjectWhoseComponentCannotBeRead() {
+        var context = new TestContext<String>(Path.of("."));
+
+        assertThat(run(new ToJson(), new ToJson.Params(true, false, null), context, new Fragile("a", 1), row("k", 1)))
+                .containsExactly("[{\"k\":1}]");
+        assertThat(context.errors).singleElement().asString().contains("cannot read broken");
+    }
+
+    @Test
+    void toCsvSkipsAnObjectWhoseComponentCannotBeRead() {
+        var context = new TestContext<String>(Path.of("."));
+
+        assertThat(run(new ToCsv(), new ToCsv.Params(null, true), context, new Fragile("a", 1)))
+                .isEmpty();
+        assertThat(context.errors).singleElement().asString().contains("cannot read broken");
+    }
+
+    @Test
+    void aCancellationInAnAccessorIsNotAnUnreadableValue() {
+        for (Cmdlet<?, Object, String> cmdlet : List.<Cmdlet<?, Object, String>>of(new ToJson(), new ToCsv())) {
+            var context = new TestContext<String>(Path.of("."));
+            Record params = cmdlet instanceof ToJson ? new ToJson.Params(true, false, null) : new ToCsv.Params(null, true);
+
+            assertThatThrownBy(() -> runUnchecked(cmdlet, params, context, new Interrupted("a", 1)))
+                    .as(cmdlet.getClass().getSimpleName()).isInstanceOf(java.util.concurrent.CancellationException.class);
+            assertThat(context.errors).isEmpty();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <P extends Record> void runUnchecked(Cmdlet<?, Object, String> cmdlet, P params,
+                                                        TestContext<String> context, Object input) throws Exception {
+        var typed = (Cmdlet<P, Object, String>) cmdlet;
+        context.hasInput = true;
+        typed.begin(params, context);
+        typed.process(params, input, context);
+    }
+
     // --- to-json ---
 
     @Test

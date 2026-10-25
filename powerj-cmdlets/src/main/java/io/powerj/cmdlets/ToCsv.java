@@ -54,7 +54,7 @@ public final class ToCsv implements Cmdlet<ToCsv.Params, Object, String> {
             for (String column : columns) {
                 values.add(Properties.get(input, column));
             }
-        } catch (IllegalStateException e) {
+        } catch (Properties.Unreadable e) {
             context.error(Messages.get("pipeline.object.skipped", e.getMessage(), Where.abbreviate(input)));
             return;
         }

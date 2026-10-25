@@ -40,14 +40,15 @@ class ValueFormatsTest {
     }
 
     @Test
-    void comparablesOfRelatedClassesAndTextOtherwise() {
+    void comparablesOfOneClassByValueAndOtherKindsByTypeRank() {
         var order = new SortComparator(true, errors::add);
         assertThat(order.compare("a", "B")).isNegative();
         assertThat(order.compare(Instant.EPOCH, Instant.EPOCH.plusSeconds(1))).isNegative();
         assertThat(order.compare(Size.LARGE, Size.SMALL)).isPositive();
-        assertThat(order.compare(Size.SMALL, "a")).isPositive(); // by text: "SMALL" > "a" ignoring case
-        assertThat(order.compare(List.of(1), "z")).isNegative();
-        assertThat(errors).containsExactly("cannot compare Size with String: these values are sorted by their text");
+        assertThat(order.compare(Size.SMALL, "a")).isPositive(); // a comparable of another class comes after the strings
+        assertThat(order.compare(List.of(1), "z")).isPositive(); // and what is not comparable comes last
+        assertThat(errors).containsExactly(
+                "cannot compare Size with String: values of different types are sorted by type (null, numbers, strings, the rest)");
     }
 
     @Test

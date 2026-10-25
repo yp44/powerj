@@ -28,7 +28,7 @@ In a test folder (e.g. `C:\tmp\m`), create `big.txt` (about 2048 characters), `n
 | 10 | `env \| measure { $_.value.length() }` | Statistics of the lengths of the variable values. |
 | 11 | `ls \| measure { $_.name.substring(5) }` | One error per name shorter than 5 characters (`object skipped`); the others are measured. |
 | 12 | `ls \| measure 3` | Error `measure: invalid property name: 3`. |
-| 13 | `List.of("b", 1) \| measure` | `count 2`, empty `sum`, one error `measure: cannot compare … these values are sorted by their text`. |
+| 13 | `List.of("b", 1) \| measure` | `count 2`, empty `sum`, one error `measure: cannot compare … values of different types are sorted by type …`. |
 | 14 | `help count`, then `help measure` | Their help, with the examples. |
 | 15 | `POWERJ_LANG=fr`, then `ls \| measure 3` | `measure : nom de propriété invalide : 3`. |
 

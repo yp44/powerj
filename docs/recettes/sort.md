@@ -32,7 +32,7 @@ Then `cd C:\tmp\s`.
 | 8 | `List.of("b", "B", "a") \| sort`, then the same with `-i` | `B a b`, then `a b B`. |
 | 9 | `List.of(10L, 3, 2.5, 1e3) \| sort` | `2.5`, `3`, `10`, `1000.0` (numbers by value). |
 | 10 | `Arrays.asList("b", null, "a") \| sort`, then with `-d` | `null` first, then `a b`; with `-d`: `b a` then `null` last. |
-| 11 | `List.of("b", 2, "a", 1) \| sort` | `1 2 a b`, and a single error `sort: cannot compare … with …: these values are sorted by their text`. |
+| 11 | `List.of("b", 2, "a", 1) \| sort` | `1 2 a b` (numbers, then strings), and a single error `sort: cannot compare … with …: values of different types are sorted by type …`. |
 | 12 | `ls \| sort { $_.name.substring(5) }` | Error `sort: … (object skipped: …)` for the names shorter than 5 characters; the other objects are sorted. |
 | 13 | `ls \| sort bad!` | Error `sort: invalid property name: bad!`; nothing is displayed. |
 | 14 | `ls \| sort 3` | Error `sort: invalid property name: 3`. |

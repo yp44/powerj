@@ -7,7 +7,12 @@ package io.powerj.api;
  */
 public interface ScriptBlock {
 
-    /** Evaluates the block with {@code $_} equal to {@code current}. */
+    /**
+     * Evaluates the block with {@code $_} equal to {@code current}.
+     *
+     * @throws java.util.concurrent.CancellationException if the user requested cancellation (Ctrl+C); it is an
+     *         {@link IllegalStateException}, so a caller that catches {@code RuntimeException} must rethrow it first
+     */
     Object invoke(Object current);
 
     /** Source text of the block, without the braces. */

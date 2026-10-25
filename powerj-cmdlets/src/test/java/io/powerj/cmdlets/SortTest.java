@@ -153,7 +153,7 @@ class SortTest {
     }
 
     @Test
-    void mixedTypesAreSortedByTextWithOneError() throws Exception {
+    void mixedTypesAreSortedByTypeWithOneError() throws Exception {
         assertThat(sort(params(false, false), "b", 2, "a", 1)).containsExactly(1, 2, "a", "b");
         assertThat(context.errors).hasSize(1).first().asString().contains("cannot compare");
     }

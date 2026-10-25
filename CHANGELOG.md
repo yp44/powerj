@@ -56,6 +56,18 @@ structures, functions) can be built on it. The work is organised in phases (revi
 - **`import` can no longer block a lookup of a class name** (C-14, step 1.5). A name lookup and `import` took two locks
   in opposite orders: a stress test deadlocked every time. The imports are now an immutable snapshot with its own cache.
 
+- **Ctrl+C is no longer taken for an error by `to-json`** (C-15, step 1.6). `CancellationException` is an
+  `IllegalStateException`, and `to-json` caught the latter around code that checks for cancellation: the command went
+  on. It now catches a dedicated `Unreadable` type, so a cancellation cannot be swallowed there; `grid` and
+  `to-csv` got the same treatment, and the contract is written in the Javadoc of `emit` and `ScriptBlock.invoke`.
+- **`sort` has a total order** (C-16, step 1.6). Mixed values were compared through their text, which is not
+  transitive (`3 < 20`, `20 < "25"`, `"25" < 3`), and `TimSort` could fail with "Comparison method violates its general
+  contract". Values are now ordered by kind (null, numbers, strings, other comparables by class, the rest by text).
+  Visible change: the error for mixed types says they are sorted by type.
+- **Ctrl+C stops `grep` and `range` on a regular expression that backtracks for ever** (C-18, step 1.6, partly): the
+  matcher reads its input through a `CharSequence` that checks the interrupt flag. The `/regex/` filter of `grid` is not
+  covered yet (Phase 5).
+
 ### Examined, not changed
 - **The seven `Messages` classes stay** (C-10, step 1.4). Replacing them with one helper in `powerj-api` was tried on a
   two-module experiment: `ResourceBundle.getBundle(…, module)` called from another module fails unless the owner of the
@@ -63,8 +75,8 @@ structures, functions) can be built on it. The work is organised in phases (revi
   class is the minimal form that works with JPMS, and the model `examples/greet` gives to module authors.
 
 ### Planned (review §8)
-- **Phase 1 (continued).** Ctrl+C is no longer swallowed by `to-json`; `sort` uses a total order; destructive
-  commands resolve symbolic links and no longer ignore case on case-sensitive file systems.
+- **Phase 1 (continued).** Destructive commands resolve symbolic links and no longer ignore case on case-sensitive
+  file systems; hygiene (shared helpers, English thread names).
 - **Phase 2 — `Interpreter` split** into a command resolution, a pipeline executor, redirections, and
   observer-based perf and preview modes.
 - **Phase 3 — packages, modules and API.** `core.exec` is split in eight packages with qualified exports, the

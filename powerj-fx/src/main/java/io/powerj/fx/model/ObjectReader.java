@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CancellationException;
 
 import io.powerj.api.Display;
 import io.powerj.api.Row;
@@ -97,6 +98,8 @@ public final class ObjectReader {
         for (ColumnSpec column : columns) {
             try {
                 values.put(column.name(), shown(reader.read(source, column.name())));
+            } catch (CancellationException e) {
+                throw e; // Ctrl+C is not an unreadable property
             } catch (RuntimeException e) {
                 values.put(column.name(), null);
                 errors.put(column.name(), e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());

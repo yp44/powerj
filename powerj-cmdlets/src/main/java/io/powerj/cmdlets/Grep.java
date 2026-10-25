@@ -191,7 +191,7 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
                 }
             }
             String text = value == null ? "" : value.toString();
-            if (pattern.matcher(text).find() != invert) {
+            if (pattern.matcher(new InterruptibleText(text)).find() != invert) {
                 context.emit(input);
             }
         }
@@ -218,7 +218,7 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
                         throw new CancellationException();
                     }
                     if (singleMatch && invert) {
-                        if (pattern.matcher(text).find()) {
+                        if (pattern.matcher(new InterruptibleText(text)).find()) {
                             return null; // the file matches: excluded, not read further
                         }
                         continue;
@@ -252,7 +252,7 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
 
         /** Line as a {@link GrepMatch} if it is kept, otherwise {@code null}. */
         GrepMatch match(Path path, int number, String text) {
-            Matcher matcher = pattern.matcher(text);
+            Matcher matcher = pattern.matcher(new InterruptibleText(text));
             if (!matcher.find()) {
                 return invert ? new GrepMatch(path, number, text, List.of(), List.of(), Map.of()) : null;
             }

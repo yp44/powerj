@@ -41,7 +41,7 @@ final class JsonWriter {
     /**
      * Writes {@code value}, its nested lines indented by {@code indent} levels.
      *
-     * @throws IllegalStateException if a record component cannot be read
+     * @throws Properties.Unreadable if a record component cannot be read
      */
     void write(Object value, StringBuilder out, int indent) {
         value(value, out, 0, indent);

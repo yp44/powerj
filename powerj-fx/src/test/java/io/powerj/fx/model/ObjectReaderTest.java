@@ -23,6 +23,8 @@ class ObjectReaderTest {
     private record Person(String name, int age, Instant born) {
     }
 
+    private record Slow(int a) { }
+
     @Display(columns = {"name", "nothing", "size"})
     private record Entry(String name, @Bytes long size, String hidden) {
     }
@@ -152,6 +154,18 @@ class ObjectReaderTest {
         assertThat(reading.row().get("b")).isNull();
         assertThat(reading.errors()).containsExactly(Map.entry("b", "cannot read b"));
         assertThat(reader.read(new Broken("x")).errors()).containsExactly(Map.entry("ok", "IllegalStateException"));
+    }
+
+    @Test
+    void aCancellationIsNotAnUnreadableProperty() {
+        // Ctrl+C reaches the reader through the block that reads the property: it must stop the command, not be
+        // reported as a property that failed (review C-15).
+        var cancelling = new ObjectReader((target, name) -> {
+            throw new java.util.concurrent.CancellationException();
+        });
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> cancelling.read(new Slow(1)))
+                .isInstanceOf(java.util.concurrent.CancellationException.class);
     }
 
     @Test
