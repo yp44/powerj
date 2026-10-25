@@ -91,6 +91,9 @@ structures, functions) can be built on it. The work is organised in phases (revi
 - **The pipeline is run by its own class** (step 2.3): `PipelineExecutor` plans and runs the stages, `ErrorReporter` says
   where the errors go and whether the line hit a blocking one. `Interpreter` goes from 1,129 to 623 lines. Nothing
   changes for the user: the 77 characterization cases are untouched.
+- **The output of a statement and its redirections have their own classes** (step 2.4): `StatementOutput` writes the
+  values to the terminal or to the file of `>`, `Redirections.target` evaluates the file a redirection names.
+  `Interpreter` is down to 545 lines.
 - The frozen ArchUnit rules no longer fail when a refactoring only changes the signature of a method already in a cycle, the
   tally of its report, or which of the (many) `exec` classes that use the syntax tree the report happens to list. The
   dependency that closes the `exec`/`lang` cycle (`lang` reaching into `exec`) is still compared line by line.

@@ -3,10 +3,8 @@ package io.powerj.core.exec;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -35,9 +33,6 @@ import io.powerj.core.lang.Token;
  * program.
  */
 public final class Interpreter {
-
-    /** Width of the tables written to a file: no truncation. */
-    private static final int FILE_WIDTH = 10_000;
 
     private final Session session;
     private final ShellIo io;
@@ -374,8 +369,9 @@ public final class Interpreter {
     private boolean statement(Statement statement) throws InterruptedException {
         Optional<NativeRunner.FileTarget> errTarget = Optional.empty();
         try {
-            errTarget = redirect(statement.pipeline(), Token.Stream.ERR);
-            Optional<NativeRunner.FileTarget> outTarget = redirect(statement.pipeline(), Token.Stream.OUT);
+            errTarget = Redirections.target(statement.pipeline(), Token.Stream.ERR, evaluator, session);
+            Optional<NativeRunner.FileTarget> outTarget =
+                    Redirections.target(statement.pipeline(), Token.Stream.OUT, evaluator, session);
             var redirections = new Redirections(outTarget, errTarget);
             if (statement.background()) {
                 return executor.background(statement.pipeline(), redirections);
@@ -390,7 +386,7 @@ public final class Interpreter {
                 session.setVariable(statement.assignTo().get(), Evaluator.single(values));
                 return succeeded;
             }
-            try (var output = new Output(outTarget)) {
+            try (var output = new StatementOutput(io, outTarget, recorder)) {
                 return executor.execute(statement.pipeline(), output::accept, false, redirections);
             }
         } catch (PjException e) {
@@ -537,87 +533,13 @@ public final class Interpreter {
 
     /** Values of a parenthesized pipeline: {@code (ls).name}. */
     private List<Object> capture(Ast.Pipeline pipeline) throws InterruptedException {
-        if (redirect(pipeline, Token.Stream.OUT).isPresent()) {
+        if (Redirections.target(pipeline, Token.Stream.OUT, evaluator, session).isPresent()) {
             throw new PjException(Messages.get("redirect.subexpression"));
         }
         List<Object> values = new ArrayList<>();
-        Optional<NativeRunner.FileTarget> errTarget = redirect(pipeline, Token.Stream.ERR);
+        Optional<NativeRunner.FileTarget> errTarget =
+                Redirections.target(pipeline, Token.Stream.ERR, evaluator, session);
         executor.execute(pipeline, values::add, true, Redirections.errors(errTarget));
         return values;
-    }
-
-    private Optional<NativeRunner.FileTarget> redirect(Ast.Pipeline pipeline, Token.Stream stream)
-            throws InterruptedException {
-        Ast.Redirect last = null;
-        for (Ast.Redirect redirect : pipeline.redirects()) {
-            if (redirect.stream() == stream) {
-                last = redirect;
-            }
-        }
-        if (last == null) {
-            return Optional.empty();
-        }
-        Path file = session.currentDirectory().resolve(Values.text(evaluator.argument(last.target())));
-        return Optional.of(new NativeRunner.FileTarget(file, last.append()));
-    }
-
-    /**
-     * Destination of a statement's values: the terminal, or the file of a {@code >} redirection.
-     * The file is opened only at the first value: a redirected native command writes it itself.
-     */
-    private final class Output implements AutoCloseable {
-
-        private final Optional<NativeRunner.FileTarget> target;
-        private OutputFormatter formatter;
-        private PrintWriter file;
-
-        Output(Optional<NativeRunner.FileTarget> target) {
-            this.target = target;
-        }
-
-        void accept(Object value) {
-            formatter().accept(value);
-        }
-
-        private OutputFormatter formatter() {
-            if (formatter == null) {
-                if (target.isPresent()) {
-                    try {
-                        var options = target.get().append()
-                                ? new StandardOpenOption[] {StandardOpenOption.CREATE, StandardOpenOption.APPEND}
-                                : new StandardOpenOption[0];
-                        file = new PrintWriter(Files.newBufferedWriter(target.get().file(), StandardCharsets.UTF_8, options));
-                    } catch (IOException e) {
-                        throw new PjException(PjError.of(Messages.get("file.writeFailed", target.get().file(),
-                                e.getMessage()), e));
-                    }
-                    formatter = new OutputFormatter(file, FILE_WIDTH);
-                } else {
-                    formatter = new OutputFormatter(io.out(), io.width().getAsInt(), io.colors());
-                }
-            }
-            return formatter;
-        }
-
-        @Override
-        public void close() {
-            PerfRecorder perf = recorder;
-            long start = perf == null ? 0 : System.nanoTime();
-            try {
-                if (formatter != null) {
-                    formatter.close();
-                }
-                if (file != null) {
-                    file.close();
-                    if (file.checkError()) {
-                        throw new PjException(Messages.get("file.writeFailed.noReason", target.orElseThrow().file()));
-                    }
-                }
-            } finally {
-                if (perf != null) {
-                    perf.addDisplay(System.nanoTime() - start);
-                }
-            }
-        }
     }
 }

@@ -3,7 +3,11 @@ package io.powerj.core.exec;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Optional;
+
+import io.powerj.core.lang.Ast;
+import io.powerj.core.lang.Token;
 
 /**
  * The files of a statement's redirections: {@code >} / {@code >>} for the values, {@code 2>} / {@code 2>>} for the
@@ -16,6 +20,25 @@ record Redirections(Optional<NativeRunner.FileTarget> out, Optional<NativeRunner
 
     /** No redirection. */
     static final Redirections NONE = new Redirections(Optional.empty(), Optional.empty());
+
+    /**
+     * The file the last redirection of {@code stream} names, if the pipeline has one. The target is an argument
+     * ({@code > $name}, {@code > "a b"}), evaluated now, and relative to the current directory.
+     */
+    static Optional<NativeRunner.FileTarget> target(Ast.Pipeline pipeline, Token.Stream stream, Evaluator evaluator,
+                                                    Session session) throws InterruptedException {
+        Ast.Redirect last = null;
+        for (Ast.Redirect redirect : pipeline.redirects()) {
+            if (redirect.stream() == stream) {
+                last = redirect;
+            }
+        }
+        if (last == null) {
+            return Optional.empty();
+        }
+        Path file = session.currentDirectory().resolve(Values.text(evaluator.argument(last.target())));
+        return Optional.of(new NativeRunner.FileTarget(file, last.append()));
+    }
 
     /** Only the errors are redirected. */
     static Redirections errors(Optional<NativeRunner.FileTarget> err) {
