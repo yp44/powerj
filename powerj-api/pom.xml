@@ -13,4 +13,22 @@
     <artifactId>powerj-api</artifactId>
     <name>PowerJ API</name>
 
+    <properties>
+        <!-- Coverage floor of the tests of this module alone (parent pom, jacoco module-check). -->
+        <coverage.module.line>0.70</coverage.module.line>
+        <coverage.module.branch>1.00</coverage.module.branch>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
 </project>
