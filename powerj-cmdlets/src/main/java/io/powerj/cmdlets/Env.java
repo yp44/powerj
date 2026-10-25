@@ -79,7 +79,9 @@ public final class Env implements Cmdlet<Env.Params, Void, EnvVar> {
 
     /** Name as stored ({@code Path} on Windows when {@code PATH} is requested). */
     private static String canonicalName(Map<String, String> env, String name) {
-        return env.keySet().stream().filter(k -> k.equalsIgnoreCase(name)).findFirst().orElse(name);
+        synchronized (env) { // shared with the other stages: iterating needs the lock of the synchronized map
+            return env.keySet().stream().filter(k -> k.equalsIgnoreCase(name)).findFirst().orElse(name);
+        }
     }
 
     private static int count(Object... values) {

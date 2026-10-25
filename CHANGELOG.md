@@ -33,6 +33,15 @@ structures, functions) can be built on it. The work is organised in phases (revi
   the direct call only; `[0] | map System::exit` or `Method.invoke` ended the JVM. It is now a `CallPolicy` consulted by
   `JavaInvoker`, the one place every Java call goes through. `System.exit("x")` now reports the usual "no overload"
   error instead of a dedicated message.
+- **A malformed `config.properties` no longer prevents startup** (C-11, step 1.2). A Windows path written with single
+  backslashes (`C:\users`) made `Properties.load` throw, and the shell died with a stack trace. The file is now ignored
+  with a one-line warning that names it and says why; the same for a file that is not UTF-8. A malformed file no longer
+  stops the consent for native modules from being asked.
+- **`Session` can be read by the stages of a pipeline while it changes** (C-13, step 1.2). Copying the environment or
+  listing the variables while another thread changed them threw `ConcurrentModificationException` (reproduced by a
+  stress test: 343,385 failures in 472,431 copies of the environment over two seconds). Variables are in a concurrent map, the state written by the command
+  thread is `volatile`, the environment is a synchronized map, and a native command starts from an immutable
+  snapshot of it. The automatic variables (`$?`, `$exit`, `$last`…) are an `enum`, not a `switch` on strings.
 
 ### Planned (review §8)
 - **Phase 1 (continued).** A malformed `config.properties` no longer prevents startup; cmdlets get an

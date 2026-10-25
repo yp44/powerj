@@ -77,7 +77,7 @@ public final class NativeRunner {
         command.addAll(args);
         var builder = new ProcessBuilder(command).directory(session.currentDirectory().toFile());
         builder.environment().clear();
-        builder.environment().putAll(session.environment());
+        builder.environment().putAll(session.environmentSnapshot());
         Charset charset = encoding.forProgram(executable, session.environment());
 
         boolean detached = !capture && stdout.isEmpty() && stderr.isEmpty()
@@ -176,7 +176,7 @@ public final class NativeRunner {
             line.addAll(command.args());
             var builder = new ProcessBuilder(line).directory(session.currentDirectory().toFile());
             builder.environment().clear();
-            builder.environment().putAll(session.environment());
+            builder.environment().putAll(session.environmentSnapshot());
             if (i == 0) {
                 builder.redirectInput(input == null && inheritInput
                         ? ProcessBuilder.Redirect.INHERIT : ProcessBuilder.Redirect.PIPE);
@@ -299,7 +299,7 @@ public final class NativeRunner {
             line.addAll(command.args());
             var builder = new ProcessBuilder(line).directory(session.currentDirectory().toFile());
             builder.environment().clear();
-            builder.environment().putAll(session.environment());
+            builder.environment().putAll(session.environmentSnapshot());
             if (i == 0) {
                 builder.redirectInput(ProcessBuilder.Redirect.from(NULL_DEVICE));
             }

@@ -28,13 +28,20 @@ final class ConfigFile {
         return file;
     }
 
-    /** Value of {@code key}, empty if the file or the key is missing. */
+    /**
+     * Value of {@code key}, empty if the file or the key is missing.
+     *
+     * @throws IOException if the file cannot be read, or is not valid properties syntax (a malformed unicode escape,
+     *                     typically a Windows path written with single backslashes)
+     */
     Optional<String> get(String key) throws IOException {
         var props = new Properties();
         try (Reader in = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
             props.load(in);
         } catch (NoSuchFileException _) {
             return Optional.empty();
+        } catch (IllegalArgumentException e) {
+            throw new IOException("Malformed " + file + ": " + e.getMessage(), e);
         }
         return Optional.ofNullable(props.getProperty(key));
     }

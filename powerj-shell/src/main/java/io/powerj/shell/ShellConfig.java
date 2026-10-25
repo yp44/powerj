@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.Properties;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -36,13 +37,27 @@ public record ShellConfig(int historySize, String language) {
 
     /** Reads the file; missing or invalid values take their default value. */
     public static ShellConfig load(Path file) {
+        return load(file, _ -> { });
+    }
+
+    /**
+     * Reads the file; missing or invalid values take their default value. A file that cannot be read at all gives the
+     * default settings, and {@code warn} is told why: the user should know that the file is not being applied.
+     * That is the case of invalid UTF-8 and of a malformed unicode escape, which is what a Windows path written with
+     * single backslashes (<code>C:&#92;users</code>) looks like to {@link Properties#load}.
+     *
+     * @param warn receives a one-line message for the user, in the language of the system (the language of the shell
+     *             is not known yet: it is read from this file)
+     */
+    public static ShellConfig load(Path file, Consumer<String> warn) {
         var props = new Properties();
         try (Reader in = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
             props.load(in);
         } catch (NoSuchFileException _) {
             return defaults();
-        } catch (IOException e) {
+        } catch (IOException | IllegalArgumentException e) {
             LOG.log(Level.WARNING, "Cannot read " + file + ", using default settings", e);
+            warn.accept(Messages.get("config.unusable", file, e.getMessage()));
             return defaults();
         }
         return new ShellConfig(positiveInt(props, HISTORY_SIZE_KEY, DEFAULT_HISTORY_SIZE), props.getProperty(LANGUAGE_KEY));

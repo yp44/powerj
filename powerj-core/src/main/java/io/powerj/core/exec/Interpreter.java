@@ -736,9 +736,7 @@ public final class Interpreter {
                     // FR-68b: stopped by the next stage (first, range…): not a failure, $exit is left as it is.
                     yield true;
                 }
-                synchronized (session) {
-                    session.recordNative(runs.getLast());
-                }
+                session.recordNative(runs.getLast());
                 yield runs.getLast().succeeded();
             }
         };

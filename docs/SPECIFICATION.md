@@ -1612,7 +1612,7 @@ User folder `~/.powerj/` (created on first launch):
 |---|---|
 | `history` | Command history (FR-09). |
 | `modules/` | Third-party module jars (§4.4). |
-| `config.properties` | `history.size=10000`, `language=en` (or `fr`, FR-61), `native.prefer=find,sort`, `colors.cmdlet=green`, `modules.nativeAccess.<module>=true` (consent to load a module that uses native code, §4.4)… |
+| `config.properties` | `history.size=10000`, `language=en` (or `fr`, FR-61), `native.prefer=find,sort`, `colors.cmdlet=green`, `modules.nativeAccess.<module>=true` (consent to load a module that uses native code, §4.4)… Java properties syntax (a backslash in a value is written twice); a file that cannot be read is reported on the standard error at startup and the default settings apply. |
 | `logs/` | Diagnostic log, in English (FR-60). |
 | `protected-paths` | Paths that `rm` and `mv` refuse to remove (FR-72): one per line, `~` for the home folder, `#` for comments; created at first launch with the defaults of the platform. |
 | `fx-grid.properties` | Position and size of the window of `grid` (`x`, `y`, `width`, `height`), written when the window is closed (FR-77). |

@@ -245,7 +245,7 @@ PowerJ keeps its files in `~/.powerj/` (`%USERPROFILE%\.powerj\` on Windows, or 
 | File / folder | Role |
 |---|---|
 | `history` | Command history (UTF-8), reloaded at startup |
-| `config.properties` | `history.size=10000`, `language=en` (or `fr`), `modules.nativeAccess.<module>=true` (consent to load a module that uses native code, asked once) |
+| `config.properties` | `history.size=10000`, `language=en` (or `fr`), `modules.nativeAccess.<module>=true` (consent to load a module that uses native code, asked once). Java properties syntax: a backslash in a value is written twice. A file that cannot be read is reported at startup and the defaults apply |
 | `profile.pj` | Commands run when the interactive shell starts: `$proj = Path.of("/home/me/dev")`, `import java.time.*`, `env --set MAVEN_OPTS=-Xmx2g` — errors show their line and never prevent startup ([profile](docs/recettes/profile.md)) |
 | `protected-paths` | Paths that `rm` and `mv` refuse to remove (one per line, `~` for the home folder); written with the defaults of the platform on first launch, then yours to edit ([fileops](docs/recettes/fileops.md)) |
 | `modules/` | Third-party module jars, or folders (a module and its dependencies), loaded at startup |

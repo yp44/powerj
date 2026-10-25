@@ -2,35 +2,43 @@ package io.powerj.core.exec;
 
 import java.nio.file.Files;
 import java.util.ArrayDeque;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.List;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * State of a shell session: current directory, environment, variables, last native command.
- * Used from the command execution thread; the stages of a pipeline read it in parallel.
+ * The command thread changes it while the stages of a pipeline, a background job or the completion read it, so every
+ * field is either {@code volatile}, a concurrent collection, or guarded by the lock of the session (review C-13).
+ * The fields that are written by the command thread only are {@code volatile} for visibility; none of them needs a
+ * compound update.
  */
 public final class Session {
 
     /** Environment variables designating the home directory, in order of priority. */
     private static final List<String> HOME_VARIABLES = List.of("HOME", "USERPROFILE");
 
+    /** Stands for {@code null} in {@link #variables}, which does not hold null values. */
+    private static final Object NULL = new Object();
+
     private final Path home;
+    /** A synchronized map: each operation is atomic; to copy or iterate it, see {@link #environmentSnapshot()}. */
     private final Map<String, String> environment;
-    private final Map<String, Object> variables = new HashMap<>();
-    private Path currentDirectory;
-    private Path previousDirectory;
-    private Path configDirectory;
-    private NativeRun lastNative;
-    private boolean lastSucceeded = true;
-    private Integer exitRequest;
+    private final Map<String, Object> variables = new ConcurrentHashMap<>();
+    private volatile Path currentDirectory;
+    private volatile Path previousDirectory;
+    private volatile Path configDirectory;
+    private volatile NativeRun lastNative;
+    private volatile boolean lastSucceeded = true;
+    private volatile Integer exitRequest;
     private final JavaClasses java = new JavaClasses();
     private final Jobs jobs = new Jobs();
     /** Recent Java exceptions, most recent first ({@code $errors}, FR-53). */
@@ -50,9 +58,14 @@ public final class Session {
     public Session(Path home, Path currentDirectory, Map<String, String> environment) {
         this.home = home.toAbsolutePath().normalize();
         this.currentDirectory = currentDirectory.toAbsolutePath().normalize();
-        // Environment variable names are case-insensitive on Windows.
-        this.environment = Platform.isWindows() ? new TreeMap<>(String.CASE_INSENSITIVE_ORDER) : new TreeMap<>();
-        this.environment.putAll(environment);
+        var copy = newEnvironment();
+        copy.putAll(environment);
+        this.environment = Collections.synchronizedMap(copy);
+    }
+
+    /** Environment variable names are case-insensitive on Windows. */
+    private static TreeMap<String, String> newEnvironment() {
+        return Platform.isWindows() ? new TreeMap<>(String.CASE_INSENSITIVE_ORDER) : new TreeMap<>();
     }
 
     /**
@@ -118,9 +131,24 @@ public final class Session {
         currentDirectory = resolved;
     }
 
-    /** Environment of the session, applied to native commands (modifiable). */
+    /**
+     * Environment of the session (modifiable). Each operation on the map is atomic; iterating over it, or copying it,
+     * must be done while holding its lock ({@code synchronized (map)}), or on {@link #environmentSnapshot()}.
+     */
     public Map<String, String> environment() {
         return environment;
+    }
+
+    /**
+     * A consistent copy of the environment that nobody changes: what a native command starts with. Names keep the case
+     * rule of the platform.
+     */
+    public Map<String, String> environmentSnapshot() {
+        var copy = newEnvironment();
+        synchronized (environment) {
+            copy.putAll(environment);
+        }
+        return Collections.unmodifiableMap(copy);
     }
 
     public Optional<NativeRun> lastNative() {
@@ -145,32 +173,39 @@ public final class Session {
     }
 
     public void setVariable(String name, Object value) {
-        variables.put(name, value);
+        variables.put(name, value == null ? NULL : value);
     }
 
     /** Names of the defined and automatic variables, sorted (completion). */
     public java.util.SortedSet<String> variableNames() {
         var names = new java.util.TreeSet<>(variables.keySet());
-        names.addAll(List.of("?", "exit", "last", "pwd", "home", "errors", "perf"));
+        names.addAll(AutomaticVariable.names());
         return names;
     }
 
     /** Value of a variable, automatic ({@code $exit}, {@code $last}, {@code $?}…) or defined. */
     public Object variable(String name) {
-        return switch (name) {
-            case "?" -> lastSucceeded;
-            case "exit" -> lastNative == null ? null : lastNative.exitCode();
-            case "last" -> lastNative;
-            case "pwd" -> currentDirectory;
-            case "home" -> home;
-            case "errors" -> recentErrors();
-            case "perf" -> perfReports().stream().findFirst().orElse(null);
-            default -> {
-                if (!variables.containsKey(name)) {
-                    throw new PjException(Messages.get("variable.unknown", name));
-                }
-                yield variables.get(name);
-            }
+        Optional<AutomaticVariable> automatic = AutomaticVariable.named(name);
+        if (automatic.isPresent()) {
+            return value(automatic.get());
+        }
+        Object value = variables.get(name);
+        if (value == null) {
+            throw new PjException(Messages.get("variable.unknown", name));
+        }
+        return value == NULL ? null : value;
+    }
+
+    private Object value(AutomaticVariable variable) {
+        NativeRun last = lastNative; // read once: another thread may record a new one
+        return switch (variable) {
+            case SUCCEEDED -> lastSucceeded;
+            case EXIT -> last == null ? null : last.exitCode();
+            case LAST -> last;
+            case PWD -> currentDirectory;
+            case HOME -> home;
+            case ERRORS -> recentErrors();
+            case PERF -> perfReports().stream().findFirst().orElse(null);
         };
     }
 
@@ -227,6 +262,7 @@ public final class Session {
     }
 
     public OptionalInt exitRequest() {
-        return exitRequest == null ? OptionalInt.empty() : OptionalInt.of(exitRequest);
+        Integer code = exitRequest;
+        return code == null ? OptionalInt.empty() : OptionalInt.of(code);
     }
 }

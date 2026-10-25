@@ -34,6 +34,20 @@ class ConfigFileTest {
     }
 
     @Test
+    void aMalformedFileIsAnIoErrorNotARuntimeException() throws IOException {
+        Files.writeString(tmp.resolve("config.properties"), "x=C:\\users\\yves\n");
+        assertThatThrownBy(() -> config().get("x")).isInstanceOf(IOException.class).hasMessageContaining("Malformed");
+    }
+
+    @Test
+    void anAnswerCanStillBeRecordedInAMalformedFile() throws IOException {
+        Path file = tmp.resolve("config.properties");
+        Files.writeString(file, "x=C:\\users\\yves\n");
+        config().set("modules.nativeAccess.org.a", "true");
+        assertThat(Files.readAllLines(file)).containsExactly("x=C:\\users\\yves", "modules.nativeAccess.org.a=true");
+    }
+
+    @Test
     void creatingTheFileCreatesItsFolderToo() throws IOException {
         var file = new ConfigFile(tmp.resolve("home").resolve("config.properties"));
         file.set("a", "1");

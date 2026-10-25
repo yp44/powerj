@@ -55,7 +55,7 @@ public final class Main {
             System.err.println(Messages.get("home.createFailed", home.dir(), e.getMessage()));
         }
         DiagnosticLog.install(home.logsDir(), debug);
-        ShellConfig config = ShellConfig.load(home.configFile());
+        ShellConfig config = ShellConfig.load(home.configFile(), System.err::println);
         // Language of the messages (FR-61): -Dpowerj.language, POWERJ_LANG, config.properties, then the system.
         Language.set(Language.resolve(System.getProperty(Language.PROPERTY),
                 System.getenv(Language.ENVIRONMENT_VARIABLE), config.language(),

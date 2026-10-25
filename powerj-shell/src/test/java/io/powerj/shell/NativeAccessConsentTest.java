@@ -38,6 +38,13 @@ class NativeAccessConsentTest {
     }
 
     @Test
+    void aMalformedConfigurationDoesNotPreventAskingTheUser() throws IOException {
+        Files.writeString(file(), "x=C:\\users\\yves\n");
+        assertThat(consent(Optional.of(true)).consent("org.a", List.of("org.a"))).contains(true);
+        assertThat(asked).containsExactly("org.a");
+    }
+
+    @Test
     void aRecordedYesIsNotAskedAgain() throws IOException {
         Files.writeString(file(), "modules.nativeAccess.io.powerj.fx=true\n");
         assertThat(consent(Optional.of(false)).consent("io.powerj.fx", List.of("a"))).contains(true);
