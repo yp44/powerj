@@ -376,7 +376,7 @@ public final class Completions {
         String command = words.getFirst();
         boolean forceNative = command.startsWith("^");
         String name = forceNative ? command.substring(1) : command;
-        var cmdlet = forceNative ? Optional.<CmdletRegistry.Registered>empty() : interpreter.registry().find(name);
+        var cmdlet = forceNative ? Optional.<CmdletRegistry.Registered>empty() : interpreter.resolution().cmdlet(name);
 
         if (name.equals("import")) {
             return imports(wordStart, word);
@@ -667,7 +667,7 @@ public final class Completions {
         for (int k = starts.size() - 2; k >= 0; k--) {
             String stage = line.substring(starts.get(k), starts.get(k + 1) - 1).strip();
             String name = splitWords(stage).getFirst();
-            var cmdlet = interpreter.registry().find(name);
+            var cmdlet = interpreter.resolution().cmdlet(name);
             if (cmdlet.isEmpty()) {
                 return null;
             }
@@ -699,21 +699,24 @@ public final class Completions {
             if (name.startsWith("^")) {
                 return String.class;
             }
-            var cmdlet = interpreter.registry().find(name);
-            if (cmdlet.isPresent()) {
-                Class<?> output = cmdlet.get().output();
-                if (output != Object.class) {
-                    return output;
+            switch (interpreter.resolution().resolve(name, session())) {
+                case Resolved.CmdletCall(var cmdlet) -> {
+                    Class<?> output = cmdlet.output();
+                    if (output != Object.class) {
+                        return output;
+                    }
+                    if (cmdlet.passThrough()) {
+                        continue; // where, sort…: the objects go through unchanged
+                    }
+                    return null;
                 }
-                if (cmdlet.get().passThrough()) {
-                    continue; // where, sort…: the objects go through unchanged
+                case Resolved.NativeCall _ -> {
+                    return String.class;
                 }
-                return null;
+                case Resolved.BuiltinCall _, Resolved.Unknown _ -> {
+                    return null;
+                }
             }
-            if (interpreter.commandKind(name) == Interpreter.CommandKind.NATIVE) {
-                return String.class;
-            }
-            return null;
         }
         return null;
     }
@@ -784,7 +787,7 @@ public final class Completions {
             if (forceNative) {
                 return new TypeInfo.ListOf(String.class);
             }
-            var cmdlet = interpreter.registry().find(name);
+            var cmdlet = interpreter.resolution().cmdlet(name);
             if (cmdlet.isPresent() && cmdlet.get().output() != Object.class) {
                 return new TypeInfo.ListOf(cmdlet.get().output());
             }

@@ -30,8 +30,12 @@ class BuiltinsAndJavaNamesTest {
         return new CallPolicy(session());
     }
 
+    /** The built-in commands of a shell, in the order of its overview. */
+    private static final List<String> BUILTINS = List.of("cd", "pwd", "which", "help", "import", "mod-load", "mod-list",
+            "jobs", "history", "exit");
+
     private List<Object> help(Object... args) {
-        return Help.run(Arrays.asList(args), CmdletRegistry.of(FakeCmdlets.all()), session().java());
+        return Help.run(Arrays.asList(args), CmdletRegistry.of(FakeCmdlets.all()), BUILTINS, session().java());
     }
 
     @Test

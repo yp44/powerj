@@ -22,7 +22,7 @@ Cycle detected: Slice exec -> \
     - Method <io.powerj.core.exec.Interpreter.prepare(io.powerj.core.lang.Ast$Stage, int, boolean)> has parameter of type <io.powerj.core.lang.Ast$Stage> in (Interpreter.java:0)\
     - Method <io.powerj.core.exec.Interpreter.redirect(io.powerj.core.lang.Ast$Pipeline, io.powerj.core.lang.Token$Stream)> has parameter of type <io.powerj.core.lang.Ast$Pipeline> in (Interpreter.java:0)\
     - Method <io.powerj.core.exec.Interpreter.redirect(io.powerj.core.lang.Ast$Pipeline, io.powerj.core.lang.Token$Stream)> has parameter of type <io.powerj.core.lang.Token$Stream> in (Interpreter.java:0)\
-    (219 further dependencies have been omitted...)\
+    (213 further dependencies have been omitted...)\
   2. Dependencies of Slice lang\
     - Class <io.powerj.core.lang.SyntaxException> extends class <io.powerj.core.exec.PjException> in (SyntaxException.java:0)\
     - Constructor <io.powerj.core.lang.SyntaxException.<init>(java.lang.String)> calls constructor <io.powerj.core.exec.PjException.<init>(java.lang.String)> in (SyntaxException.java:10)

@@ -14,23 +14,22 @@ import io.powerj.api.CmdletInfo;
 /** Help generated from cmdlet metadata (specification FR-29, FR-45). */
 final class Help {
 
-    /**
-     * Documented built-in commands, in display order; usage and description are the keys
-     * {@code help.builtin.<name>.usage} and {@code help.builtin.<name>.description}.
-     */
-    private static final List<String> BUILTINS = List.of("cd", "pwd", "which", "help", "import", "mod-load",
-            "mod-list", "jobs", "history", "exit");
-
     private Help() {
     }
 
+    /**
+     * A built-in command is documented by the keys {@code help.builtin.<name>.usage} and
+     * {@code help.builtin.<name>.description} of the bundle: the list of built-in commands is the one of the
+     * interpreter, not a second one kept here.
+     */
     static boolean isDocumentedBuiltin(String name) {
-        return BUILTINS.contains(name);
+        return Messages.has("help.builtin." + name + ".description");
     }
 
-    static List<Object> run(List<Object> args, CmdletRegistry registry, JavaClasses java) {
+    /** @param builtins the built-in commands, in the order of the overview */
+    static List<Object> run(List<Object> args, CmdletRegistry registry, List<String> builtins, JavaClasses java) {
         if (args.isEmpty()) {
-            return overview(registry);
+            return overview(registry, builtins);
         }
         if (args.getFirst() instanceof String word && word.equals("members")) {
             if (args.size() != 2) {
@@ -50,7 +49,7 @@ final class Help {
         if (cmdlet.isPresent()) {
             return List.copyOf(cmdlet(cmdlet.get()));
         }
-        if (BUILTINS.contains(name)) {
+        if (builtins.contains(name) && isDocumentedBuiltin(name)) {
             return List.of(name + " — " + builtinDescription(name), Messages.get("help.usage", builtinUsage(name)));
         }
         if (args.getFirst() instanceof Evaluator.ClassRef(var type)) {
@@ -111,10 +110,11 @@ final class Help {
         }
     }
 
-    private static List<Object> overview(CmdletRegistry registry) {
+    private static List<Object> overview(CmdletRegistry registry, List<String> builtins) {
         List<Object> lines = new ArrayList<>();
         lines.add(Messages.get("help.overview.builtins"));
-        BUILTINS.forEach(name -> lines.add("  %-10s %s".formatted(name, builtinDescription(name))));
+        builtins.stream().filter(Help::isDocumentedBuiltin)
+                .forEach(name -> lines.add("  %-10s %s".formatted(name, builtinDescription(name))));
         Map<String, List<CmdletRegistry.Registered>> byCategory = new TreeMap<>();
         for (var registered : registry.all()) {
             byCategory.computeIfAbsent(registered.category(), _ -> new ArrayList<>()).add(registered);

@@ -52,7 +52,7 @@ public final class Interpreter {
     private final Map<String, Builtin> builtins = new LinkedHashMap<>();
     private final CmdletRegistry registry;
     private final ModuleLoader modules;
-    private final CommandResolver resolver;
+    private final CommandResolution resolution;
     private final NativeRunner nativeRunner;
     private final Evaluator evaluator;
     /** Standard input lines in non-interactive mode, read by the first stage; otherwise {@code null}. */
@@ -87,19 +87,20 @@ public final class Interpreter {
         this.session = session;
         this.io = io;
         this.registry = registry;
-        this.resolver = resolver;
         this.nativeRunner = nativeRunner;
         this.evaluator = new Evaluator(session, this::capture);
+        // The order is the one of the overview printed by `help`; the shell's own commands come before `exit`.
         builtins.put("cd", Builtins::cd);
         builtins.put("pwd", Builtins::pwd);
-        builtins.put("exit", Builtins::exit);
         builtins.put("which", this::which);
-        builtins.put("jobs", (_, s) -> new ArrayList<>(s.jobs().list()));
-        builtins.put("help", (args, _) -> Help.run(args, registry, session.java()));
+        builtins.put("help", (args, _) -> Help.run(args, registry, List.copyOf(builtins.keySet()), session.java()));
         builtins.put("import", (args, _) -> importClasses(args));
         builtins.put("mod-load", this::modLoad);
         builtins.put("mod-list", this::modList);
+        builtins.put("jobs", (_, s) -> new ArrayList<>(s.jobs().list()));
         builtins.putAll(extraBuiltins);
+        builtins.putIfAbsent("exit", Builtins::exit);
+        this.resolution = new CommandResolution(builtins, registry, resolver);
         this.modules = new ModuleLoader(registry, Collections.unmodifiableSet(builtins.keySet()));
     }
 
@@ -157,7 +158,12 @@ public final class Interpreter {
 
     /** Names of the built-in commands. */
     public Set<String> builtinNames() {
-        return Collections.unmodifiableSet(builtins.keySet());
+        return resolution.builtinNames();
+    }
+
+    /** What a command name stands for (FR-13): the rule that execution, {@code which}, highlighting and completion share. */
+    CommandResolution resolution() {
+        return resolution;
     }
 
     /** Java static names, and the commands whose cmdlet declares the short form {@code where size > 1mb}. */
@@ -167,20 +173,17 @@ public final class Interpreter {
 
     /** {@code @CmdletInfo(comparison = true)} on the cmdlet the name runs (FR-13: a built-in command comes first). */
     private boolean acceptsComparison(String name) {
-        return !builtins.containsKey(name) && registry.find(name).map(CmdletRegistry.Registered::comparison).orElse(false);
+        return resolution.cmdlet(name).map(CmdletRegistry.Registered::comparison).orElse(false);
     }
 
     /** Resolves a command name as execution would (FR-13), without launching anything. */
     public CommandKind commandKind(String name) {
-        boolean forceNative = name.startsWith("^");
-        String bare = forceNative ? name.substring(1) : name;
-        if (!forceNative && builtins.containsKey(bare)) {
-            return CommandKind.BUILTIN;
-        }
-        if (!forceNative && registry.find(bare).isPresent()) {
-            return CommandKind.CMDLET;
-        }
-        return !bare.isEmpty() && resolver.resolve(bare, session).isPresent() ? CommandKind.NATIVE : CommandKind.UNKNOWN;
+        return switch (resolution.resolve(name, session)) {
+            case Resolved.BuiltinCall _ -> CommandKind.BUILTIN;
+            case Resolved.CmdletCall _ -> CommandKind.CMDLET;
+            case Resolved.NativeCall _ -> CommandKind.NATIVE;
+            case Resolved.Unknown _ -> CommandKind.UNKNOWN;
+        };
     }
 
     /**
@@ -805,23 +808,20 @@ public final class Interpreter {
         }
         var command = (Ast.Command) stage.body();
         List<Object> args = arguments(command.arguments());
-        if (!command.forceNative()) {
-            Builtin builtin = builtins.get(command.name());
-            if (builtin != null) {
-                PreviewGuard.deny(Messages.get("preview.off.builtin", command.name()));
+        return switch (resolution.resolve(command.name(), command.forceNative(), session)) {
+            case Resolved.BuiltinCall(var name, var builtin) -> {
+                PreviewGuard.deny(Messages.get("preview.off.builtin", name));
                 if (index > 0) {
-                    throw new PjException(Messages.get("pipeline.noInput", command.name()));
+                    throw new PjException(Messages.get("pipeline.noInput", name));
                 }
-                return new ObjectStep((_, output, _) -> {
-                    invokeBuiltin(command.name(), builtin, args).forEach(output);
+                yield new ObjectStep((_, output, _) -> {
+                    invokeBuiltin(name, builtin, args).forEach(output);
                     return true;
-                }, label(command.name(), args));
+                }, label(name, args));
             }
-            var found = registry.find(command.name());
-            if (found.isPresent()) {
-                var cmdlet = found.get();
+            case Resolved.CmdletCall(var cmdlet) -> {
                 if (args.contains("--help")) {
-                    return new ObjectStep((_, output, _) -> {
+                    yield new ObjectStep((_, output, _) -> {
                         Help.cmdlet(cmdlet).forEach(output);
                         return true;
                     }, label(command.name(), args));
@@ -832,16 +832,18 @@ public final class Interpreter {
                 if (!cmdlet.preview()) {
                     PreviewGuard.deny(Messages.get("preview.off.cmdlet", command.name()));
                 }
-                return new ObjectStep((input, output, errors) -> runCmdlet(cmdlet, args,
+                yield new ObjectStep((input, output, errors) -> runCmdlet(cmdlet, args,
                         cmdlet.readsInput() ? input : null, output,
                         stage.errorsToOutput() ? message -> output.accept(message) : errors),
                         label(command.name(), args));
             }
-        }
-        Path executable = resolver.resolve(command.name(), session).orElseThrow(() -> unknownCommand(command));
-        PreviewGuard.deny(Messages.get("preview.off.native", command.name()));
-        List<String> textArgs = args.stream().map(Values::text).toList();
-        return new NativeStep(new NativeRunner.Command(executable, textArgs, stage.errorsToOutput()));
+            case Resolved.NativeCall(var executable) -> {
+                PreviewGuard.deny(Messages.get("preview.off.native", command.name()));
+                List<String> textArgs = args.stream().map(Values::text).toList();
+                yield new NativeStep(new NativeRunner.Command(executable, textArgs, stage.errorsToOutput()));
+            }
+            case Resolved.Unknown _ -> throw unknownCommand(command);
+        };
     }
 
     /** Command not found; {@code Math.NOPE}: the static field is missing rather than the command. */
@@ -969,20 +971,13 @@ public final class Interpreter {
         List<Object> lines = new ArrayList<>();
         for (Object value : names) {
             String name = Values.text(value);
-            if (name.startsWith("^") && name.length() > 1) {
-                String program = name.substring(1);
-                Path path = resolver.resolve(program, session)
-                        .orElseThrow(() -> new PjException(Messages.get("which.programNotFound", program)));
-                lines.add(Messages.get("which.native", name, path));
-            } else if (builtins.containsKey(name)) {
-                lines.add(Messages.get("which.builtin", name));
-            } else if (registry.find(name).isPresent()) {
-                lines.add(Messages.get("which.cmdlet", name, registry.find(name).get().module()));
-            } else {
-                Path path = resolver.resolve(name, session)
-                        .orElseThrow(() -> new PjException(Messages.get("which.notFound", name)));
-                lines.add(Messages.get("which.native", name, path));
-            }
+            lines.add(switch (resolution.resolve(name, session)) {
+                case Resolved.BuiltinCall _ -> Messages.get("which.builtin", name);
+                case Resolved.CmdletCall(var cmdlet) -> Messages.get("which.cmdlet", name, cmdlet.module());
+                case Resolved.NativeCall(var path) -> Messages.get("which.native", name, path);
+                case Resolved.Unknown(var program, var forcedNative) -> throw new PjException(
+                        Messages.get(forcedNative ? "which.programNotFound" : "which.notFound", forcedNative ? program : name));
+            });
         }
         return lines;
     }

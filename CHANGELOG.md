@@ -80,6 +80,12 @@ structures, functions) can be built on it. The work is organised in phases (revi
   `grep` share their report of walk errors and `ls`, `grep` the check of `--parallel`.
 - A new test fails when `Messages.get("key")` names a key that no bundle of the module defines.
 
+### Changed (Phase 2, the `Interpreter` split — in progress)
+- **One place decides what a command name stands for** (step 2.1): built-in command, then cmdlet, then program on the
+  `PATH`, `^` skipping the first two. Execution, `which`, highlighting and completion all read `CommandResolution`;
+  completion no longer treats a cmdlet as such when a built-in command of the same name runs first. `help` lists the
+  built-in commands the interpreter has, not a second list kept in `Help`.
+
 ### Examined, not changed
 - **The seven `Messages` classes stay** (C-10, step 1.4). Replacing them with one helper in `powerj-api` was tried on a
   two-module experiment: `ResourceBundle.getBundle(…, module)` called from another module fails unless the owner of the

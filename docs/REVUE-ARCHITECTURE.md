@@ -329,7 +329,7 @@ Principes : (1) **aucune étape ne change le comportement observable** hors corr
 | 1.7 | **C-21, C-22** destructif | `toRealPath` de l'ancêtre existant le plus profond, casse selon le système de fichiers réel (macOS), test des liens ; `mv` sans `ATOMIC_MOVE` quand `!force` ; glob sensible à la casse par défaut sous POSIX, `--ignore-case` ; `Perf --save` sans `REPLACE_EXISTING` silencieux |
 | 1.8 | **C-27, C-36 (a)(b)** hygiène | Imports (OpenRewrite), noms de threads en anglais (constantes dans l'API), `Platform` et `HomeDirectory` partagés, `report(WalkError)` et validation de `-p` factorisés |
 
-### Phase 2 — Démonter l'`Interpreter` *(≈ 16 j, étape-clef)*
+### Phase 2 — Démonter l'`Interpreter` *(≈ 16 j, étape-clef ; **en cours, voir § 13**)*
 
 Ordre imposé par les dépendances ; chaque sous-étape ramène le build au vert, **sans jamais fusionner 2.3 et 2.5 dans la même PR**.
 
@@ -516,4 +516,14 @@ Ce que la phase a appris, au-delà des correctifs :
 | Fenêtre « vérifier puis supprimer » dans `FileTrees` ; noms 8.3, `\\?\` et jonctions Windows (C-21) | réécriture de `powerj-fs` avec `SecureDirectoryStream` ; non testable hors Windows | 5 |
 | C-23 : la complétion appelle les getters | typage par signature | 3.3 |
 | C-02 : `Interpreter` | c'est la Phase 2 | 2 |
+
+## 13. Phase 2 : démonter l'`Interpreter` (en cours)
+
+Chaque sous-étape ramène le build au vert. Les 77 lignes de caractérisation (§ 11.2, étape 0.1) sont le filet : elles ne changent pas. Les règles ArchUnit gelées comptent les dépendances d'un cycle dans leur texte (« 219 further dependencies have been omitted »), donc **chaque sous-étape qui déplace du code oblige à refiger** (`freeze.refreeze=true` pour une exécution, puis relire la différence : elle ne doit montrer que des suppressions).
+
+### 13.1 Statut des étapes
+
+| Étape | Statut | Ce qui a été fait | Écart avec le plan (§ 8) |
+|---|---|---|---|
+| 2.1 `Resolved` + `CommandResolution` | ✅ | `sealed interface Resolved` (`BuiltinCall`, `CmdletCall`, `NativeCall`, `Unknown`) et `CommandResolution`, qui écrit la règle FR-13 **une fois** : `commandKind`, `which`, `prepare`, `acceptsComparison` et quatre sites de `Completions` la lisent. `inProcess(name)` répond sans regarder le système de fichiers (le parseur le demande à chaque frappe) ; `resolve(...)` y ajoute la recherche dans le `PATH`. `Help.BUILTINS` est supprimée : l'aperçu liste les commandes internes du vrai registre, dans l'ordre d'enregistrement (`exit` enregistré en dernier, ce qui garde l'ordre de l'aide), et une commande est « documentée » quand le bundle a sa clé (`Messages.has`). 11 tests (`CommandResolutionTest`), dont « toute commande interne de l'interpréteur est documentée » | La complétion ignorait la priorité des commandes internes (un cmdlet de même nom qu'une commande interne était complété comme un cmdlet alors que l'exécution lançait la commande interne) : elle suit maintenant l'exécution. `Builtin` reste une interface fonctionnelle ; la rendre auto-descriptive demande de changer l'API publique pour la commande `history` du shell, et le bundle porte déjà la description |
 
