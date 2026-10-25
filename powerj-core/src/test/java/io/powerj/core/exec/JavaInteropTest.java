@@ -212,14 +212,16 @@ class JavaInteropTest {
 
     @Test
     void cancellationIsCooperativeInJavaCallbacks() throws Exception {
+        var calls = new java.util.concurrent.atomic.AtomicLong();
+        session.setVariable("calls", calls);
         var runner = Thread.ofPlatform().start(() -> {
             try {
-                interpreter.execute("Stream.iterate(0, { $_ + 1 }).forEach({ $_ })");
+                interpreter.execute("Stream.iterate(0, { $_ + 1 }).forEach({ $calls.incrementAndGet() })");
             } catch (Exception _) {
                 // expected: cancellation
             }
         });
-        Thread.sleep(300);
+        Waits.until("the callback runs", () -> calls.get() > 0);
         runner.interrupt();
         runner.join(5_000);
         assertThat(runner.isAlive()).isFalse();

@@ -4,12 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
+
+import io.powerj.fx.Threads;
 import org.junit.jupiter.api.Timeout;
 
 @Timeout(20)
@@ -59,21 +59,12 @@ class LiveTableTest {
         var live = new LiveTable(2);
         live.offer(reading("a"));
         live.offer(reading("b"));
-        CountDownLatch started = new CountDownLatch(1);
-        CompletableFuture<Boolean> third = CompletableFuture.supplyAsync(() -> {
-            try {
-                started.countDown();
-                return live.offer(reading("c"));
-            } catch (InterruptedException e) {
-                throw new IllegalStateException(e);
-            }
-        });
-        assertThat(started.await(5, TimeUnit.SECONDS)).isTrue();
-        Thread.sleep(150);
-        assertThat(third).isNotDone();               // the queue is full: it waits
+        var third = Threads.start(() -> live.offer(reading("c")));
+        Threads.awaitParked(third.thread());
+        assertThat(third.result()).isNotDone();      // the queue is full: it waits
         var table = new GridTable();
         live.drain(table, 1);                         // room for one
-        assertThat(third.get(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(third.result().get(5, TimeUnit.SECONDS)).isTrue();
         live.drain(table, 10);
         assertThat(values(table)).containsExactly("a", "b", "c");
     }
@@ -82,17 +73,11 @@ class LiveTableTest {
     void closingTheWindowFreesAndStopsThePipeline() throws Exception {
         var live = new LiveTable(1);
         live.offer(reading("a"));
-        CompletableFuture<Boolean> blocked = CompletableFuture.supplyAsync(() -> {
-            try {
-                return live.offer(reading("b"));
-            } catch (InterruptedException e) {
-                throw new IllegalStateException(e);
-            }
-        });
-        Thread.sleep(150);
-        assertThat(blocked).isNotDone();
+        var blocked = Threads.start(() -> live.offer(reading("b")));
+        Threads.awaitParked(blocked.thread());
+        assertThat(blocked.result()).isNotDone();
         live.close();
-        assertThat(blocked.get(5, TimeUnit.SECONDS)).isFalse();
+        assertThat(blocked.result().get(5, TimeUnit.SECONDS)).isFalse();
         assertThat(live.isClosed()).isTrue();
         assertThat(live.offer(reading("c"))).isFalse();
         assertThat(live.pending()).isZero();
@@ -111,7 +96,7 @@ class LiveTableTest {
             }
         });
         producer.start();
-        Thread.sleep(150);
+        Threads.awaitParked(producer);
         producer.interrupt();
         producer.join(5_000);
         assertThat(failure.get()).isInstanceOf(InterruptedException.class);
@@ -185,22 +170,16 @@ class LiveTableTest {
         live.setPaused(true);
         live.offer(reading("a"));
         live.offer(reading("b"));
-        CompletableFuture<Boolean> third = CompletableFuture.supplyAsync(() -> {
-            try {
-                return live.offer(reading("c"));
-            } catch (InterruptedException e) {
-                throw new IllegalStateException(e);
-            }
-        });
+        var third = Threads.start(() -> live.offer(reading("c")));
         var table = new GridTable();
+        Threads.awaitParked(third.thread());
         for (int i = 0; i < 3; i++) {
-            Thread.sleep(60);
             assertThat(live.drain(table, 10)).isZero();      // the window takes nothing
-            assertThat(third).isNotDone();                    // so the pipeline waits
+            assertThat(third.result()).isNotDone();           // so the pipeline waits
         }
         live.setPaused(false);
         live.drain(table, 1);
-        assertThat(third.get(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(third.result().get(5, TimeUnit.SECONDS)).isTrue();
         live.drain(table, 10);
         assertThat(values(table)).containsExactly("a", "b", "c");
     }
@@ -210,17 +189,11 @@ class LiveTableTest {
         var live = new LiveTable(1);
         live.setPaused(true);
         live.offer(reading("a"));
-        CompletableFuture<Boolean> blocked = CompletableFuture.supplyAsync(() -> {
-            try {
-                return live.offer(reading("b"));
-            } catch (InterruptedException e) {
-                throw new IllegalStateException(e);
-            }
-        });
-        Thread.sleep(150);
-        assertThat(blocked).isNotDone();
+        var blocked = Threads.start(() -> live.offer(reading("b")));
+        Threads.awaitParked(blocked.thread());
+        assertThat(blocked.result()).isNotDone();
         live.close();
-        assertThat(blocked.get(5, TimeUnit.SECONDS)).isFalse();
+        assertThat(blocked.result().get(5, TimeUnit.SECONDS)).isFalse();
     }
 
     @Test
@@ -246,17 +219,14 @@ class LiveTableTest {
     @Test
     void awaitClosedWaitsForTheClose() throws Exception {
         var live = new LiveTable(1);
-        CompletableFuture<Void> waiting = CompletableFuture.runAsync(() -> {
-            try {
-                live.awaitClosed();
-            } catch (InterruptedException e) {
-                throw new IllegalStateException(e);
-            }
+        var waiting = Threads.start(() -> {
+            live.awaitClosed();
+            return null;
         });
-        Thread.sleep(150);
-        assertThat(waiting).isNotDone();
+        Threads.awaitParked(waiting.thread());
+        assertThat(waiting.result()).isNotDone();
         live.close();
-        waiting.get(5, TimeUnit.SECONDS);
+        waiting.result().get(5, TimeUnit.SECONDS);
         live.awaitClosed(); // already closed: no wait
     }
 
@@ -272,7 +242,7 @@ class LiveTableTest {
             }
         });
         waiting.start();
-        Thread.sleep(150);
+        Threads.awaitParked(waiting);
         waiting.interrupt();
         waiting.join(5_000);
         assertThat(failure.get()).isInstanceOf(InterruptedException.class);
@@ -303,17 +273,13 @@ class LiveTableTest {
     void theResultIsThereWhenAwaitClosedReturns() throws Exception {
         var live = new LiveTable(1);
         var row = new GridRow("x", java.util.Map.of());
-        CompletableFuture<Object> seen = CompletableFuture.supplyAsync(() -> {
-            try {
-                live.awaitClosed();
-                return live.accepted().orElseThrow();
-            } catch (InterruptedException e) {
-                throw new IllegalStateException(e);
-            }
+        var seen = Threads.start(() -> {
+            live.awaitClosed();
+            return live.accepted().orElseThrow();
         });
-        Thread.sleep(100);
+        Threads.awaitParked(seen.thread());
         live.accept(List.of(row));
-        assertThat(seen.get(5, TimeUnit.SECONDS)).isEqualTo(List.of(row));
+        assertThat(seen.result().get(5, TimeUnit.SECONDS)).isEqualTo(List.of(row));
     }
 
     @Test

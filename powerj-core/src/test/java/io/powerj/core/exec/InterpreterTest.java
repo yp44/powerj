@@ -215,6 +215,8 @@ class InterpreterTest {
             });
             // Ctrl+C in the terminal reaches the whole process group: the background command ignores it.
             new ProcessBuilder("kill", "-INT", String.valueOf(last.pid())).start().waitFor();
+            // The one wait of this suite that is a duration on purpose: "the process did NOT die" can only be
+            // observed by letting some time pass (a death would be immediate).
             Thread.sleep(300);
             assertThat(sleep.isAlive()).isTrue();
         } finally {

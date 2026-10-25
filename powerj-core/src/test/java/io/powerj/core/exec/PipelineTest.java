@@ -193,6 +193,7 @@ class PipelineTest {
     @Timeout(20)
     void ctrlCStopsTheWholePipeline() throws Exception {
         var failure = new AtomicReference<Throwable>();
+        int producersBefore = FakeCmdlets.Infinite.RUNNING.get();
         Thread runner = Thread.ofPlatform().start(() -> {
             try {
                 interpreter.execute("infinite | filter { $_ >= 0 } | count");
@@ -200,12 +201,13 @@ class PipelineTest {
                 failure.set(t);
             }
         });
-        Thread.sleep(300);
+        // The stages are virtual threads, which Thread.getAllStackTraces() does not list: the old check "no thread named
+        // powerj-etape* is left" could never fail. The producer says itself whether it still runs.
+        Waits.until("the producer runs", () -> FakeCmdlets.Infinite.RUNNING.get() == producersBefore + 1);
         runner.interrupt();
         runner.join();
         assertThat(failure.get()).isInstanceOfAny(InterruptedException.class, CancellationException.class);
-        Thread.sleep(100);
-        assertThat(Thread.getAllStackTraces().keySet()).noneMatch(t -> t.getName().startsWith("powerj-etape"));
+        Waits.until("the producer stops", () -> FakeCmdlets.Infinite.RUNNING.get() == producersBefore);
     }
 
     // --- Native commands (Linux / macOS) ---

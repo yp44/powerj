@@ -9,6 +9,8 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+import io.powerj.fx.Threads;
+
 import io.powerj.api.CmdletInfo;
 import io.powerj.fx.model.ColumnKind;
 import io.powerj.fx.model.ColumnSpec;
@@ -317,7 +319,7 @@ class GridCmdletTest {
                 done.completeExceptionally(e);
             }
         });
-        Thread.sleep(300);
+        Threads.awaitParked(stage);
         assertThat(done).isNotDone();                       // the prompt is not given back
         assertThat(opener.live().state()).isEqualTo(LiveTable.State.COMPLETE);
         opener.live().close();                              // the user closes the window
@@ -344,7 +346,7 @@ class GridCmdletTest {
             }
         });
         stage.start();
-        Thread.sleep(300);
+        Threads.awaitParked(stage);
         stage.interrupt();                                  // Ctrl+C
         stage.join(5_000);
         assertThat(failure.get()).isInstanceOf(InterruptedException.class);
@@ -409,7 +411,7 @@ class GridCmdletTest {
     void passThruWaitsForTheWindowLikeWait() throws Exception {
         PassThru run = new PassThru(PASS_THRU, "a", "b");
         run.windowShown();
-        Thread.sleep(200);
+        Threads.awaitParked(run.stage);
         assertThat(run.done).isNotDone();                 // the prompt is not given back
         assertThat(run.context.emitted).isEmpty();
         run.ok(1);

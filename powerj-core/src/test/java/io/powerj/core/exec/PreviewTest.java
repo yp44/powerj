@@ -36,10 +36,14 @@ class PreviewTest {
 
         record Params(@Option(shortName = 'n') int count, @Option boolean forever) { }
 
+        /** Set once {@code --forever} has emitted its first object: the preview is then running. */
+        static volatile java.util.concurrent.CountDownLatch emitting = new java.util.concurrent.CountDownLatch(1);
+
         @Override
         public void begin(Params params, CmdletContext<Item> context) {
             for (int i = 1; params.forever() || i <= (params.count() == 0 ? 3 : params.count()); i++) {
                 context.emit(new Item("item" + i, i * 10));
+                emitting.countDown();
             }
         }
     }
@@ -272,12 +276,13 @@ class PreviewTest {
     @Test
     void interruptingThePreviewReturnsWhatHasArrived() throws Exception {
         var started = new CompletableFuture<Thread>();
+        Items.emitting = new java.util.concurrent.CountDownLatch(1);
         var result = CompletableFuture.supplyAsync(() -> {
             started.complete(Thread.currentThread());
             return interpreter.preview("items --forever | keep { i -> false }", 10, 120, false);
         });
         Thread worker = started.get(5, TimeUnit.SECONDS);
-        Thread.sleep(200);
+        assertThat(Items.emitting.await(10, TimeUnit.SECONDS)).as("the preview is running").isTrue();
         worker.interrupt();
         var values = (PreviewResult.Values) result.get(10, TimeUnit.SECONDS);
         assertThat(values.values()).isEmpty();

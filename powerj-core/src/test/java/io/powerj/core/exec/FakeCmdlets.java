@@ -113,10 +113,18 @@ final class FakeCmdlets {
 
         record Params() { }
 
+        /** Number of {@code infinite} stages running: a test can tell that Ctrl+C stopped the producer (a virtual thread). */
+        static final java.util.concurrent.atomic.AtomicInteger RUNNING = new java.util.concurrent.atomic.AtomicInteger();
+
         @Override
         public void begin(Params params, CmdletContext<Long> context) {
-            for (long i = 0; ; i++) {
-                context.emit(i);
+            RUNNING.incrementAndGet();
+            try {
+                for (long i = 0; ; i++) {
+                    context.emit(i);
+                }
+            } finally {
+                RUNNING.decrementAndGet();
             }
         }
     }
