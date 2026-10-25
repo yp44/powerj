@@ -238,6 +238,38 @@ class CmdletRunnerTest {
     }
 
     @Test
+    void aUsageExceptionIsAUsageErrorToo() {
+        Probe probe = new Probe();
+        probe.onBegin = _ -> {
+            throw new io.powerj.api.UsageException("count must be positive");
+        };
+
+        assertThatThrownBy(() -> run(probe, null, "w")).isInstanceOf(PjException.class)
+                .hasMessageContaining("probe").hasMessageContaining("count must be positive")
+                .hasCauseInstanceOf(io.powerj.api.UsageException.class);
+    }
+
+    @Test
+    void theEnvironmentOfTheContextIsACopyAndIsChangedThroughTheContext() throws Exception {
+        Probe probe = new Probe();
+        List<Object> seen = new ArrayList<>();
+        probe.onBegin = context -> {
+            var before = context.environment();
+            assertThatThrownBy(() -> before.put("X", "1")).isInstanceOf(UnsupportedOperationException.class);
+            context.setEnvironment("X", "1");
+            seen.add(before.containsKey("X"));                 // the copy taken before does not follow
+            seen.add(context.environment().get("X"));         // a new one does
+            seen.add(context.unsetEnvironment("X"));
+            seen.add(context.unsetEnvironment("X"));
+            seen.add(context.environment().containsKey("X"));
+        };
+
+        run(probe, null, "w");
+
+        assertThat(seen).containsExactly(false, "1", true, false, false);
+    }
+
+    @Test
     void anyOtherExceptionReachesTheCaller() {
         Probe probe = new Probe();
         probe.onBegin = _ -> {

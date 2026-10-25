@@ -15,6 +15,7 @@ import java.util.function.BiConsumer;
 import java.util.regex.PatternSyntaxException;
 
 import io.powerj.api.CmdletContext;
+import io.powerj.api.UsageException;
 import io.powerj.fs.FileTrees;
 import io.powerj.fs.WalkError;
 
@@ -46,7 +47,7 @@ final class FileOps {
         for (Object path : paths) {
             if (path instanceof io.powerj.api.ScriptBlock b) {
                 if (block != null) {
-                    throw new IllegalArgumentException(Messages.get("fileops.block.twice"));
+                    throw new UsageException(Messages.get("fileops.block.twice"));
                 }
                 block = b;
             } else {
@@ -54,10 +55,10 @@ final class FileOps {
             }
         }
         if (block != null && property != null) {
-            throw new IllegalArgumentException(Messages.get("fileops.block.property"));
+            throw new UsageException(Messages.get("fileops.block.property"));
         }
         if (block != null && !context.hasInput()) {
-            throw new IllegalArgumentException(Messages.get("fileops.block.needs.input", block.source()));
+            throw new UsageException(Messages.get("fileops.block.needs.input", block.source()));
         }
         return new Arguments(words, block);
     }
@@ -158,7 +159,7 @@ final class FileOps {
     /** Checks the value of {@code -p/--parallel}: {@code null} is sequential. */
     static int parallelism(Integer parallel) {
         if (parallel != null && parallel < 1) {
-            throw new IllegalArgumentException(Messages.get("fileops.parallel.invalid", parallel));
+            throw new UsageException(Messages.get("fileops.parallel.invalid", parallel));
         }
         return parallel == null ? 1 : parallel;
     }

@@ -16,6 +16,7 @@ import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
+import io.powerj.api.UsageException;
 import io.powerj.fs.FileWalker;
 import io.powerj.fs.Globs;
 
@@ -50,7 +51,7 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
     @Override
     public void begin(Params params, CmdletContext<FileEntry> context) {
         if (params.dirs() && params.files()) {
-            throw new IllegalArgumentException(Messages.get("ls.dirs.files.incompatible"));
+            throw new UsageException(Messages.get("ls.dirs.files.incompatible"));
         }
         FileOps.parallelism(params.parallel()); // refuses a count below 1 before anything is listed
         Optional<PathMatcher> filter = Optional.ofNullable(params.filter()).map(Globs::matcher);

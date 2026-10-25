@@ -15,6 +15,7 @@ import java.util.Locale;
 import java.util.function.Consumer;
 
 import io.powerj.api.CmdletContext;
+import io.powerj.api.UsageException;
 import io.powerj.fs.FileWalker;
 import io.powerj.fs.Globs;
 import io.powerj.fs.WalkError;
@@ -90,7 +91,7 @@ final class FileArguments {
         try {
             return Charset.forName(encoding);
         } catch (IllegalCharsetNameException | UnsupportedCharsetException _) {
-            throw new IllegalArgumentException(Messages.get(unknownKey, encoding));
+            throw new UsageException(Messages.get(unknownKey, encoding));
         }
     }
 }

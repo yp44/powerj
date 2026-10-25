@@ -10,6 +10,7 @@ import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
+import io.powerj.api.UsageException;
 
 /**
  * {@code kill}: stops processes given by pid or received from the pipeline (specification FR-74), with the JDK
@@ -37,7 +38,7 @@ public final class Kill implements Cmdlet<Kill.Params, Object, ProcessEntry> {
     public void begin(Params p, CmdletContext<ProcessEntry> context) {
         List<Object> arguments = p.pids() == null ? List.of() : p.pids();
         if (arguments.isEmpty() && !context.hasInput()) {
-            throw new IllegalArgumentException(Messages.get("kill.pid.expected"));
+            throw new UsageException(Messages.get("kill.pid.expected"));
         }
         long[] pids = new long[arguments.size()];
         for (int i = 0; i < pids.length; i++) {
@@ -56,7 +57,7 @@ public final class Kill implements Cmdlet<Kill.Params, Object, ProcessEntry> {
         try {
             return Long.parseLong(String.valueOf(argument).strip());
         } catch (NumberFormatException e) {
-            throw new IllegalArgumentException(Messages.get("kill.pid.invalid", argument));
+            throw new UsageException(Messages.get("kill.pid.invalid", argument));
         }
     }
 

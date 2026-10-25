@@ -16,6 +16,7 @@ import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
+import io.powerj.api.UsageException;
 
 /**
  * {@code cat}: reads files, as lines or as a whole content (specification FR-65).
@@ -81,7 +82,7 @@ public final class Cat implements Cmdlet<Cat.Params, Object, Object> {
                 }
             }
         } else if (!context.hasInput()) {
-            throw new IllegalArgumentException(Messages.get("cat.file.expected"));
+            throw new UsageException(Messages.get("cat.file.expected"));
         }
     }
 
@@ -125,7 +126,7 @@ public final class Cat implements Cmdlet<Cat.Params, Object, Object> {
             int chosen = (params.lines() ? 1 : 0) + (params.text() ? 1 : 0) + (params.numbered() ? 1 : 0)
                     + (params.content() ? 1 : 0);
             if (chosen > 1) {
-                throw new IllegalArgumentException(Messages.get("cat.one.output"));
+                throw new UsageException(Messages.get("cat.one.output"));
             }
             return params.text() ? Mode.TEXT : params.numbered() ? Mode.NUMBERED
                     : params.content() ? Mode.CONTENT : Mode.LINES;

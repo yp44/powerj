@@ -4,6 +4,7 @@ import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
+import io.powerj.api.UsageException;
 
 /**
  * {@code first}: the first {@code n} objects of the pipeline (specification FR-68). Once they are emitted, the previous
@@ -55,7 +56,7 @@ public final class First implements Cmdlet<First.Params, Object, Object> {
             return 1;
         }
         if (count < 0) {
-            throw new IllegalArgumentException(Messages.get("count.negative", count));
+            throw new UsageException(Messages.get("count.negative", count));
         }
         return count;
     }

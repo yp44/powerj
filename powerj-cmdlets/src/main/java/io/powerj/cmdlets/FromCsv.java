@@ -12,6 +12,7 @@ import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
 import io.powerj.api.Row;
+import io.powerj.api.UsageException;
 
 /**
  * {@code from-csv}: reads the CSV text received from the pipeline (specification FR-73), one {@code Row} per record,
@@ -48,7 +49,7 @@ public final class FromCsv implements Cmdlet<FromCsv.Params, Object, Row> {
         return context.state(State.class, () -> {
             char delimiter = CsvWriter.delimiter(p.delimiter());
             if (!context.hasInput()) {
-                throw new IllegalArgumentException(Messages.get("from-csv.input.expected"));
+                throw new UsageException(Messages.get("from-csv.input.expected"));
             }
             return new State(new PipelineText(p.property(), context, "from-csv.not.text"), new CsvReader(delimiter));
         });

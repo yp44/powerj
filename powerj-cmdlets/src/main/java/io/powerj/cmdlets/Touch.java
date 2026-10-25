@@ -13,6 +13,7 @@ import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
+import io.powerj.api.UsageException;
 import io.powerj.fs.Globs;
 
 /**
@@ -38,7 +39,7 @@ public final class Touch implements Cmdlet<Touch.Params, Object, Object> {
         FileOps.Arguments arguments = FileOps.arguments(p.paths(), p.property(), context);
         context.state(PipelineFiles.class, () -> new PipelineFiles(p.property(), arguments.block(), context, FileOps.KEYS));
         if (arguments.words().isEmpty() && !context.hasInput()) {
-            throw new IllegalArgumentException(Messages.get("fileops.path.expected", "touch"));
+            throw new UsageException(Messages.get("fileops.path.expected", "touch"));
         }
         for (String argument : arguments.words()) {
             if (Globs.isPattern(argument)) {

@@ -11,6 +11,7 @@ import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.ScriptBlock;
+import io.powerj.api.UsageException;
 import io.powerj.fx.Messages;
 import io.powerj.fx.model.ColumnChoice;
 import io.powerj.fx.model.WindowSettings;
@@ -86,20 +87,20 @@ public final class GridCmdlet implements Cmdlet<GridParams, Object, Object> {
     @Override
     public void begin(GridParams p, CmdletContext<Object> context) {
         if (!context.hasInput()) {
-            throw new IllegalArgumentException(Messages.get("grid.noInput"));
+            throw new UsageException(Messages.get("grid.noInput"));
         }
         if (p.single() && !p.passThru()) {
-            throw new IllegalArgumentException(Messages.get("grid.single.needsPassThru"));
+            throw new UsageException(Messages.get("grid.single.needsPassThru"));
         }
         if (p.limit() <= 0) {
-            throw new IllegalArgumentException(Messages.get("grid.maxRows.invalid", p.limit()));
+            throw new UsageException(Messages.get("grid.maxRows.invalid", p.limit()));
         }
         ColumnChoice columns = ColumnChoice.ALL;
         if (p.columns() != null) {
             try {
                 columns = ColumnChoice.parse(p.columns());
             } catch (IllegalArgumentException e) {
-                throw new IllegalArgumentException(Messages.get("grid.columns.invalid", p.columns()), e);
+                throw new UsageException(Messages.get("grid.columns.invalid", p.columns()), e);
             }
         }
         String title = p.title() == null || p.title().isBlank() ? Messages.get("grid.title") : p.title();
@@ -195,7 +196,7 @@ public final class GridCmdlet implements Cmdlet<GridParams, Object, Object> {
 
         @Override
         public Object read(Object target, String name) {
-            return blocks.computeIfAbsent(name, n -> context.compile("$_." + n)).invoke(target);
+            return blocks.computeIfAbsent(name, n -> context.property(n)).invoke(target);
         }
     }
 }

@@ -5,6 +5,7 @@ import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
+import io.powerj.api.UsageException;
 
 /**
  * {@code to-json}: the objects received as JSON text (specification FR-73), always an array, emitted when the input
@@ -43,7 +44,7 @@ public final class ToJson implements Cmdlet<ToJson.Params, Object, String> {
     private static State state(Params p, CmdletContext<String> context) {
         return context.state(State.class, () -> {
             if (p.depth() != null && p.depth() < 1) {
-                throw new IllegalArgumentException(Messages.get("to-json.depth.invalid", p.depth()));
+                throw new UsageException(Messages.get("to-json.depth.invalid", p.depth()));
             }
             int depth = p.depth() == null ? DEFAULT_DEPTH : p.depth();
             return new State(new JsonWriter(!p.compact() && !p.lines(), depth));

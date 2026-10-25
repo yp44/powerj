@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
+import io.powerj.api.UsageException;
+
 /**
  * Writes CSV lines (RFC 4180; specification FR-73): a field is quoted when it holds the delimiter, a quote or a line
  * break, or starts or ends with a space; numbers use {@code .} without exponent, nested values are compact JSON.
@@ -75,7 +77,7 @@ final class CsvWriter {
             return '\t';
         }
         if (option.length() != 1 || option.charAt(0) == '"' || option.charAt(0) == '\n' || option.charAt(0) == '\r') {
-            throw new IllegalArgumentException(Messages.get("csv.delimiter.invalid", option));
+            throw new UsageException(Messages.get("csv.delimiter.invalid", option));
         }
         return option.charAt(0);
     }

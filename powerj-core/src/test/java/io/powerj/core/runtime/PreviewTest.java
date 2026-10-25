@@ -98,7 +98,7 @@ class PreviewTest {
         @Override
         public void begin(Params params, CmdletContext<String> context) {
             if (params.set() != null) {
-                context.environment().put("SETTING", params.set());
+                context.setEnvironment("SETTING", params.set());
             }
             context.emit(context.environment().getOrDefault("SETTING", "none"));
         }

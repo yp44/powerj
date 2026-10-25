@@ -14,6 +14,7 @@ import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
 import io.powerj.api.Row;
 import io.powerj.api.ScriptBlock;
+import io.powerj.api.UsageException;
 
 /**
  * {@code select}: turns each object into a {@link Row} of chosen columns (specification FR-69).
@@ -150,7 +151,7 @@ public final class Select implements Cmdlet<Select.Params, Object, Row> {
     /** Columns described by the arguments, in order. */
     static List<Column> columns(List<Object> arguments, CmdletContext<?> context) {
         if (arguments == null || arguments.isEmpty()) {
-            throw new IllegalArgumentException(Messages.get("select.column.expected"));
+            throw new UsageException(Messages.get("select.column.expected"));
         }
         List<Column> columns = new ArrayList<>();
         int unnamed = 0;
@@ -162,7 +163,7 @@ public final class Select implements Cmdlet<Select.Params, Object, Row> {
             } else if (argument instanceof String word && word.endsWith("=") && word.indexOf('=') == word.length() - 1) {
                 String name = name(word.substring(0, word.length() - 1));
                 if (i + 1 >= arguments.size() || !(arguments.get(i + 1) instanceof ScriptBlock block)) {
-                    throw new IllegalArgumentException(Messages.get("select.block.expected", word));
+                    throw new UsageException(Messages.get("select.block.expected", word));
                 }
                 i++;
                 column = new Column(name, block, null);
@@ -175,11 +176,11 @@ public final class Select implements Cmdlet<Select.Params, Object, Row> {
                 String name = property.substring(property.lastIndexOf('.') + 1);
                 column = new Column(name, Keys.block(property, context, "select.column.invalid"), simple(property));
             } else {
-                throw new IllegalArgumentException(Messages.get("select.column.invalid", argument));
+                throw new UsageException(Messages.get("select.column.invalid", argument));
             }
             for (Column other : columns) {
                 if (other.name().equals(column.name())) {
-                    throw new IllegalArgumentException(Messages.get("select.column.duplicate", column.name()));
+                    throw new UsageException(Messages.get("select.column.duplicate", column.name()));
                 }
             }
             columns.add(column);
@@ -189,7 +190,7 @@ public final class Select implements Cmdlet<Select.Params, Object, Row> {
 
     private static String name(String name) {
         if (!NAME.matcher(name).matches()) {
-            throw new IllegalArgumentException(Messages.get("select.name.invalid", name));
+            throw new UsageException(Messages.get("select.name.invalid", name));
         }
         return name;
     }

@@ -6,6 +6,7 @@ import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
+import io.powerj.api.UsageException;
 
 /**
  * {@code from-json}: reads the JSON text received from the pipeline (specification FR-73). Each top-level value is
@@ -28,7 +29,7 @@ public final class FromJson implements Cmdlet<FromJson.Params, Object, Object> {
     private static State state(Params p, CmdletContext<Object> context) {
         return context.state(State.class, () -> {
             if (!context.hasInput()) {
-                throw new IllegalArgumentException(Messages.get("from-json.input.expected"));
+                throw new UsageException(Messages.get("from-json.input.expected"));
             }
             return new State(new PipelineText(p.property(), context, "from-json.not.text"), new JsonSplitter());
         });

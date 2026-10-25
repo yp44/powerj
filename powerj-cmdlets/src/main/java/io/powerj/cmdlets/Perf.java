@@ -13,6 +13,7 @@ import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
 import io.powerj.api.PerfReport;
+import io.powerj.api.UsageException;
 
 /**
  * {@code perf}: what was measured in perf mode (Alt+P), as records to process in a pipeline (specification FR-76).
@@ -47,13 +48,13 @@ public final class Perf implements Cmdlet<Perf.Params, Void, Object> {
     public void begin(Params p, CmdletContext<Object> context) {
         View view = p.view() == null ? View.STAGES : p.view();
         if (p.line() != null && p.line() < 1) {
-            throw new IllegalArgumentException(Messages.get("perf.line.invalid", p.line()));
+            throw new UsageException(Messages.get("perf.line.invalid", p.line()));
         }
         if (p.line() != null && p.all()) {
-            throw new IllegalArgumentException(Messages.get("perf.line.all"));
+            throw new UsageException(Messages.get("perf.line.all"));
         }
         if (p.save() != null && (p.view() != null || p.all())) {
-            throw new IllegalArgumentException(Messages.get("perf.save.exclusive"));
+            throw new UsageException(Messages.get("perf.save.exclusive"));
         }
         List<PerfReport> kept = context.perfReports();
         if (kept.isEmpty()) {

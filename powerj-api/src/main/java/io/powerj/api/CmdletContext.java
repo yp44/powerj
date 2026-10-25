@@ -30,8 +30,31 @@ public interface CmdletContext<O> {
     /** Current directory of the session, base for relative paths. */
     Path currentDirectory();
 
-    /** Environment of the session (modifiable), passed on to native commands launched afterwards. */
+    /**
+     * Environment of the session, as it is when this is called: a read-only copy that does not follow later changes (the
+     * other stages of the pipeline and the commands launched afterwards change the real one). To change the
+     * environment, use {@link #setEnvironment} and {@link #unsetEnvironment}.
+     */
     Map<String, String> environment();
+
+    /**
+     * Sets an environment variable of the session, passed on to the native commands launched afterwards.
+     *
+     * @throws UnsupportedOperationException by default: the shell's context overrides it
+     */
+    default void setEnvironment(String name, String value) {
+        throw new UnsupportedOperationException("this context cannot change the environment");
+    }
+
+    /**
+     * Removes an environment variable of the session.
+     *
+     * @return {@code true} if the variable was set
+     * @throws UnsupportedOperationException by default: the shell's context overrides it
+     */
+    default boolean unsetEnvironment(String name) {
+        throw new UnsupportedOperationException("this context cannot change the environment");
+    }
 
     /** Value of a session variable. */
     Optional<Object> variable(String name);
@@ -77,6 +100,16 @@ public interface CmdletContext<O> {
      * @throws IllegalArgumentException if the expression is syntactically invalid
      */
     ScriptBlock compile(String expression);
+
+    /**
+     * The block that reads a property of the received object, or a path of properties: {@code property("size")} is
+     * {@code { $_.size }} and {@code property("path.fileName")} is {@code { $_.path.fileName }}.
+     *
+     * @throws IllegalArgumentException if {@code path} is not a property name or a path of them
+     */
+    default ScriptBlock property(String path) {
+        return compile("$_." + path);
+    }
 
     /**
      * The cmdlet will read no more objects (specification FR-68b): {@link Cmdlet#process} is no longer called,

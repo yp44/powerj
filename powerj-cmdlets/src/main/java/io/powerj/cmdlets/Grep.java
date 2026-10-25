@@ -27,6 +27,7 @@ import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
 import io.powerj.api.ScriptBlock;
 import io.powerj.api.Span;
+import io.powerj.api.UsageException;
 import io.powerj.fs.FileWalker;
 
 /**
@@ -132,13 +133,13 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
         Search(Params params, CmdletContext<?> context) {
             int parallelism = FileOps.parallelism(params.parallel());
             if (params.maxDepth() != null && params.maxDepth() < 1) {
-                throw new IllegalArgumentException(Messages.get("grep.maxDepth.invalid", params.maxDepth()));
+                throw new UsageException(Messages.get("grep.maxDepth.invalid", params.maxDepth()));
             }
             try {
                 pattern = Pattern.compile(params.pattern(),
                         params.ignoreCase() ? Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE : 0);
             } catch (PatternSyntaxException e) {
-                throw new IllegalArgumentException(Messages.get("grep.pattern.invalid", params.pattern(),
+                throw new UsageException(Messages.get("grep.pattern.invalid", params.pattern(),
                         e.getDescription(), e.getIndex()));
             }
             invert = params.invert();
@@ -155,9 +156,9 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
 
         private static ScriptBlock property(String name, CmdletContext<?> context) {
             if (!Where.PROPERTY.matcher(name).matches()) {
-                throw new IllegalArgumentException(Messages.get("where.property.invalid", name));
+                throw new UsageException(Messages.get("where.property.invalid", name));
             }
-            return context.compile("$_." + name);
+            return context.property(name);
         }
 
         /** Searches the files below the roots; the lines of a file are emitted together, in order. */

@@ -15,6 +15,7 @@ import java.util.List;
 
 import io.powerj.api.CmdletContext;
 import io.powerj.api.ScriptBlock;
+import io.powerj.api.UsageException;
 
 /**
  * One execution of {@code cp} or {@code mv} (specification FR-72): sources from the arguments and the pipeline, the
@@ -46,11 +47,11 @@ final class Transfer {
     Transfer(Options options, List<Object> paths, String property, CmdletContext<?> context) {
         this.options = options;
         if (paths.isEmpty() || (paths.size() == 1 && !context.hasInput())) {
-            throw new IllegalArgumentException(Messages.get("fileops.destination.expected", options.move() ? "mv" : "cp"));
+            throw new UsageException(Messages.get("fileops.destination.expected", options.move() ? "mv" : "cp"));
         }
         for (Object path : paths.subList(0, paths.size() - 1)) {
             if (path instanceof ScriptBlock) {
-                throw new IllegalArgumentException(Messages.get("fileops.block.destination"));
+                throw new UsageException(Messages.get("fileops.block.destination"));
             }
         }
         this.files = new PipelineFiles(property, context, FileOps.KEYS);

@@ -9,6 +9,7 @@ import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
 import io.powerj.api.ScriptBlock;
+import io.powerj.api.UsageException;
 
 /**
  * {@code where}: lets through only the objects for which the condition is true (specification FR-36).
@@ -71,11 +72,11 @@ public final class Where implements Cmdlet<Where.Params, Object, Object> {
         if (words.size() == 3 && words.get(0) instanceof String property && words.get(1) instanceof String operator
                 && OPERATORS.contains(operator)) {
             if (!PROPERTY.matcher(property).matches()) {
-                throw new IllegalArgumentException(Messages.get("where.property.invalid", property));
+                throw new UsageException(Messages.get("where.property.invalid", property));
             }
             return context.compile("$_." + property + " " + operator + " " + value(words.get(2)));
         }
-        throw new IllegalArgumentException(Messages.get("where.condition.expected"));
+        throw new UsageException(Messages.get("where.condition.expected"));
     }
 
     /** Short-form value as expression text: literal as is, otherwise a quoted string. */
@@ -86,7 +87,7 @@ public final class Where implements Cmdlet<Where.Params, Object, Object> {
             case Boolean b -> b.toString();
             case String s when LITERAL.matcher(s).matches() -> s;
             case String s -> quote(s);
-            default -> throw new IllegalArgumentException(Messages.get("where.value.unsupported",
+            default -> throw new UsageException(Messages.get("where.value.unsupported",
                     value.getClass().getSimpleName()));
         };
     }

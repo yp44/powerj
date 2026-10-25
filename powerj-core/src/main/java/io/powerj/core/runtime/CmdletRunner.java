@@ -175,7 +175,17 @@ public final class CmdletRunner {
 
         @Override
         public Map<String, String> environment() {
-            return session.environment();
+            return session.environmentSnapshot();
+        }
+
+        @Override
+        public void setEnvironment(String name, String value) {
+            session.environment().put(name, value);
+        }
+
+        @Override
+        public boolean unsetEnvironment(String name) {
+            return session.environment().remove(name) != null;
         }
 
         @Override

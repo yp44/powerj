@@ -40,7 +40,17 @@ final class TestContext<O> implements CmdletContext<O> {
 
     @Override
     public Map<String, String> environment() {
-        return environment;
+        return java.util.Collections.unmodifiableMap(environment);
+    }
+
+    @Override
+    public void setEnvironment(String name, String value) {
+        environment.put(name, value);
+    }
+
+    @Override
+    public boolean unsetEnvironment(String name) {
+        return environment.remove(name) != null;
     }
 
     @Override

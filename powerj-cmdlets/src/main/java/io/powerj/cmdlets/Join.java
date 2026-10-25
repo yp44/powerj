@@ -20,6 +20,7 @@ import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
 import io.powerj.api.Row;
 import io.powerj.api.ScriptBlock;
+import io.powerj.api.UsageException;
 
 /**
  * {@code join}: one {@link Row} per pair of a pipeline object and an object of {@code --right} with the same key
@@ -71,18 +72,18 @@ public final class Join implements Cmdlet<Join.Params, Object, Row> {
     public void begin(Params p, CmdletContext<Row> context) {
         ScriptBlock right = side(p.right(), "join.right.expected");
         if (p.key() != null && (p.leftKey() != null || p.rightKey() != null)) {
-            throw new IllegalArgumentException(Messages.get("join.key.conflict"));
+            throw new UsageException(Messages.get("join.key.conflict"));
         }
         Object leftKeyArgument = p.key() != null ? p.key() : p.leftKey();
         if (leftKeyArgument == null) {
-            throw new IllegalArgumentException(Messages.get("join.key.expected"));
+            throw new UsageException(Messages.get("join.key.expected"));
         }
         Object rightKeyArgument = p.rightKey() != null ? p.rightKey() : leftKeyArgument;
         ScriptBlock leftKey = Keys.block(leftKeyArgument, context, "join.key.invalid");
         ScriptBlock rightKey = Keys.block(rightKeyArgument, context, "join.key.invalid");
         ScriptBlock left = null;
         if (context.hasInput() && p.left() != null) {
-            throw new IllegalArgumentException(Messages.get("join.left.conflict"));
+            throw new UsageException(Messages.get("join.left.conflict"));
         }
         if (!context.hasInput()) {
             left = side(p.left(), "join.left.expected");
@@ -169,14 +170,14 @@ public final class Join implements Cmdlet<Join.Params, Object, Row> {
         if (argument instanceof ScriptBlock block) {
             return block;
         }
-        throw new IllegalArgumentException(Messages.get(expectedKey));
+        throw new UsageException(Messages.get(expectedKey));
     }
 
     /** Objects given by a side, a collection, an array or a stream being unrolled as by the pipeline (FR-30b). */
     private static List<Object> objects(ScriptBlock side, String option) {
         var attempt = side.tryInvoke(null);
         if (attempt.failed()) {
-            throw new IllegalArgumentException(Messages.get("join.side.failed", option, attempt.error().getMessage()),
+            throw new UsageException(Messages.get("join.side.failed", option, attempt.error().getMessage()),
                     attempt.error());
         }
         Object value = attempt.value();

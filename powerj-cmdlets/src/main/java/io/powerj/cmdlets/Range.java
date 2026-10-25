@@ -9,6 +9,7 @@ import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
 import io.powerj.api.ScriptBlock;
+import io.powerj.api.UsageException;
 
 /**
  * {@code range}: the objects between two bounds (specification FR-68). A bound is a position (from 1) without
@@ -79,13 +80,13 @@ public final class Range implements Cmdlet<Range.Params, Object, Object> {
     @Override
     public void begin(Params p, CmdletContext<Object> context) {
         if (p.include() && p.exclude()) {
-            throw new IllegalArgumentException(Messages.get("range.include.exclude"));
+            throw new UsageException(Messages.get("range.include.exclude"));
         }
         ScriptBlock property = p.property() == null ? null : Keys.block(p.property(), context, "range.property.invalid");
         Bound from = bound("--from", p.from(), property, p.ignoreCase());
         Bound to = bound("--to", p.to(), property, p.ignoreCase());
         if (p.repeat() && !(from instanceof Match || from instanceof Condition)) {
-            throw new IllegalArgumentException(Messages.get("range.repeat.position"));
+            throw new UsageException(Messages.get("range.repeat.position"));
         }
         State state = context.state(State.class, () -> new State(from, to));
         long first = from instanceof Position(long n) ? n : 1;
@@ -174,7 +175,7 @@ public final class Range implements Cmdlet<Range.Params, Object, Object> {
                 return new Match(property, Pattern.compile(text,
                         ignoreCase ? Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE : 0));
             } catch (PatternSyntaxException e) {
-                throw new IllegalArgumentException(Messages.get("grep.pattern.invalid", text, e.getDescription(),
+                throw new UsageException(Messages.get("grep.pattern.invalid", text, e.getDescription(),
                         e.getIndex()));
             }
         }
@@ -182,10 +183,10 @@ public final class Range implements Cmdlet<Range.Params, Object, Object> {
         try {
             position = Long.parseLong(text);
         } catch (NumberFormatException e) {
-            throw new IllegalArgumentException(Messages.get("range.not.position", option, text));
+            throw new UsageException(Messages.get("range.not.position", option, text));
         }
         if (position < 1) {
-            throw new IllegalArgumentException(Messages.get("range.position.invalid", option, text));
+            throw new UsageException(Messages.get("range.position.invalid", option, text));
         }
         return new Position(position);
     }

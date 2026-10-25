@@ -67,8 +67,11 @@ public abstract interface io.powerj.api.CmdletContext<O>
   public abstract void io.powerj.api.CmdletContext.error(java.lang.String)
   public default <S> S io.powerj.api.CmdletContext.state(java.lang.Class<S>,java.util.function.Supplier<? extends S>)
   public default boolean io.powerj.api.CmdletContext.hasInput()
+  public default boolean io.powerj.api.CmdletContext.unsetEnvironment(java.lang.String)
+  public default io.powerj.api.ScriptBlock io.powerj.api.CmdletContext.property(java.lang.String)
   public default java.util.List<io.powerj.api.PerfReport> io.powerj.api.CmdletContext.perfReports()
   public default java.util.Optional<java.nio.file.Path> io.powerj.api.CmdletContext.configDirectory()
+  public default void io.powerj.api.CmdletContext.setEnvironment(java.lang.String,java.lang.String)
   public default void io.powerj.api.CmdletContext.stopInput()
 
 public abstract @interface io.powerj.api.CmdletInfo extends java.lang.annotation.Annotation retention=RUNTIME
@@ -285,3 +288,7 @@ public final record io.powerj.api.StageStat
   public java.time.Duration io.powerj.api.StageStat.blocked()
   public java.time.Duration io.powerj.api.StageStat.starved()
   public java.time.Duration io.powerj.api.StageStat.wall()
+
+public final class io.powerj.api.UsageException extends java.lang.IllegalArgumentException
+  public io.powerj.api.UsageException(java.lang.String)
+  public io.powerj.api.UsageException(java.lang.String,java.lang.Throwable)

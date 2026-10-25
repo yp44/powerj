@@ -12,6 +12,7 @@ import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
+import io.powerj.api.UsageException;
 
 /** {@code mkdir}: creates folders and emits their {@link FileEntry} (specification FR-72). */
 @CmdletInfo(name = "mkdir", category = "Files", summary = "Creates folders",
@@ -35,7 +36,7 @@ public final class MakeDirectory implements Cmdlet<MakeDirectory.Params, Object,
         FileOps.Arguments arguments = FileOps.arguments(p.paths(), p.property(), context);
         context.state(PipelineFiles.class, () -> new PipelineFiles(p.property(), arguments.block(), context, FileOps.KEYS));
         if (arguments.words().isEmpty() && !context.hasInput()) {
-            throw new IllegalArgumentException(Messages.get("fileops.path.expected", "mkdir"));
+            throw new UsageException(Messages.get("fileops.path.expected", "mkdir"));
         }
         for (String argument : arguments.words()) {
             Path path = FileOps.path(argument, context);

@@ -8,6 +8,7 @@ import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
+import io.powerj.api.UsageException;
 
 /**
  * {@code rm}: removes files and folders (specification FR-72). A non-empty folder needs {@code -r}; links are removed,
@@ -51,7 +52,7 @@ public final class Remove implements Cmdlet<Remove.Params, Object, Object> {
                 p.allowProtected() ? null : ProtectedPaths.load(context.configDirectory(), context.environment(),
                         context.currentDirectory()), parallelism));
         if (arguments.words().isEmpty() && !context.hasInput()) {
-            throw new IllegalArgumentException(Messages.get("fileops.path.expected", "rm"));
+            throw new UsageException(Messages.get("fileops.path.expected", "rm"));
         }
         for (String argument : arguments.words()) {
             for (Path path : FileOps.expand(argument, context)) {
