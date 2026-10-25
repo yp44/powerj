@@ -64,6 +64,15 @@ public final class NativeRunner {
         public Command {
             args = List.copyOf(args);
         }
+
+        /** {@code xeyes -geometry 100x100}: program name and arguments, on one line, for {@code jobs} and the perf summary. */
+        String text() {
+            List<String> words = new ArrayList<>(args.size() + 1);
+            words.add(executable.getFileName().toString());
+            args.forEach(arg -> words.add(arg.isEmpty() || arg.chars().anyMatch(Character::isWhitespace)
+                    ? '"' + arg.replace("\n", "\\n").replace("\t", "\\t") + '"' : arg));
+            return String.join(" ", words);
+        }
     }
 
     /**

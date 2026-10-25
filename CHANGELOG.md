@@ -88,8 +88,12 @@ structures, functions) can be built on it. The work is organised in phases (revi
 
 - **The parameters that always travelled together are one object** (step 2.2): `ExecutionContext` and `Redirections`.
   No method of the execution has more than five parameters any more (there were eleven).
-- The frozen ArchUnit rules no longer fail when a refactoring only changes the signature of a method already in a cycle, or
-  the tally of its report.
+- **The pipeline is run by its own class** (step 2.3): `PipelineExecutor` plans and runs the stages, `ErrorReporter` says
+  where the errors go and whether the line hit a blocking one. `Interpreter` goes from 1,129 to 623 lines. Nothing
+  changes for the user: the 77 characterization cases are untouched.
+- The frozen ArchUnit rules no longer fail when a refactoring only changes the signature of a method already in a cycle, the
+  tally of its report, or which of the (many) `exec` classes that use the syntax tree the report happens to list. The
+  dependency that closes the `exec`/`lang` cycle (`lang` reaching into `exec`) is still compared line by line.
 
 ### Examined, not changed
 - **The seven `Messages` classes stay** (C-10, step 1.4). Replacing them with one helper in `powerj-api` was tried on a

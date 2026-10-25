@@ -7,12 +7,17 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CancellationException;
+import java.util.function.Supplier;
 import java.util.stream.BaseStream;
 
+import io.powerj.api.ScriptBlock;
 import io.powerj.core.lang.Ast;
 import io.powerj.core.lang.Ast.Expression;
 import io.powerj.core.lang.Ast.Operator;
+import io.powerj.core.lang.ExpressionParser;
 import io.powerj.core.lang.StringPart;
+import io.powerj.core.lang.Syntax;
+import io.powerj.core.lang.SyntaxException;
 
 /**
  * Evaluates expressions: arguments, values at the start of a line, contents of {@code { … }} blocks, Java
@@ -49,11 +54,17 @@ final class Evaluator {
 
     private final Session session;
     private final PipelineRunner runner;
+    private final Supplier<Syntax> syntax;
     private final CallPolicy policy;
 
-    Evaluator(Session session, PipelineRunner runner) {
+    /**
+     * @param runner runs the pipeline of a subexpression
+     * @param syntax the syntax the text of a block is read with, as the interpreter reads a line
+     */
+    Evaluator(Session session, PipelineRunner runner, Supplier<Syntax> syntax) {
         this.session = session;
         this.runner = runner;
+        this.syntax = syntax;
         this.policy = new CallPolicy(session);
     }
 
@@ -64,6 +75,36 @@ final class Evaluator {
             throw unknownName(name);
         }
         return value;
+    }
+
+    /** Compiles the text of a block for a cmdlet ({@code CmdletContext.compile}). */
+    ScriptBlock compile(String source) {
+        try {
+            var function = ExpressionParser.function(source, syntax.get());
+            return (ScriptBlock) evaluate(function);
+        } catch (SyntaxException e) {
+            throw new IllegalArgumentException(e.getMessage(), e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new CancellationException();
+        }
+    }
+
+    /** Values of the arguments of a command, in order. */
+    List<Object> arguments(List<Ast.Argument> arguments) throws InterruptedException {
+        List<Object> values = new ArrayList<>(arguments.size());
+        for (Ast.Argument argument : arguments) {
+            values.add(argument(argument));
+        }
+        return values;
+    }
+
+    /** Value of one argument: a bare word (with {@code ~} expanded, FR-62) or an expression. */
+    Object argument(Ast.Argument argument) throws InterruptedException {
+        return switch (argument) {
+            case Ast.WordArgument(var text) -> session.expandTilde(text); // ~, ~/x (FR-62); not in quotes
+            case Ast.ExpressionArgument(var expression) -> evaluate(expression);
+        };
     }
 
     private Object eval(Expression expression) throws InterruptedException {
