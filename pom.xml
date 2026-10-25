@@ -19,6 +19,7 @@
         <module>powerj-cmdlets</module>
         <module>powerj-fx</module>
         <module>powerj-shell</module>
+        <module>powerj-architecture</module>
         <module>powerj-coverage</module>
         <module>powerj-dist</module>
         <module>examples/greet</module>
@@ -38,6 +39,7 @@
         <assertj.version>3.27.4</assertj.version>
         <jline.version>4.4.7</jline.version>
         <jacoco.version>0.8.15</jacoco.version>
+        <archunit.version>1.5.1</archunit.version>
         <javafx.version>25.0.5</javafx.version>
     </properties>
 
@@ -100,6 +102,11 @@
                 <artifactId>assertj-core</artifactId>
                 <version>${assertj.version}</version>
             </dependency>
+            <dependency>
+                <groupId>com.tngtech.archunit</groupId>
+                <artifactId>archunit-junit5</artifactId>
+                <version>${archunit.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -134,6 +141,13 @@
                         <systemPropertyVariables>
                             <powerj.language>en</powerj.language>
                         </systemPropertyVariables>
+                        <!-- A test that blocks (deadlock, pipeline never closed) must fail, not freeze the build (review
+                             C-31). The slowest test takes 1.5 s; one that needs more declares its own @Timeout. -->
+                        <properties>
+                            <configurationParameters>
+                                junit.jupiter.execution.timeout.default = 60 s
+                            </configurationParameters>
+                        </properties>
                     </configuration>
                 </plugin>
                 <plugin>

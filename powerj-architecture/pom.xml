@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.powerj</groupId>
+        <artifactId>powerj-parent</artifactId>
+        <version>0.2.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>powerj-architecture</artifactId>
+    <name>PowerJ Architecture</name>
+    <description>
+        Architecture rules of PowerJ, checked by ArchUnit on the classes of every module (review C-32). No production code:
+        only tests, which run on the class path so that one importer sees all the modules. Violations that existed when a
+        rule was introduced are frozen in src/test/resources/archunit_store: they may disappear, never appear.
+    </description>
+
+    <properties>
+        <!-- No artifact: neither installed nor deployed. -->
+        <maven.install.skip>true</maven.install.skip>
+        <maven.deploy.skip>true</maven.deploy.skip>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.powerj</groupId>
+            <artifactId>powerj-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.powerj</groupId>
+            <artifactId>powerj-fs</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.powerj</groupId>
+            <artifactId>powerj-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.powerj</groupId>
+            <artifactId>powerj-cmdlets</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.powerj</groupId>
+            <artifactId>powerj-fx</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.powerj</groupId>
+            <artifactId>powerj-shell</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- Nothing to package: the module only holds tests. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <configuration>
+                    <skipIfEmpty>true</skipIfEmpty>
+                </configuration>
+            </plugin>
+            <!-- The tests of this module cover ArchUnit, not PowerJ: nothing to add to the coverage. -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <configuration>
+                    <skip>true</skip>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

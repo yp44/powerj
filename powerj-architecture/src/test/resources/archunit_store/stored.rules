@@ -1,0 +1,6 @@
+#
+#Sun Oct 25 08:38:21 UTC 2026
+fields\ that\ are\ static\ should\ be\ final=cf65444f-fa1d-4ab3-b9bb-bd0e45b347dc
+no\ classes\ that\ reside\ in\ a\ package\ 'io.powerj.core.lang..'\ should\ depend\ on\ classes\ that\ reside\ in\ a\ package\ 'io.powerj.core.exec..'=f5c8f9ad-7c18-4408-a569-dcbe6dfb5860
+no\ classes\ that\ reside\ in\ a\ package\ 'io.powerj.shell..'\ should\ depend\ on\ classes\ that\ reside\ in\ a\ package\ 'io.powerj.cmdlets..'=b4c92b57-ef83-4683-b136-7ea0e9ef1230
+slices\ matching\ 'io.powerj.core.(*)..'\ should\ be\ free\ of\ cycles=67415faf-718b-440b-8a5f-14be4644e9b8
