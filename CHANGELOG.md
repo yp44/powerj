@@ -96,7 +96,8 @@ structures, functions) can be built on it. The work is organised in phases (revi
   `Interpreter` is down to 545 lines.
 - **Perf mode no longer runs through the execution code** (step 2.5): the execution reports to an `ExecutionObserver`
   (a neutral one when nothing is measured), `Pipe` has no measuring branch (`MeasuredPipe` counts), and `PerfMode`
-  owns the mode, the profiler settings and the report. `Interpreter` is down to 396 lines.
+  owns the mode, the profiler settings and the report. `Interpreter` is down to 396 lines. The profiler (Java Flight
+  Recorder) is found through a `ServiceLoader`, so the shell names no `jdk.jfr` type outside it.
 - **The profiler's recordings are removed by one hook at exit** instead of a `deleteOnExit` per measured line, which
   made the JVM remember every line of a long session.
 - The frozen ArchUnit rules no longer fail when a refactoring only changes the signature of a method already in a cycle, the

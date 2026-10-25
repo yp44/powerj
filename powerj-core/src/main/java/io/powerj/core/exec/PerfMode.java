@@ -7,6 +7,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
@@ -31,18 +32,21 @@ final class PerfMode {
 
     private final Session session;
     private final ShellIo io;
+    /** The profiler of this runtime, if it has one. */
+    private final Optional<Profiler> profiler;
     private volatile boolean on;
-    /** The profiler records each measured line (part B); only a test or a runtime without it turns it off. */
-    private volatile boolean profiler = true;
+    /** The profiler records each measured line (part B); only a test turns it off. */
+    private volatile boolean profiling = true;
     /** Folder of the profiler's recordings, created at the first one. */
     private Path recordings;
     /** Value of each variable the warning was last given for: one warning per value, not one per line. */
     private String warnedPeriod;
     private String warnedThrottle;
 
-    PerfMode(Session session, ShellIo io) {
+    PerfMode(Session session, ShellIo io, Optional<Profiler> profiler) {
         this.session = session;
         this.io = io;
+        this.profiler = profiler;
     }
 
     /** What measures a line, and what to do when it is over. */
@@ -53,9 +57,9 @@ final class PerfMode {
 
         private final PerfMode mode;
         private final PerfRecorder recorder;
-        private final JfrCapture capture;
+        private final Profiler.Recording capture;
 
-        private Measurement(PerfMode mode, PerfRecorder recorder, JfrCapture capture) {
+        private Measurement(PerfMode mode, PerfRecorder recorder, Profiler.Recording capture) {
             this.mode = mode;
             this.recorder = recorder;
             this.capture = capture;
@@ -82,10 +86,10 @@ final class PerfMode {
     void on(boolean on) {
         if (on) {
             PerfRecorder.warmUp();
-            if (profiler && PerfJfr.available()) {
+            if (profiling && profiler.isPresent()) {
                 Path file = recordingFile();
                 if (file != null) {
-                    JfrCapture.warmUp(file);
+                    profiler.get().warmUp(file);
                 }
             }
         }
@@ -93,8 +97,8 @@ final class PerfMode {
     }
 
     /** Without the profiler, a line is measured with the counters only. */
-    void profiler(boolean on) {
-        profiler = on;
+    void profiling(boolean on) {
+        profiling = on;
     }
 
     /**
@@ -108,7 +112,7 @@ final class PerfMode {
             return Measurement.NONE;
         }
         long started = System.nanoTime();
-        JfrCapture capture = startProfiler();
+        Profiler.Recording capture = startProfiler();
         // Starting the profiler is not part of the line.
         return new Measurement(this, new PerfRecorder(line, begin + (System.nanoTime() - started), parsed), capture);
     }
@@ -128,16 +132,16 @@ final class PerfMode {
                 && !forceNative && name.equals("perf"));
     }
 
-    private JfrCapture startProfiler() {
-        if (!profiler || !PerfJfr.available()) {
+    private Profiler.Recording startProfiler() {
+        if (!profiling || profiler.isEmpty()) {
             return null;
         }
         Path file = recordingFile();
-        return file == null ? null : JfrCapture.start(file, samplePeriod(), allocThrottle());
+        return file == null ? null : profiler.get().start(file, samplePeriod(), allocThrottle());
     }
 
     /** Keeps the report of the line and prints its summary, even for a cancelled line. */
-    private void print(PerfRecorder perf, JfrCapture capture, boolean cancelled) {
+    private void print(PerfRecorder perf, Profiler.Recording capture, boolean cancelled) {
         boolean interrupted = Thread.interrupted(); // a cancelled line must still print: keep the flag for later
         try {
             perf.stop(); // before reading the recording: that work is not the line's

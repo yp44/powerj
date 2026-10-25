@@ -56,7 +56,7 @@ public final class Interpreter {
         this.registry = registry;
         this.evaluator = new Evaluator(session, this::capture, this::syntax);
         this.reporter = new ErrorReporter(session, io);
-        this.perf = new PerfMode(session, io);
+        this.perf = new PerfMode(session, io, Profiler.discover());
         // The order is the one of the overview printed by `help`; the shell's own commands come before `exit`.
         builtins.put("cd", Builtins::cd);
         builtins.put("pwd", Builtins::pwd);
@@ -214,7 +214,7 @@ public final class Interpreter {
 
     /** Without the profiler, a line is measured with the counters only. */
     void perfProfiler(boolean on) {
-        perf.profiler(on);
+        perf.profiling(on);
     }
 
     private boolean statement(Statement statement) throws InterruptedException {

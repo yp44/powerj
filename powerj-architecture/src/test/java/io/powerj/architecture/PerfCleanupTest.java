@@ -31,7 +31,10 @@ class PerfCleanupTest {
         String reported = output.lines().filter(line -> line.startsWith(PerfCleanupProbe.RECORDING)).findFirst()
                 .orElseThrow(() -> new AssertionError("the probe did not report a recording: " + output))
                 .substring(PerfCleanupProbe.RECORDING.length());
-        assumeTrue(!reported.equals("none"), "this runtime has no profiler, so there is no recording");
+        boolean profilerInThisRuntime = ModuleLayer.boot().findModule("jdk.jfr").isPresent();
+        assumeTrue(profilerInThisRuntime, "this runtime has no profiler, so there is no recording");
+        // On the class path the profiler is found through META-INF/services: without it there would be nothing to clean.
+        assertThat(reported).as("the profiler was not found: %s", output).isNotEqualTo("none");
 
         Path recording = Path.of(reported);
         assertThat(process.exitValue()).as(output).isZero();

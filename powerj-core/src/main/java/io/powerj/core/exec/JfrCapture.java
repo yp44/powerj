@@ -1,7 +1,6 @@
 package io.powerj.core.exec;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
@@ -30,7 +29,7 @@ import io.powerj.api.HotMethod;
  * (execution samples), what they allocate, and the garbage collections. A recording per line gives its exact window
  * and keeps the cost bounded; its file is kept with the report, to open in JDK Mission Control.
  */
-final class JfrCapture {
+final class JfrCapture implements Profiler.Recording {
 
     private static final Logger LOG = Logger.getLogger(JfrCapture.class.getName());
 
@@ -46,19 +45,6 @@ final class JfrCapture {
     private JfrCapture(Recording recording, Path file) {
         this.recording = recording;
         this.file = file;
-    }
-
-    /** The first recording of the JVM initializes the recorder, and the first read loads the parser: pay it once. */
-    static void warmUp(Path file) {
-        JfrCapture capture = start(file, PerfJfr.DEFAULT_SAMPLE_PERIOD, null);
-        if (capture != null) {
-            capture.finish(0, List.of());
-            try {
-                Files.deleteIfExists(file);
-            } catch (IOException _) {
-                // a temporary file: removed at exit
-            }
-        }
     }
 
     /**
@@ -89,12 +75,13 @@ final class JfrCapture {
         }
     }
 
-    Path file() {
+    @Override
+    public Path file() {
         return file;
     }
 
-    /** Stops the recording and reads it. */
-    JfrData finish(int line, List<StageProbe> stages) {
+    @Override
+    public JfrData finish(int line, List<StageProbe> stages) {
         try {
             recording.stop();
         } catch (RuntimeException e) {
