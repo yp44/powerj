@@ -68,6 +68,15 @@ structures, functions) can be built on it. The work is organised in phases (revi
   matcher reads its input through a `CharSequence` that checks the interrupt flag. The `/regex/` filter of `grid` is not
   covered yet (Phase 5).
 
+- **Protected paths are compared as the file system sees them** (C-21, step 1.7). `alias/..`, an alias of `/home`, a
+  protected entry that is a link: `Path.normalize` knew none of that. Links and `..` of the folders above a target are
+  resolved before comparing, case is ignored on macOS too, and copying a folder into itself is detected through a link.
+  `mv` without `-f` no longer uses an atomic move, which replaces the destination on Unix, and `perf --save` no longer
+  replaces a file that exists. The guarantee is documented for what it is: a guard against a mistake, not an access
+  control.
+- **Wildcards of `rm`, `cp`, `mv` and `touch` respect case** except on Windows (C-22, step 1.7): `rm README*` no longer
+  removes `readme.md` on Linux and macOS. `ls readme* | rm` gives the other rule. `ls`, `grep` and `cat` are unchanged.
+
 ### Examined, not changed
 - **The seven `Messages` classes stay** (C-10, step 1.4). Replacing them with one helper in `powerj-api` was tried on a
   two-module experiment: `ResourceBundle.getBundle(…, module)` called from another module fails unless the owner of the
@@ -75,8 +84,7 @@ structures, functions) can be built on it. The work is organised in phases (revi
   class is the minimal form that works with JPMS, and the model `examples/greet` gives to module authors.
 
 ### Planned (review §8)
-- **Phase 1 (continued).** Destructive commands resolve symbolic links and no longer ignore case on case-sensitive
-  file systems; hygiene (shared helpers, English thread names).
+- **Phase 1 (end).** Hygiene: shared helpers, English thread names, imports.
 - **Phase 2 — `Interpreter` split** into a command resolution, a pipeline executor, redirections, and
   observer-based perf and preview modes.
 - **Phase 3 — packages, modules and API.** `core.exec` is split in eight packages with qualified exports, the

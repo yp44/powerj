@@ -1,9 +1,9 @@
 package io.powerj.cmdlets;
 
 import java.io.IOException;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -108,8 +108,10 @@ public final class Perf implements Cmdlet<Perf.Params, Void, Object> {
             target = target.resolve("perf-" + report.line() + ".jfr");
         }
         try {
-            Files.copy(recording, target, StandardCopyOption.REPLACE_EXISTING);
+            Files.copy(recording, target); // never replaces: a recording is not worth losing a file for
             context.emit(target);
+        } catch (FileAlreadyExistsException e) {
+            context.error(Messages.get("perf.save.exists", target));
         } catch (IOException e) {
             context.error(Messages.get("perf.save.failed", target, e.getMessage()));
         }

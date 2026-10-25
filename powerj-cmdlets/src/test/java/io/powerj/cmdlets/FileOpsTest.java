@@ -83,6 +83,103 @@ class FileOpsTest {
         return run(new Remove(), new Remove.Params(paths, recurse, null, force, verbose, dryRun, allowProtected, null), inputs);
     }
 
+    private boolean symbolicLink(Path link, Path target) throws IOException {
+        try {
+            Files.createSymbolicLink(link, target);
+            return true;
+        } catch (UnsupportedOperationException | IOException e) {
+            return false;
+        }
+    }
+
+    // --- Wildcards: the case rule (review C-22) ---
+
+    @Test
+    void wildcardsOfTheCommandsThatChangeFilesAreCaseSensitiveOffWindows() throws Exception {
+        assumeTrue(!FileOps.WILDCARDS_IGNORE_CASE, "the file system ignores case here");
+        file("README.md", "r");
+        file("readme.txt", "r");
+        file("README.txt", "r");
+
+        rm(false, false, false, false, false, args("README*"));
+
+        assertThat(work.resolve("README.md")).doesNotExist();
+        assertThat(work.resolve("README.txt")).doesNotExist();
+        assertThat(work.resolve("readme.txt")).exists(); // not matched: another case
+    }
+
+    @Test
+    void theCaseRuleCanBeChosenWhenExpanding() throws Exception {
+        assumeTrue(!FileOps.WILDCARDS_IGNORE_CASE, "the matcher of Windows ignores case whatever is asked");
+        file("Notes.TXT", "n");
+        file("other.md", "o");
+
+        assertThat(FileOps.expand("*.txt", true, context)).containsExactly(work.resolve("Notes.TXT"));
+        assertThat(FileOps.expand("*.txt", false, context)).isEmpty();
+        assertThat(context.errors).singleElement().asString().contains("*.txt");
+    }
+
+    @Test
+    void anInvalidWildcardIsAnErrorNotAnException() {
+        assertThat(FileOps.expand("a[*", false, context)).isEmpty();
+        assertThat(context.errors).singleElement().asString().startsWith("invalid wildcard a[*");
+    }
+
+    // --- mv does not replace what appears at the destination without -f (review C-21) ---
+
+    @Test
+    void mvWithoutForceDoesNotReplaceTheDestinationEvenIfItAppearedAfterTheCheck() throws Exception {
+        Path source = file("a.txt", "source");
+        Path target = file("b.txt", "precious");
+        var transfer = new Transfer(new Transfer.Options(true, true, 1, false, false, false, false), args("a.txt", "b.txt"),
+                null, context);
+
+        // Called directly, as if b.txt had been created after the check of transfer(): an atomic move would replace it.
+        boolean moved = transfer.move(source, target, context);
+
+        assertThat(moved).isFalse();
+        assertThat(target).hasContent("precious");
+        assertThat(source).hasContent("source");
+        assertThat(context.errors).singleElement().asString().startsWith("already exists");
+    }
+
+    @Test
+    void mvWithForceReplacesTheDestination() throws Exception {
+        Path source = file("a.txt", "source");
+        Path target = file("b.txt", "old");
+        var transfer = new Transfer(new Transfer.Options(true, true, 1, true, false, false, false), args("a.txt", "b.txt"),
+                null, context);
+
+        assertThat(transfer.move(source, target, context)).isTrue();
+
+        assertThat(target).hasContent("source");
+        assertThat(source).doesNotExist();
+    }
+
+    // --- Links: a folder is still copied into itself through an alias ---
+
+    @Test
+    void cpRefusesToCopyAFolderIntoItselfThroughALink() throws Exception {
+        Path tree = Files.createDirectories(work.resolve("tree"));
+        assumeTrue(symbolicLink(work.resolve("alias"), tree), "symbolic links not available");
+
+        cp(true, false, false, false, args("tree", "alias/inside"));
+
+        assertThat(context.errors).singleElement().asString().startsWith("cannot copy").contains("into itself");
+        assertThat(tree.resolve("inside")).doesNotExist();
+    }
+
+    @Test
+    void cpOfAFileOntoItselfThroughALinkIsTheSameFile() throws Exception {
+        file("data/f.txt", "x");
+        assumeTrue(symbolicLink(work.resolve("alias"), work.resolve("data")), "symbolic links not available");
+
+        cp(false, true, false, false, args("data/f.txt", "alias/f.txt"));
+
+        assertThat(context.errors).singleElement().asString().startsWith("source and destination are the same");
+        assertThat(work.resolve("data/f.txt")).hasContent("x");
+    }
+
     // --- mkdir ---
 
     @Test

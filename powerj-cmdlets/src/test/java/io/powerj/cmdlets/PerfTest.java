@@ -206,6 +206,20 @@ class PerfTest {
     }
 
     @Test
+    void saveNeverReplacesAFileThatExists(@org.junit.jupiter.api.io.TempDir Path tmp) throws Exception {
+        var recording = Files.writeString(tmp.resolve("source.jfr"), "new recording");
+        var precious = Files.writeString(tmp.resolve("precious.jfr"), "a file of the user");
+        var ctx = new TestContext<Object>(tmp);
+        ctx.perfReports = List.of(report(4, "line 4", recording));
+
+        new Perf().begin(new Perf.Params(null, null, false, Path.of("precious.jfr")), ctx);
+
+        assertThat(precious).hasContent("a file of the user");
+        assertThat(ctx.emitted).isEmpty();
+        assertThat(ctx.errors).singleElement().asString().contains("already exists").contains("precious.jfr");
+    }
+
+    @Test
     void saveWithoutARecordingOrWithOtherOptionsIsAnError() throws Exception {
         keep(1);
         run(new Perf.Params(null, null, false, Path.of("x.jfr")));

@@ -11,6 +11,7 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.PatternSyntaxException;
 
 import io.powerj.api.CmdletContext;
 import io.powerj.fs.FileTrees;
@@ -60,12 +61,28 @@ final class FileOps {
         return new Arguments(words, block);
     }
 
+    /**
+     * Wildcards of the commands that change files ignore case where file names do (Windows) and only there:
+     * {@code rm README*} must not remove {@code readme.md} on Linux or macOS, as in a shell there (review C-22).
+     * {@code ls readme* | rm} is the way to ask for the other rule, with the list in plain sight.
+     */
+    static final boolean WILDCARDS_IGNORE_CASE = System.getProperty("os.name", "").startsWith("Windows");
+
     /** Paths of an argument: the path itself, or the matches of a wildcard on its last element. */
     static List<Path> expand(String argument, CmdletContext<?> context) {
+        return expand(argument, WILDCARDS_IGNORE_CASE, context);
+    }
+
+    /** Paths of an argument, with the given case rule for the wildcard. */
+    static List<Path> expand(String argument, boolean ignoreCase, CmdletContext<?> context) {
         try {
-            return FileArguments.expand(argument, false, context, error -> report(error, context), "fileops.no.match");
+            return FileArguments.expand(argument, false, ignoreCase, context, error -> report(error, context),
+                    "fileops.no.match");
         } catch (InvalidPathException e) {
             context.error(Messages.get("fileops.invalid.path", argument, e.getMessage()));
+            return List.of();
+        } catch (PatternSyntaxException e) {
+            context.error(Messages.get("fileops.invalid.pattern", argument, e.getDescription()));
             return List.of();
         }
     }

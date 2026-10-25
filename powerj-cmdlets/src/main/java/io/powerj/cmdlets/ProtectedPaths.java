@@ -8,7 +8,6 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
@@ -17,6 +16,14 @@ import java.util.Optional;
  * of the configuration folder, any folder that contains one of them, and the current folder with its parents. The
  * file holds one path per line; {@code ~} is the home folder; empty lines and lines starting with {@code #} are
  * ignored. When it is missing, the defaults of the platform apply: a missing file never means "nothing protected".
+ * <p>
+ * Paths are compared as the file system sees them: the links of the folders above a target are resolved, so an alias
+ * of a protected folder is refused as the folder is, and a protected entry that is itself a link protects what it points
+ * to. Removing a link only removes the link, so the link itself is not resolved.
+ * <p>
+ * This guards against a mistake, such as removing a whole folder by typing the wrong path. It is not an access
+ * control: the <em>content</em> of a protected folder is not protected ({@code rm /etc/hosts} is allowed), and a path
+ * can still be changed between the check and the removal.
  */
 public final class ProtectedPaths {
 
@@ -27,11 +34,13 @@ public final class ProtectedPaths {
     private static final boolean MAC = System.getProperty("os.name", "").startsWith("Mac");
 
     private final List<Path> paths;
-    private final Path currentDirectory;
+    /** The current folder as written and with its links resolved (being in a link to a folder is being in it). */
+    private final List<Path> currentDirectories;
 
     ProtectedPaths(List<Path> paths, Path currentDirectory) {
-        this.paths = paths.stream().map(ProtectedPaths::key).toList();
-        this.currentDirectory = key(currentDirectory);
+        this.paths = paths.stream().flatMap(path -> keys(path).stream()).distinct().toList();
+        this.currentDirectories = List.of(RealPaths.compared(currentDirectory.toAbsolutePath().normalize()),
+                RealPaths.ofFolder(currentDirectory)).stream().distinct().toList();
     }
 
     /** Content of the file written at first launch: comments, then the defaults of the platform. */
@@ -98,7 +107,7 @@ public final class ProtectedPaths {
 
     /** Why {@code target} must not be removed: a message, or empty if it may be removed. */
     Optional<String> refusal(Path target) {
-        Path key = key(target);
+        Path key = RealPaths.of(target);
         for (Path path : paths) {
             if (path.equals(key)) {
                 return Optional.of(Messages.get("fileops.protected", target));
@@ -107,8 +116,10 @@ public final class ProtectedPaths {
                 return Optional.of(Messages.get("fileops.protected.contains", target, path));
             }
         }
-        if (currentDirectory.startsWith(key)) {
-            return Optional.of(Messages.get("fileops.current.directory", target));
+        for (Path current : currentDirectories) {
+            if (current.startsWith(key)) {
+                return Optional.of(Messages.get("fileops.current.directory", target));
+            }
         }
         return Optional.empty();
     }
@@ -128,9 +139,13 @@ public final class ProtectedPaths {
         return Path.of(System.getProperty("user.home")).toAbsolutePath().normalize();
     }
 
-    /** Path compared: absolute, normalized, and in lower case on Windows (case-insensitive file system). */
-    private static Path key(Path path) {
-        Path normalized = path.toAbsolutePath().normalize();
-        return WINDOWS ? Path.of(normalized.toString().toLowerCase(Locale.ROOT)) : normalized;
+    /**
+     * What a protected entry protects: the path as written, and the real path if the entry is a link or goes through
+     * one ({@code /etc} is a link to {@code /private/etc} on macOS).
+     */
+    private static List<Path> keys(Path entry) {
+        Path lexical = RealPaths.compared(entry.toAbsolutePath().normalize());
+        Path real = RealPaths.ofFolder(entry);
+        return lexical.equals(real) ? List.of(lexical) : List.of(lexical, real);
     }
 }

@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.CopyOption;
 import java.nio.file.DirectoryNotEmptyException;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.LinkOption;
@@ -154,11 +155,13 @@ final class Transfer {
             context.error(Messages.get("fileops.is.directory", source));
             return;
         }
-        if (target.equals(source)) {
+        // Compared as the file system sees them: through an alias or a link, a folder is still copied into itself.
+        Path realTarget = RealPaths.of(target);
+        if (realTarget.equals(RealPaths.of(source))) {
             context.error(Messages.get("fileops.same.file", source));
             return;
         }
-        if (directory && target.startsWith(source)) {
+        if (directory && realTarget.startsWith(RealPaths.ofFolder(source))) {
             context.error(Messages.get("fileops.into.itself", source, target));
             return;
         }
@@ -186,23 +189,31 @@ final class Transfer {
      * Moves atomically when possible; otherwise (another file system, a folder merged with {@code -f}) copies, then
      * removes the source only if the whole copy succeeded.
      */
-    private boolean move(Path source, Path target, CmdletContext<Object> context) {
+    boolean move(Path source, Path target, CmdletContext<Object> context) {
         CopyOption[] replace = options.force()
                 ? new CopyOption[] {StandardCopyOption.REPLACE_EXISTING, LinkOption.NOFOLLOW_LINKS}
                 : new CopyOption[] {LinkOption.NOFOLLOW_LINKS};
         try {
-            try {
-                Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
-                return true;
-            } catch (AtomicMoveNotSupportedException e) {
-                Files.move(source, target, replace);
-                return true;
+            if (options.force()) {
+                // Only with -f: an atomic move replaces what is at the destination, without a word, on Unix
+                // (rename), including a file that appeared since the check (review C-21).
+                try {
+                    Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
+                    return true;
+                } catch (AtomicMoveNotSupportedException _) {
+                    // another file system: the plain move below
+                }
             }
+            Files.move(source, target, replace); // without REPLACE_EXISTING it fails if the destination exists
+            return true;
         } catch (DirectoryNotEmptyException e) {
             if (!FileOps.copyTree(source, target, 1, options.force(), context)) {
                 return false; // the source is kept
             }
             return FileOps.deleteTree(source, 1, false, false, context, (path, entry) -> { });
+        } catch (FileAlreadyExistsException e) {
+            FileOps.report(e, target, context);
+            return false;
         } catch (IOException e) {
             FileOps.report(e, source, context);
             return false;
