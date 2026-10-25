@@ -108,6 +108,8 @@ class SupervisorTest {
         assertThat(supervisor.run("ok", List::of)).isEqualTo(new Outcome.Success(List.of()));
     }
 
+    /** Deliberate: the test needs a {@link StackOverflowError} (FR-56). */
+    @SuppressWarnings("InfiniteRecursion")
     private static int recurse(int depth) {
         return recurse(depth + 1) + 1;
     }

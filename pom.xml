@@ -40,6 +40,8 @@
         <jline.version>4.4.7</jline.version>
         <jacoco.version>0.8.15</jacoco.version>
         <archunit.version>1.5.1</archunit.version>
+        <spotless.version>3.10.4</spotless.version>
+        <errorprone.version>2.51.0</errorprone.version>
 
         <!-- Per-module coverage floor, overridden by each module (see the jacoco plugin below). -->
         <coverage.module.line>0.00</coverage.module.line>
@@ -113,6 +115,37 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
+
+    <profiles>
+        <!-- Static analysis, as warnings for now (review C-32): ./mvnw -Pquality verify. Needs .mvn/jvm.config. -->
+        <profile>
+            <id>quality</id>
+            <build>
+                <pluginManagement>
+                    <plugins>
+                        <plugin>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-compiler-plugin</artifactId>
+                            <configuration>
+                                <compilerArgs combine.children="append">
+                                    <arg>-XDcompilePolicy=simple</arg>
+                                    <arg>--should-stop=ifError=FLOW</arg>
+                                    <arg>-Xplugin:ErrorProne -XepAllErrorsAsWarnings</arg>
+                                </compilerArgs>
+                                <annotationProcessorPaths>
+                                    <path>
+                                        <groupId>com.google.errorprone</groupId>
+                                        <artifactId>error_prone_core</artifactId>
+                                        <version>${errorprone.version}</version>
+                                    </path>
+                                </annotationProcessorPaths>
+                            </configuration>
+                        </plugin>
+                    </plugins>
+                </pluginManagement>
+            </build>
+        </profile>
+    </profiles>
 
     <build>
         <pluginManagement>
@@ -204,6 +237,37 @@
         </pluginManagement>
 
         <plugins>
+            <!-- Formatting rules that need no judgement and that the code already follows (see .editorconfig). The
+                 whole-file google-java-format is deliberately not used: it would rewrite every file (review C-32). -->
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <version>${spotless.version}</version>
+                <configuration>
+                    <java>
+                        <includes>
+                            <include>src/main/java/**/*.java</include>
+                            <include>src/test/java/**/*.java</include>
+                        </includes>
+                        <removeUnusedImports/>
+                        <trimTrailingWhitespace/>
+                        <endWithNewline/>
+                        <indent>
+                            <spaces>true</spaces>
+                            <spacesPerTab>4</spacesPerTab>
+                        </indent>
+                    </java>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>spotless-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-enforcer-plugin</artifactId>

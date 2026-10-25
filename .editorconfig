@@ -1,0 +1,30 @@
+# https://editorconfig.org — the conventions the code already follows, written down.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{xml,yml,yaml,json}]
+indent_size = 4
+
+[*.{yml,yaml}]
+indent_size = 2
+
+[*.md]
+# trailing double space is a line break in Markdown
+trim_trailing_whitespace = false
+
+[*.properties]
+# messages_*.properties are read as UTF-8 (Java 9+), see the resource bundles
+charset = utf-8
+
+[*.{cmd,bat}]
+end_of_line = crlf
+
+[mvnw]
+end_of_line = lf

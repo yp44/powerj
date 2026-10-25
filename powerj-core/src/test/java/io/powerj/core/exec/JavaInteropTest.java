@@ -1,7 +1,6 @@
 package io.powerj.core.exec;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.File;
 import java.io.PrintWriter;
