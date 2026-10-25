@@ -9,6 +9,4 @@ module io.powerj.shell {
     requires org.jline.terminal;
     // Native terminal provider (Windows console, Unix pty) via the FFM API, loaded by ServiceLoader.
     requires org.jline.terminal.ffm;
-
-    exports io.powerj.shell;
 }

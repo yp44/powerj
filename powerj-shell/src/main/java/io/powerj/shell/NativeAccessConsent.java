@@ -9,7 +9,7 @@ import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import io.powerj.core.exec.NativeAccessPolicy;
+import io.powerj.core.command.NativeAccessPolicy;
 
 /**
  * Consent to load the modules that use native code (FR-77): the answers are the settings

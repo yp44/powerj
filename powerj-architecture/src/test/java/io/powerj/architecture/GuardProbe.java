@@ -4,10 +4,10 @@ import java.io.PrintWriter;
 import java.nio.file.Path;
 import java.util.Map;
 
-import io.powerj.core.exec.CmdletRegistry;
-import io.powerj.core.exec.Interpreter;
-import io.powerj.core.exec.Session;
-import io.powerj.core.exec.ShellIo;
+import io.powerj.core.command.CmdletRegistry;
+import io.powerj.core.runtime.Interpreter;
+import io.powerj.core.runtime.Session;
+import io.powerj.core.runtime.ShellIo;
 
 /**
  * Runs one PowerJ line in a throw-away JVM, then says it is still alive. Used by {@link ExitGuardTest}: a line that

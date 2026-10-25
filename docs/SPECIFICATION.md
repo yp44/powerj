@@ -1296,7 +1296,7 @@ A value is matched on its prefix: `fr`, `fr_FR`, `FR` give French; `en`, `de`…
 |---|---|---|
 | `io/powerj/api` | `messages_en.properties`, `messages_fr.properties` | Messages of the public API (non-boolean block) |
 | `io/powerj/core/lang` | idem | Syntax errors (`syntax: …`) |
-| `io/powerj/core/exec` | idem | Execution errors, built-in commands, options, help, completion, Java interop |
+| `io/powerj/core/i18n` | idem | Execution errors, built-in commands, options, help, completion, Java interop |
 | `io/powerj/cmdlets` | idem | Built-in cmdlets (summaries, options, categories, errors) |
 | `io/powerj/shell` | idem | REPL, history, startup, configuration |
 | `com/example/greet` | idem | Example module (§4.3) |

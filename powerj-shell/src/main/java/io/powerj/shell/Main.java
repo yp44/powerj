@@ -26,11 +26,11 @@ import org.jline.utils.WriterOutputStream;
 
 import io.powerj.core.BuildInfo;
 import io.powerj.api.Language;
-import io.powerj.core.exec.CmdletRegistry;
-import io.powerj.core.exec.NativeEncoding;
-import io.powerj.core.exec.Session;
-import io.powerj.core.exec.StandardInput;
-import io.powerj.core.exec.Supervisor;
+import io.powerj.core.command.CmdletRegistry;
+import io.powerj.core.nativeexec.NativeEncoding;
+import io.powerj.core.runtime.Session;
+import io.powerj.core.runtime.StandardInput;
+import io.powerj.core.runtime.Supervisor;
 
 /**
  * Entry point of {@code powerj.exe}: interactive shell without arguments; {@code -c "line"} or a

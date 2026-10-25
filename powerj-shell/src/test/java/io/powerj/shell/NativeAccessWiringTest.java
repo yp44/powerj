@@ -22,9 +22,9 @@ import org.junit.jupiter.api.io.CleanupMode;
 import org.junit.jupiter.api.io.TempDir;
 
 import io.powerj.core.BuildInfo;
-import io.powerj.core.exec.CmdletRegistry;
-import io.powerj.core.exec.Session;
-import io.powerj.core.exec.Supervisor;
+import io.powerj.core.command.CmdletRegistry;
+import io.powerj.core.runtime.Session;
+import io.powerj.core.runtime.Supervisor;
 
 /**
  * The consent of the user to load a module that uses native code (FR-77), from the shell to the loader. The module is a

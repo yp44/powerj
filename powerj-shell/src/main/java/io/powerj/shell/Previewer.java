@@ -12,9 +12,9 @@ import org.jline.utils.AttributedString;
 import org.jline.utils.AttributedStringBuilder;
 import org.jline.utils.AttributedStyle;
 
-import io.powerj.core.exec.Completions;
-import io.powerj.core.exec.Interpreter;
-import io.powerj.core.exec.PreviewResult;
+import io.powerj.core.assist.Completions;
+import io.powerj.core.runtime.Interpreter;
+import io.powerj.core.runtime.PreviewResult;
 
 /**
  * Preview mode (FR-66): Alt+V switches between the normal mode and the preview mode, shown by the {@code PJ?} prompt.

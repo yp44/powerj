@@ -110,6 +110,15 @@ structures, functions) can be built on it. The work is organised in phases (revi
   tally of its report, or which of the (many) `exec` classes that use the syntax tree the report happens to list. The
   dependency that closes the `exec`/`lang` cycle (`lang` reaching into `exec`) is still compared line by line.
 
+### Changed (Phase 3, packages, modules and API — in progress)
+- **`powerj-core` is split in packages by layer** (step 3.1): `error`, `i18n`, `lang`, `format`, `java`, `nativeexec`,
+  `command`, `runtime`, `perf`, `assist` replace `core.exec`. Nothing changes for the user. `powerj-core` exports its
+  packages to the shell only, `powerj-shell` exports nothing, `powerj-cmdlets` exports to the shell only (until the
+  shell stops using `ProtectedPaths`): no package of the product is visible to a third-party module any more.
+- The architecture rules check the layers of the core (a lower layer never reaches into a higher one) instead of
+  freezing a report of package cycles; the debt that exists is frozen line by line.
+- Compiler warnings: 72 → 37.
+
 ### Examined, not changed
 - **The seven `Messages` classes stay** (C-10, step 1.4). Replacing them with one helper in `powerj-api` was tried on a
   two-module experiment: `ResourceBundle.getBundle(…, module)` called from another module fails unless the owner of the

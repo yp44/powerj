@@ -50,12 +50,12 @@ class ShellParserTest {
 
     @Test
     void completionLineReplacesTheWordAndQuotesPathsWithSpaces() throws Exception {
-        var session = new io.powerj.core.exec.Session(java.nio.file.Path.of("."), java.nio.file.Path.of("."),
+        var session = new io.powerj.core.runtime.Session(java.nio.file.Path.of("."), java.nio.file.Path.of("."),
                 java.util.Map.of("PATH", ""));
-        var interpreter = new io.powerj.core.exec.Interpreter(session, new io.powerj.core.exec.ShellIo(
+        var interpreter = new io.powerj.core.runtime.Interpreter(session, new io.powerj.core.runtime.ShellIo(
                 new java.io.PrintWriter(new java.io.StringWriter()), _ -> { }, false), java.util.Map.of(),
-                io.powerj.core.exec.CmdletRegistry.discover());
-        var completing = new ShellParser(new io.powerj.core.exec.Completions(interpreter));
+                io.powerj.core.command.CmdletRegistry.discover());
+        var completing = new ShellParser(new io.powerj.core.assist.Completions(interpreter));
 
         var parsed = (ShellParser.CompletionLine) completing.parse("ls -r wh", 8, ParseContext.COMPLETE);
         assertThat(parsed.word()).isEqualTo("wh");

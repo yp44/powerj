@@ -8,13 +8,13 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 
-import io.powerj.core.exec.CmdletRegistry;
-import io.powerj.core.exec.Interpreter;
-import io.powerj.core.exec.NativeRun;
-import io.powerj.core.exec.Outcome;
-import io.powerj.core.exec.Session;
-import io.powerj.core.exec.ShellIo;
-import io.powerj.core.exec.Supervisor;
+import io.powerj.core.command.CmdletRegistry;
+import io.powerj.core.runtime.Interpreter;
+import io.powerj.core.nativeexec.NativeRun;
+import io.powerj.core.runtime.Outcome;
+import io.powerj.core.runtime.Session;
+import io.powerj.core.runtime.ShellIo;
+import io.powerj.core.runtime.Supervisor;
 
 /**
  * Non-interactive mode (specification FR-04d): {@code powerj -c "line"} or {@code powerj file.pj}. No

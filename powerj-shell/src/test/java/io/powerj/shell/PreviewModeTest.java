@@ -19,9 +19,9 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 import io.powerj.core.BuildInfo;
-import io.powerj.core.exec.CmdletRegistry;
-import io.powerj.core.exec.Session;
-import io.powerj.core.exec.Supervisor;
+import io.powerj.core.command.CmdletRegistry;
+import io.powerj.core.runtime.Session;
+import io.powerj.core.runtime.Supervisor;
 
 /** Preview mode in the shell (FR-66): Alt+V, {@code PJ?} prompt, results below the line. */
 @Timeout(60)

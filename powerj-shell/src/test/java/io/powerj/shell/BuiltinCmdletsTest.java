@@ -16,10 +16,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import io.powerj.core.exec.CmdletRegistry;
-import io.powerj.core.exec.Interpreter;
-import io.powerj.core.exec.Session;
-import io.powerj.core.exec.ShellIo;
+import io.powerj.core.command.CmdletRegistry;
+import io.powerj.core.runtime.Interpreter;
+import io.powerj.core.runtime.Session;
+import io.powerj.core.runtime.ShellIo;
 
 /** {@code ls} and {@code env} discovered by ServiceLoader, as in the real shell. */
 class BuiltinCmdletsTest {

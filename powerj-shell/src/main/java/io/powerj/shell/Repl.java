@@ -18,16 +18,16 @@ import org.jline.utils.AttributedStyle;
 import org.jline.utils.InfoCmp;
 
 import io.powerj.core.BuildInfo;
-import io.powerj.core.exec.CmdletRegistry;
-import io.powerj.core.exec.Completions;
-import io.powerj.core.exec.ConsoleInput;
-import io.powerj.core.exec.Interpreter;
-import io.powerj.core.exec.Outcome;
-import io.powerj.core.exec.PjException;
-import io.powerj.core.exec.Session;
-import io.powerj.core.exec.ShellIo;
-import io.powerj.core.exec.Supervisor;
-import io.powerj.core.exec.Values;
+import io.powerj.core.command.CmdletRegistry;
+import io.powerj.core.assist.Completions;
+import io.powerj.core.runtime.ConsoleInput;
+import io.powerj.core.runtime.Interpreter;
+import io.powerj.core.runtime.Outcome;
+import io.powerj.core.error.PjException;
+import io.powerj.core.runtime.Session;
+import io.powerj.core.runtime.ShellIo;
+import io.powerj.core.runtime.Supervisor;
+import io.powerj.core.format.Values;
 
 /**
  * Read-execute loop of the shell: reads a line with JLine (history, Ctrl+R…), executes it

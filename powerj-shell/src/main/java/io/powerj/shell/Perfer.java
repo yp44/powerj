@@ -7,7 +7,7 @@ import org.jline.reader.LineReader;
 import org.jline.reader.Reference;
 import org.jline.reader.impl.LineReaderImpl;
 
-import io.powerj.core.exec.Interpreter;
+import io.powerj.core.runtime.Interpreter;
 
 /**
  * Perf mode (FR-76): Alt+P switches between the normal mode and the perf mode, shown by the {@code PJ%} prompt. In perf

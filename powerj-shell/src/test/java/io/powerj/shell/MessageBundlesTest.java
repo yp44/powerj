@@ -76,7 +76,7 @@ class MessageBundlesTest {
                 .contains("powerj-api/src/main/resources/io/powerj/api/messages_en.properties",
                         "powerj-shell/src/main/resources/io/powerj/shell/messages_en.properties",
                         "powerj-cmdlets/src/main/resources/io/powerj/cmdlets/messages_en.properties",
-                        "powerj-core/src/main/resources/io/powerj/core/exec/messages_en.properties",
+                        "powerj-core/src/main/resources/io/powerj/core/i18n/messages_en.properties",
                         "powerj-core/src/main/resources/io/powerj/core/lang/messages_en.properties",
                         "examples/greet/src/main/resources/com/example/greet/messages_en.properties");
     }

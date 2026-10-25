@@ -16,9 +16,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import io.powerj.api.Language;
-import io.powerj.core.exec.CmdletRegistry;
-import io.powerj.core.exec.Platform;
-import io.powerj.core.exec.Session;
+import io.powerj.core.command.CmdletRegistry;
+import io.powerj.core.nativeexec.Platform;
+import io.powerj.core.runtime.Session;
 
 /** Non-interactive mode: {@code powerj -c}, {@code .pj} file, standard input (FR-04d). */
 class ScriptModeTest {

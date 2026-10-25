@@ -8,7 +8,7 @@ import org.jline.reader.EOFError;
 import org.jline.reader.ParsedLine;
 import org.jline.reader.Parser;
 
-import io.powerj.core.exec.Completions;
+import io.powerj.core.assist.Completions;
 import io.powerj.core.lang.Lexer;
 
 /**

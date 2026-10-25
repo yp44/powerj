@@ -7,7 +7,7 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
-import io.powerj.core.exec.PreviewResult;
+import io.powerj.core.runtime.PreviewResult;
 
 /** Lines shown below the input in preview mode (FR-66): banner, results, kept lines. */
 class PreviewRenderTest {

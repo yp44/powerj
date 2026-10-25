@@ -3,6 +3,7 @@ package io.powerj.architecture;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.fields;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 import static com.tngtech.archunit.library.freeze.FreezingArchRule.freeze;
 
@@ -94,17 +95,41 @@ class ArchitectureTest {
 
     // --- Target architecture: violations frozen (finding in brackets) ---
 
-    /** [C-05] {@code lang} is the language: no execution, no shell. */
+    /** [C-05] {@code lang} is the language: it knows nothing of the rest of the core (review §5.1). */
     @Test
-    void langDoesNotDependOnExec() {
+    void langDoesNotDependOnTheRestOfTheCore() {
         check(freeze(noClasses().that().resideInAPackage("io.powerj.core.lang..")
-                .should().dependOnClassesThat().resideInAPackage("io.powerj.core.exec..")));
+                .should().dependOnClassesThat().resideInAnyPackage("io.powerj.core.error..", "io.powerj.core.i18n..",
+                        "io.powerj.core.format..", "io.powerj.core.java..", "io.powerj.core.nativeexec..",
+                        "io.powerj.core.command..", "io.powerj.core.runtime..", "io.powerj.core.perf..",
+                        "io.powerj.core.assist..")));
     }
 
-    /** [C-05] No cycle between the packages of the core. */
+    /**
+     * [C-04, C-05] The packages of the core are layered, and a lower layer never reaches into a higher one: this is what
+     * keeps them free of cycles. {@code runtime} must not know {@code perf} or {@code assist}, which plug into it.
+     * Dependencies inside a layer are not checked.
+     */
     @Test
-    void corePackagesHaveNoCycle() {
-        check(freeze(slices().matching("io.powerj.core.(*)..").should().beFreeOfCycles()));
+    void corePackagesRespectTheLayers() {
+        check(freeze(layeredArchitecture().consideringOnlyDependenciesInLayers()
+                .layer("Base").definedBy("io.powerj.core.error..", "io.powerj.core.i18n..", "io.powerj.core.lang..")
+                .layer("Services").definedBy("io.powerj.core.format..", "io.powerj.core.java..",
+                        "io.powerj.core.nativeexec..")
+                .layer("Command").definedBy("io.powerj.core.command..")
+                .layer("Runtime").definedBy("io.powerj.core.runtime..")
+                .layer("Plugged in").definedBy("io.powerj.core.perf..", "io.powerj.core.assist..")
+                .whereLayer("Plugged in").mayNotBeAccessedByAnyLayer()
+                .whereLayer("Runtime").mayOnlyBeAccessedByLayers("Plugged in")
+                .whereLayer("Command").mayOnlyBeAccessedByLayers("Runtime", "Plugged in")
+                .whereLayer("Services").mayOnlyBeAccessedByLayers("Command", "Runtime", "Plugged in")));
+    }
+
+    /** [C-06] The completion reads the commands through a narrow interface, never the interpreter itself (step 3.3). */
+    @Test
+    void assistDoesNotUseTheConcreteInterpreter() {
+        check(freeze(noClasses().that().resideInAPackage("io.powerj.core.assist..")
+                .should().dependOnClassesThat().haveFullyQualifiedName("io.powerj.core.runtime.Interpreter")));
     }
 
     /** [C-09] The shell has no business with the cmdlets' classes: {@code ProtectedPaths} should live elsewhere. */

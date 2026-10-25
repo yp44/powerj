@@ -4,10 +4,10 @@ import java.io.PrintWriter;
 import java.nio.file.Path;
 import java.util.Map;
 
-import io.powerj.core.exec.CmdletRegistry;
-import io.powerj.core.exec.Interpreter;
-import io.powerj.core.exec.Session;
-import io.powerj.core.exec.ShellIo;
+import io.powerj.core.command.CmdletRegistry;
+import io.powerj.core.runtime.Interpreter;
+import io.powerj.core.runtime.Session;
+import io.powerj.core.runtime.ShellIo;
 
 /**
  * Measures one line in perf mode in a throw-away JVM, tells where the profiler's recording went, and ends normally.

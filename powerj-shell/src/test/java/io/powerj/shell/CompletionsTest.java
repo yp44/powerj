@@ -14,11 +14,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import io.powerj.core.exec.CmdletRegistry;
-import io.powerj.core.exec.Completions;
-import io.powerj.core.exec.Interpreter;
-import io.powerj.core.exec.Session;
-import io.powerj.core.exec.ShellIo;
+import io.powerj.core.command.CmdletRegistry;
+import io.powerj.core.assist.Completions;
+import io.powerj.core.runtime.Interpreter;
+import io.powerj.core.runtime.Session;
+import io.powerj.core.runtime.ShellIo;
 
 /** Tab completion (FR-21 to FR-25, FR-24b) with the real cmdlets. */
 class CompletionsTest {

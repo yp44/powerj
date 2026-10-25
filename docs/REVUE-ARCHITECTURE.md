@@ -345,7 +345,7 @@ Ordre imposé par les dépendances ; chaque sous-étape ramène le build au vert
 
 *Risque principal* : régression subtile sur annulation et arrêt en cascade. Garde-fous : tests 0.1/0.2, tests de fumée du lanceur, `PipelineTest.ctrlCStopsTheWholePipeline` (qui vérifie l'absence de fuite de threads).
 
-### Phase 3 — Packages, modules et API *(≈ 12 j)*
+### Phase 3 — Packages, modules et API *(≈ 12 j ; **en cours, voir § 14**)*
 
 | Étape | Action |
 |---|---|
@@ -568,4 +568,24 @@ Ce que la phase a appris :
 | `Completions` (1 006 l.) reste la plus grosse classe de production | six métiers dans une classe | 3.3 |
 | `PipelineExecutor` (445 l.) mêle planification et exécution | `segments`/`prepare` pourraient devenir un planificateur ; sans urgence tant que la classe reste sous 500 lignes | à juger après 3.1 |
 | `Platform` injectable, `Language.current` statique | inchangé depuis la Phase 1 | 3.4 / 4.1 |
+
+## 14. Phase 3 : packages, modules et API (en cours)
+
+### 14.1 Statut des étapes
+
+| Étape | Statut | Ce qui a été fait | Écart avec le plan (§ 8) |
+|---|---|---|---|
+| 3.1 packages et exports | ✅ | Les 72 classes de `core.exec` (et leurs 54 tests) sont déplacées vers **dix** packages : `error` (`PjError`, `PjException`), `i18n` (`Messages`), `lang` (inchangé), `format` (`OutputFormatter`, `ValueUnroller`, `Values`), `java` (interop, `CallPolicy`, `PreviewGuard`, `PreviewPolicy`), `nativeexec` (`NativeRunner`, `NativeRun`, `CommandResolver`…), `command` (`CmdletRegistry`, `CmdletRunner`, `OptionBinder`, `ModuleLoader`, `Resolved`, `CommandResolution`, `Builtins`), `runtime` (`Interpreter`, `PipelineExecutor`, `Session` et ses parties, `Pipe`/`MeasuredPipe`, l'évaluateur, les entrées-sorties du shell), `perf` (`PerfMode`, `PerfRecorder`, `StageProbe`, `Profiler`, JFR) et `assist` (`Completions`, `Highlights`, `Help`). Le dossier `exec` disparaît. Les déplacements sont faits par script (git mv, `package`, imports, noms qualifiés) puis la visibilité par un second script qui lit les erreurs du compilateur : 110 déclarations passent à `public`, toutes dans des packages qui ne sont exportés qu'au shell. `module-info` : `core` exporte ses neuf packages **au seul `io.powerj.shell`** ; `shell` n'exporte plus rien ; `cmdlets` n'exporte qu'au shell. Les règles ArchUnit : `langDoesNotDependOnExec` et `corePackagesHaveNoCycle` sont remplacées par `langDoesNotDependOnTheRestOfTheCore`, **`corePackagesRespectTheLayers`** (architecture en couches : *Base* `error`/`i18n`/`lang` < *Services* `format`/`java`/`nativeexec` < `command` < `runtime` < *branchés* `perf`/`assist`) et `assistDoesNotUseTheConcreteInterpreter`, gelées avec leur dette : 148 lignes (91 de `nativeexec`, 33 de `command`, 18 de `runtime`, 6 de `java`), 2 pour `lang` et 11 pour `assist`. Le service `Profiler` suit : `META-INF/services/io.powerj.core.perf.Profiler`. Mesures : **0 classe exportée à qui que ce soit d'autre que le shell** (32 publiques toutes exportées dans `core.exec`) ; avertissements du compilateur **72 → 37** (les 35 « classe publique sans constructeur explicite » d'un package exporté disparaissent) | **Dix packages et non huit** : `error` (annoncé en 3.2) et `i18n`, parce que `Messages` est utilisé par tous les autres et que le bundle `exec` n'a plus de maison. `PreviewGuard`/`PreviewPolicy` vont à `java` (c'est le point d'étranglement des appels Java) et `MeasuredPipe` à `runtime` (l'interface de l'observateur l'expose) plutôt qu'à `perf`, ce qui retire 3 dépendances montantes. **`cmdlets` exporte encore au shell** : `ProtectedPaths` y est utilisé par `PowerJHome` (C-09), l'export disparaît avec l'étape 4.5, pas avant. **Le cycle gelé est remplacé** : le rapport d'un cycle n'affiche que vingt dépendances par côté, et sa forme instable avait déjà coûté trois évolutions du comparateur ; une règle de couches produit une ligne par dépendance fautive, qui est stable et dont chaque ligne disparaît quand on la corrige. Le prix de la séparation en packages est que ce qui était privé au package devient `public` : l'encapsulation passe du niveau de la classe à celui du package (exports + ArchUnit) |
+
+### 14.2 La dette de couches, telle que la règle la gèle
+
+| De → vers | Lignes | Cause | Repris en |
+|---|---|---|---|
+| `nativeexec` → `runtime` | 91 | `NativeRunner` lit `ExecutionContext`, `Redirections`, `ShellIo`, `Session`, `Pipe`, `Source`, `ConsoleInput` ; `CommandResolver` lit `Session` | 3.2 (types d'entrée-sortie plus bas, ou interface) |
+| `command` → `runtime` | 33 | `Builtin`, `Builtins`, `CmdletRunner`, `CommandResolution` reçoivent la `Session`, `ShellIo` ou une `Source` | 3.2 |
+| `runtime` → `perf` | 14 | `Interpreter` construit `PerfMode` ; `CompiledBlock` lit `PerfRecorder.STAGE` ; `ExecutionObserver` appelle `StageProbe.threadName` | 3.2 (le nom de thread passe dans l'observateur ; `PerfMode` injecté) |
+| `runtime` → `assist` | 2 | la commande interne `help` et `--help` d'un cmdlet appellent `Help` | 3.3 |
+| `java` → `runtime` | 6 | `CallPolicy` lit `Session` ; `FunctionalAdapter` lit `CompiledBlock` et `Operators` | 3.2 |
+| `lang` → `error` | 2 | `SyntaxException extends PjException` | 3.2 |
+| `assist` → `Interpreter` | 11 | `Completions`, `Highlights` | 3.3 |
 
