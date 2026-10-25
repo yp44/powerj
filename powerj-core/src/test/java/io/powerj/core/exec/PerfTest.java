@@ -261,11 +261,11 @@ class PerfTest {
 
     @Test
     void onlyTheLastFiftyLinesAreKept() throws Exception {
-        for (int i = 0; i < Session.MAX_PERF_REPORTS + 5; i++) {
+        for (int i = 0; i < ShellStatistics.MAX_PERF_REPORTS + 5; i++) {
             run("items -n 1");
         }
-        assertThat(session.perfReports()).hasSize(Session.MAX_PERF_REPORTS);
-        assertThat(session.perfReports().getFirst().line()).isEqualTo(Session.MAX_PERF_REPORTS + 5);
+        assertThat(session.perfReports()).hasSize(ShellStatistics.MAX_PERF_REPORTS);
+        assertThat(session.perfReports().getFirst().line()).isEqualTo(ShellStatistics.MAX_PERF_REPORTS + 5);
     }
 
     @Test
@@ -447,12 +447,12 @@ class PerfTest {
     void aRecordingIsDeletedWhenItsReportIsNoLongerKept() throws Exception {
         var first = java.nio.file.Files.createTempFile(tmp, "line-", ".jfr");
         var jvm = new io.powerj.api.JvmStat(1, 0, Duration.ZERO, 0, 0, Duration.ZERO);
-        for (int i = 1; i <= Session.MAX_PERF_REPORTS + 1; i++) {
+        for (int i = 1; i <= ShellStatistics.MAX_PERF_REPORTS + 1; i++) {
             session.addPerfReport(new PerfReport(i, "l", Duration.ZERO, false, List.of(), List.of(), List.of(), List.of(),
                     jvm, List.of(), List.of(), List.of(), i == 1 ? first : null));
         }
         assertThat(first).doesNotExist();
-        assertThat(session.perfReports()).hasSize(Session.MAX_PERF_REPORTS);
+        assertThat(session.perfReports()).hasSize(ShellStatistics.MAX_PERF_REPORTS);
     }
 
     // --- sampling period: POWERJ_PERF_JFR_SAMPLEPERIOD ---

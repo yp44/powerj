@@ -80,7 +80,7 @@ structures, functions) can be built on it. The work is organised in phases (revi
   `grep` share their report of walk errors and `ls`, `grep` the check of `--parallel`.
 - A new test fails when `Messages.get("key")` names a key that no bundle of the module defines.
 
-### Changed (Phase 2, the `Interpreter` split — in progress)
+### Changed (Phase 2, the `Interpreter` split)
 - **One place decides what a command name stands for** (step 2.1): built-in command, then cmdlet, then program on the
   `PATH`, `^` skipping the first two. Execution, `which`, highlighting and completion all read `CommandResolution`;
   completion no longer treats a cmdlet as such when a built-in command of the same name runs first. `help` lists the
@@ -103,6 +103,9 @@ structures, functions) can be built on it. The work is organised in phases (revi
 - **Preview mode and the shell's own commands are out of the interpreter** (step 2.6): `PreviewMode` runs the line
   through the same executor as execution; `which`, `import`, `mod-load` and `mod-list` join the other built-in
   commands in `Builtins`. `Interpreter` is down to 250 lines (it was 1,129).
+- **`Session` is made of three parts** (step 2.7): `SessionState` (directories and environment), `Variables` (what the
+  user defines) and `ShellStatistics` (last result, recent errors, measured lines). Its API is unchanged; the values of
+  the automatic variables live in `AutomaticVariable`.
 - The frozen ArchUnit rules no longer fail when a refactoring only changes the signature of a method already in a cycle, the
   tally of its report, or which of the (many) `exec` classes that use the syntax tree the report happens to list. The
   dependency that closes the `exec`/`lang` cycle (`lang` reaching into `exec`) is still compared line by line.
@@ -114,9 +117,7 @@ structures, functions) can be built on it. The work is organised in phases (revi
   class is the minimal form that works with JPMS, and the model `examples/greet` gives to module authors.
 
 ### Planned (review §8)
-Phase 1 is done (report in the review, §12).
-- **Phase 2 — `Interpreter` split** into a command resolution, a pipeline executor, redirections, and
-  observer-based perf and preview modes.
+Phases 1 and 2 are done (reports in the review, §12 and §13).
 - **Phase 3 — packages, modules and API.** `core.exec` is split in eight packages with qualified exports, the
   package cycles are removed, performance types leave the public API. Deprecated API members are removed no sooner than
   0.3.0.
