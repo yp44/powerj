@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.CancellationException;
 import java.util.stream.BaseStream;
 
 import io.powerj.api.Cmdlet;
@@ -95,15 +94,12 @@ public final class Join implements Cmdlet<Join.Params, Object, Row> {
             if (columns == null) {
                 columns = Properties.columns(object);
             }
-            Object key;
-            try {
-                key = rightKey.invoke(object);
-            } catch (CancellationException e) {
-                throw e;
-            } catch (RuntimeException e) {
-                context.error(Messages.get("pipeline.object.skipped", e.getMessage(), Where.abbreviate(object)));
+            var attempt = rightKey.tryInvoke(object);
+            if (attempt.failed()) {
+                Skipped.report(context, attempt.error(), object);
                 continue;
             }
+            Object key = attempt.value();
             if (key != null) {
                 index.computeIfAbsent(Keys.normalized(key), k -> new ArrayList<>()).add(object);
             }
@@ -124,15 +120,12 @@ public final class Join implements Cmdlet<Join.Params, Object, Row> {
     }
 
     private static void join(State state, Params p, Object left, CmdletContext<Row> context) {
-        Object key;
-        try {
-            key = state.leftKey().invoke(left);
-        } catch (CancellationException e) {
-            throw e;
-        } catch (RuntimeException e) {
-            context.error(Messages.get("pipeline.object.skipped", e.getMessage(), Where.abbreviate(left)));
+        var attempt = state.leftKey().tryInvoke(left);
+        if (attempt.failed()) {
+            Skipped.report(context, attempt.error(), left);
             return;
         }
+        Object key = attempt.value();
         List<Object> matches = key == null ? List.of() : state.index().getOrDefault(Keys.normalized(key), List.of());
         if (matches.isEmpty()) {
             if (p.outer()) {
@@ -181,14 +174,12 @@ public final class Join implements Cmdlet<Join.Params, Object, Row> {
 
     /** Objects given by a side, a collection, an array or a stream being unrolled as by the pipeline (FR-30b). */
     private static List<Object> objects(ScriptBlock side, String option) {
-        Object value;
-        try {
-            value = side.invoke(null);
-        } catch (CancellationException e) {
-            throw e;
-        } catch (RuntimeException e) {
-            throw new IllegalArgumentException(Messages.get("join.side.failed", option, e.getMessage()), e);
+        var attempt = side.tryInvoke(null);
+        if (attempt.failed()) {
+            throw new IllegalArgumentException(Messages.get("join.side.failed", option, attempt.error().getMessage()),
+                    attempt.error());
         }
+        Object value = attempt.value();
         List<Object> objects = new ArrayList<>();
         switch (value) {
             case null -> {

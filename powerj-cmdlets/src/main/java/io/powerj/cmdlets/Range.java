@@ -1,9 +1,9 @@
 package io.powerj.cmdlets;
 
-import java.util.concurrent.CancellationException;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
+import io.powerj.api.Attempt;
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
@@ -103,38 +103,42 @@ public final class Range implements Cmdlet<Range.Params, Object, Object> {
             return; // the input was stopped
         }
         boolean include = !p.exclude();
-        try {
-            if (!state.open) {
-                if (!matches(state.from, input, state.index)) {
-                    return;
-                }
-                state.open = true;
-                // A position --to already reached closes the range on its opening object (as sed does).
-                if (state.to instanceof Position(long n) && state.index >= n) {
-                    if (include) {
-                        context.emit(input);
-                    }
-                    close(state, p, context);
-                    return;
-                }
-                if (include) {
-                    context.emit(input);
-                }
-                return; // --to is tested from the next object
+        if (!state.open) {
+            var opens = matches(state.from, input, state.index);
+            if (opens.failed()) {
+                Skipped.report(context, opens.error(), input); // FR-68: neither emitted nor used as a bound
+                return;
             }
-            if (state.to != null && matches(state.to, input, state.index)) {
+            if (!opens.value()) {
+                return;
+            }
+            state.open = true;
+            // A position --to already reached closes the range on its opening object (as sed does).
+            if (state.to instanceof Position(long n) && state.index >= n) {
                 if (include) {
                     context.emit(input);
                 }
                 close(state, p, context);
                 return;
             }
-        } catch (CancellationException e) {
-            throw e;
-        } catch (RuntimeException e) {
-            // FR-68: an evaluation error is non-blocking; the object is neither emitted nor used as a bound.
-            context.error(Messages.get("pipeline.object.skipped", e.getMessage(), Where.abbreviate(input)));
-            return;
+            if (include) {
+                context.emit(input);
+            }
+            return; // --to is tested from the next object
+        }
+        if (state.to != null) {
+            var closes = matches(state.to, input, state.index);
+            if (closes.failed()) {
+                Skipped.report(context, closes.error(), input);
+                return;
+            }
+            if (closes.value()) {
+                if (include) {
+                    context.emit(input);
+                }
+                close(state, p, context);
+                return;
+            }
         }
         context.emit(input);
     }
@@ -147,14 +151,12 @@ public final class Range implements Cmdlet<Range.Params, Object, Object> {
         }
     }
 
-    private static boolean matches(Bound bound, Object input, long index) {
+    private static Attempt<Boolean> matches(Bound bound, Object input, long index) {
         return switch (bound) {
-            case Position(long n) -> index == n;
-            case Match(ScriptBlock property, Pattern regex) -> {
-                Object value = property.invoke(input);
-                yield value != null && regex.matcher(new InterruptibleText(String.valueOf(value))).find();
-            }
-            case Condition(ScriptBlock block) -> block.test(input);
+            case Position(long n) -> Attempt.succeeded(index == n);
+            case Match(ScriptBlock property, Pattern regex) -> property.tryInvoke(input).map(value ->
+                    value != null && regex.matcher(new InterruptibleText(String.valueOf(value))).find());
+            case Condition(ScriptBlock block) -> block.tryTest(input);
         };
     }
 

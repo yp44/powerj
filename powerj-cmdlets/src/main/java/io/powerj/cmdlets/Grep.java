@@ -170,14 +170,12 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
         void filter(Object input, CmdletContext<Object> context) {
             Object value = input;
             if (property != null) {
-                try {
-                    value = property.invoke(input);
-                } catch (CancellationException e) {
-                    throw e;
-                } catch (RuntimeException e) {
-                    context.error(Messages.get("pipeline.object.skipped", e.getMessage(), Where.abbreviate(input)));
+                var attempt = property.tryInvoke(input);
+                if (attempt.failed()) {
+                    Skipped.report(context, attempt.error(), input);
                     return;
                 }
+                value = attempt.value();
             }
             String text = value == null ? "" : value.toString();
             if (pattern.matcher(new InterruptibleText(text)).find() != invert) {

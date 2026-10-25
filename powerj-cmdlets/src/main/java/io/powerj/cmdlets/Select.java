@@ -6,7 +6,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CancellationException;
 import java.util.regex.Pattern;
 
 import io.powerj.api.Cmdlet;
@@ -86,18 +85,11 @@ public final class Select implements Cmdlet<Select.Params, Object, Row> {
     private static Row row(State state, Object input, CmdletContext<Row> context) {
         Map<String, Object> values = new LinkedHashMap<>();
         for (Column column : state.columns) {
-            Object value;
-            try {
-                value = column.value().invoke(input);
-            } catch (CancellationException e) {
-                throw e;
-            } catch (RuntimeException e) {
-                value = null;
-                if (state.reported.add(column.name())) {
-                    context.error(Messages.get("select.column.failed", column.name(), e.getMessage()));
-                }
+            var attempt = column.value().tryInvoke(input);
+            if (attempt.failed() && state.reported.add(column.name())) {
+                context.error(Messages.get("select.column.failed", column.name(), attempt.error().getMessage()));
             }
-            values.put(column.name(), value);
+            values.put(column.name(), attempt.value()); // null when it failed
         }
         return Row.of(values, state.sizeColumns);
     }

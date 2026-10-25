@@ -12,7 +12,6 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CancellationException;
 
 import io.powerj.api.CmdletContext;
 import io.powerj.api.ScriptBlock;
@@ -107,15 +106,12 @@ final class Transfer {
             Path absolute = source.path().toAbsolutePath().normalize();
             Object current = source.object() instanceof Path path
                     ? FileEntries.of(path, LinkOption.NOFOLLOW_LINKS).<Object>map(e -> e).orElse(path) : source.object();
-            Object value;
-            try {
-                value = destinationBlock.invoke(current);
-            } catch (CancellationException e) {
-                throw e;
-            } catch (RuntimeException e) {
-                context.error(Messages.get("pipeline.object.skipped", e.getMessage(), Where.abbreviate(current)));
+            var destination = destinationBlock.tryInvoke(current);
+            if (destination.failed()) {
+                Skipped.report(context, destination.error(), current);
                 continue;
             }
+            Object value = destination.value();
             if (value == null) {
                 continue;
             }

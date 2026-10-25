@@ -1,6 +1,5 @@
 package io.powerj.cmdlets;
 
-import java.util.concurrent.CancellationException;
 
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
@@ -37,17 +36,13 @@ public final class MapCmdlet implements Cmdlet<MapCmdlet.Params, Object, Object>
 
     @Override
     public void process(Params p, Object input, CmdletContext<Object> context) {
-        Object result;
-        try {
-            result = ((ScriptBlock) p.function()).invoke(input);
-        } catch (CancellationException e) {
-            throw e;
-        } catch (RuntimeException e) {
-            context.error(Messages.get("pipeline.object.skipped", e.getMessage(), Where.abbreviate(input)));
+        var result = ((ScriptBlock) p.function()).tryInvoke(input);
+        if (result.failed()) {
+            Skipped.report(context, result.error(), input);
             return;
         }
-        if (result != null) {
-            context.emit(result);
+        if (result.value() != null) {
+            context.emit(result.value());
         }
     }
 }

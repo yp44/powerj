@@ -2,7 +2,6 @@ package io.powerj.cmdlets;
 
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.CancellationException;
 import java.util.regex.Pattern;
 
 import io.powerj.api.Cmdlet;
@@ -54,17 +53,12 @@ public final class Where implements Cmdlet<Where.Params, Object, Object> {
     @Override
     public void process(Params p, Object input, CmdletContext<Object> context) {
         ScriptBlock condition = compiled(p, context);
-        boolean keep;
-        try {
-            keep = condition.test(input);
-        } catch (CancellationException e) {
-            throw e;
-        } catch (RuntimeException e) {
-            // FR-36: an evaluation error is non-blocking, the object is skipped.
-            context.error(Messages.get("pipeline.object.skipped", e.getMessage(), abbreviate(input)));
+        var keep = condition.tryTest(input);
+        if (keep.failed()) {
+            Skipped.report(context, keep.error(), input); // FR-36: an evaluation error is non-blocking
             return;
         }
-        if (keep) {
+        if (keep.value()) {
             context.emit(input);
         }
     }

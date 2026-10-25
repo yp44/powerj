@@ -12,6 +12,20 @@ public final record io.powerj.api.AllocStat
   public java.lang.String io.powerj.api.AllocStat.type()
   public long io.powerj.api.AllocStat.bytes()
 
+public final record io.powerj.api.Attempt<T>
+  component T value
+  component java.lang.RuntimeException error
+  public <R> io.powerj.api.Attempt<R> io.powerj.api.Attempt.map(java.util.function.Function<? super T, ? extends R>)
+  public T io.powerj.api.Attempt.value()
+  public boolean io.powerj.api.Attempt.failed()
+  public final boolean io.powerj.api.Attempt.equals(java.lang.Object)
+  public final int io.powerj.api.Attempt.hashCode()
+  public final java.lang.String io.powerj.api.Attempt.toString()
+  public io.powerj.api.Attempt(T,java.lang.RuntimeException)
+  public java.lang.RuntimeException io.powerj.api.Attempt.error()
+  public static <T> io.powerj.api.Attempt<T> io.powerj.api.Attempt.failed(java.lang.RuntimeException)
+  public static <T> io.powerj.api.Attempt<T> io.powerj.api.Attempt.succeeded(T)
+
 public final record io.powerj.api.BlockStat
   component int line
   component int stage
@@ -233,6 +247,8 @@ public abstract interface io.powerj.api.ScriptBlock
   public abstract java.lang.Object io.powerj.api.ScriptBlock.invoke(java.lang.Object)
   public abstract java.lang.String io.powerj.api.ScriptBlock.source()
   public default boolean io.powerj.api.ScriptBlock.test(java.lang.Object)
+  public default io.powerj.api.Attempt<java.lang.Boolean> io.powerj.api.ScriptBlock.tryTest(java.lang.Object)
+  public default io.powerj.api.Attempt<java.lang.Object> io.powerj.api.ScriptBlock.tryInvoke(java.lang.Object)
 
 public final record io.powerj.api.Span
   component int end

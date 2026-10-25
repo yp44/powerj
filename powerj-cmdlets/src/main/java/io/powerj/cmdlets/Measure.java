@@ -7,8 +7,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CancellationException;
 
+import io.powerj.api.Attempt;
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
@@ -72,15 +72,12 @@ public final class Measure implements Cmdlet<Measure.Params, Object, Row> {
         if (state.size == null) {
             state.size = p.key() instanceof String property && Sizes.isSizeProperty(input, property);
         }
-        Object value;
-        try {
-            value = state.key == null ? input : state.key.invoke(input);
-        } catch (CancellationException e) {
-            throw e;
-        } catch (RuntimeException e) {
-            context.error(Messages.get("pipeline.object.skipped", e.getMessage(), Where.abbreviate(input)));
+        var measured = state.key == null ? Attempt.succeeded(input) : state.key.tryInvoke(input);
+        if (measured.failed()) {
+            Skipped.report(context, measured.error(), input);
             return;
         }
+        Object value = measured.value();
         if (value == null) {
             return;
         }

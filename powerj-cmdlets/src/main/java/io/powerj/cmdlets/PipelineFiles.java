@@ -2,7 +2,6 @@ package io.powerj.cmdlets;
 
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
-import java.util.concurrent.CancellationException;
 
 import io.powerj.api.CmdletContext;
 import io.powerj.api.ScriptBlock;
@@ -62,14 +61,12 @@ final class PipelineFiles {
         Object value = input;
         ScriptBlock evaluated = block != null ? block : property;
         if (evaluated != null) {
-            try {
-                value = evaluated.invoke(input);
-            } catch (CancellationException e) {
-                throw e;
-            } catch (RuntimeException e) {
-                context.error(Messages.get("pipeline.object.skipped", e.getMessage(), Where.abbreviate(input)));
+            var attempt = evaluated.tryInvoke(input);
+            if (attempt.failed()) {
+                Skipped.report(context, attempt.error(), input);
                 return null;
             }
+            value = attempt.value();
         }
         if (block != null && value == null) {
             return null; // the block chose to skip this object
