@@ -30,6 +30,8 @@ import io.powerj.core.java.JavaInvoker;
 import io.powerj.core.java.Members;
 import io.powerj.core.java.PreviewPolicy;
 import io.powerj.core.java.PropertyAccess;
+import io.powerj.core.lang.Lexer;
+import io.powerj.core.lang.Scanning;
 import io.powerj.core.nativeexec.NativeCommands;
 import io.powerj.core.nativeexec.Platform;
 import io.powerj.core.runtime.CommandCatalog;
@@ -112,12 +114,13 @@ public final class Completions {
 
     static Context analyze(String line, int cursor) {
         Frame frame = new Frame(Frame.Kind.COMMAND, 0, null);
+        String typed = line.substring(0, cursor);
         int i = 0;
         while (i < cursor) {
             char c = line.charAt(i);
             switch (c) {
                 case '"' -> {
-                    int end = stringEnd(line, i, cursor);
+                    int end = Scanning.stringEnd(typed, i);
                     if (end < 0) {
                         return new Context(frame, true, i);
                     }
@@ -169,24 +172,8 @@ public final class Completions {
 
     /** Lone {@code &} that ends a statement (FR-75): not inside a word such as {@code ?a=1&b=2}. */
     private static boolean isBackground(String line, int at, int cursor) {
-        return at + 1 >= cursor || line.charAt(at + 1) == ';' || io.powerj.core.lang.Lexer.isBlank(line.charAt(at + 1))
-                || at > 0 && io.powerj.core.lang.Lexer.isBlank(line.charAt(at - 1));
-    }
-
-    /** End (exclusive) of the string opened at {@code open}, or -1 if it is not closed before {@code limit}. */
-    private static int stringEnd(String line, int open, int limit) {
-        int i = open + 1;
-        while (i < limit) {
-            char c = line.charAt(i);
-            if (c == '\\') {
-                i += 2;
-            } else if (c == '"') {
-                return i + 1;
-            } else {
-                i++;
-            }
-        }
-        return -1;
+        return at + 1 >= cursor || line.charAt(at + 1) == ';' || Lexer.isBlank(line.charAt(at + 1))
+                || at > 0 && Lexer.isBlank(line.charAt(at - 1));
     }
 
     // --- Entry point ---
@@ -260,14 +247,12 @@ public final class Completions {
     /** Is the current stage an expression ({@code new java.io.F}, {@code Math.max(…)}) rather than a command? */
     private boolean isExpressionStage(String line, Frame frame, int at) {
         int start = frame.stageStart();
-        while (start < at && io.powerj.core.lang.Lexer.isBlank(line.charAt(start))) {
-            start++;
-        }
+        start = Math.min(Scanning.skipBlanks(line, start), at);
         Matcher assignment = ASSIGNMENT.matcher(line).region(start, at);
         if (assignment.lookingAt()) {
             start = assignment.end(); // $x = …: what follows the = is what counts
         }
-        return start < at && io.powerj.core.lang.Lexer.expressionAt(line, start, session().java()::isStaticReference);
+        return start < at && Lexer.expressionAt(line, start, session().java()::isStaticReference);
     }
 
     /** Is the word starting at {@code at} the first one of its stage (command name)? */

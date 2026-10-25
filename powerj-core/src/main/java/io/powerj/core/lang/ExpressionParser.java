@@ -347,7 +347,7 @@ public final class ExpressionParser {
     }
 
     private Expression lambdaOrExpression() {
-        int start = skipBlanks(input, pos);
+        int start = Scanning.skipBlanks(input, pos);
         Matcher header = LAMBDA_HEADER.matcher(input).region(start, input.length());
         if (!header.lookingAt()) {
             return expression();
@@ -435,11 +435,11 @@ public final class ExpressionParser {
      */
     private Expression group(Tok paren) {
         int open = paren.at();
-        int close = matching(input, open);
+        int close = Scanning.matching(input, open);
         if (close < 0) {
             throw new SyntaxException(Messages.get("syntax.missingCloseParen", open + 1));
         }
-        int contentStart = skipBlanks(input, open + 1);
+        int contentStart = Scanning.skipBlanks(input, open + 1);
         if (contentStart == close) {
             throw new SyntaxException(Messages.get("syntax.emptyParentheses"));
         }
@@ -460,16 +460,16 @@ public final class ExpressionParser {
 
     /** {@code [type] value} (conversion) or {@code [1, 2, 3]} (list). */
     private Expression castOrList(Tok bracket) {
-        int start = skipBlanks(input, bracket.at() + 1);
+        int start = Scanning.skipBlanks(input, bracket.at() + 1);
         int end = start;
         while (end < input.length() && (Character.isJavaIdentifierPart(input.charAt(end)) || input.charAt(end) == '.')) {
             end++;
         }
-        int closing = skipBlanks(input, end);
+        int closing = Scanning.skipBlanks(input, end);
         if (end > start && Character.isJavaIdentifierStart(input.charAt(start))
                 && closing < input.length() && input.charAt(closing) == ']') {
             String type = input.substring(start, end);
-            int after = skipBlanks(input, closing + 1);
+            int after = Scanning.skipBlanks(input, closing + 1);
             if (isOperandStart(after) && (PRIMITIVES.contains(type) || Character.isUpperCase(lastPart(type).charAt(0)))) {
                 reset(closing + 1);
                 return new Ast.Cast(type, unary());
@@ -493,7 +493,7 @@ public final class ExpressionParser {
 
     /** {@code { … }}: block evaluated later ({@code ScriptBlock}). */
     private Expression block(Tok brace) {
-        int close = matching(input, brace.at());
+        int close = Scanning.matching(input, brace.at());
         if (close < 0) {
             throw new SyntaxException(Messages.get("syntax.unclosedBlock", brace.at() + 1));
         }
@@ -580,7 +580,7 @@ public final class ExpressionParser {
 
     private Tok peek() {
         if (lookahead == null) {
-            lookahead = scanToken(skipBlanks(input, pos));
+            lookahead = scanToken(Scanning.skipBlanks(input, pos));
         }
         return lookahead;
     }
@@ -590,14 +590,6 @@ public final class ExpressionParser {
         pos = token.end();
         lookahead = null;
         return token;
-    }
-
-    static int skipBlanks(String input, int from) {
-        int at = from;
-        while (at < input.length() && Lexer.isBlank(input.charAt(at))) {
-            at++;
-        }
-        return at;
     }
 
     // --- Tokenizing ---
@@ -732,83 +724,5 @@ public final class ExpressionParser {
             throw new SyntaxException(Messages.get("syntax.characterQuotes", open + 1));
         }
         return new Lexer.Scanned<>(value, at + 1);
-    }
-
-    /**
-     * Position of the closing symbol matching the one opened at {@code open} ({@code (}, {@code [} or
-     * {@code {}), ignoring the content of strings and characters; -1 if it is missing.
-     */
-    static int matching(String input, int open) {
-        List<Character> expected = new ArrayList<>();
-        int at = open;
-        while (at < input.length()) {
-            char c = input.charAt(at);
-            switch (c) {
-                case '(' -> expected.add(')');
-                case '[' -> expected.add(']');
-                case '{' -> expected.add('}');
-                case ')', ']', '}' -> {
-                    if (!expected.isEmpty() && expected.getLast() == c) {
-                        expected.removeLast();
-                        if (expected.isEmpty()) {
-                            return at;
-                        }
-                    }
-                }
-                case '"' -> {
-                    at = skipString(input, at);
-                    if (at < 0) {
-                        return -1;
-                    }
-                    continue;
-                }
-                case '\'' -> {
-                    int end = characterEnd(input, at);
-                    if (end > 0) {
-                        at = end;
-                        continue;
-                    }
-                }
-                default -> { }
-            }
-            at++;
-        }
-        return -1;
-    }
-
-    /** Position following the string opened at {@code open}; -1 if it is not closed. */
-    private static int skipString(String input, int open) {
-        int at = open + 1;
-        while (at < input.length()) {
-            char c = input.charAt(at);
-            if (c == '\\') {
-                at += 2;
-            } else if (c == '"') {
-                return at + 1;
-            } else if (c == '$' && at + 1 < input.length() && input.charAt(at + 1) == '(') {
-                int close = matching(input, at + 1);
-                if (close < 0) {
-                    return -1;
-                }
-                at = close + 1;
-            } else {
-                at++;
-            }
-        }
-        return -1;
-    }
-
-    /** End of a character literal ({@code 'a'}, {@code '\n'}, {@code 'é'}) at {@code open}, otherwise -1. */
-    private static int characterEnd(String input, int open) {
-        if (open + 2 < input.length() && input.charAt(open + 1) != '\\' && input.charAt(open + 2) == '\'') {
-            return open + 3;
-        }
-        if (open + 3 < input.length() && input.charAt(open + 1) == '\\' && input.charAt(open + 3) == '\'') {
-            return open + 4;
-        }
-        if (open + 7 < input.length() && input.startsWith("\\u", open + 1) && input.charAt(open + 7) == '\'') {
-            return open + 8;
-        }
-        return -1;
     }
 }

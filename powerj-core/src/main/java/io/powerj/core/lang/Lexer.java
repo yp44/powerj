@@ -149,7 +149,7 @@ public final class Lexer {
         while (end < input.length() && (Character.isLetterOrDigit(input.charAt(end)) || input.charAt(end) == '_')) {
             end++;
         }
-        int after = ExpressionParser.skipBlanks(input, end);
+        int after = Scanning.skipBlanks(input, end);
         if (after < input.length() && input.charAt(after) == '=' && !input.startsWith("==", after)) {
             String name = input.substring(pos + 1, end);
             pos = after + 1;
@@ -192,7 +192,7 @@ public final class Lexer {
             return true;
         }
         if (word.equals("new") && end < input.length() && isBlank(input.charAt(end))) {
-            int next = ExpressionParser.skipBlanks(input, end);
+            int next = Scanning.skipBlanks(input, end);
             return next < input.length() && isIdentifierStart(input.charAt(next));
         }
         Matcher qualified = QUALIFIED.matcher(input).region(at, input.length());

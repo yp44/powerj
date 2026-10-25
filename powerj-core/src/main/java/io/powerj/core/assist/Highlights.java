@@ -10,6 +10,7 @@ import java.util.function.Predicate;
 
 import io.powerj.core.lang.ExpressionParser;
 import io.powerj.core.lang.Lexer;
+import io.powerj.core.lang.Scanning;
 import io.powerj.core.runtime.CommandKind;
 
 /**
@@ -48,7 +49,8 @@ public final class Highlights {
                 continue;
             }
             if (c == '"') {
-                int end = stringEnd(line, i);
+                int closed = Scanning.stringEnd(line, i);
+                int end = closed < 0 ? line.length() : closed; // not closed: to the end of the line
                 spans.add(new Span(i, end, Kind.STRING));
                 i = end;
                 head = false;
@@ -60,7 +62,7 @@ public final class Highlights {
                     end++;
                 }
                 spans.add(new Span(i, end, Kind.VARIABLE));
-                int next = skipBlanks(line, end);
+                int next = Scanning.skipBlanks(line, end);
                 head = head && command && next < line.length() && line.charAt(next) == '='
                         && !line.startsWith("==", next);
                 i = end;
@@ -148,21 +150,6 @@ public final class Highlights {
         return Character.isLetterOrDigit(c) || c == '_' || c == '?';
     }
 
-    private static int stringEnd(String line, int open) {
-        int i = open + 1;
-        while (i < line.length()) {
-            char c = line.charAt(i);
-            if (c == '\\') {
-                i += 2;
-            } else if (c == '"') {
-                return i + 1;
-            } else {
-                i++;
-            }
-        }
-        return line.length();
-    }
-
     private static int wordEnd(String line, int start) {
         int i = start;
         while (i < line.length()) {
@@ -171,14 +158,6 @@ public final class Highlights {
                     || c == '>' && i > start) {
                 break;
             }
-            i++;
-        }
-        return i;
-    }
-
-    private static int skipBlanks(String line, int from) {
-        int i = from;
-        while (i < line.length() && Lexer.isBlank(line.charAt(i))) {
             i++;
         }
         return i;

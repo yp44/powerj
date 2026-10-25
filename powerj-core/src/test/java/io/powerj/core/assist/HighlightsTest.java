@@ -68,4 +68,28 @@ class HighlightsTest {
         // outside the lambda, f is no longer a parameter
         assertThat(colored("ls | map { f -> f.name } ; (f.size)", Kind.UNKNOWN)).isEqualTo("f.size");
     }
+
+    @Test
+    void aStringWithAnInterpolationOfStringsIsOneString() {
+        String line = "git commit -m \"on $(f(\"y\")) done\" ; ls";
+
+        assertThat(colored(line, Kind.STRING)).isEqualTo("\"on $(f(\"y\")) done\"");
+        assertThat(colored(line, Kind.NATIVE)).isEqualTo("git");
+        assertThat(colored(line, Kind.CMDLET)).isEqualTo("ls");
+        assertThat(colored(line, Kind.UNKNOWN)).isEmpty();
+    }
+
+    @Test
+    void aBraceInsideAnInterpolationDoesNotCloseTheBlock() {
+        String line = "ls | map { \"x $(f(\"}\")) y\" } | where { $_.dir }";
+
+        assertThat(colored(line, Kind.STRING)).isEqualTo("\"x $(f(\"}\")) y\"");
+        assertThat(colored(line, Kind.CMDLET)).isEqualTo("ls,map,where");
+        assertThat(colored(line, Kind.VARIABLE)).isEqualTo("$_");
+    }
+
+    @Test
+    void anInterpolationThatIsNotClosedRunsToTheEndOfTheLine() {
+        assertThat(colored("echo \"a $(f(\"y\"", Kind.STRING)).isEqualTo("\"a $(f(\"y\"");
+    }
 }
