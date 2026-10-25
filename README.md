@@ -376,7 +376,9 @@ The complete example lives in [`examples/greet`](examples/greet) (also built by 
 
 Unit and integration tests use JUnit 5 and AssertJ: lexer, parser, option binding, Java interop, pipeline, completion, native commands, module loading, the built-in cmdlets, and the REPL driven through a scripted terminal. Tests force English messages so that they do not depend on the machine, and pass on Linux and on Windows. The CI additionally runs a smoke test against the packaged launcher. Each development step has a manual acceptance checklist in [`docs/recettes/`](docs/recettes/).
 
-**Coverage.** `./mvnw verify` measures the coverage with JaCoCo and fails below **80% of the lines and of the branches**, for PowerJ as a whole and for the built-in cmdlets (`io.powerj.cmdlets`). The tests of every module count for every module. The report is in `powerj-coverage/target/site/jacoco-aggregate/index.html` (the CI publishes it as the `coverage-report` artifact); `-Djacoco.skip=true` skips the measure.
+**Coverage.** `./mvnw verify` measures the coverage with JaCoCo and fails below **80% of the lines and of the branches**, for PowerJ as a whole and for the built-in cmdlets (`io.powerj.cmdlets`). The tests of every module count for every module. The report is in `powerj-coverage/target/site/jacoco-aggregate/index.html` (the CI publishes it as the `coverage-report` artifact); `-Djacoco.skip=true` skips the measure. Each module also keeps a floor for the coverage of its own tests (a ratchet: it goes up, never down).
+
+**Other gates** (`./mvnw verify` runs them): Spotless (formatting), Maven Enforcer (dependency convergence, pinned plugins), the architecture rules of `powerj-architecture` (ArchUnit; existing violations are frozen, new ones fail), and a snapshot of the public API of `powerj-api` that fails when the extension API changes. `./mvnw -Pquality verify` adds Error Prone (warnings only for now); the baselines are in [`docs/quality/`](docs/quality/). The smoke tests of the packaged launcher are scripts: after `./mvnw -Pdist verify`, run `ci/smoke/launcher.sh` (or any other script of [`ci/smoke/`](ci/smoke/)).
 
 ## Status and roadmap
 
@@ -399,7 +401,7 @@ The v1 cmdlet roadmap is done ([roadmap](docs/plans/cmdlet-roadmap.md), end-to-e
 - [Specification](docs/SPECIFICATION.md): functional requirements, grammar, extension API, architecture.
 - [Acceptance checklists](docs/recettes/) for each development step, and [plans](docs/plans/) of the latest iterations.
 - [Example module `greet`](examples/greet/README.md).
-- [Architecture review](docs/REVUE-ARCHITECTURE.md) (in French): strengths, findings, target organization, design patterns and a phased refactoring plan.
+- [Architecture review](docs/REVUE-ARCHITECTURE.md) (in French): strengths, findings, target organization, design patterns and a phased refactoring plan; Phase 0 (the safety net) is done, see its §11. [Changelog](CHANGELOG.md).
 - [Module `powerj-fx` and `grid`](docs/plans/fx-grid.md): plan, decisions and [acceptance checklist](docs/recettes/fx-grid.md).
 
 Coming from PowerShell? A few equivalences (full table in [§12.4](docs/SPECIFICATION.md#124-powershell--powerj-mapping)):

@@ -10,8 +10,23 @@ the extension API (`powerj-api`); such a change is announced as *deprecated* one
 removes the structural debt found by the [architecture review](docs/REVUE-ARCHITECTURE.md) so that v2 (control
 structures, functions) can be built on it. The work is organised in phases (review, §8).
 
-### Added
-- Phase 0, safety net — see the entries below as they land.
+### Added (Phase 0, the safety net — done)
+- **Tests that pin today's behaviour** before the code is moved: 77 lines of `Interpreter.execute` (output, errors, `$?`,
+  exit request), direct tests of `Pipe`, `CmdletRunner`, `PreviewGuard`/`PreviewPolicy`, `Jobs`, and the first tests of
+  `powerj-api` (23), among them a snapshot of its public surface that fails when the extension API changes.
+- **Architecture rules** (ArchUnit, module `powerj-architecture`): module dependencies, no cycles, only `Main` ends the
+  JVM, every cmdlet declared and registered. Violations that exist today are frozen and may only disappear.
+- **Per-module coverage floors** next to the aggregate threshold; a default 60 s timeout per test.
+- **Static analysis**: `-Xlint:all`, Spotless, stricter Maven Enforcer rules, an opt-in Error Prone profile
+  (`-Pquality`); the baselines are in `docs/quality/`.
+- **CI**: the smoke tests are scripts (`ci/smoke/*.sh`) that run on a developer's machine too; actions pinned by commit,
+  timeouts, concurrency, Dependabot, CodeQL; reproducible archive timestamps; the Maven wrapper checks its download.
+- Nine tests that demonstrate defects of the review, committed red and `@Disabled` with the phase that fixes each.
+
+### Changed
+- `powerj-cmdlets` declares `requires transitive io.powerj.api` (its public types expose the API's).
+- Tests wait for a state or a signal instead of a duration; the thread-leak check of the Ctrl+C pipeline test, which
+  could not fail, now can.
 
 ### Planned (review §8)
 - **Phase 1 — targeted fixes.** The `System.exit` guard covers method references and reflection; a malformed
