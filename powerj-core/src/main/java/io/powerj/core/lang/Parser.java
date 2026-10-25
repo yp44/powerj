@@ -15,30 +15,34 @@ import io.powerj.core.lang.Ast.Step;
 public final class Parser {
 
     private final List<Token> tokens;
-    private final Predicate<String> staticNames;
+    private final ParseContext context;
     private int pos;
 
-    private Parser(List<Token> tokens, Predicate<String> staticNames) {
+    private Parser(List<Token> tokens, ParseContext context) {
         this.tokens = tokens;
-        this.staticNames = staticNames;
+        this.context = context;
     }
 
     public static Ast.Script parse(String line) {
-        return parse(line, _ -> false);
+        return parse(line, ParseContext.NONE);
     }
 
     /**
      * @param staticNames recognizes qualified names designating a Java class or static field
-     *                    ({@code Math.PI}), expressions at the start of a statement (FR-46); a {@link Syntax}
-     *                    also gives the commands that take the short form {@code where size > 1mb}
+     *                    ({@code Math.PI}), expressions at the start of a statement (FR-46)
      */
     public static Ast.Script parse(String line, Predicate<String> staticNames) {
-        return new Parser(Lexer.tokenize(line, staticNames), staticNames).script();
+        return parse(line, ParseContext.of(staticNames));
+    }
+
+    /** The line, read with what the context knows (Java names, short-form commands). */
+    public static Ast.Script parse(String line, ParseContext context) {
+        return new Parser(Lexer.tokenize(line, context), context).script();
     }
 
     /** Pipeline alone (content of a group {@code ( … )}). */
-    static Ast.Pipeline pipeline(String text, Predicate<String> staticNames) {
-        var parser = new Parser(Lexer.tokenize(text, staticNames), staticNames);
+    static Ast.Pipeline pipeline(String text, ParseContext context) {
+        var parser = new Parser(Lexer.tokenize(text, context), context);
         if (parser.atEnd()) {
             throw new SyntaxException(Messages.get("syntax.emptyParentheses"));
         }
@@ -124,14 +128,14 @@ public final class Parser {
             boolean errorsToOutput = false;
             while (!atEnd() && peek() instanceof Token.Redirection(var stream, var append)) {
                 pos++;
-                if (stream == Token.Stream.ERR_TO_OUT) {
+                if (stream == RedirectedStream.ERR_TO_OUT) {
                     errorsToOutput = true;
                     continue;
                 }
                 if (atEnd() || !isArgument(peek())) {
                     throw new SyntaxException(Messages.get("syntax.redirectionFileExpected"));
                 }
-                if (stream == Token.Stream.OUT && peekAt(1) instanceof Token.Pipe) {
+                if (stream == RedirectedStream.OUT && peekAt(1) instanceof Token.Pipe) {
                     throw new SyntaxException(Messages.get("syntax.redirectionNotLast"));
                 }
                 redirects.add(new Redirect(stream, append, argument(next())));
@@ -177,10 +181,10 @@ public final class Parser {
      * ({@code @CmdletInfo(comparison = true)}).
      */
     private boolean isShortFormOperator(String command, boolean forceNative, List<Argument> arguments) {
-        return !forceNative && Syntax.acceptsComparison(staticNames, command) && arguments.size() == 1
+        return !forceNative && context.acceptsComparison(command) && arguments.size() == 1
                 && arguments.getFirst() instanceof Ast.WordArgument
                 && peek() instanceof Token.Redirection(var stream, var append)
-                && stream == Token.Stream.OUT && !append;
+                && stream == RedirectedStream.OUT && !append;
     }
 
     private static boolean isArgument(Token token) {

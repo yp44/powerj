@@ -16,7 +16,7 @@ import io.powerj.core.java.PreviewGuard;
 import io.powerj.core.lang.Ast.Statement;
 import io.powerj.core.lang.Ast;
 import io.powerj.core.lang.Parser;
-import io.powerj.core.lang.Syntax;
+import io.powerj.core.lang.ParseContext;
 import io.powerj.core.lang.SyntaxException;
 
 /**
@@ -29,11 +29,11 @@ final class PreviewMode {
     /** Stops a preview that has received enough values. */
     private static final class PreviewFull extends CancellationException { }
 
-    private final Supplier<Syntax> syntax;
+    private final Supplier<ParseContext> parseContext;
     private final PipelineExecutor executor;
 
-    PreviewMode(Supplier<Syntax> syntax, PipelineExecutor executor) {
-        this.syntax = syntax;
+    PreviewMode(Supplier<ParseContext> parseContext, PipelineExecutor executor) {
+        this.parseContext = parseContext;
         this.executor = executor;
     }
 
@@ -52,7 +52,7 @@ final class PreviewMode {
         }
         Ast.Script script;
         try {
-            script = Parser.parse(line, syntax.get());
+            script = Parser.parse(line, parseContext.get());
         } catch (SyntaxException e) {
             return new PreviewResult.Incomplete(e.getMessage());
         }

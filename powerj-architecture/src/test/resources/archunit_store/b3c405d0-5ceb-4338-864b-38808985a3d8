@@ -1,2 +1,0 @@
-Class <io.powerj.core.lang.SyntaxException> extends class <io.powerj.core.error.PjException> in (SyntaxException.java:0)
-Constructor <io.powerj.core.lang.SyntaxException.<init>(java.lang.String)> calls constructor <io.powerj.core.error.PjException.<init>(java.lang.String)> in (SyntaxException.java:10)

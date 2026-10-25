@@ -154,7 +154,7 @@ class InterpreterCharacterizationTest {
                     "[Math has no static field NOPE]", false, null, null),
             row("1 +",
                     "",
-                    "[]", true, null, "io.powerj.core.lang.SyntaxException: syntax: incomplete expression"),
+                    "[]", true, null, "io.powerj.core.error.PjException: syntax: incomplete expression"),
             row("eval { 1 + 2 }",
                     "3\n",
                     "[]", true, null, null),

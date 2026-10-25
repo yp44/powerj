@@ -76,8 +76,8 @@ class ParserTest {
     void redirections() {
         var statement = only("git log > log.txt 2>> err.txt");
         assertThat(statement.redirects()).containsExactly(
-                new Ast.Redirect(Token.Stream.OUT, false, new WordArgument("log.txt")),
-                new Ast.Redirect(Token.Stream.ERR, true, new WordArgument("err.txt")));
+                new Ast.Redirect(RedirectedStream.OUT, false, new WordArgument("log.txt")),
+                new Ast.Redirect(RedirectedStream.ERR, true, new WordArgument("err.txt")));
     }
 
     @Test
@@ -153,11 +153,11 @@ class ParserTest {
         var statement = only("git status 2>&1 | where { $_.contains(\"x\") } 2> err.txt");
         assertThat(statement.pipeline().stages()).extracting(Ast.Stage::errorsToOutput).containsExactly(true, false);
         assertThat(statement.redirects()).containsExactly(
-                new Ast.Redirect(Token.Stream.ERR, false, new WordArgument("err.txt")));
+                new Ast.Redirect(RedirectedStream.ERR, false, new WordArgument("err.txt")));
     }
 
     /** The commands declared {@code @CmdletInfo(comparison = true)}, as the interpreter gives them. */
-    private static final Syntax WHERE = new Syntax(_ -> false, "where"::equals);
+    private static final ParseContext WHERE = new ParseContext(_ -> false, "where"::equals);
 
     private static Statement onlyWithWhere(String line) {
         var steps = Parser.parse(line, WHERE).steps();
@@ -170,7 +170,7 @@ class ParserTest {
         assertThat(onlyWithWhere("ls | where size > 10kb > out.txt").pipeline()).satisfies(p -> {
             assertThat(((Command) p.stages().get(1).body()).arguments()).containsExactly(
                     new WordArgument("size"), new WordArgument(">"), new WordArgument("10kb"));
-            assertThat(p.redirects()).containsExactly(new Ast.Redirect(Token.Stream.OUT, false, new WordArgument("out.txt")));
+            assertThat(p.redirects()).containsExactly(new Ast.Redirect(RedirectedStream.OUT, false, new WordArgument("out.txt")));
         });
         assertThat(((Command) onlyWithWhere("where ext == log").body()).arguments()).containsExactly(
                 new WordArgument("ext"), new WordArgument("=="), new WordArgument("log"));
@@ -184,15 +184,15 @@ class ParserTest {
     void shortFormOnlyForTheDeclaredCommands() {
         // No command declared: the > of where is a redirection, like after any command.
         assertThat(only("ls | where size > 1mb").redirects())
-                .containsExactly(new Ast.Redirect(Token.Stream.OUT, false, new WordArgument("1mb")));
+                .containsExactly(new Ast.Redirect(RedirectedStream.OUT, false, new WordArgument("1mb")));
         // Any command name can be declared; none is known by the parser itself.
-        var keep = new Syntax(_ -> false, "keep"::equals);
+        var keep = new ParseContext(_ -> false, "keep"::equals);
         assertThat(Parser.parse("ls | keep size > 1mb", keep).steps().getFirst().statement().redirects()).isEmpty();
     }
 
     @Test
     void shortFormInParenthesesAndLambdas() {
-        // ( … ) is parsed by ExpressionParser, which hands the Syntax over to the pipeline inside.
+        // ( … ) is parsed by ExpressionParser, which hands the ParseContext over to the pipeline inside.
         var group = (ExpressionBody) onlyWithWhere("(ls | where size > 1mb)").body();
         var pipeline = ((Ast.SubExpression) group.expression()).pipeline();
         assertThat(((Command) pipeline.stages().get(1).body()).arguments()).containsExactly(
@@ -237,5 +237,11 @@ class ParserTest {
         assertThatThrownBy(() -> Parser.parse("(ls &)")).hasMessage("syntax: unexpected \"&\"");
         assertThatThrownBy(() -> Parser.parse("ls | String::valueOf")).hasMessageContaining("write map { … }");
         assertThatThrownBy(() -> Parser.parse("$x = ;")).hasMessageContaining("value expected");
+    }
+
+    @Test
+    void aLineThatDoesNotParseThrowsTheSyntaxExceptionOfTheLanguage() {
+        assertThatThrownBy(() -> Parser.parse("1 +")).isExactlyInstanceOf(SyntaxException.class)
+                .hasMessage("syntax: incomplete expression");
     }
 }

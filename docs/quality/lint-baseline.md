@@ -6,14 +6,14 @@ The target is zero warnings, then `-Werror`.
 
 Reproduce: `./mvnw clean test-compile 2>&1 | grep 'WARNING.*\.java'`.
 
-## State on 2026-10-25, after Phase 3.1 (0.2.0-SNAPSHOT, JDK 25.0.5): 37 warnings
+## State on 2026-10-25, after Phase 3.2 (0.2.0-SNAPSHOT, JDK 25.0.5): 35 warnings
 
 (72 when `-Xlint:all` was switched on, in Phase 0.4.)
 
 | Module | main | test |
 |---|---|---|
 | `powerj-cmdlets` | 5 | 7 |
-| `powerj-core` | 15 | 5 |
+| `powerj-core` | 14 | 5 |
 | `powerj-shell` | 2 | 2 |
 | other modules | 0 | 0 |
 
@@ -21,7 +21,7 @@ Reproduce: `./mvnw clean test-compile 2>&1 | grep 'WARNING.*\.java'`.
 |---|---|---|---|
 | "found raw type" / unchecked call (`[rawtypes]`, `[unchecked]`) | 10 | `Collected` used raw in `Collect`; AssertJ generics in tests | `Collect.Received` (open question of the PR), tests |
 | Restricted method (`[restricted]`) | 7 | FFM calls in `StandardInput`, `WindowsConsole`, `ModuleLoader` | needs `--enable-native-access` in the launcher and tests; Phase 4 |
-| Serializable class without `serialVersionUID` / non-serializable field (`[serial]`) | 7 | `PjException`, `SyntaxException`, `PreviewGuard.Denied`, `PreviewMode.PreviewFull`, `JsonException`, `Unreadable` | Phase 3.2 (`CancelledException`, `PjException` rework) |
+| Serializable class without `serialVersionUID` / non-serializable field (`[serial]`) | 6 | `PjException`, `PreviewGuard.Denied`, `PreviewMode.PreviewFull`, `JsonException`, `Unreadable` | Phase 3.4 (`CancelledException`, `PjException` rework) |
 | `try` on an auto-closeable that `close()` may throw `InterruptedException` from (`[try]`) | 5 | `CmdletRunner.Context` and its test doubles (Phase 1.3) | Phase 3.4 |
 | Dangling Javadoc (`[dangling-doc-comments]`) | 3 | comments before blocks | Phase 3.3 (`Completions`, `Members`) |
 | Deprecated JLine API (`[deprecation]`) | 3 | `Terminal.getWidth()`, `Size(int,int)` | Phase 4.3 |

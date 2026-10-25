@@ -25,7 +25,7 @@ import io.powerj.core.command.CommandResolution;
 import io.powerj.core.error.PjException;
 import io.powerj.core.lang.Ast;
 import io.powerj.core.lang.Parser;
-import io.powerj.core.lang.Syntax;
+import io.powerj.core.lang.ParseContext;
 import io.powerj.core.nativeexec.CommandResolver;
 import io.powerj.core.nativeexec.NativeRun;
 import io.powerj.core.nativeexec.NativeRunner;
@@ -131,7 +131,7 @@ class PipelineExecutorTest {
         reporter = new ErrorReporter(session, io);
         var evaluator = new Evaluator(session, _ -> {
             throw new UnsupportedOperationException("no subexpression in these tests");
-        }, () -> new Syntax(_ -> false, _ -> false));
+        }, () -> new ParseContext(_ -> false, _ -> false));
         executor = new PipelineExecutor(session, io, resolution, new NativeRunner(), evaluator, reporter,
                 () -> observer);
     }

@@ -2,7 +2,6 @@ package io.powerj.core.lang;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -68,21 +67,21 @@ public final class ExpressionParser {
 
     private final String input;
     private final Mode mode;
-    private Predicate<String> staticNames;
+    private ParseContext context;
     private int pos;
     private int depth;
     private Tok lookahead;
 
-    private ExpressionParser(String input, int start, Mode mode, Predicate<String> staticNames) {
+    private ExpressionParser(String input, int start, Mode mode, ParseContext context) {
         this.input = input;
         this.pos = start;
         this.mode = mode;
-        this.staticNames = staticNames;
+        this.context = context;
     }
 
     /** Parses the complete content of a block. */
     public static Expression parse(String source) {
-        return parse(source, _ -> false);
+        return parse(source, ParseContext.NONE);
     }
 
     /**
@@ -92,7 +91,11 @@ public final class ExpressionParser {
      *                    ({@code Math.PI}), for commands placed in parentheses
      */
     public static Expression parse(String source, Predicate<String> staticNames) {
-        var parser = new ExpressionParser(source, 0, Mode.BLOCK, staticNames);
+        return parse(source, ParseContext.of(staticNames));
+    }
+
+    public static Expression parse(String source, ParseContext context) {
+        var parser = new ExpressionParser(source, 0, Mode.BLOCK, context);
         if (parser.atEnd()) {
             throw new SyntaxException(Messages.get("syntax.emptyBlock"));
         }
@@ -105,11 +108,15 @@ public final class ExpressionParser {
 
     /** Parsed block {@code { source }}: lambda ({@code f -> …}) or {@code $_} block. */
     public static Expression block(String source) {
-        return function(source, _ -> false);
+        return function(source, ParseContext.NONE);
     }
 
     /** Content of a block: lambda if the text starts with parameters and {@code ->}, otherwise {@code $_} block. */
     public static Expression function(String source, Predicate<String> staticNames) {
+        return function(source, ParseContext.of(staticNames));
+    }
+
+    public static Expression function(String source, ParseContext context) {
         Matcher header = LAMBDA_HEADER.matcher(source);
         if (header.lookingAt()) {
             List<String> parameters = parameters(header);
@@ -117,35 +124,9 @@ public final class ExpressionParser {
             if (body.isBlank()) {
                 throw new SyntaxException(Messages.get("syntax.lambdaBodyExpected"));
             }
-            return new Ast.Lambda(source.strip(), parameters, parse(body, withParameters(staticNames, parameters)));
+            return new Ast.Lambda(source.strip(), parameters, parse(body, context.withParameters(parameters)));
         }
-        return new Ast.BlockExpression(source.strip(), parse(source, staticNames));
-    }
-
-    /**
-     * Names known at the start of a parenthesized command: Java static names, plus the parameters of
-     * enclosing lambdas ({@code (f.size)} in {@code f -> …} is an expression, not the command
-     * {@code f.size}).
-     */
-    private record Names(Predicate<String> statics, Set<String> parameters) implements Predicate<String> {
-        @Override
-        public boolean test(String name) {
-            int dot = name.indexOf('.');
-            return parameters.contains(dot < 0 ? name : name.substring(0, dot)) || statics.test(name);
-        }
-    }
-
-    private static Predicate<String> withParameters(Predicate<String> staticNames, List<String> parameters) {
-        if (parameters.isEmpty()) {
-            return staticNames;
-        }
-        Set<String> names = new HashSet<>(parameters);
-        Predicate<String> statics = staticNames;
-        if (staticNames instanceof Names(var outer, var outerParameters)) {
-            names.addAll(outerParameters);
-            statics = outer;
-        }
-        return new Names(statics, Set.copyOf(names));
+        return new Ast.BlockExpression(source.strip(), parse(source, context));
     }
 
     /**
@@ -162,16 +143,6 @@ public final class ExpressionParser {
         } catch (SyntaxException e) {
             return Optional.empty();
         }
-    }
-
-    /** The names given by the caller, without the parameters of enclosing lambdas added here. */
-    static Predicate<String> syntax(Predicate<String> staticNames) {
-        return staticNames instanceof Names(var statics, var _) ? statics : staticNames;
-    }
-
-    /** Is {@code name} a parameter of an enclosing lambda? */
-    static boolean isParameter(Predicate<String> staticNames, String name) {
-        return staticNames instanceof Names(var _, var parameters) && parameters.contains(name);
     }
 
     /** {@code f ->}, {@code (a, b) ->}, {@code () ->} at the start of the text. */
@@ -200,15 +171,15 @@ public final class ExpressionParser {
      * Parses the expression starting at {@code start} in a command line, and indicates where it
      * stops.
      */
-    static Lexer.Scanned<Expression> scan(String input, int start, Mode mode, Predicate<String> staticNames) {
-        var parser = new ExpressionParser(input, start, mode, staticNames);
+    static Lexer.Scanned<Expression> scan(String input, int start, Mode mode, ParseContext context) {
+        var parser = new ExpressionParser(input, start, mode, context);
         Expression expression = mode == Mode.ARGUMENT ? parser.postfix(parser.primary()) : parser.expression();
         return new Lexer.Scanned<>(expression, parser.pos);
     }
 
     /** Group {@code ( … )} starting at {@code open}: expression or pipeline; used for {@code $( … )}. */
-    static Lexer.Scanned<Expression> group(String input, int open, Predicate<String> staticNames) {
-        var parser = new ExpressionParser(input, open, Mode.BLOCK, staticNames);
+    static Lexer.Scanned<Expression> group(String input, int open, ParseContext context) {
+        var parser = new ExpressionParser(input, open, Mode.BLOCK, context);
         Tok paren = parser.next();
         Expression expression = parser.group(paren);
         return new Lexer.Scanned<>(expression, parser.pos);
@@ -383,13 +354,13 @@ public final class ExpressionParser {
         }
         List<String> parameters = parameters(header);
         reset(header.end());
-        Predicate<String> enclosing = staticNames;
-        staticNames = withParameters(enclosing, parameters);
+        ParseContext enclosing = context;
+        context = enclosing.withParameters(parameters);
         Expression body;
         try {
             body = expression();
         } finally {
-            staticNames = enclosing;
+            context = enclosing;
         }
         return new Ast.Lambda(input.substring(start, pos).strip(), parameters, body);
     }
@@ -472,7 +443,7 @@ public final class ExpressionParser {
         if (contentStart == close) {
             throw new SyntaxException(Messages.get("syntax.emptyParentheses"));
         }
-        if (Lexer.expressionAt(input, contentStart, staticNames)) {
+        if (Lexer.expressionAt(input, contentStart, context)) {
             depth++;
             Expression inner = expression();
             depth--;
@@ -482,7 +453,7 @@ public final class ExpressionParser {
             }
             // value followed by a pipeline: ($l | where { … })
         }
-        Ast.Pipeline pipeline = Parser.pipeline(input.substring(open + 1, close), staticNames);
+        Ast.Pipeline pipeline = Parser.pipeline(input.substring(open + 1, close), context);
         reset(close + 1);
         return new Ast.SubExpression(pipeline);
     }
@@ -528,7 +499,7 @@ public final class ExpressionParser {
         }
         String source = input.substring(brace.at() + 1, close);
         reset(close + 1);
-        return function(source, staticNames);
+        return function(source, context);
     }
 
     // --- Utilities ---
@@ -637,7 +608,7 @@ public final class ExpressionParser {
         }
         char c = input.charAt(start);
         if (c == '"') {
-            var scanned = Lexer.stringAt(input, start, staticNames);
+            var scanned = Lexer.stringAt(input, start, context);
             return new Text(scanned.value(), start, scanned.end());
         }
         if (c == '\'') {

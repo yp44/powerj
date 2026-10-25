@@ -11,7 +11,7 @@ import io.powerj.core.error.PjException;
 import io.powerj.core.format.Values;
 import io.powerj.core.i18n.Messages;
 import io.powerj.core.lang.Ast;
-import io.powerj.core.lang.Token;
+import io.powerj.core.lang.RedirectedStream;
 import io.powerj.core.nativeexec.NativeRunner;
 
 /**
@@ -30,7 +30,7 @@ public record Redirections(Optional<NativeRunner.FileTarget> out, Optional<Nativ
      * The file the last redirection of {@code stream} names, if the pipeline has one. The target is an argument
      * ({@code > $name}, {@code > "a b"}), evaluated now, and relative to the current directory.
      */
-    static Optional<NativeRunner.FileTarget> target(Ast.Pipeline pipeline, Token.Stream stream, Evaluator evaluator,
+    static Optional<NativeRunner.FileTarget> target(Ast.Pipeline pipeline, RedirectedStream stream, Evaluator evaluator,
                                                     Session session) throws InterruptedException {
         Ast.Redirect last = null;
         for (Ast.Redirect redirect : pipeline.redirects()) {

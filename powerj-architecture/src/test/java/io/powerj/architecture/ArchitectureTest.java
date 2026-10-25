@@ -95,14 +95,15 @@ class ArchitectureTest {
 
     // --- Target architecture: violations frozen (finding in brackets) ---
 
-    /** [C-05] {@code lang} is the language: it knows nothing of the rest of the core (review §5.1). */
+    /**
+     * [C-05] {@code lang} is the language: it needs nothing of the rest of the product, only the JDK and the
+     * localization of the API ({@code io.powerj.api.Language}, for its error messages) (review §5.1).
+     */
     @Test
-    void langDoesNotDependOnTheRestOfTheCore() {
-        check(freeze(noClasses().that().resideInAPackage("io.powerj.core.lang..")
-                .should().dependOnClassesThat().resideInAnyPackage("io.powerj.core.error..", "io.powerj.core.i18n..",
-                        "io.powerj.core.format..", "io.powerj.core.java..", "io.powerj.core.nativeexec..",
-                        "io.powerj.core.command..", "io.powerj.core.runtime..", "io.powerj.core.perf..",
-                        "io.powerj.core.assist..")));
+    void langDependsOnlyOnTheJdkAndTheApi() {
+        check(classes().that().resideInAPackage("io.powerj.core.lang..")
+                .should().onlyDependOnClassesThat().resideInAnyPackage("io.powerj.core.lang..", "io.powerj.api..",
+                        "java..", "javax.."));
     }
 
     /**

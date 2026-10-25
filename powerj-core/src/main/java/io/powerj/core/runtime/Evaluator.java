@@ -27,7 +27,7 @@ import io.powerj.core.lang.Ast.Operator;
 import io.powerj.core.lang.Ast;
 import io.powerj.core.lang.ExpressionParser;
 import io.powerj.core.lang.StringPart;
-import io.powerj.core.lang.Syntax;
+import io.powerj.core.lang.ParseContext;
 import io.powerj.core.lang.SyntaxException;
 
 /**
@@ -65,17 +65,17 @@ public final class Evaluator {
 
     private final Session session;
     private final PipelineRunner runner;
-    private final Supplier<Syntax> syntax;
+    private final Supplier<ParseContext> parseContext;
     private final CallPolicy policy;
 
     /**
      * @param runner runs the pipeline of a subexpression
-     * @param syntax the syntax the text of a block is read with, as the interpreter reads a line
+     * @param parseContext what the text of a block is read with, as the interpreter reads a line
      */
-    Evaluator(Session session, PipelineRunner runner, Supplier<Syntax> syntax) {
+    Evaluator(Session session, PipelineRunner runner, Supplier<ParseContext> parseContext) {
         this.session = session;
         this.runner = runner;
-        this.syntax = syntax;
+        this.parseContext = parseContext;
         this.policy = new CallPolicy(session);
     }
 
@@ -91,7 +91,7 @@ public final class Evaluator {
     /** Compiles the text of a block for a cmdlet ({@code CmdletContext.compile}). */
     ScriptBlock compile(String source) {
         try {
-            var function = ExpressionParser.function(source, syntax.get());
+            var function = ExpressionParser.function(source, parseContext.get());
             return (ScriptBlock) evaluate(function);
         } catch (SyntaxException e) {
             throw new IllegalArgumentException(e.getMessage(), e);

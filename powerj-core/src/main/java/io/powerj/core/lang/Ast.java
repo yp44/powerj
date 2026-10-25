@@ -191,5 +191,5 @@ public final class Ast {
     }
 
     /** Redirection of a stream to a file. */
-    public record Redirect(Token.Stream stream, boolean append, Argument target) { }
+    public record Redirect(RedirectedStream stream, boolean append, Argument target) { }
 }

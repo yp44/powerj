@@ -24,8 +24,9 @@ import io.powerj.core.i18n.Messages;
 import io.powerj.core.lang.Ast.Statement;
 import io.powerj.core.lang.Ast;
 import io.powerj.core.lang.Parser;
-import io.powerj.core.lang.Syntax;
-import io.powerj.core.lang.Token;
+import io.powerj.core.lang.ParseContext;
+import io.powerj.core.lang.SyntaxException;
+import io.powerj.core.lang.RedirectedStream;
 import io.powerj.core.nativeexec.CommandResolver;
 import io.powerj.core.nativeexec.NativeRunner;
 import io.powerj.core.perf.PerfMode;
@@ -66,7 +67,7 @@ public final class Interpreter {
         this.session = session;
         this.io = io;
         this.registry = registry;
-        this.evaluator = new Evaluator(session, this::capture, this::syntax);
+        this.evaluator = new Evaluator(session, this::capture, this::parseContext);
         this.reporter = new ErrorReporter(session, io);
         this.perf = new PerfMode(session, io, Profiler.discover());
         this.modules = new ModuleLoader(registry, Collections.unmodifiableSet(builtins.keySet()));
@@ -84,7 +85,7 @@ public final class Interpreter {
         this.resolution = new CommandResolution(builtins, registry, resolver);
         this.executor = new PipelineExecutor(session, io, resolution, nativeRunner, evaluator, reporter,
                 () -> observer);
-        this.preview = new PreviewMode(this::syntax, executor);
+        this.preview = new PreviewMode(this::parseContext, executor);
     }
 
     /** Consent asked before loading a module that uses native code (FR-77); none by default: it is not loaded. */
@@ -123,8 +124,8 @@ public final class Interpreter {
     }
 
     /** Java static names, and the commands whose cmdlet declares the short form {@code where size > 1mb}. */
-    private Syntax syntax() {
-        return new Syntax(session.java()::isStaticReference, this::acceptsComparison);
+    private ParseContext parseContext() {
+        return new ParseContext(session.java()::isStaticReference, this::acceptsComparison);
     }
 
     /** {@code @CmdletInfo(comparison = true)} on the cmdlet the name runs (FR-13: a built-in command comes first). */
@@ -159,7 +160,12 @@ public final class Interpreter {
     public void execute(String line) throws InterruptedException {
         reporter.reset();
         long begin = System.nanoTime();
-        Ast.Script script = Parser.parse(line, syntax());
+        Ast.Script script;
+        try {
+            script = Parser.parse(line, parseContext());
+        } catch (SyntaxException e) {
+            throw new PjException(e.getMessage()); // a line that does not parse is an error to show, like any other
+        }
         long parsed = System.nanoTime() - begin;
         PerfMode.Measurement measurement = perf.start(line, script, begin, parsed);
         observer = measurement.observer();
@@ -206,9 +212,9 @@ public final class Interpreter {
     private boolean statement(Statement statement) throws InterruptedException {
         Optional<NativeRunner.FileTarget> errTarget = Optional.empty();
         try {
-            errTarget = Redirections.target(statement.pipeline(), Token.Stream.ERR, evaluator, session);
+            errTarget = Redirections.target(statement.pipeline(), RedirectedStream.ERR, evaluator, session);
             Optional<NativeRunner.FileTarget> outTarget =
-                    Redirections.target(statement.pipeline(), Token.Stream.OUT, evaluator, session);
+                    Redirections.target(statement.pipeline(), RedirectedStream.OUT, evaluator, session);
             var redirections = new Redirections(outTarget, errTarget);
             if (statement.background()) {
                 return executor.background(statement.pipeline(), redirections);
@@ -252,12 +258,12 @@ public final class Interpreter {
 
     /** Values of a parenthesized pipeline: {@code (ls).name}. */
     private List<Object> capture(Ast.Pipeline pipeline) throws InterruptedException {
-        if (Redirections.target(pipeline, Token.Stream.OUT, evaluator, session).isPresent()) {
+        if (Redirections.target(pipeline, RedirectedStream.OUT, evaluator, session).isPresent()) {
             throw new PjException(Messages.get("redirect.subexpression"));
         }
         List<Object> values = new ArrayList<>();
         Optional<NativeRunner.FileTarget> errTarget =
-                Redirections.target(pipeline, Token.Stream.ERR, evaluator, session);
+                Redirections.target(pipeline, RedirectedStream.ERR, evaluator, session);
         executor.execute(pipeline, values::add, true, Redirections.errors(errTarget));
         return values;
     }

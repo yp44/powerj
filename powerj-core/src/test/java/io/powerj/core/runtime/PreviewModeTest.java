@@ -21,7 +21,7 @@ import io.powerj.core.command.Builtin;
 import io.powerj.core.command.CmdletRegistry;
 import io.powerj.core.command.CommandResolution;
 import io.powerj.core.error.PjException;
-import io.powerj.core.lang.Syntax;
+import io.powerj.core.lang.ParseContext;
 import io.powerj.core.nativeexec.CommandResolver;
 import io.powerj.core.nativeexec.NativeRunner;
 import io.powerj.core.support.PreviewableItems;
@@ -47,13 +47,13 @@ class PreviewModeTest {
         });
         var resolution = new CommandResolution(builtins, CmdletRegistry.of(PreviewableItems.all()),
                 new CommandResolver());
-        Syntax syntax = new Syntax(_ -> false, _ -> false);
+        ParseContext parseContext = new ParseContext(_ -> false, _ -> false);
         var evaluator = new Evaluator(session, _ -> {
             throw new UnsupportedOperationException("no subexpression in these tests");
-        }, () -> syntax);
+        }, () -> parseContext);
         var executor = new PipelineExecutor(session, io, resolution, new NativeRunner(), evaluator,
                 new ErrorReporter(session, io), () -> ExecutionObserver.NONE);
-        preview = new PreviewMode(() -> syntax, executor);
+        preview = new PreviewMode(() -> parseContext, executor);
     }
 
     private PreviewResult run(String line, int limit) {
