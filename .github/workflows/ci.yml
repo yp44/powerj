@@ -9,211 +9,106 @@ on:
 permissions:
   contents: read
 
+# A new push to a pull request cancels the run in progress for it; on main every run goes through.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# The actions are pinned by commit (a tag can be moved); the comment gives the tag. Dependabot updates both.
 jobs:
   build:
-    name: Build et tests (Linux)
+    name: Build and tests (Linux)
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           distribution: temurin
           java-version: '25'
           cache: maven
 
-      - name: Build, tests et image applicative
+      - name: Build, tests and application image
         run: ./mvnw -B -Pdist verify
 
-      - name: Rapport de couverture des tests
+      - name: Test coverage report
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: coverage-report
           path: powerj-coverage/target/site/jacoco-aggregate/
           if-no-files-found: ignore
 
-      - name: Test de fumée du lanceur
-        run: |
-          cat > smoke.txt <<'EOF'
-          cd /usr
-          pwd
-          $l = sh -c "printf 'un\ndeux\n'"
-          "ligne : $l[1]"
-          sh -c "exit 1" || "secours"
-          which ls
-          (ls / --dirs)*.name
-          $u = (ls / | where name == usr).name
-          "filtre : $u"
-          $t = printf "b\na\nc\n" | sort | where { $_ != "c" }
-          "tri : $t"
-          "java : $(Math.max(3, 7))"
-          $n = List.of("a", "bb", "ccc").stream().filter(s -> s.length() > 1).count()
-          "lambda : $n"
-          $r = List.of("b", "a") | map String::toUpperCase | where { s -> s != "B" }
-          "reference : $r"
-          $c = (ls / | where name == usr | collect).size()
-          "collect : $c"
-          sh -c "exit 3"
-          exit $exit
-          EOF
-          set +e
-          powerj-dist/target/jpackage/powerj/bin/powerj < smoke.txt > out.txt 2>&1
-          code=$?
-          set -e
-          cat out.txt
-          test "$code" -eq 3 || { echo "code retour attendu 3, obtenu $code"; exit 1; }
-          grep -q '/usr$' out.txt
-          grep -q 'ligne : deux' out.txt
-          grep -q 'secours' out.txt
-          grep -q 'ls → cmdlet (io.powerj.cmdlets)' out.txt
-          grep -q 'usr$' out.txt
-          grep -q 'filtre : usr' out.txt
-          grep -q 'tri : \[a, b\]' out.txt
-          grep -q 'java : 7' out.txt
-          grep -q 'lambda : 2' out.txt
-          grep -q 'reference : A' out.txt
-          grep -q 'collect : 1' out.txt
+      # The smoke tests are scripts (ci/smoke): they run on a developer's machine after `./mvnw -Pdist verify` too.
+      - name: Smoke test of the launcher
+        run: ci/smoke/launcher.sh
 
-      - name: Profileur du mode perf dans le lanceur
-        run: |
-          app=powerj-dist/target/jpackage/powerj
-          java=$(find "$app" -path '*runtime/bin/java' | head -1)
-          "$java" --list-modules | grep -q '^jdk.jfr@'
-          "$java" --list-modules | grep -q '^jdk.management@'
-          # The profiler is only resolved when asked: without this option the perf mode has no recording.
-          grep -q -- '--add-modules=jdk.jfr' "$(find "$app" -name powerj.cfg | head -1)"
+      - name: Profiler of the perf mode in the launcher
+        run: ci/smoke/profiler.sh
 
-      - name: Test de fumée du mode non interactif
-        run: |
-          pj=powerj-dist/target/jpackage/powerj/bin/powerj
-          set +e
-          $pj -c 'sh -c "exit 3"'
-          code=$?
-          set -e
-          test "$code" -eq 3 || { echo "code retour attendu 3, obtenu $code"; exit 1; }
-          printf 'x.txt\ny.log\nz.txt\n' | $pj -c 'where { $_.endsWith(".txt") }' > stdin.txt
-          cat stdin.txt
-          test "$(cat stdin.txt)" = "$(printf 'x.txt\nz.txt')"
-          $pj -c 'grep -i "^ROOT:" /etc/passwd -p 2 | map { m -> "grep : " + m.line }' < /dev/null > grep.txt
-          cat grep.txt
-          test "$(cat grep.txt)" = "grep : 1"
+      - name: Smoke test of the non-interactive mode
+        run: ci/smoke/non-interactive.sh
 
-      - name: Test de fumée des modules tiers
-        run: |
-          pj=$PWD/powerj-dist/target/jpackage/powerj/bin/powerj
-          export POWERJ_HOME=$RUNNER_TEMP/pjhome
-          mkdir -p $POWERJ_HOME/modules
-          cp examples/greet/target/greet.jar $POWERJ_HOME/modules/
-          $pj -c 'greet --name Yves -c 2 | where { g -> g.message.contains("Yves") } | map { g -> g.message }' > greet.txt
-          $pj -c 'mod-list' >> greet.txt
-          $pj -c 'new com.example.greet.Greeting("a", "b", null)' >> greet.txt 2>&1 || true
-          cat greet.txt
-          test "$(grep -c 'Hello Yves!' greet.txt)" -eq 2
-          grep -q 'com.example.greet .*\[greet\]' greet.txt
-          grep -q 'class not found: com.example.greet.Greeting' greet.txt
+      - name: Smoke test of the third-party modules
+        run: ci/smoke/third-party-modules.sh
 
-      - name: Test de fumée du module graphique (powerj-fx)
+      - name: Smoke test of the graphical module (powerj-fx)
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb libgtk-3-0 libxtst6 libxxf86vm1 libgl1
-          pj=$PWD/powerj-dist/target/jpackage/powerj/bin/powerj
-          export POWERJ_HOME=$RUNNER_TEMP/fxhome
-          mkdir -p $POWERJ_HOME/modules
-          unzip -q powerj-fx/target/powerj-fx-*-linux.zip -d $POWERJ_HOME/modules
-          # Sans réponse enregistrée et sans terminal, un module qui utilise du code natif n'est pas chargé (spec §4.4).
-          $pj -c 'mod-list' > fx.txt 2>&1
-          printf 'modules.nativeAccess.io.powerj.fx=false\n' > $POWERJ_HOME/config.properties
-          $pj -c 'mod-list' >> fx.txt 2>&1
-          printf 'modules.nativeAccess.io.powerj.fx=true\n' > $POWERJ_HOME/config.properties
-          xvfb-run -a $pj -c 'mod-list' >> fx.txt 2>&1
-          xvfb-run -a $pj -c 'help grid' >> fx.txt 2>&1
-          # Une vraie fenêtre JavaFX s'ouvre dans la couche du module, sans erreur ni avertissement du JDK sur le code natif.
-          # NO_AT_BRIDGE: le runner n'a pas de bus d'accessibilité, GTK s'en plaint sinon (message sans rapport avec PowerJ).
-          NO_AT_BRIDGE=1 xvfb-run -a $pj -c 'ls | grid --title ci --columns name,size' > fxwin.txt 2>&1
-          # Sans affichage : un message clair, le shell continue.
-          env -u DISPLAY $pj -c 'ls | grid' >> fx.txt 2>&1 || true
-          cat fx.txt fxwin.txt
-          grep -q 'no answer is recorded (set modules.nativeAccess.io.powerj.fx=true' fx.txt
-          grep -q 'native access refused for module io.powerj.fx' fx.txt
-          grep -q 'io.powerj.fx .*\[grid\]' fx.txt
-          grep -q -- '--max-rows' fx.txt
-          grep -q 'the graphical toolkit cannot start' fx.txt
-          if grep -Eiq 'restricted method|cannot start|exception' fxwin.txt; then echo 'fenêtre : message inattendu'; exit 1; fi
+          ci/smoke/fx.sh
 
-      - name: Test de fumée des langues (en / fr)
-        run: |
-          pj=$PWD/powerj-dist/target/jpackage/powerj/bin/powerj
-          export POWERJ_HOME=$RUNNER_TEMP/pjhome
-          POWERJ_LANG=en $pj -c 'nope' > lang.txt 2>&1 || true
-          POWERJ_LANG=fr $pj -c 'nope' >> lang.txt 2>&1 || true
-          POWERJ_LANG=fr $pj -c 'help ls' >> lang.txt 2>&1
-          POWERJ_LANG=fr $pj -c 'greet -n Yves' >> lang.txt 2>&1
-          printf 'language=fr\n' > $POWERJ_HOME/config.properties
-          $pj -c '1 +' >> lang.txt 2>&1 || true
-          rm $POWERJ_HOME/config.properties
-          cat lang.txt
-          grep -q 'unknown command: nope' lang.txt
-          grep -q 'commande inconnue : nope' lang.txt
-          grep -q 'ls — Liste les fichiers et dossiers' lang.txt
-          grep -q 'Bonjour Yves !' lang.txt
-          grep -q 'syntaxe : expression incomplète' lang.txt
+      - name: Smoke test of the languages (en / fr)
+        run: ci/smoke/languages.sh
 
-      - name: Test de fumée du tilde (~ = HOME)
-        run: |
-          pj=$PWD/powerj-dist/target/jpackage/powerj/bin/powerj
-          export HOME=$RUNNER_TEMP/tildehome
-          mkdir -p $HOME/docs
-          touch $HOME/docs/note.txt
-          $pj -c 'cd ~ ; pwd ; (ls ~/docs)*.name ; "x" > ~/out.txt' > tilde.txt
-          cat tilde.txt
-          grep -qx "$HOME" tilde.txt
-          grep -qx 'note.txt' tilde.txt
-          test -f $HOME/out.txt
+      - name: Smoke test of the tilde (~ = HOME)
+        run: ci/smoke/tilde.sh
 
-      - name: Module graphique powerj-fx
-        uses: actions/upload-artifact@v5
+      - name: Graphical module powerj-fx
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: powerj-fx-linux-x64
           path: powerj-fx/target/powerj-fx-*-linux.zip
           if-no-files-found: error
 
-      - name: Module d'exemple greet.jar
-        uses: actions/upload-artifact@v5
+      - name: Example module greet.jar
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: greet-module
           path: examples/greet/target/greet.jar
           if-no-files-found: error
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: powerj-linux-x64
           path: powerj-dist/target/powerj-*.zip
           if-no-files-found: error
 
   windows:
-    name: Exe et installeur (Windows)
+    name: Exe and installer (Windows)
     runs-on: windows-latest
+    timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           distribution: temurin
           java-version: '25'
           cache: maven
 
-      - name: Installation de WiX (requis par jpackage pour l'installeur)
+      - name: Install WiX (jpackage needs it for the installer)
         shell: pwsh
         run: |
           dotnet tool install --global wix --version 5.0.2
           wix extension add -g WixToolset.Util.wixext/5.0.2 WixToolset.UI.wixext/5.0.2
 
-      - name: Build, tests, powerj.exe et installeur
+      - name: Build, tests, powerj.exe and installer
         shell: cmd
         run: mvnw.cmd -B -Pdist,installer verify
 
-      - name: Test de fumée de powerj.exe
+      - name: Smoke test of powerj.exe
         shell: pwsh
         run: |
           @'
@@ -250,7 +145,7 @@ jobs:
           # The expected exit code 3 of powerj.exe must not become the step's exit code.
           exit 0
 
-      - name: Profileur du mode perf dans le lanceur
+      - name: Profiler of the perf mode in the launcher
         shell: pwsh
         run: |
           $app = "powerj-dist\target\jpackage\powerj"
@@ -262,7 +157,7 @@ jobs:
           $cfg = Get-ChildItem $app -Recurse -Filter powerj.cfg | Select-Object -First 1
           if (-not (Select-String -Path $cfg.FullName -SimpleMatch '--add-modules=jdk.jfr' -Quiet)) { throw "option --add-modules=jdk.jfr absente de powerj.cfg" }
 
-      - name: Test de fumée du mode non interactif
+      - name: Smoke test of the non-interactive mode
         shell: pwsh
         run: |
           $pj = "powerj-dist\target\jpackage\powerj\powerj.exe"
@@ -274,7 +169,7 @@ jobs:
           if (($lignes -join ',') -ne 'x.txt,z.txt') { throw "filtrage de l'entrée standard incorrect : $lignes" }
           exit 0
 
-      - name: Test de fumée des modules tiers
+      - name: Smoke test of the third-party modules
         shell: pwsh
         run: |
           $pj = "$PWD\powerj-dist\target\jpackage\powerj\powerj.exe"
@@ -297,7 +192,7 @@ jobs:
           if (-not ($modules -match 'com.example.greet')) { throw "mod-list ne liste pas com.example.greet" }
           exit 0
 
-      - name: Test de fumée du module graphique (powerj-fx)
+      - name: Smoke test of the graphical module (powerj-fx)
         shell: pwsh
         run: |
           # Chargement et consentement seulement : l'ouverture d'une fenêtre se vérifie à la main (docs/recettes/fx-grid.md).
@@ -317,22 +212,22 @@ jobs:
           if (-not ($aide -match '--max-rows')) { throw "help grid sans --max-rows : $aide" }
           exit 0
 
-      - name: Module graphique powerj-fx
-        uses: actions/upload-artifact@v5
+      - name: Graphical module powerj-fx
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: powerj-fx-windows-x64
           path: powerj-fx/target/powerj-fx-*-win.zip
           if-no-files-found: error
 
-      - name: Archive portable powerj.exe
-        uses: actions/upload-artifact@v5
+      - name: Portable powerj.exe archive
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: powerj-windows-x64-portable
           path: powerj-dist/target/powerj-*.zip
           if-no-files-found: error
 
-      - name: Installeur Windows
-        uses: actions/upload-artifact@v5
+      - name: Windows installer
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: powerj-windows-x64-installer
           path: powerj-dist/target/installer/*.exe
