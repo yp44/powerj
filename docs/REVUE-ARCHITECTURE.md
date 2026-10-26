@@ -365,7 +365,7 @@ Ordre imposé par les dépendances ; chaque sous-étape ramène le build au vert
 | 4.4 | `LatestWinsRunner` (exécuteur à une place, `Future` annulable, `Clock` injectable) partagé par `Previewer` et `Debouncer` de `fx`, testé isolément |
 | 4.5 | Déplacer `ProtectedPaths.defaultFile` hors de `cmdlets` : `shell` ne dépend plus de `cmdlets` |
 
-### Phase 5 — Industrialisation, performance, documentation *(≈ 12 j, en parallèle dès 0.7)*
+### Phase 5 — Industrialisation, performance, documentation *(≈ 12 j, en parallèle dès 0.7 ; **terminée, voir § 16** — les écarts avec ce paragraphe y sont expliqués)*
 
 `docs/ARCHITECTURE.md` + ADR ; réconciliation de la spécification (§5.1, §6, NFR-03, statut par FR, **FR-16 : implémenter `native.prefer` ou le retirer**) ; `CONTRIBUTING`, `SECURITY`, `CHANGELOG`, politique de langue ; consentement natif lié au SHA-256 du jar ; PIT (objectif ≥ 60 % sur `lang`/`runtime`) ; corpus JSONTestSuite/RFC 4180 + correctifs C-25 ; `RecordShape` + JMH pour NFR-02/07 ; `GridView` allégée (≤ 300 l., décisions déplacées vers le model), `GridRow` à tableau + index partagé, filtrage hors thread FX, fixture à 100 000 lignes, accessibilité ; sortir `fx` du chemin critique du build (profil `-Pfx`) ; `dist.platform` calculé (os/arch) ; job macOS ; première release `0.2.0` non-SNAPSHOT signée avec SBOM et `SHA256SUMS`.
 
@@ -382,6 +382,8 @@ Charge totale indicative : ≈ 64 j-dev (≈ 13 semaines à un développeur, ≈
 ```
 
 ### Indicateurs de réussite
+
+*État à la fin de la phase 5 : § 16.3.*
 
 | Indicateur | Aujourd'hui | Cible |
 |---|---|---|
@@ -698,3 +700,84 @@ Ce que la phase a appris :
 | Verrou de `config.properties` entre processus | `FileChannel.lock` pour un cas rare | à juger |
 | `requires io.powerj.cmdlets` du shell | sert à mettre le module dans l'image | 5 (avec `--bind-services`, si le build le permet) |
 | Analyse statique de sécurité (CodeQL, constat C-34) | le workflow ajouté en 0.7 est retiré à la demande du commanditaire, « on verra plus tard » ; il est dans l'historique (`cf487bb`) | à rediscuter avec la Phase 5 (chaîne d'approvisionnement) |
+
+## 16. Phase 5 : industrialisation, performance, documentation (terminée, avec les réserves du § 16.4)
+
+### 16.1 Statut des étapes
+
+| Étape | Statut | Ce qui a été fait | Écart avec le plan (§ 8) |
+|---|---|---|---|
+| 5.1 gouvernance et architecture | ✅ | `CONTRIBUTING.md` (construire, les garde-fous, comment on travaille, la politique de langue, comment ajouter un cmdlet), `SECURITY.md` (ce qui est un garde-fou et ce à quoi on fait confiance, comment signaler), `docs/ARCHITECTURE.md` (modules, couches, parcours d'une ligne, quel test garde quelle règle) et **neuf ADR** (`docs/adr/`) qui reprennent les décisions des fiches de plan. `docs/recettes/etape-N.md` devient `docs/acceptance/step-N.md` ; les messages de la CI et la description du projet sont en anglais ; la case à cocher de `cmdlet-roadmap.md` est corrigée | Pas de C4 complet : un diagramme `mermaid` des modules et un tableau des couches. `SECURITY.md` s'appuie sur le **signalement privé de GitHub**, qu'il faut activer dans les réglages du dépôt (voir § 16.4) |
+| 5.2 spécification réconciliée | ✅ | Nombre de cmdlets, modules, JLine 4, nom du journal, jobs de la CI, fonctions Java utilisées ou non, installeur (il n'ajoute rien au `PATH`), grammaire et synopsis en anglais. **FR-16 (`native.prefer`) et `colors.cmdlet` sont retirés** (décision du commanditaire : spécifiés, cités comme échappatoires, jamais construits). **FR-40 est marqué partiel** : les jokers des arguments d'un programme natif ne sont pas développés. `SpecificationTraceabilityTest` : chaque exigence est citée par le code, un test ou un script de fumée (sauf si elle est marquée retirée), rien ne cite une exigence qui n'existe pas. Douze exigences que rien ne citait le sont maintenant ; `FR-04e`, que la spécification n'avait jamais eue, devient FR-34 ; `CmdletNamesTest` garde la règle de nommage FR-12 | Le « statut d'implémentation par FR vérifié en CI » du plan est réalisé sous la forme la plus modeste : le test vérifie les **citations** et les marques « retiré » ; « partiel » reste écrit en toutes lettres dans la spécification. Le tableau des cmdlets du README n'est pas généré |
+| 5.3 consentement natif lié au contenu (C-24) | ✅ | Un oui est enregistré `sha256:<empreinte>` du contenu de **tout ce qui est chargé avec le module** (chaque module de la couche, par nom et contenu ; un dossier par ses noms de fichiers et leur contenu) ; un jar remplacé, une dépendance changée, un ancien `true` : on redemande, et le message dit pourquoi et donne la ligne à enregistrer. 4 classes de test (`ContentFingerprintTest`, `ModuleLoaderTest`, `NativeAccessConsentTest`, `NativeAccessWiringTest`). ADR 0006. Corrigé au passage : le message français du refus montrait `l''autoriser` | `NativeAccessPolicy.consent` prend l'empreinte (interface interne). Ni signature ni liste d'éditeurs de confiance : l'empreinte dit « c'est ce que vous avez accepté », pas « c'est sûr » |
+| 5.4 JSON/CSV : corpus et correctifs (C-25) | ✅ | Les **316 petits fichiers de JSONTestSuite** (95 valides acceptés, 186 invalides rejetés avec une position, les 35 que le RFC laisse ouverts figés un par un), le RFC 4180 section par section, des aller-retours sur des valeurs tirées d'une graine fixe. Ils ont trouvé et fait corriger : un nombre hors d'un `double` lu comme `Infinity` (maintenant une erreur) ; un `float` écrit comme le `double` le plus proche (`0.1f` donnait `0.10000000149011612`) ; une demi-paire de substitution écrite brute et perdue à l'encodage UTF-8 ; un enregistrement CSV d'un seul champ vide écrit comme une ligne vide, que `from-csv` saute. Un objet jamais fermé n'avale plus l'entrée (64 Mi caractères au plus). ADR 0009 : pourquoi les analyseurs restent maison | `to-json` construit encore son tableau en mémoire (`--lines` diffuse) ; documenté, pas corrigé |
+| 5.5 `RecordShape` et JMH (C-26, NFR-02, NFR-07) | ✅ | **Mesuré d'abord** (module `powerj-bench`, profil `-Pbench`) : lire une propriété d'un record coûtait 7 µs parce que `getRecordComponents()` reconstruit ses objets à chaque appel. Un `RecordShape` par classe (un `ClassValue`) : **185 fois plus vite** (7 017 → 38 ns), les 8 colonnes d'une ligne de `to-csv` 150 fois (61 → 0,4 µs), un record lu par `to-json` 95 fois, un appel Java statique 5 fois. NFR-02 (Tab) : 20 à 350 µs à chaud ; NFR-07 : 28 ms en moyenne pour le premier appel Java, 0,8 µs ensuite | Les deux exigences tiennent avec une grande marge ; la mesure de NFR-02 est **à chaud** (le shell chauffe la complétion au démarrage), le premier Tab d'une session n'est pas un chiffre. `PerfModeTest` attendait la première ligne du résumé et vérifiait les autres : corrigé |
+| 5.6 test de mutation (PIT) | ✅ | Profil `-Pmutation` (PIT 1.30), hors du build normal (≈ 12 min). **`lang` 90 % (704/782), `runtime` 85 % (714/844), ensemble 87 %** pour une cible de 60 %. Il a trouvé deux assertions qui manquaient, maintenant écrites : les fins d'un littéral caractère dans le scanner de groupes, et **l'environnement d'une commande native** (le fils doit recevoir celui de la session et rien de celui de la JVM ; supprimer `clear()` ne faisait échouer aucun test). Page `docs/quality/mutation.md` | 46 mutants ne sont « tués » que par un délai dépassé (comptés tués par PIT, faible preuve : dit dans la page). Pas de seuil dans le build : un score qui bouge avec la charge de la machine est un mauvais garde-fou |
+| 5.7 `powerj-fx` (C-29, C-18) | ✅ en partie | **(a)** une ligne est un tableau et une `RowShape` partagée par les lignes d'un type, non plus une `LinkedHashMap` : lire 100 000 objets prend le dixième du temps (1 020–1 390 → 83–180 ms), une ligne retient 387 octets au lieu de 827, et 155 au lieu de 595 avec des valeurs simples ; une ligne ne garde l'objet d'origine qu'avec `--pass-thru`. **(b)** un filtre `/regex/` a un budget par cellule et ne peut plus figer la fenêtre (la barre d'état dit combien de cellules n'ont pas été examinées). **(c)** les décisions de `GridView` (texte de la barre d'état, état du bouton pause, effet de Échap, quand reconstruire une colonne, sa largeur) sont dans le modèle, testées ; dix mutants tués. **(d)** `GridViewUiTest` construit la **vraie fenêtre** sous un affichage virtuel (`-Pfx-ui`, un job de la CI) : les lignes arrivent, Échap ferme, chaque champ a un nom accessible, un filtre invalide est dit en mots dans la barre d'état (et plus seulement par une couleur) | **`GridView` : 565 → 531 lignes, pas les 300 visés** : ce qui reste est de la construction JavaFX. **Le filtrage hors du fil JavaFX n'est pas fait** : mesuré à 20–250 ms pour 100 000 lignes (tri 76–390 ms, « tout cocher » 0,6–0,9 s), une pause et non un gel, et la liste filtrée de JavaFX est liée à ce fil. `RowSelection` n'est pas touchée. L'accessibilité est vérifiée par ce que les contrôles *contiennent* (nom, aide), **pas avec un lecteur d'écran**. Le premier test de fenêtre a trouvé un défaut : un filtre invalide garde le dernier bon filtre, les lignes ne changent pas, et la barre d'état n'était donc jamais rafraîchie |
+| 5.8 build : `fx` hors du chemin critique, plateforme, SBOM, sommes (C-33, C-34) | ✅ en partie | `-DskipFx` : le module graphique est un profil du réacteur, et ses dépendances dans `coverage` et `architecture` aussi (vérifié par un `verify` complet sans lui, et par un job de la CI qui garde ce chemin vivant). `dist.platform` suit la machine (`linux-x64`, `linux-aarch64`, `macos-x64`, `macos-aarch64`, `windows-x64`, `windows-aarch64`). `-Psbom` : nomenclature CycloneDX 1.6 de ce qui est livré. L'archive de la distribution et celle du module graphique ont un `.sha256` que `sha256sum -c` accepte ; `-Pdist verify` et les sept scripts de fumée ont été joués sur le résultat | Le choix de la plateforme n'est **vérifié que sur Linux x64** (les cinq autres sont simulées par `os.name`/`os.arch`). Examinés et laissés : la version numérique de `jpackage` pour un SNAPSHOT (`powerj --version` les distingue), une chaîne d'outils pour `jlink` (l'Enforcer exige déjà le JDK 25), les archives Ant reproductibles (**non fait**) |
+| 5.9 CI (C-34) | ◐ | Les contrôles tournent côte à côte : le build Linux, les tests de la fenêtre (xvfb), le build sans le module graphique, macOS, Windows. Un **job macOS** construit l'image et joue cinq scripts de fumée. Un **workflow de release** (`release.yml`) : un tag `vX.Y.Z` construit les trois systèmes, refuse un tag qui n'est pas la version du projet ou qui est un SNAPSHOT, et laisse une **release en brouillon** (archives, installeur, module graphique, SBOM, `SHA256SUMS`). Procédure : `docs/RELEASING.md` | **Le workflow de release n'a jamais tourné** (aucun tag n'a été posé : décision du commanditaire à prendre) et **rien n'est signé**. Le job macOS est nouveau : ses premières exécutions ont trouvé trois tests liés à Linux, corrigés — voir § 16.4 pour son état |
+| 5.10 restes | ✅ | Le shell ne `requires` plus le module des cmdlets : l'image l'ajoute (`--add-modules`) et le chargeur de services le trouve (sept scripts de fumée verts). **`--bind-services`, l'alternative du plan, a été mesurée et écartée** : 28 modules de plus (le compilateur, `jlink`, `jpackage`, `jshell`…) et 163 Mo au lieu de 97. `Where.PROPERTY`/`Where.abbreviate` (utilisés depuis dix classes) deviennent `Texts` ; la règle de `-n` que `last` prenait à `first` devient `Counts` ; le message du délai de démarrage de JavaFX est dans les bundles | Écartés avec la raison (CHANGELOG) : un `Platform` injectable (le job Windows joue toute la suite sur un vrai Windows), les deux détections du dossier personnel (12 lignes dans deux modules qui ne se connaissent pas), `Option.min` (les deux validations sont déjà une fonction chacune), les deux rapporteurs de `WalkError` (deux libellés), le verrou de `config.properties` entre processus, les messages d'exception anglais qui n'atteignent jamais l'utilisateur |
+
+Mesures après la phase 5 : **2 142 tests** (760 pour `core`, 684 pour `cmdlets`, 310 pour `fx`, 260 pour `shell`), dont 453 de plus qu'à la fin de la phase 4 ; avertissements du compilateur **inchangés à 32** ; `Interpreter` 297 lignes.
+
+### 16.2 Bilan de la phase
+
+| | Avant | Après |
+|---|---|---|
+| Lecture d'une propriété d'un record (`$_.size`) | 7 017 ns | **38 ns** |
+| Lecture de 100 000 objets par `grid` | 1,0 à 1,4 s | **0,08 à 0,18 s** |
+| Mémoire d'une ligne de `grid` | 827 octets | **387 octets** (155 contre 595 avec des valeurs simples) |
+| Score de mutation (`lang`, `runtime`) | non mesuré | **87 %** (90 % et 85 %) |
+| Entrées de JSONTestSuite jouées | 0 | **316** |
+| Un `/regex/` de `grid` sur une cellule de 80 caractères | minutes, fenêtre figée | **borné** (500 000 caractères lus + 10 par caractère) |
+| Tests de la vraie fenêtre de `grid` | 0 | **4**, sous affichage virtuel |
+| Exigences de la spécification qu'aucun code ne cite | 12 (+ une inexistante) | **0** (vérifié par un test) |
+| Consentement natif | par nom de module | **par contenu** (SHA-256) |
+| Construire sans JavaFX | pas prévu | `-DskipFx` |
+| Nomenclature des composants (SBOM), sommes de contrôle | aucune | `-Psbom`, `.sha256` |
+| Documents d'un contributeur ou d'un utilisateur | README, spécification | + `CONTRIBUTING`, `SECURITY`, `ARCHITECTURE`, 9 ADR, `RELEASING`, `docs/quality/` (performance, mutation, deux bases de lint) |
+
+Ce que la phase a appris :
+
+1. **Mesurer d'abord a trouvé le plus gros défaut du projet, et aucun outil de couverture ne pouvait le voir.** 7 µs par lecture de propriété, sur chaque objet de chaque pipeline : sept secondes par million de fichiers pour `ls -r | where { $_.size > 1mb }`, avant même d'évaluer la condition. Le constat C-26 le soupçonnait « sans cache » ; il fallait JMH pour dire que c'était 185 fois.
+2. **Un constat vieillit, son principe pas toujours.** L'exemple du constat C-18, `(a+)+$`, est mémoïsé par le JDK 25 et répond tout de suite ; un `(.*?,){11}P` sur quarante virgules prend encore des minutes. Le test écrit avec le second exemple, et le budget par cellule, tiennent ; ceux qu'on aurait écrits avec le premier n'auraient rien démontré.
+3. **Une estimation n'est pas une mesure, et il faut le dire quand on s'en aperçoit.** Le message de l'un des commits annonçait « environ 520 octets » pour une ligne de l'ancienne forme ; la mesure contrôlée est de 595. La page de performance et le commit suivant le corrigent en le disant.
+4. **Faire tourner la chose réelle trouve ce que les modèles ne voient pas.** Le premier test de la vraie fenêtre a trouvé une barre d'état jamais rafraîchie ; la première exécution sur macOS a trouvé deux tests qui supposaient Linux ; la mutation a trouvé que rien ne vérifiait l'environnement d'un processus fils.
+5. **Écarter une option après l'avoir mesurée vaut mieux que la suivre sur la foi du plan.** `--bind-services` aurait retiré le `requires` du shell au prix de 28 modules et de 66 Mo ; `--add-modules` le retire sans rien coûter.
+6. **Les « restes » se règlent en les nommant un à un** : sur dix, quatre ont été faits et six écartés avec une raison écrite — aucun n'est resté « à voir ».
+
+### 16.3 Les indicateurs de réussite
+
+Les cibles du § 8, à la fin de la phase 5 :
+
+| Indicateur | Départ | Fin de la phase 5 | Cible |
+|---|---|---|---|
+| Taille de `Interpreter` | 1 156 l. | **297 l.** | ≤ 300 l. — atteint |
+| Plus grosse classe de production | 1 156 l. | **728 l.** (`ExpressionParser`), puis `GridView` 540, `FileTrees` 539 | ≤ 500 l. — **non atteint** |
+| Cycles de packages | ≥ 2 | **0** (ArchUnit) | 0 — atteint |
+| Classes de `core.exec` exportées | 32 | **0** : le package n'existe plus, les exports sont qualifiés vers le shell | 0 — atteint |
+| Copies de la règle de résolution de commande | 4 | **1** | 1 — atteint |
+| `if (perf != null)` dans l'exécution | 19 | **1** (`CompiledBlock`) | 0 — presque |
+| Score de mutation (`lang`, `runtime`) | non mesuré | **87 %** | ≥ 60 % — atteint |
+| Ruptures d'API non intentionnelles | non contrôlées | contrôlées par l'instantané de la surface (`ApiSurfaceTest`) ; **japicmp non branché** | 0 — partiel |
+| Contournements du garde-fou `System.exit` | ≥ 2 | **0** | 0 — atteint |
+| Constats 🔴 ouverts | 4 | **0** | 0 — atteint |
+
+### 16.4 Ce que la phase laisse ouvert (et où c'est repris)
+
+| Reste | Pourquoi | Repris en |
+|---|---|---|
+| **La première release `0.2.0`** (version, tag, brouillon, publication) et **le workflow `release.yml`, jamais lancé** | le plan la prévoyait « signée, avec SBOM et `SHA256SUMS` » ; poser un tag est une décision du commanditaire, et un workflow qui n'a jamais tourné se corrige au premier essai (`docs/RELEASING.md` dit quoi regarder) | à décider |
+| **La signature des archives** (GPG ou Sigstore) | demande une clé ou une identité à choisir ; les sommes de contrôle disent que le fichier est celui que le workflow a produit, pas qui l'a produit | à décider, avant la première publication |
+| **Activer le signalement privé de vulnérabilités de GitHub** | `SECURITY.md` renvoie vers lui ; c'est un réglage du dépôt, que je ne peux pas poser | action du commanditaire |
+| **FR-40, les jokers des arguments natifs** (`^ls *.txt` passe `*.txt` tel quel) | trouvé en citant l'exigence ; marqué partiel. Sous Windows c'est le programme qui développe, sous Linux et macOS c'est le shell | à décider : l'implémenter, ou en faire un choix de conception écrit |
+| **CodeQL / analyse statique de sécurité** (C-34) | le workflow ajouté en 0.7 a été retiré à la demande du commanditaire, « on verra plus tard » ; il est dans l'historique | à rediscuter |
+| **Le job macOS** | nouveau : ses premières exécutions ont trouvé trois tests liés à Linux (un `/usr/bin/cd` existe sous macOS ; les dossiers temporaires y sont longs ; le système de fichiers y ignore la casse), corrigés ; il reste à voir ce que `shell`, `architecture` et l'image `jpackage` (un bundle `powerj.app`) y donnent | à relire à chaque exécution |
+| **Lecteur d'écran** | l'accessibilité de la fenêtre est vérifiée par ce que les contrôles contiennent, pas par ce qu'un lecteur en dit (ligne 118 de la fiche) | à faire à la main |
+| `GridView` ≤ 300 lignes, filtrage hors du fil JavaFX, `RowSelection` | mesurés à ≤ 1 s pour 100 000 lignes : une pause, pas un gel | à reprendre si la limite par défaut de 100 000 lignes devient insuffisante |
+| `ExpressionParser` (728 lignes) est la plus grosse classe ; cible ≤ 500 | la phase 5 ne l'a pas touché | non planifié (un candidat pour la phase 6) |
+| japicmp | l'instantané de la surface de l'API (`ApiSurfaceTest`) garde déjà chaque changement ; japicmp compare à une version *publiée*, il n'y en a pas | à brancher à la première publication de `powerj-api` |
+| Archives Ant reproductibles ; `to-json` en mémoire ; profils Windows ARM et macOS non joués sur de vraies machines | voir 5.4 et 5.8 | non planifié |
+| Mutation : seuil dans le build ; `cmdlets` et `fx` hors du périmètre | un score qui bouge avec la charge n'est pas un garde-fou ; `FilterParser` est le premier candidat | quand les scores sont stables sur plusieurs exécutions |
+| `Language.current` statique, `OutcomeReporter`, `ConsoleInputAdapter`, horloge de `LatestWinsRunner` | inchangé depuis la phase 4 | non planifié |
+| Phase 6 (structures de contrôle, fonctions) | prérequis posés par les étapes 1.2, 2.2 et 3.2 | à planifier |

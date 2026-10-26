@@ -286,11 +286,15 @@ structures, functions) can be built on it. The work is organised in phases (revi
   class is the minimal form that works with JPMS, and the model `examples/greet` gives to module authors.
 
 ### Planned (review §8)
-Phases 1 to 4 are done (reports in the review, §12 to §15). The API members deprecated in 0.2 (`Cmdlet.previewable`,
-`Cmdlet.columns`) are removed no sooner than 0.3.0.
-- **Phase 5 — industrialisation.** Release workflow, SBOM, mutation tests, benchmarks, documentation (ADR, C4).
+Phases 1 to 5 are done (reports in the review, §12 to §16). The API members deprecated in 0.2 (`Cmdlet.previewable`,
+`Cmdlet.columns`) are removed no sooner than 0.3.0. What is open, and who decides it, is listed in §16.4 of the review:
+- **The first release.** The release workflow is written ([docs/RELEASING.md](docs/RELEASING.md)) and has never run; nothing
+  is signed. Tagging, and the way to sign, are the maintainer's decisions.
 - **Code scanning.** A CodeQL workflow was added in Phase 0 and taken out again on the maintainer's request, to be
   looked at later (it is in the history, commit `cf487bb`).
+- **Wildcards in the arguments of a native program** (FR-40, marked partial).
+- **Private vulnerability reporting** has to be switched on in the settings of the repository (`SECURITY.md` relies on it).
+- **Phase 6**: control structures and functions, on the foundations of the phases above.
 
 ## [0.1.0] — never released (baseline)
 

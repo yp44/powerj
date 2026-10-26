@@ -97,15 +97,17 @@ class FileOpsTest {
     @Test
     void wildcardsOfTheCommandsThatChangeFilesAreCaseSensitiveOffWindows() throws Exception {
         assumeTrue(!FileOps.WILDCARDS_IGNORE_CASE, "the file system ignores case here");
+        // Names that differ by more than the case: on macOS the file system ignores case and "readme.txt" and
+        // "README.txt" would be one file.
         file("README.md", "r");
-        file("readme.txt", "r");
+        file("readme.log", "r");
         file("README.txt", "r");
 
         rm(false, false, false, false, false, args("README*"));
 
         assertThat(work.resolve("README.md")).doesNotExist();
         assertThat(work.resolve("README.txt")).doesNotExist();
-        assertThat(work.resolve("readme.txt")).exists(); // not matched: another case
+        assertThat(work.resolve("readme.log")).exists(); // not matched: another case
     }
 
     @Test
