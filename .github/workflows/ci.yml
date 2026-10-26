@@ -138,8 +138,9 @@ jobs:
           java-version: '25'
           cache: maven
 
+      # -fae: every module that can be built is, so that one run shows all that macOS breaks.
       - name: Build, tests and application image
-        run: ./mvnw -B -Pdist verify
+        run: ./mvnw -B -fae -Pdist verify
 
       # jpackage makes an application bundle on macOS: the launcher is inside it. The smoke test of the profiler looks for
       # the layout of the Linux and Windows images and is left out.

@@ -101,8 +101,9 @@ class InterpreterTest {
         run("commandeinexistante a b");
         assertThat(errors).containsExactly("unknown command: commandeinexistante");
         assertThat(session.lastSucceeded()).isFalse();
-        run("^cd");
-        assertThat(errors).containsExactly("native command not found: cd");
+        // not "cd": macOS has a /usr/bin/cd (a script that runs the builtin of sh, for POSIX completeness)
+        run("^no-such-program-for-powerj");
+        assertThat(errors).containsExactly("native command not found: no-such-program-for-powerj");
     }
 
     @Test
