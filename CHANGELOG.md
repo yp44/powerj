@@ -20,7 +20,7 @@ structures, functions) can be built on it. The work is organised in phases (revi
 - **Static analysis**: `-Xlint:all`, Spotless, stricter Maven Enforcer rules, an opt-in Error Prone profile
   (`-Pquality`); the baselines are in `docs/quality/`.
 - **CI**: the smoke tests are scripts (`ci/smoke/*.sh`) that run on a developer's machine too; actions pinned by commit,
-  timeouts, concurrency, Dependabot, CodeQL; reproducible archive timestamps; the Maven wrapper checks its download.
+  timeouts, concurrency, Dependabot; reproducible archive timestamps; the Maven wrapper checks its download.
 - Nine tests that demonstrate defects of the review, committed red and `@Disabled` with the phase that fixes each.
 
 ### Changed
@@ -184,6 +184,8 @@ structures, functions) can be built on it. The work is organised in phases (revi
 Phases 1 to 4 are done (reports in the review, §12 to §15). The API members deprecated in 0.2 (`Cmdlet.previewable`,
 `Cmdlet.columns`) are removed no sooner than 0.3.0.
 - **Phase 5 — industrialisation.** Release workflow, SBOM, mutation tests, benchmarks, documentation (ADR, C4).
+- **Code scanning.** A CodeQL workflow was added in Phase 0 and taken out again on the maintainer's request, to be
+  looked at later (it is in the history, commit `cf487bb`).
 
 ## [0.1.0] — never released (baseline)
 
