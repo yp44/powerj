@@ -82,6 +82,37 @@ class ModuleLoaderTest {
     }
 
     @Test
+    void aModuleIsToldWhereTheConfigurationFolderIsWhenItIsLoaded() throws Exception {
+        Path config = Files.createDirectories(tmp.resolve("config"));
+        interpreter.session().configDirectory(config);
+        Path modules = Files.createDirectories(tmp.resolve("modules"));
+        hello(modules.resolve("hello.jar"), "org.test.hello", "hello", Map.of(), """
+                @Override public void initialize(java.nio.file.Path dir) throws java.io.IOException {
+                    java.nio.file.Files.writeString(dir.resolve("hello-was-here"), "yes");
+                }
+                """);
+
+        assertThat(interpreter.loadModules(modules)).isEmpty();
+
+        assertThat(config.resolve("hello-was-here")).hasContent("yes");
+    }
+
+    @Test
+    void aModuleThatCannotPrepareTheFolderIsReportedAndStillLoads() throws Exception {
+        interpreter.session().configDirectory(Files.createDirectories(tmp.resolve("config")));
+        Path modules = Files.createDirectories(tmp.resolve("modules"));
+        hello(modules.resolve("hello.jar"), "org.test.hello", "hello", Map.of(), """
+                @Override public void initialize(java.nio.file.Path dir) throws java.io.IOException {
+                    throw new java.io.IOException("read-only disk");
+                }
+                """);
+
+        assertThat(interpreter.loadModules(modules)).singleElement().asString()
+                .contains("org.test.hello").contains("read-only disk");
+        assertThat(interpreter.commandKind("hello")).isEqualTo(CommandKind.CMDLET);
+    }
+
+    @Test
     void missingDirectoryLoadsNothing() {
         assertThat(interpreter.loadModules(tmp.resolve("absent"))).isEmpty();
     }
@@ -251,6 +282,12 @@ class ModuleLoaderTest {
     }
 
     private void hello(Path jar, String module, String name, Map<String, String> manifest) throws IOException {
+        hello(jar, module, name, manifest, "");
+    }
+
+    /** {@code providerBody}: members added to the provider of the module. */
+    private void hello(Path jar, String module, String name, Map<String, String> manifest, String providerBody)
+            throws IOException {
         String pkg = module;
         Map<String, String> sources = Map.of(
                 "Greeting.java", "package " + pkg + "; public record Greeting(String name, String message) { }",
@@ -278,8 +315,9 @@ class ModuleLoaderTest {
                         import io.powerj.api.*;
                         public final class Provider implements CmdletProvider {
                             @Override public List<Cmdlet<?, ?, ?>> cmdlets() { return List.of(new Hello()); }
+                            %s
                         }
-                        """.formatted(pkg));
+                        """.formatted(pkg, providerBody));
         Path src = Files.createDirectories(tmp.resolve("src-" + module).resolve(pkg.replace('.', '/')));
         Path classes = Files.createDirectories(tmp.resolve("classes-" + module));
         List<String> args = new ArrayList<>(List.of("-d", classes.toString(), "-cp", apiLocation(), "-nowarn"));

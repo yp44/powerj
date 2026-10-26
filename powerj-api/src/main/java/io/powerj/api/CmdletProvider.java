@@ -1,5 +1,7 @@
 package io.powerj.api;
 
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
 import java.util.ResourceBundle;
@@ -22,5 +24,15 @@ public interface CmdletProvider {
      */
     default ResourceBundle messages(Locale locale) {
         return null;
+    }
+
+    /**
+     * Called once, when the shell starts (for the modules loaded later, when they are loaded), with the configuration
+     * folder ({@code ~/.powerj}, or {@code POWERJ_HOME}), which exists: the module can create its default files there
+     * and nothing else is needed from the shell to do so. Not called when the shell runs without such a folder.
+     *
+     * @throws IOException if the files cannot be written: the user is warned, and the module still loads
+     */
+    default void initialize(Path configDirectory) throws IOException {
     }
 }

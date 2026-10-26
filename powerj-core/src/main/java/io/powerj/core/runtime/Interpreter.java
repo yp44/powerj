@@ -101,12 +101,17 @@ public final class Interpreter implements CommandCatalog {
     }
 
     /**
-     * Loads the third-party modules from the directory (at startup, §4.4).
+     * Loads the third-party modules from the directory (at startup, §4.4), then prepares the configuration folder for the
+     * cmdlets, the built-in ones and those of the modules, that have default files to put in it.
      *
      * @return warnings to display (invalid module, conflicting name)
      */
     public List<String> loadModules(Path dir) {
-        return modules.loadAll(dir).stream().flatMap(r -> r.warnings().stream()).toList();
+        List<String> warnings = new ArrayList<>();
+        modules.loadAll(dir).forEach(result -> warnings.addAll(result.warnings()));
+        // The built-in cmdlets and those of the modules just loaded, in the order they were registered.
+        warnings.addAll(registry.initialize(session.configDirectory()));
+        return warnings;
     }
 
     @Override

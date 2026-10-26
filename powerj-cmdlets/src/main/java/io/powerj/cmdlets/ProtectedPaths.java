@@ -39,8 +39,19 @@ public final class ProtectedPaths {
         this.currentDirectories = keys(currentDirectory);
     }
 
+    /**
+     * Writes the file of the configuration folder, with the defaults of the platform, if it does not exist: an existing
+     * file, edited or not, is never changed.
+     */
+    static void writeDefaultIfMissing(Path configDirectory) throws IOException {
+        Path file = configDirectory.resolve(FILE_NAME);
+        if (Files.notExists(file)) {
+            Files.write(file, defaultFile(configDirectory));
+        }
+    }
+
     /** Content of the file written at first launch: comments, then the defaults of the platform. */
-    public static List<String> defaultFile(Path configDirectory) {
+    static List<String> defaultFile(Path configDirectory) {
         List<String> lines = new ArrayList<>(List.of(
                 "# Paths that rm and mv refuse to remove, nor any folder that contains one of them (PowerJ, FR-72).",
                 "# One path per line; ~ is the home folder; lines starting with # are ignored.",

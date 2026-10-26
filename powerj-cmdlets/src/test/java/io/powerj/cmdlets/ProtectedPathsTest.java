@@ -25,6 +25,18 @@ class ProtectedPathsTest {
     }
 
     @Test
+    void theDefaultFileIsWrittenOnceAndAnEditedFileIsKept() throws IOException {
+        Path config = Files.createDirectories(tmp.resolve("fresh"));
+
+        new BuiltinCmdlets().initialize(config);
+
+        assertThat(Files.readAllLines(config.resolve(ProtectedPaths.FILE_NAME))).contains("~", config.toString());
+        Files.writeString(config.resolve(ProtectedPaths.FILE_NAME), "# mine\n");
+        new BuiltinCmdlets().initialize(config);
+        assertThat(Files.readString(config.resolve(ProtectedPaths.FILE_NAME))).isEqualTo("# mine\n");
+    }
+
+    @Test
     void readsTheFileWithCommentsAndHome() throws IOException {
         var paths = load("# comment", "", "  " + tmp.resolve("keep") + "  ", "~/docs");
         assertThat(paths.refusal(tmp.resolve("keep"))).get().asString().startsWith("protected path:");

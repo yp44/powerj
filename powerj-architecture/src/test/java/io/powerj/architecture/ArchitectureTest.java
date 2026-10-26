@@ -170,11 +170,11 @@ class ArchitectureTest {
                 .orShould().dependOnClassesThat().haveSimpleName("Perfer"));
     }
 
-    /** [C-09] The shell has no business with the cmdlets' classes: {@code ProtectedPaths} should live elsewhere. */
+    /** [C-09] The shell has no business with the cmdlets' classes: it only finds them through the service loader. */
     @Test
     void shellDoesNotUseTheBuiltInCmdlets() {
-        check(freeze(noClasses().that().resideInAPackage("io.powerj.shell..")
-                .should().dependOnClassesThat().resideInAPackage("io.powerj.cmdlets..")));
+        check(noClasses().that().resideInAPackage("io.powerj.shell..")
+                .should().dependOnClassesThat().resideInAPackage("io.powerj.cmdlets.."));
     }
 
     /** [C-10, C-13] No global mutable state: a static field is final. */

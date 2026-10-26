@@ -119,6 +119,23 @@ class ShellBootstrapTest {
     }
 
     @Test
+    void theBuiltInCmdletsPrepareTheirFilesInTheHome() throws Exception {
+        assertThat(execute("-c", "\"x\"")).isZero();
+
+        assertThat(Files.readAllLines(tmp.resolve("home").resolve("protected-paths"))).contains("~");
+    }
+
+    @Test
+    void anEditedListOfProtectedPathsIsKept() throws Exception {
+        Files.createDirectories(tmp.resolve("home"));
+        Files.writeString(tmp.resolve("home").resolve("protected-paths"), "# mine\n");
+
+        execute("-c", "\"x\"");
+
+        assertThat(Files.readString(tmp.resolve("home").resolve("protected-paths"))).isEqualTo("# mine\n");
+    }
+
+    @Test
     void debugIsPassedToTheLog() throws Exception {
         execute("--debug", "-c", "\"x\"");
 

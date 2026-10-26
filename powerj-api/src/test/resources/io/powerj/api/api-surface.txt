@@ -50,6 +50,7 @@ public abstract @interface io.powerj.api.CmdletInfo extends java.lang.annotation
 public abstract interface io.powerj.api.CmdletProvider
   public abstract java.util.List<io.powerj.api.Cmdlet<?, ?, ?>> io.powerj.api.CmdletProvider.cmdlets()
   public default java.util.ResourceBundle io.powerj.api.CmdletProvider.messages(java.util.Locale)
+  public default void io.powerj.api.CmdletProvider.initialize(java.nio.file.Path) throws java.io.IOException
 
 public final class io.powerj.api.Collected<T> extends java.util.AbstractList<T> implements java.util.RandomAccess
   public T io.powerj.api.Collected.get(int)

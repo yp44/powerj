@@ -1,16 +1,20 @@
 package io.powerj.core.command;
 
+import java.io.IOException;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.ResourceBundle;
 import java.util.ServiceLoader;
+import java.util.Set;
 import java.util.logging.Logger;
 
 import io.powerj.api.Cmdlet;
@@ -126,6 +130,8 @@ public final class CmdletRegistry {
         }
     }
 
+    /** Providers already told where the configuration folder is. */
+    private final Set<CmdletProvider> initialized = Collections.newSetFromMap(new IdentityHashMap<>());
     private final Map<String, Registered> byName = new LinkedHashMap<>();
     private final Map<String, Registered> byQualifiedName = new LinkedHashMap<>();
     private final Map<String, LoadedModule> modules = new LinkedHashMap<>();
@@ -252,6 +258,33 @@ public final class CmdletRegistry {
     /** Cmdlets shadowed by a namesake, accessible only by their qualified name. */
     public synchronized List<Registered> shadowed() {
         return byQualifiedName.values().stream().filter(r -> byName.get(r.name()) != r).toList();
+    }
+
+    /**
+     * Tells the providers that were not told yet where the configuration folder is, so that they can create their
+     * default files ({@link CmdletProvider#initialize}). A provider that fails is reported and not asked again.
+     *
+     * @return warnings, one per provider that could not prepare the folder
+     */
+    public synchronized List<String> initialize(Optional<Path> configDirectory) {
+        List<String> warnings = new ArrayList<>();
+        if (configDirectory.isEmpty()) {
+            return warnings;
+        }
+        for (Registered registered : byName.values()) {
+            CmdletProvider provider = registered.provider();
+            if (provider == null || !initialized.add(provider)) {
+                continue;
+            }
+            try {
+                provider.initialize(configDirectory.get());
+            } catch (IOException | RuntimeException e) {
+                LOG.log(java.util.logging.Level.WARNING, "Module " + registered.module() + " could not prepare "
+                        + configDirectory.get(), e);
+                warnings.add(Messages.get("module.initializeFailed", registered.module(), e.getMessage()));
+            }
+        }
+        return warnings;
     }
 
     public synchronized boolean hasModule(String name) {
