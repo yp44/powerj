@@ -16,7 +16,8 @@ version, reads the draft and publishes it. **The workflow has never run**: it wa
 
 **Not signed.** The checksums say that the files are the ones the workflow produced and that they were not damaged on the
 way; they do not say who produced them. Signing (a GPG key, or Sigstore through the OIDC identity of the workflow) needs a
-decision of the maintainer about the key, and is not done. The draft says so, and so must the published notes.
+decision of the maintainer about the key, and is not done ([issue #48](https://github.com/yp44/powerj/issues/48)). The draft
+says so, and so must the published notes. The first release itself is [issue #47](https://github.com/yp44/powerj/issues/47).
 
 ## Procedure
 

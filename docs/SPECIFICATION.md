@@ -71,7 +71,7 @@ FRIDAY
 - No syntax compatibility with PowerShell or bash.
 - No remote execution (*remoting*).
 - No PowerShell-style *providers* (registry, certificates…).
-- **The cmdlet catalog grows by mini-iterations** (29 cmdlets today, §3.9); what is not done is in the backlog (§12.3).
+- **The cmdlet catalog grows by mini-iterations** (29 cmdlets today, §3.9); what is not done is in the backlog (§12.3, and the [GitHub issues](https://github.com/yp44/powerj/issues)).
 
 ---
 
@@ -1118,7 +1118,7 @@ A program-specific value can be given by **`POWERJ_NATIVE_ENCODING_<NAME>`**, wh
 - CA: on a French Windows, `ipconfig | where { $_.contains("Adresse") }` displays accented characters correctly without any configuration; `env --set POWERJ_NATIVE_ENCODING_GIT=UTF-8` then `git log --oneline | where { $_.contains("é") }`.
 
 **FR-40 — Arguments.** Arguments are passed as is after variable and wildcard expansion (wildcard expansion on existing paths, which can be disabled by putting the argument in quotes). On Windows, the command line is built according to the quoting rules of `CommandLineToArgvW`.
-- **Status: partial.** Variables and `~` (FR-62) are expanded; **wildcards are not**: `^ls *.txt` passes `*.txt` to the program as written, so on Linux and macOS, where programs expect the shell to expand, the cmdlets (`ls --filter`, `cat *.txt`) or `sh -c` are the way. The quoting of the Windows command line is `ProcessBuilder`'s.
+- **Status: partial** ([issue #51](https://github.com/yp44/powerj/issues/51)). Variables and `~` (FR-62) are expanded; **wildcards are not**: `^ls *.txt` passes `*.txt` to the program as written, so on Linux and macOS, where programs expect the shell to expand, the cmdlets (`ls --filter`, `cat *.txt`) or `sh -c` are the way. The quoting of the Windows command line is `ProcessBuilder`'s.
 
 ### 3.11 Errors
 
@@ -1908,13 +1908,17 @@ PJ C:\dev> (ls)*.name.stream().map({ $_.toUpperCase() }).sorted().toList()
 
 ### 12.3 Cmdlet backlog (outside the current scope)
 
+This table is the history of the cmdlet backlog. **Open work is tracked in [GitHub issues](https://github.com/yp44/powerj/issues)**
+(see [CONTRIBUTING.md](../CONTRIBUTING.md#the-backlog)): a cmdlet that is wanted gets an issue, and a row here once it is
+done or cancelled.
+
 | Cmdlet | Description | Planned output record |
 |---|---|---|
 | ~~`cat`~~ | Read files — **done** (FR-65) | `String`, `CatLine`, `CatContent` |
 | ~~`find`~~ | Advanced search — **cancelled** (`ls -r --filter`, `where` and `^find` cover it) | `FileEntry` |
 | ~~`cp`, `mv`, `rm`, `mkdir`, `touch`~~ | File operations — **done** (FR-72) | `FileEntry`, `FileOperation` |
 | ~~`ps`, `kill`~~ | Processes — **done** (FR-74) | `ProcessEntry` |
-| ~~`select`~~ | Attribute projection — **done** (FR-69); `--expand` not done | `Row` |
+| ~~`select`~~ | Attribute projection — **done** (FR-69); `--expand` not done ([issue #53](https://github.com/yp44/powerj/issues/53)) | `Row` |
 | ~~`sort`~~ | Sorting — **done** (FR-67) | unchanged |
 | ~~`collect`~~ | Gather into a list — **done** (FR-36d) | `Collected` |
 | ~~`first`, `last`~~ | First / last N — **done** (FR-68) | unchanged |

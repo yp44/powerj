@@ -401,11 +401,13 @@ PowerJ is in active development (version `0.2.0-SNAPSHOT`). Implemented so far:
 
 The v1 cmdlet roadmap is done ([roadmap](docs/plans/cmdlet-roadmap.md), end-to-end check in [pipeline-v1](docs/acceptance/pipeline-v1.md)). Still in the backlog ([§12.3](docs/SPECIFICATION.md#123-cmdlet-backlog-outside-the-current-scope)): `uniq`, `find`, `tee`, `table`/`tree`, `http`/`ping`, `open`. Next: a scripting language with control structures in v2. The step-by-step plan is in [§11 of the specification](docs/SPECIFICATION.md#11-iterative-development-plan).
 
+**The backlog is kept in [GitHub issues](https://github.com/yp44/powerj/issues)**: what is not done yet, and the decisions that wait for the maintainer (first release, signing, wildcards for native programs...). See [Contributing](CONTRIBUTING.md#the-backlog).
+
 ## Documentation
 
 - [Specification](docs/SPECIFICATION.md): functional requirements, grammar, extension API, architecture.
 - [Architecture](docs/ARCHITECTURE.md): modules, layers, how a line runs, the rules and the tests that keep them; [decision records](docs/adr/).
-- [Contributing](CONTRIBUTING.md): building, the gates of `verify`, how we work, the language policy, adding a cmdlet. [Security policy](SECURITY.md).
+- [Contributing](CONTRIBUTING.md): building, the gates of `verify`, the backlog (GitHub issues), how we work, the language policy, adding a cmdlet. [Security policy](SECURITY.md).
 - [Acceptance checklists](docs/acceptance/) for each development step, and [plans](docs/plans/) of the latest iterations.
 - [Example module `greet`](examples/greet/README.md).
 - [Architecture review](docs/REVUE-ARCHITECTURE.md) (in French): strengths, findings, target organization, design patterns and a phased refactoring plan; Phases 0 to 4 are done, see its §11 to §15. [Changelog](CHANGELOG.md).

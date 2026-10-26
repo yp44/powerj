@@ -51,6 +51,28 @@ refreeze to make a build pass. Each rule says in its Javadoc which finding of th
 `powerj-api/src/test/resources/io/powerj/api/api-surface.txt`, and describe the change in [CHANGELOG.md](CHANGELOG.md)
 (add, never remove, unless you deprecate first with `@Deprecated(since = …, forRemoval = true)`).
 
+## The backlog
+
+**What is still to do lives in [GitHub issues](https://github.com/yp44/powerj/issues)**, not in a file of the
+repository: one issue per gap or decision, each with a *Context*, a *To do*, a *Done when* and its *References*. Look
+there before starting something, and open an issue (or comment on the existing one) rather than adding a `TODO`
+to the code or a line to a document.
+
+- Labels say what kind of work it is (`decision` and `maintainer-action` need the maintainer; `release`, `security`,
+  `ci`, `fx`, `cmdlet`, `spec`, `tech-debt`, `performance`, `quality`, `accessibility`, `epic`, `v2`…).
+- Work on an issue in a commit or a pull request that says `Refs #nn`; the one that finishes it says `Fixes #nn`.
+- When an issue is done or dropped, close it with the reason. Do not delete the text: it is the record.
+
+What goes where:
+
+| Where | What it holds |
+|---|---|
+| GitHub issues | work that is **not done yet** and the decisions waiting for someone |
+| [CHANGELOG.md](CHANGELOG.md) | what **changed** in each version |
+| [docs/adr/](docs/adr/) | decisions taken, with the reason |
+| [docs/SPECIFICATION.md](docs/SPECIFICATION.md) | what the product is required to do (`FR-nn`) |
+| [docs/REVUE-ARCHITECTURE.md](docs/REVUE-ARCHITECTURE.md), [docs/plans/](docs/plans/) | the review and the plans of past iterations: history, not a to-do list |
+
 ## Releasing
 
 [docs/RELEASING.md](docs/RELEASING.md): how a version is cut, what the release workflow builds, and what is not done yet

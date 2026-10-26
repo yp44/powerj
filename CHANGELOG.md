@@ -291,15 +291,28 @@ structures, functions) can be built on it. The work is organised in phases (revi
   class is the minimal form that works with JPMS, and the model `examples/greet` gives to module authors.
 
 ### Planned (review §8)
-Phases 1 to 5 are done (reports in the review, §12 to §16). The API members deprecated in 0.2 (`Cmdlet.previewable`,
-`Cmdlet.columns`) are removed no sooner than 0.3.0. What is open, and who decides it, is listed in §16.4 of the review:
-- **The first release.** The release workflow is written ([docs/RELEASING.md](docs/RELEASING.md)) and has never run; nothing
-  is signed. Tagging, and the way to sign, are the maintainer's decisions.
-- **Code scanning.** A CodeQL workflow was added in Phase 0 and taken out again on the maintainer's request, to be
-  looked at later (it is in the history, commit `cf487bb`).
-- **Wildcards in the arguments of a native program** (FR-40, marked partial).
-- **Private vulnerability reporting** has to be switched on in the settings of the repository (`SECURITY.md` relies on it).
-- **Phase 6**: control structures and functions, on the foundations of the phases above.
+**The backlog is kept in [GitHub issues](https://github.com/yp44/powerj/issues)** (see [CONTRIBUTING.md](CONTRIBUTING.md#the-backlog));
+this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5 are done (reports in the review, §12 to
+§16). The API members deprecated in 0.2 (`Cmdlet.previewable`, `Cmdlet.columns`) are removed no sooner than 0.3.0. What is
+open, and who decides it, is listed in §16.4 of the review and has one issue each:
+- **The first release** ([#47](https://github.com/yp44/powerj/issues/47)) **and how to sign it**
+  ([#48](https://github.com/yp44/powerj/issues/48)). The release workflow is written ([docs/RELEASING.md](docs/RELEASING.md))
+  and has never run; nothing is signed. Tagging, and the way to sign, are the maintainer's decisions.
+- **Code scanning** ([#50](https://github.com/yp44/powerj/issues/50)). A CodeQL workflow was added in Phase 0 and taken out
+  again on the maintainer's request, to be looked at later (it is in the history, commit `cf487bb`).
+- **Wildcards in the arguments of a native program** ([#51](https://github.com/yp44/powerj/issues/51); FR-40, marked partial).
+- **Private vulnerability reporting** ([#49](https://github.com/yp44/powerj/issues/49)) has to be switched on in the
+  settings of the repository (`SECURITY.md` relies on it).
+- **Phase 6**: control structures and functions ([#52](https://github.com/yp44/powerj/issues/52)), on the foundations of
+  the phases above.
+- Smaller items, each with its issue: `select --expand` ([#53](https://github.com/yp44/powerj/issues/53)), `to-json` in
+  memory ([#54](https://github.com/yp44/powerj/issues/54)), the grid ([#55](https://github.com/yp44/powerj/issues/55)),
+  `ExpressionParser` ([#56](https://github.com/yp44/powerj/issues/56)), japicmp
+  ([#57](https://github.com/yp44/powerj/issues/57)), reproducible Ant archives
+  ([#58](https://github.com/yp44/powerj/issues/58)), mutation testing ([#59](https://github.com/yp44/powerj/issues/59)),
+  CI and platforms ([#60](https://github.com/yp44/powerj/issues/60)), a screen reader on the grid
+  ([#61](https://github.com/yp44/powerj/issues/61)), the status of each requirement
+  ([#62](https://github.com/yp44/powerj/issues/62)), small leftovers ([#63](https://github.com/yp44/powerj/issues/63)).
 
 ## [0.1.0] — never released (baseline)
 
