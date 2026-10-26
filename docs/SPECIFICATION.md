@@ -864,7 +864,7 @@ to-csv [-d|--delimiter <char>] [--no-header]
 from-csv [-d|--delimiter <char>] [--no-header] [--property <name>]
 ```
 
-No external library: the writers and parsers are part of PowerJ. The four cmdlets change nothing on disk and run in preview (FR-66).
+No external library: the writers and parsers are part of PowerJ, and tested against the JSONTestSuite and RFC 4180 ([ADR 0009](adr/0009-json-and-csv-are-written-in-house.md)). The four cmdlets change nothing on disk and run in preview (FR-66).
 - **No file name.** To write a file, redirect their text: `ls | select name size | to-json > files.json`.
 - **Pipeline only.** To read one, pipe it: `cat files.json | from-json`. A `String` received is always text, never a file name. With `--property <name>`, that property of each object received holds the text: `cat files.json -c | from-json --property content`.
 
@@ -874,7 +874,8 @@ No external library: the writers and parsers are part of PowerJ. The four cmdlet
   - a record becomes an object of all its components (a `@Bytes` size stays a number of bytes);
   - a `Row` or a `Map` becomes an object;
   - collections, arrays and streams become arrays;
-  - numbers and booleans stay as they are; `NaN` and infinities become `null`;
+  - numbers and booleans stay as they are; `NaN` and infinities become `null`; a `float` keeps the digits it was written with (`0.1f` is `0.1`);
+  - a surrogate that is not part of a pair, which would not survive the encoding to UTF-8, is written as a `\uXXXX` escape;
   - dates are written as ISO-8601 strings, and enums, paths and other objects as their text.
 - `--depth` (default 10) limits the nesting: deeper values are written as their text, with one non-blocking error.
 
@@ -882,7 +883,9 @@ No external library: the writers and parsers are part of PowerJ. The four cmdlet
 - The text may hold several values one after the other (JSON Lines); each one is emitted as soon as it is complete.
 - A top-level array is unrolled.
 - An object gives a `Row` (FR-69), keys in order; an inner array gives a `List`.
-- Integers give `Long` (`BigInteger` beyond), other numbers `Double`.
+- Integers give `Long` (`BigInteger` beyond), other numbers `Double`; a number that does not fit a double (`1e999`) is an error, not `Infinity`, and one that is too small is `0.0`.
+- Where RFC 8259 leaves the choice: a key that is repeated keeps its **last** value; an escaped lone surrogate (`"\ud800"`) is read as that character; a UTF-8 byte order mark at the start of the input is skipped; nesting beyond 1000 levels is an error.
+- A single value of more than 64 Mi characters (for example an object that is never closed) is reported once and **stops the reading**, instead of absorbing the rest of the input; very large inputs are JSON Lines.
 - Invalid JSON gives a non-blocking error with its position (`invalid JSON at line 3, column 7: expected ':' after a key`), and reading resumes at the next value.
 
 **`to-csv`** emits CSV (RFC 4180), one `String` per line, as the objects arrive: the header, then one line per object.
@@ -890,14 +893,15 @@ No external library: the writers and parsers are part of PowerJ. The four cmdlet
 - **Fields**:
   - they are quoted when they contain the delimiter, a quote or a line break;
   - numbers use `.` and no exponent;
-  - nested values are written as compact JSON.
+  - nested values are written as compact JSON;
+  - a record of one empty field is written `""`, because an empty line is not a record for `from-csv`.
 - `--delimiter` takes one character or `tab` (`;` for Excel in French). `--no-header` omits the header.
 
 **`from-csv`** reads CSV, either the `String` lines received or their `--property`, and emits one `Row` per record as soon as it is complete.
 - **Header**: the first record gives the column names. With `--no-header`, the columns are `c1`, `c2`…
 - **Lines**:
   - a quoted field may span several lines;
-  - empty lines and a UTF-8 byte order mark are skipped;
+  - empty lines and a UTF-8 byte order mark are skipped (a line holding only `""` is a record with one empty field);
   - a record with too many fields gives a non-blocking error, and a record with too few fields gets `null` values.
 - **Values**: always `String`, as in PowerShell's `Import-Csv` (`007` stays `007`). An empty field is `""`, and a missing column is `null`.
 
@@ -906,7 +910,7 @@ CA:
 - `ls a.txt | select name size | to-json` gives `[ { … } ]`;
 - `ls | select name size | to-json > f.json`, then `cat f.json | from-json | where { $_.size > 1kb }`;
 - `cat f.json | from-json` gives the same rows; `"[1, 2]" | from-json` gives `1` and `2`;
-- `"{\"a\": 1,}" | from-json`: error `invalid JSON at line 1, column 9: …`;
+- `"{\"a\": 1,}" | from-json`: error `invalid JSON at line 1, column 9: …`; `"1e999" | from-json`: error `… number out of range for a double: 1e999`;
 - `ls | select name size | to-csv -d ";" > f.csv`, then `cat f.csv | from-csv -d ";"` gives the same names, with the sizes as strings;
 - `cat f.json -c | from-json --property content` reads the content of a `CatContent`; `"data.json" | from-json` is invalid JSON;
 - a CSV field with a `,`, a `"` and a line break survives `to-csv | from-csv`.

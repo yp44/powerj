@@ -8,6 +8,10 @@ import java.util.List;
  * may hold several values one after the other (JSON Lines); each one is parsed as soon as it is complete, once. The
  * scan counts the brackets outside strings and keeps its state between the pieces, so a large document is read in
  * linear time. A top-level number or literal ends at the next white space.
+ * <p>
+ * A value that is never closed would absorb everything that follows it into the buffer: past {@code maxValueLength}
+ * characters it is reported once, and the reading stops (what comes after it cannot be trusted). Several values, as in
+ * JSON Lines, are each far below the limit.
  */
 final class JsonSplitter {
 
@@ -23,6 +27,11 @@ final class JsonSplitter {
     record Failed(JsonParser.JsonException error) implements Result {
     }
 
+    /** Longest value read: beyond it, the input is JSON Lines, or it is not JSON. */
+    static final int DEFAULT_MAX_VALUE_LENGTH = 64 * 1024 * 1024;
+
+    private final int maxValueLength;
+    private boolean abandoned;
     private final StringBuilder buffer = new StringBuilder();
     /** Next character of {@link #buffer} to scan. */
     private int scanned;
@@ -40,15 +49,27 @@ final class JsonSplitter {
     private boolean inString;
     private boolean escape;
 
+    JsonSplitter() {
+        this(DEFAULT_MAX_VALUE_LENGTH);
+    }
+
+    /** @param maxValueLength the most characters that one value may have */
+    JsonSplitter(int maxValueLength) {
+        this.maxValueLength = maxValueLength;
+    }
+
     /** Adds a piece of text, followed by a line break, and returns the values it completes. */
     List<Result> feed(CharSequence piece) {
+        if (abandoned) {
+            return List.of();
+        }
         buffer.append(piece).append('\n');
         return scan(false);
     }
 
     /** End of the text: completes a last number or literal, or reports a value that is not closed. */
     List<Result> finish() {
-        return scan(true);
+        return abandoned ? List.of() : scan(true);
     }
 
     private List<Result> scan(boolean last) {
@@ -57,9 +78,19 @@ final class JsonSplitter {
             char c = buffer.charAt(scanned);
             if (!started) {
                 started = true;
-                if (c == '﻿') { // byte order mark
+                if (c == '\uFEFF') { // byte order mark
                     continue;
                 }
+            }
+            if (valueStart >= 0 && scanned - valueStart >= maxValueLength) {
+                results.add(new Failed(new JsonParser.JsonException(Messages.get("json.value.too.large",
+                        maxValueLength), valueLine, valueColumn)));
+                abandoned = true;
+                buffer.setLength(0);
+                scanned = 0;
+                reset();
+                valueStart = -1;
+                return results;
             }
             if (valueStart >= 0 && scalar && (isSpace(c) || c == '{' || c == '[' || c == '"')) {
                 complete(scanned, results);

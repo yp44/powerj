@@ -5,3 +5,5 @@ mvnw text eol=lf
 # Read by tests that compare them with text built in memory.
 powerj-api/src/test/resources/io/powerj/api/api-surface.txt text eol=lf
 powerj-architecture/src/test/resources/archunit_store/* text eol=lf
+# Test data that is bytes, some of them not text: no conversion of any kind.
+powerj-cmdlets/src/test/resources/jsontestsuite/*.json -text

@@ -42,10 +42,15 @@ Then `cd C:\tmp\j`.
 | 20 | Alt+V, then type `ls \| select name size \| to-json -c` | The preview shows the JSON line. |
 | 21 | `help to-json`, `help from-csv` | Their help, with the options and examples. |
 | 22 | `POWERJ_LANG=fr`, then `42 \| from-json` | `from-json : pas un texte JSON : 42 (utiliser --property …)`. |
+| 23 | `"[1, 1e999]" \| from-json` | A non-blocking error at line 1, column 5: `number out of range for a double: 1e999`; nothing is read as `Infinity`. |
+| 24 | `"{\"a\": 1, \"a\": 2}" \| from-json` | One row, `a` is `2` (the last of a repeated key). |
+| 25 | `[0] \| map { _ -> 0.1f } \| to-json -c` | `[0.1]`, not `[0.10000000149011612]`. |
+| 26 | `[""] \| map { s -> s } \| select value={ $_ } \| to-csv --no-header \| from-csv --no-header` | The row comes back (`""` is written for a record of one empty field), it is not lost as an empty line. |
 
 ## Known limitations
 
 - `to-json` without `-l` keeps its text in memory until the input ends; use `-l` for a long stream.
+- A single JSON value of more than 64 Mi characters stops the reading with one error (an object that is never closed would otherwise absorb everything after it).
 - Other objects than records, maps and collections are written as their text (`toString()`): their getters are not called.
 - `from-csv` gives strings only: convert them to compare numbers (`Long.parseLong($_.size)`).
 - Numbers are written to CSV with a `.`: Excel in French may read `1.5` as text.

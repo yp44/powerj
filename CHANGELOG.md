@@ -192,6 +192,15 @@ structures, functions) can be built on it. The work is organised in phases (revi
   (`NativeAccessPolicy.consent` takes the fingerprint: an internal interface). [ADR 0006](docs/adr/0006-consent-to-native-access-is-tied-to-the-content.md).
   Also fixed: the French message of that refusal showed `l''autoriser` (doubled apostrophe: the formatter does not
   unescape).
+- **JSON and CSV are checked against the standards** (C-25): the 316 small files of the JSONTestSuite (all valid ones
+  accepted, all invalid ones rejected with a position, the 35 that the RFC leaves open pinned one by one), RFC 4180 section by
+  section, and random values written then read back. They found and fixed: a number that does not fit a double was read as
+  `Infinity` (now an error); a `float` was written as the double nearest to it (`0.1f` gave `0.10000000149011612`); a lone
+  surrogate was written raw and lost in the UTF-8 encoding (now a `\uXXXX` escape); a CSV record of one empty field was
+  written as an empty line, which `from-csv` skips (now `""`). An object that is never closed no longer absorbs the whole
+  input: a value of more than 64 Mi characters stops the reading with one error. The choices that the standards leave open
+  are in the specification (FR-73) and in [ADR 0009](docs/adr/0009-json-and-csv-are-written-in-house.md); `to-json` still
+  builds its array in memory (`--lines` streams). The byte order marks in the sources are written `\uFEFF`.
 - **`SpecificationTraceabilityTest`**: every requirement of the specification is cited by the code, a test or a smoke
   script (unless it is marked withdrawn), nothing cites a requirement that does not exist, and the specification only
   mentions requirements it defines. Twelve requirements that nothing cited now are, `FR-04e` (a name the specification

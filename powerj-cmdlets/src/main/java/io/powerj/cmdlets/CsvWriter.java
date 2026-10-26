@@ -18,8 +18,14 @@ final class CsvWriter {
         this.delimiter = delimiter;
     }
 
-    /** One line of fields, without line break. */
+    /**
+     * One line of fields, without line break. A record of a single empty field is written {@code ""}: left empty it
+     * would be an empty line, which the readers skip.
+     */
     String line(List<?> values) {
+        if (values.size() == 1 && text(values.getFirst()).isEmpty()) {
+            return "\"\"";
+        }
         StringBuilder out = new StringBuilder();
         for (int i = 0; i < values.size(); i++) {
             if (i > 0) {

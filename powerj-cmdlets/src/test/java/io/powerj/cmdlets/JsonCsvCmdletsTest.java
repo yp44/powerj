@@ -219,7 +219,7 @@ class JsonCsvCmdletsTest {
     @Test
     void fromCsvGivesRowsOfStrings() {
         TestContext<Row> context = new TestContext<>(Path.of("."));
-        run(new FromCsv(), new FromCsv.Params(";", false, null), context, "﻿name;size;name;", "a.txt;007;x;",
+        run(new FromCsv(), new FromCsv.Params(";", false, null), context, "\uFEFFname;size;name;", "a.txt;007;x;",
                 "", "\"b;c\";1.5", "d;1;2;3;4");
         assertThat(context.emitted).hasSize(3);
         assertThat(context.emitted.get(0)).containsExactly(Map.entry("name", "a.txt"), Map.entry("size", "007"),

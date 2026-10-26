@@ -60,7 +60,7 @@ class CsvTest {
                 List.of("a", "b,c", "say \"hi\""), List.of("x", "", ""));
         assertThat(read(',', "a,\"two", "lines\",b")).containsExactly(List.of("a", "two\nlines", "b"));
         assertThat(read(',', "h1,h2\r\nv1,v2\r\n")).containsExactly(List.of("h1", "h2"), List.of("v1", "v2"));
-        assertThat(read(';', "﻿a;b", "1;2")).containsExactly(List.of("a", "b"), List.of("1", "2"));
+        assertThat(read(';', "\uFEFFa;b", "1;2")).containsExactly(List.of("a", "b"), List.of("1", "2"));
         assertThat(read('\t', "a\tb")).containsExactly(List.of("a", "b"));
     }
 

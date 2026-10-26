@@ -18,5 +18,6 @@ evidence.
 | [0006](0006-consent-to-native-access-is-tied-to-the-content.md) | The consent to native access is tied to the content of the modules | accepted |
 | [0007](0007-a-composition-root-without-a-framework.md) | A composition root, without a dependency-injection framework | accepted |
 | [0008](0008-english-repository-bilingual-interface.md) | An English repository, a bilingual interface | accepted |
+| [0009](0009-json-and-csv-are-written-in-house.md) | JSON and CSV are written in-house, and checked against the standard suites | accepted |
 
 To add one: copy the shape of the last, number it, add a row here.
