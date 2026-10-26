@@ -15,4 +15,9 @@ cat "$WORK/stdin.txt"
 "$PJ" -c 'grep -i "^ROOT:" /etc/passwd -p 2 | map { m -> "grep: " + m.line }' < /dev/null > "$WORK/grep.txt"
 cat "$WORK/grep.txt"
 [ "$(cat "$WORK/grep.txt")" = "grep: 1" ] || { echo "grep through the launcher failed" >&2; exit 1; }
+# --version and --help answer without starting the shell (and without touching the home folder).
+"$PJ" --version > "$WORK/version.txt"
+expect "$WORK/version.txt" "^PowerJ " "(Java "
+"$PJ" --help > "$WORK/help.txt"
+expect "$WORK/help.txt" "usage: powerj" "--version" "--help"
 echo "non-interactive: OK"

@@ -167,6 +167,11 @@ jobs:
           $lignes = 'x.txt', 'y.log', 'z.txt' | & $pj filtre.pj
           $lignes
           if (($lignes -join ',') -ne 'x.txt,z.txt') { throw "filtrage de l'entrée standard incorrect : $lignes" }
+          # --version et --help répondent sans démarrer le shell.
+          $version = & $pj --version
+          if (-not ($version -match '^PowerJ .* \(Java ')) { throw "--version incorrect : $version" }
+          $aide = (& $pj --help) -join ' '
+          if (-not ($aide -match 'usage: powerj' -and $aide -match '--version' -and $aide -match '--help')) { throw "--help incorrect : $aide" }
           exit 0
 
       - name: Smoke test of the third-party modules

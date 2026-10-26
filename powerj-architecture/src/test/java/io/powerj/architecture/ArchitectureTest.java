@@ -1,5 +1,10 @@
 package io.powerj.architecture;
 
+import static com.tngtech.archunit.core.domain.JavaAccess.Predicates.targetOwner;
+import static com.tngtech.archunit.core.domain.JavaCall.Predicates.target;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.assignableTo;
+import static com.tngtech.archunit.core.domain.properties.HasName.Predicates.nameMatching;
+import static com.tngtech.archunit.core.domain.properties.HasOwner.Predicates.With.owner;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.fields;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
@@ -137,6 +142,22 @@ class ArchitectureTest {
     void assistDoesNotUseTheConcreteInterpreter() {
         check(noClasses().that().resideInAPackage("io.powerj.core.assist..")
                 .should().dependOnClassesThat().haveFullyQualifiedName("io.powerj.core.runtime.Interpreter"));
+    }
+
+    /**
+     * [C-09] Only {@code Environment}, {@code SystemTerminals} and {@code Main} read the process around the shell
+     * (variables, properties, standard streams, console): everything else is given what it needs, so a shell can be
+     * started in a test with a folder and a few streams.
+     */
+    @Test
+    void shellReadsTheProcessInThreePlacesOnly() {
+        check(noClasses().that().resideInAPackage("io.powerj.shell..")
+                .and().doNotHaveSimpleName("Environment").and().doNotHaveSimpleName("SystemTerminals")
+                .and().doNotHaveSimpleName("Main")
+                .should().callMethodWhere(target(owner(assignableTo(System.class)))
+                        .and(target(nameMatching("getenv|getProperty|setProperty|console|exit"))))
+                .orShould().accessFieldWhere(targetOwner(assignableTo(System.class)))
+                .because("the process is read once, in Environment, and handed to whoever needs it"));
     }
 
     /** [C-09] The shell has no business with the cmdlets' classes: {@code ProtectedPaths} should live elsewhere. */

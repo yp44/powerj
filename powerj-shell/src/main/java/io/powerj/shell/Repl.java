@@ -61,7 +61,7 @@ public final class Repl {
         this.terminal = reader.getTerminal();
         this.out = terminal.writer();
         boolean interactive = !terminal.getType().startsWith("dumb");
-        this.colors = interactive && colors(terminal);
+        this.colors = interactive && colors(terminal, session);
         var io = new ShellIo(out, this::printError, interactive, () -> terminal.getWidth(), consoleInput(terminal),
                 colors);
         this.interpreter = new Interpreter(session, io, Map.of("history", this::history), registry,
@@ -95,9 +95,9 @@ public final class Repl {
     }
 
     /** {@code true} if the terminal displays ANSI colors (FR-64), unless {@code NO_COLOR} is set. */
-    private static boolean colors(Terminal terminal) {
+    private static boolean colors(Terminal terminal, Session session) {
         Integer colors = terminal.getNumericCapability(InfoCmp.Capability.max_colors);
-        String noColor = System.getenv("NO_COLOR");
+        String noColor = session.environment().get("NO_COLOR");
         return colors != null && colors >= 8 && (noColor == null || noColor.isEmpty());
     }
 

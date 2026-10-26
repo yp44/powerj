@@ -89,7 +89,11 @@ final class TestTerminal implements AutoCloseable {
 
     /** Everything that was displayed, with ANSI escape sequences removed. */
     String screen() {
-        terminal.flush();
+        try {
+            terminal.flush();
+        } catch (IllegalStateException _) {
+            // closed by whoever ran the shell on it: everything was flushed when it closed
+        }
         return output.toString(StandardCharsets.UTF_8).replaceAll("\033\\[[0-9;?]*[A-Za-z]", "");
     }
 
