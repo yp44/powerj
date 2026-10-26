@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| **Document version** | 0.10 (`~` = `HOME` directory in every argument) |
-| **Status** | Pending approval |
-| **Target platform** | Windows 10/11 x64 (`powerj.exe`), Linux/macOS as a bonus |
-| **Technical foundation** | Java 25, Maven 3.9, JLine 3 |
+| **Document version** | 0.11 (reconciled with the code: Phase 5 of the [architecture review](REVUE-ARCHITECTURE.md)) |
+| **Status** | Living document: it describes the product as built (`0.2.0-SNAPSHOT`). Every requirement `FR-nn` is traced to the code or the tests by `SpecificationTraceabilityTest`. |
+| **Target platform** | Windows 10/11 x64 (`powerj.exe`) and Linux x64, both built and tested by the CI on every push; macOS launcher built by the `mac` profile, not tested by the CI |
+| **Technical foundation** | Java 25, Maven 3.9, JLine 4 |
 
 ---
 
@@ -71,7 +71,7 @@ FRIDAY
 - No syntax compatibility with PowerShell or bash.
 - No remote execution (*remoting*).
 - No PowerShell-style *providers* (registry, certificates…).
-- **Cmdlet scope deliberately limited to 3 cmdlets (`ls`, `where`, `env`)**; the rest of the catalog is in the backlog (§12.3).
+- **The cmdlet catalog grows by mini-iterations** (29 cmdlets today, §3.9); what is not done is in the backlog (§12.3).
 
 ---
 
@@ -101,7 +101,7 @@ Each requirement has an identifier `FR-xx` and one or more verifiable **acceptan
 
 ### 3.1 REPL
 
-**FR-01 — Prompt.** On startup, PowerJ displays a banner (`PowerJ 0.x — Java 25`) then the prompt `PJ <répertoire courant>> ` (`<current directory>`).
+**FR-01 — Prompt.** On startup, PowerJ displays a banner (`PowerJ 0.x — Java 25`) then the prompt `PJ <current directory>> `.
 - CA: launching `powerj.exe` from `C:\Users\yves` displays `PJ C:\Users\yves> `.
 
 **FR-02 — Multi-line input.** If a line ends with `|`, `&&` or `||`, or if a brace, parenthesis or quote is left open (no continuation with `\`, so that `cd C:\` remains valid), the shell displays a continuation prompt `>> ` and waits for the rest.
@@ -119,7 +119,7 @@ Each requirement has an identifier `FR-xx` and one or more verifiable **acceptan
 
 | Command | Effect |
 |---|---|
-| `cd <chemin>` | Changes the current directory (absolute path, relative path, `..`, `~` = home directory (FR-62), drive `D:`). |
+| `cd <path>` | Changes the current directory (absolute path, relative path, `..`, `~` = home directory (FR-62), drive `D:`). |
 | `cd` | Returns to the user home directory. |
 | `cd -` | Returns to the previous directory. |
 | `pwd` | Displays the current directory (`Path` object). |
@@ -155,8 +155,8 @@ The current directory belongs to the shell: it is the base for relative paths of
 
 | Invocation | Effect |
 |---|---|
-| `powerj -c "<ligne>"` | Runs the line then exits. |
-| `powerj fichier.pj` | Runs the file line by line (in v1: a sequence of lines, without control structures) then exits. |
+| `powerj -c "<line>"` | Runs the line then exits. |
+| `powerj file.pj` | Runs the file line by line (in v1: a sequence of lines, without control structures) then exits. |
 | `… \| powerj -c "where { $_.contains(\"x\") }"` | If stdin is not a terminal, its lines feed the first stage (`String` lines). |
 
 In this mode: no prompt, no history, no colors if the output is not a terminal, and a terminating error stops execution. Process **return code**: `exit <n>` if called; otherwise 0 if the last command succeeded, the code of the last native command if it failed, 1 for a PowerJ terminating error.
@@ -231,14 +231,14 @@ There is **no** long form (`pj-ls`, `Get-ChildItem`…).
 4. **native command** found in the `PATH` (with `PATHEXT` on Windows);
 5. otherwise: error `unknown command: xxx` with suggestions (edit distance).
 
-**FR-14 — `^` prefix.** `^nom` skips steps 1 to 3 and always launches the native command: `^ls`, `^find "foo" a.txt`, `^sort data.txt`.
+**FR-14 — `^` prefix.** `^name` skips steps 1 to 3 and always launches the native command: `^ls`, `^find "foo" a.txt`, `^sort data.txt`.
 - CA: on Windows, `^find "x" a.txt` runs `C:\Windows\System32\find.exe`.
 
-**FR-15 — `which`.** `which nom` indicates what will be executed: `ls → cmdlet (io.powerj.cmdlets)`, `git → native C:\Program Files\Git\cmd\git.exe`, `cd → built-in command`.
+**FR-15 — `which`.** `which name` indicates what will be executed: `ls → cmdlet (io.powerj.cmdlets)`, `git → native C:\Program Files\Git\cmd\git.exe`, `cd → built-in command`.
 
-**FR-16 — Configurable preference.** The `native.prefer` key in `config.properties` lists the names for which the native command takes precedence over the cmdlet (e.g. `native.prefer=find,sort`).
+**FR-16 — Withdrawn.** A `native.prefer` setting in `config.properties` was specified to let a native command take precedence over a cmdlet of the same name. It was never built and was withdrawn: `^name` (FR-14) is the way to the native program.
 
-**FR-17 — Collisions between modules.** If a module declares a cmdlet whose name already exists, a warning is displayed at load time; the first one loaded keeps the short name, the other remains accessible as `module:nom` (e.g. `docker:ps`), where `module` is the last segment of the Java module name (`com.example.greet` → `greet:greet`). A cmdlet named after a built-in command (`cd`, `help`, `mod-load`…) is ignored with a warning: it could never be called.
+**FR-17 — Collisions between modules.** If a module declares a cmdlet whose name already exists, a warning is displayed at load time; the first one loaded keeps the short name, the other remains accessible as `module:name` (e.g. `docker:ps`), where `module` is the last segment of the Java module name (`com.example.greet` → `greet:greet`). A cmdlet named after a built-in command (`cd`, `help`, `mod-load`…) is ignored with a warning: it could never be called.
 
 ### 3.5 Parameters
 
@@ -251,7 +251,7 @@ There is **no** long form (`pj-ls`, `Get-ChildItem`…).
 | Long option | `--recurse` |
 | Value separated or with `=` | `--filter *.java`, `--filter=*.java` |
 | Positional | `ls C:\temp` |
-| End of options | `ls -- -fichier-commencant-par-tiret` |
+| End of options | `ls -- -file-starting-with-a-dash` |
 
 Option names are case-insensitive; a long option can be abbreviated as long as it is not ambiguous (`--rec`).
 
@@ -274,7 +274,7 @@ Option names are case-insensitive; a long option can be abbreviated as long as i
 
 **FR-24b — Java completion.** In a Java expression (§3.13):
 - after `java.` / `javax.` / a package name → subpackages and public classes (index of the exported packages of the runtime and of loaded modules);
-- after `Classe.` → **static** methods and fields;
+- after `Class.` → **static** methods and fields;
 - after `$x.` or `expr().` → public methods and properties (getters, fields) of the actual type of the value, or of the known static return type;
 - after `new ` → instantiable classes; after `import ` → packages and classes.
 
@@ -292,25 +292,25 @@ The menu displays the signature (`of(E...) : List<E>`). Imported classes (§FR-4
 **Records remain the recommended format** for cmdlet outputs (table display, attribute completion, automatic documentation), but they are not mandatory: a cmdlet can produce any type.
 
 **FR-28 — Access to attributes and methods.**
-- `$x.nom` (without parentheses) is a **property**, resolved in this order, case-insensitively:
-  1. record component `nom()`;
+- `$x.name` (without parentheses) is a **property**, resolved in this order, case-insensitively:
+  1. record component `name()`;
   2. getter `getNom()` or `isNom()` (boolean);
-  3. public field `nom`;
-  4. on a `Map`: value associated with the key `"nom"`.
-- `$x.nom(args)` (with parentheses) is always a **method call** (§3.13).
+  3. public field `name`;
+  4. on a `Map`: value associated with the key `"name"`.
+- `$x.name(args)` (with parentheses) is always a **method call** (§3.13).
 - Access can be chained: `$x.path.parent`, `$f.toPath().fileName`.
 - **`.` always applies to the object itself**, as in Java: on a list, `$f.size()` is the number of elements and `$f.empty` calls `isEmpty()`.
 - **`*.` (the "spread" operator, as in Groovy) applies to each element** and returns the list of results: `$f*.name` (names of all files), `$f*.size`, `$f*.name*.toUpperCase()`, `$f*.name.size()` (number of names). A single value counts as one element, `null` as none: `(ls -r)*.name` always gives a list, even with a single file.
 - `$f.name` on a list is an explicit error: `List has no property 'name' (for each element: *.name)`. In a pipeline, the equivalent of `*.` is `map`: `ls | map FileEntry::name`.
-- Indexing: `$f[0]`, `$f[-1]` on `List`, array or `String`; `$m['clé']` on `Map`.
+- Indexing: `$f[0]`, `$f[-1]` on `List`, array or `String`; `$m['key']` on `Map`.
 - Nonexistent property → error `FileEntry has no property 'siz' (properties: name, size, …)`; if a method with that name exists, the message says so: `String has no property 'length' (method: length())`.
 
 **FR-29 — Introspection.** `help members` on a value (`$f | help members` or `help members FileEntry`) lists the components: name, type, description (Javadoc / `@Doc` annotation).
 
 **FR-30 — Default display.** At the end of a pipeline, each object is displayed according to its type:
-- **record**: as a table if ≤ 5 displayable components (aligned columns, width adapted to the terminal), otherwise as a `nom : valeur` list; a record can declare its columns via `@Display(columns = {"name", "size", "modified"})`;
+- **record**: as a table if ≤ 5 displayable components (aligned columns, width adapted to the terminal), otherwise as a `name : value` list; a record can declare its columns via `@Display(columns = {"name", "size", "modified"})`;
 - **`Row`** (output of `select`, FR-69): successive rows with the same columns form one table, whatever the number of columns;
-- **`Map`**: `clé / valeur` (key / value) table;
+- **`Map`**: `key / value` table;
 - **scalars** (`String`, numbers, booleans, dates, `Path`, enums): readable form; the line breaks of a text are kept, also in a table cell or a redirected file (`cat a.txt -t`, `cat a.txt -c | map { $_.content } > copie.txt`), and a text that already ends with a line break gets no other one (the copy is identical to the file);
 - **other objects**: `toString()`; `help members` lets you explore their properties.
 
@@ -335,7 +335,7 @@ Sizes and durations in readable format (`14.2 KB`, `2 h 05 min`; the decimal sep
 
 ### 3.8 Expression language
 
-**FR-31 — Variables.** `$nom = <pipeline>` assigns the result (one object → the object; several → list; none → `null`). Automatic variables: `$_` (current object), `$last` (metadata of the last native command), `$exit` (its return code), `$?` (success of the last command), `$errors` (recent errors), `$home`, `$pwd`.
+**FR-31 — Variables.** `$name = <pipeline>` assigns the result (one object → the object; several → list; none → `null`). Automatic variables: `$_` (current object), `$last` (metadata of the last native command), `$exit` (its return code), `$?` (success of the last command), `$errors` (recent errors), `$home`, `$pwd`.
 
 **FR-32 — Literals.** As in Java, with a few shell additions:
 - **strings** between double quotes, with **Java escapes**: `\\` for a backslash, `\"`, `\n`, `\t`, `\uXXXX` → `"C:\\Users\\yves"`; interpolation `$var` and `$(expr)` (`\$` for a literal `$`); text blocks `"""…"""`;
@@ -391,31 +391,31 @@ Note: `!` at the beginning of a line remains history expansion (FR-11); inside a
 | The block merely **calls a method** on the object, or passes it to a method | method reference | `ls \| map FileEntry::name`, `$l.stream().map(String::toUpperCase)`, `$noms.stream().map(Path::of)` |
 | Argument of a **Java method** (`stream().filter(…)`, `sort(…)`) | lambda without braces | `$l.stream().filter(s -> s.length() > 4)` |
 | Argument of a **cmdlet** (`where`, `map`) | braces mandatory | `where { f -> f.size > 1mb }` (never `where f -> …`) |
-| `.pj` script meant to be reread and maintained | named lambda | `where { fichier -> fichier.ext == "log" }` |
+| `.pj` script meant to be reread and maintained | named lambda | `where { file -> file.ext == "log" }` |
 
 Short rule: **`$_` for one-line filters typed at the keyboard, a named lambda as soon as the expression grows, nests or takes two parameters, a method reference when it is enough.**
 
 - A lambda parameter shadows, in the body of the block, a class with the same name (rare case: name parameters in lowercase).
 - `$a`, `$b` and `$args` (step 5) are **removed**: write a two-parameter lambda instead.
 - **Strict booleans**: wherever a condition is expected (`where`, `filter`, `&&`, `||`, `!`, ternary), the value must be a `boolean`, like a Java `Predicate`. `where { f -> f.name }` is a non-terminating error (`the block must return a boolean, got String …`); write `where { f -> !f.name.isEmpty() }`. `null` is not a boolean.
-- Conversions keep the `[type] valeur` notation: the Java form `(type) valeur` would be ambiguous with `(commande)`.
+- Conversions keep the `[type] value` notation: the Java form `(type) value` would be ambiguous with `(command)`.
 - **Text blocks**: `"""…"""` as in Java (common indentation removed), with interpolation `$x` and `$( … )`.
 
-**FR-34 — Redirections (outside blocks).** `> fichier` (overwrites), `>> fichier` (appends) for the output stream; `2> fichier`, `2>&1` for the error stream. Objects redirected to a file are written in their displayed form.
+**FR-34 — Redirections (outside blocks).** `> file` (overwrites), `>> file` (appends) for the output stream; `2> file`, `2>&1` for the error stream. Objects redirected to a file are written in their displayed form.
 
 ### 3.9 Cmdlets in the current scope
 
-Only **four cmdlets** are in the scope of the first steps: `ls`, `where`, `map` and `env`; the mini-iterations add `collect` (FR-36d), `grep` (FR-64), `cat` (FR-65), `sort` (FR-67), `first`, `last` and `range` (FR-68), `select` (FR-69), `count` and `measure` (FR-70), `group` (FR-71), `join` (FR-78), and the file operations `mkdir`, `touch`, `cp`, `mv`, `rm` (FR-72), the conversions `to-json`, `from-json`, `to-csv`, `from-csv` (FR-73), and the processes `ps`, `kill` (FR-74), and `perf` (FR-76). The first two alone cover the core mechanisms: producing record objects, attribute access, the pipeline, expressions, and mixing with native commands.
+The first steps delivered **four cmdlets**: `ls`, `where`, `map` and `env`; the mini-iterations added `collect` (FR-36d), `grep` (FR-64), `cat` (FR-65), `sort` (FR-67), `first`, `last` and `range` (FR-68), `select` (FR-69), `count` and `measure` (FR-70), `group` (FR-71), `join` (FR-78), and the file operations `mkdir`, `touch`, `cp`, `mv`, `rm` (FR-72), the conversions `to-json`, `from-json`, `to-csv`, `from-csv` (FR-73), and the processes `ps`, `kill` (FR-74), `perf` (FR-76), and `grid` (FR-77) in the optional module `powerj-fx`. The first two alone cover the core mechanisms: producing record objects, attribute access, the pipeline, expressions, and mixing with native commands.
 
 #### FR-35 — `ls`: list files
 
 ```text
-ls [chemin...] [-a|--all] [-r|--recurse] [-f|--filter <motif>] [-d|--dirs] [--files] [-p|--parallel <n>]
+ls [path...] [-a|--all] [-r|--recurse] [-f|--filter <pattern>] [-d|--dirs] [--files] [-p|--parallel <n>]
 ```
 
 | Option | Type | Description |
 |---|---|---|
-| `chemin` (positional, multiple) | `Path` | Folder(s) or file(s) to list; default: current directory. Wildcards accepted (`*.txt`). |
+| `path` (positional, multiple) | `Path` | Folder(s) or file(s) to list; default: current directory. Wildcards accepted (`*.txt`). |
 | `-a`, `--all` | boolean | Includes hidden/system files. |
 | `-r`, `--recurse` | boolean | Walks subfolders. |
 | `-f`, `--filter` | pattern | Keeps only the names matching the pattern (`*.java`). |
@@ -448,14 +448,14 @@ CA:
 #### FR-64 — `grep`: search a regular expression
 
 ```text
-grep <motif> [chemin...] [-r|--recurse] [-p|--parallel <n>] [--max-depth <n>] [-i|--ignore-case]
-     [-v|--invert] [-a|--all] [--encoding <charset>] [--property <nom>] [--binary] [-s|--single-match]
+grep <pattern> [path...] [-r|--recurse] [-p|--parallel <n>] [--max-depth <n>] [-i|--ignore-case]
+     [-v|--invert] [-a|--all] [--encoding <charset>] [--property <name>] [--binary] [-s|--single-match]
 ```
 
 | Option | Type | Description |
 |---|---|---|
-| `motif` (positional, mandatory) | `String` | Regular expression, **`java.util.regex.Pattern`** syntax (`\w`, `(?<nom>…)`, `(?i)`…). Unquoted, the argument is taken as is (`grep class\s+\w+`, FR-32b); in quotes, backslashes are doubled as in Java source (`grep "class (\\w+)"`). |
-| `chemin` (positional, multiple) | `String` | File(s) or folder(s) to search; wildcards on the last element (`*.log`, `src/*.java`). Default: the current directory, unless `grep` receives objects from the pipeline. A folder without `-r` is searched one level deep (its files). |
+| `pattern` (positional, mandatory) | `String` | Regular expression, **`java.util.regex.Pattern`** syntax (`\w`, `(?<name>…)`, `(?i)`…). Unquoted, the argument is taken as is (`grep class\s+\w+`, FR-32b); in quotes, backslashes are doubled as in Java source (`grep "class (\\w+)"`). |
+| `path` (positional, multiple) | `String` | File(s) or folder(s) to search; wildcards on the last element (`*.log`, `src/*.java`). Default: the current directory, unless `grep` receives objects from the pipeline. A folder without `-r` is searched one level deep (its files). |
 | `-r`, `--recurse` | boolean | Walks subfolders. Symbolic links to folders are not followed. |
 | `-p`, `--parallel` | `int` ≥ 1 | Walks the tree and reads up to `n` files at the same time, in **virtual threads**. The order of the files is then free; the lines of a file stay grouped and in order. `1` (default): sequential, files in alphabetical order. |
 | `--max-depth` | `int` ≥ 1 | Maximum depth (`1`: only the files of the folder); implies `-r`. |
@@ -477,7 +477,7 @@ public record GrepMatch(
         @Highlight("matches") String text,   // line without its end-of-line characters
         List<Span> matches,         // position of each match in text (empty with -v)
         List<String> groups,        // groups of the first match: groups[0] = whole match, groups[1]…
-        Map<String, String> named)  // named groups (?<nom>…) of the first match: m.named.nom
+        Map<String, String> named)  // named groups (?<name>…) of the first match: m.named.name
 { }
 ```
 
@@ -487,7 +487,7 @@ The table displays `path line text`; on a terminal that accepts colors, the matc
 - a file (`FileEntry`, `Path`, `java.io.File`) without `--property`: its **content** is searched, output `GrepMatch` (`ls -r --filter *.java | grep TODO`); a folder is walked only with `-r` (otherwise skipped: `ls -r` already emits its files);
 - any other object is **filtered** like `where`: it is emitted unchanged if its text (`toString`, or the value of `--property`) matches (`git log --oneline | grep -i fix`).
 
-With objects in input and no `chemin`, the current directory is not searched. The `chemin` given are searched in any case. In non-interactive mode, a redirected standard input is such an input (FR-04d): `powerj -c "grep TODO . -r"` names the folder explicitly.
+With objects in input and no `path`, the current directory is not searched. The `path` given are searched in any case. In non-interactive mode, a redirected standard input is such an input (FR-04d): `powerj -c "grep TODO . -r"` names the folder explicitly.
 
 **Walk library.** The walk lives in the module **`powerj-fs`** (`io.powerj.fs.FileWalker`), reusable by any cmdlet (`ls -r` uses it; a third-party module can `requires io.powerj.fs`): depth, hidden files, order, parallelism in virtual threads with a bounded number of files open at once, cancellation by Ctrl+C, non-blocking errors. The visitor runs in the worker threads; results and errors are handed over to the cmdlet's thread, which alone calls `emit` / `error`.
 
@@ -505,12 +505,12 @@ CA:
 #### FR-65 — `cat`: read files
 
 ```text
-cat [chemin...] [-l|--lines | -t|--text | -n|--numbered | -c|--content] [--encoding <charset>] [--property <nom>]
+cat [path...] [-l|--lines | -t|--text | -n|--numbered | -c|--content] [--encoding <charset>] [--property <name>]
 ```
 
 | Option | Type | Description |
 |---|---|---|
-| `chemin` (positional, multiple) | `String` | File(s) to read, in the order given; wildcards on the last element (`*.log`, `src/*.java`), matches in alphabetical order. Default: the pipeline objects. |
+| `path` (positional, multiple) | `String` | File(s) to read, in the order given; wildcards on the last element (`*.log`, `src/*.java`), matches in alphabetical order. Default: the pipeline objects. |
 | `-l`, `-t`, `-n`, `-c` | boolean | Shape of the output, see below. **Exclusive**: two of them give the blocking error `only one output at a time among --lines, --text, --numbered, --content`. None: `--lines`. |
 | `--encoding` | charset | Charset of the files; default **UTF-8**, without fallback: a file that is not valid in this charset produces the non-blocking error `cannot read <file>: not readable as UTF-8 text (choose the charset with --encoding)`. |
 | `--property` | name | Property of the pipeline objects that gives the file to read (`String`, `Path` or `File`): `grep TODO -r -s \| cat --property path`. |
@@ -542,12 +542,12 @@ public record CatContent(
 
 **Several files.** They are read one after the other. The line numbers go on: if the first file has 3 lines, the first line of the second file is line 4. With `--text` and `--content`, a single object holds the content of all the files (`CatContent` has no `path`: it can mix several files).
 
-**Pipeline input.** After a `|`, each object received is read **as if it had been given as a `chemin`**, after the `chemin` arguments (numbering and content go on):
+**Pipeline input.** After a `|`, each object received is read **as if it had been given as a `path`**, after the `path` arguments (numbering and content go on):
 - a `String` is a path, relative to the current directory (no wildcards): `"a.txt" | cat`, `git ls-files | cat -n`;
 - a `Path`, a `java.io.File`, or a `FileEntry` (`ls --filter *.txt | cat`) is read; a folder listed by `ls` is skipped;
-- any other object: `--property <nom>` names its property that gives the file (`String`, `Path` or `File`); without `--property`, or if the property is not a file, non-blocking error `not a file: …` and the object is skipped. With `--property`, the property is read on every object.
+- any other object: `--property <name>` names its property that gives the file (`String`, `Path` or `File`); without `--property`, or if the property is not a file, non-blocking error `not a file: …` and the object is skipped. With `--property`, the property is read on every object.
 
-With `--text` and `--content`, the single object is emitted at the end of the pipeline, if at least one file was read. A missing file, a folder given as `chemin`, an unreadable or undecodable file produce a non-blocking error and the reading goes on with the next file. `cat` without `chemin` and without pipeline input is a blocking error `file expected: cat <file>... or ... | cat`.
+With `--text` and `--content`, the single object is emitted at the end of the pipeline, if at least one file was read. A missing file, a folder given as `path`, an unreadable or undecodable file produce a non-blocking error and the reading goes on with the next file. `cat` without `path` and without pipeline input is a blocking error `file expected: cat <file>... or ... | cat`.
 
 CA:
 - `cat a.txt` displays the lines of `a.txt`;
@@ -562,7 +562,7 @@ CA:
 
 ```text
 where { <expression> }
-where <attribut> <opérateur> <valeur>        # short form
+where <attribute> <operator> <value>        # short form
 ```
 
 Evaluates the condition for each received object (lambda parameter, or `$_`) and lets through only those for which it is `true`. Works on records, scalars and therefore on **`String` lines produced by a native command**. The short form `where size > 1mb` is equivalent to `where { $_.size > 1mb }`. The `>` after the first word is a comparison, not a redirection, because `where` declares `@CmdletInfo(comparison = true)` (§4.1); the parser knows no command by name.
@@ -581,7 +581,7 @@ CA:
 
 ```text
 map { <lambda ou expression> }
-map <référence de méthode>
+map <method reference>
 ```
 
 Applies the block to each received object and emits the result, like `Stream.map`: `ls -r | map { f -> f.name + " : " + f.name.length() }`, `ls | map FileEntry::name`. A `null` result emits nothing; a collection result is unrolled (FR-30b), like a `flatMap`. An evaluation error is non-blocking (object skipped).
@@ -613,12 +613,12 @@ CA:
 #### FR-36b — `env`: environment variables
 
 ```text
-env                              # list all variables
-env <NOM>                        # a single variable
-env --set <NOM>=<valeur>         # create or modify (also: env -s NOM=valeur)
-env --unset <NOM>                # remove
-env --append <NOM> <valeur>      # append to a list (separator ; on Windows, : elsewhere)
-env --prepend <NOM> <valeur>     # same, at the head of the list
+env                               # list all variables
+env <NAME>                        # a single variable
+env --set <NAME>=<value>          # create or modify (also: env -s NAME=value)
+env --unset <NAME>                # remove
+env --append <NAME> <value>       # append to a list (separator ; on Windows, : elsewhere)
+env --prepend <NAME> <value>      # same, at the head of the list
 ```
 
 Output: stream of `record EnvVar(String name, String value)`, sorted by name (names case-insensitive on Windows).
@@ -635,12 +635,12 @@ CA:
 #### FR-67 — `sort`: sort objects
 
 ```text
-sort [<clé>...] [-d|--desc] [-i|--ignore-case]
+sort [<key>...] [-d|--desc] [-i|--ignore-case]
 ```
 
 | Option | Short | Type | Description |
 |---|---|---|---|
-| `clé` (position 0, multiple) | — | property, property path or block | Sort keys by priority: ties on a key are broken by the next one. None: the objects themselves. |
+| `key` (position 0, multiple) | — | property, property path or block | Sort keys by priority: ties on a key are broken by the next one. None: the objects themselves. |
 | `--desc` | `-d` | boolean | Descending order, for all keys. |
 | `--ignore-case` | `-i` | boolean | Compares `String` keys ignoring case. |
 
@@ -650,7 +650,7 @@ Output: the received objects, unchanged, in the new order. `sort` emits once its
 
 Comparison of two key values: `null` is smaller than any value (first in ascending order, last with `--desc`, as in PowerShell's `Sort-Object`); numbers by value whatever their class (`3` < `10L` < `10.5`); strings with `compareTo` (or ignoring case with `-i`); other `Comparable`s (dates, `Path`, enums, booleans) with `compareTo`, grouped by class. The order is **total**: values of different kinds are ordered by kind, `null` < numbers (`NaN` last) < strings < other comparables (one group per class, in the order of the class names) < anything else, with a single non-blocking error `cannot compare <type> with <type>: values of different types are sorted by type …`. Objects that are not comparable at all are ordered by their text, with a single error `… these values are sorted by their text`. An error while evaluating a key is non-blocking: the object is left out.
 
-`sort` is a filter without side effect (allowed in preview mode, FR-66). The native `sort` remains available with `^sort` or `native.prefer=sort` (FR-14, FR-16).
+`sort` is a filter without side effect (allowed in preview mode, FR-66). The native `sort` remains available with `^sort` (FR-14).
 
 CA:
 - `ls | sort size --desc` lists the largest files first;
@@ -658,21 +658,21 @@ CA:
 - `ls -r | sort { $_.name.length() } -d`;
 - `(ls)*.name | sort -i` ignores case;
 - `git branch | sort` sorts the lines of a native command;
-- `ls | sort nom-invalide!` is a blocking error; `sort` on mixed strings and numbers reports one error and sorts them by text.
+- `ls | sort invalid-name!` is a blocking error; `sort` on mixed strings and numbers reports one error and sorts them by text.
 
 #### FR-68 — `first`, `last`, `range`: slices of the pipeline
 
 ```text
 first [<n>]                      # the first n objects (default 1)
 last [<n>]                       # the last n objects (default 1)
-range [--from <borne>] [--to <borne>] [--property <nom>] [-i|--ignore-case] [--include|--exclude] [--repeat]
+range [--from <bound>] [--to <bound>] [--property <name>] [-i|--ignore-case] [--include|--exclude] [--repeat]
 ```
 
 `first n` emits the first `n` objects as they arrive, then **stops the previous stage** (FR-68b): `ls -r C:\ | first 3` answers at once. `last n` emits the last `n` objects, in their order, when the input ends. `n` must be ≥ 0.
 
 `range` emits the objects between two bounds, both included by default. Each bound is read as follows:
 
-| Bound | Without `--property` | With `--property <nom>` |
+| Bound | Without `--property` | With `--property <name>` |
 |---|---|---|
 | Integer `5` | Position, from 1: `--from 5` starts at the 5th object, `--to 10` ends at the 10th. | Regular expression searched in the property's text. |
 | Text `Paul` | Blocking error: add `--property` or use a block. | Regular expression searched in the property's text, as with `grep`: `Paul` (contains), `^Peter$` (equals); `-i` ignores case. |
@@ -742,7 +742,7 @@ CA:
 
 ```text
 count
-measure [<clé>]
+measure [<key>]
 ```
 
 `count` emits one number: the objects received (`ls -r | count`). With no input it emits `0`.
@@ -767,7 +767,7 @@ CA:
 #### FR-71 — `group`: group objects by key
 
 ```text
-group [<clé>...] [-n|--no-items]
+group [<key>...] [-n|--no-items]
 ```
 
 Emits one **`Group`** record per distinct key, when the input ends, in the order the keys first appear:
@@ -795,14 +795,14 @@ CA:
 #### FR-72 — `mkdir`, `touch`, `cp`, `mv`, `rm`: file operations
 
 ```text
-mkdir <chemin>... [-p|--parents] [-n|--dry-run]
-touch <chemin>... [-n|--dry-run]
+mkdir <path>... [-p|--parents] [-n|--dry-run]
+touch <path>... [-n|--dry-run]
 cp <source>... <destination> [-r|--recurse] [-f|--force] [-v|--verbose] [-n|--dry-run]
 mv <source>... <destination> [-f|--force] [-v|--verbose] [-n|--dry-run] [--allow-protected]
-rm <chemin>... [-r|--recurse] [-f|--force] [-v|--verbose] [-n|--dry-run] [--allow-protected]
+rm <path>... [-r|--recurse] [-f|--force] [-v|--verbose] [-n|--dry-run] [--allow-protected]
 ```
 
-The paths are arguments (wildcards on the last element: `rm *.tmp`; names are matched **in the case they are written** except on Windows, where file names ignore case: `rm README*` does not remove `readme.md` on Linux or macOS, and `ls readme* | rm` gives the other rule, with the list in plain sight) or the objects received from the pipeline, read as by `cat` (`String`, `Path`, `File`, `FileEntry`, or `--property <nom>`): `ls --filter *.tmp | rm`. For `cp` and `mv`, the last argument is the destination; with several sources, or an existing folder as destination, each source goes into it under its own name (`ls *.txt | cp backup/`).
+The paths are arguments (wildcards on the last element: `rm *.tmp`; names are matched **in the case they are written** except on Windows, where file names ignore case: `rm README*` does not remove `readme.md` on Linux or macOS, and `ls readme* | rm` gives the other rule, with the list in plain sight) or the objects received from the pipeline, read as by `cat` (`String`, `Path`, `File`, `FileEntry`, or `--property <name>`): `ls --filter *.tmp | rm`. For `cp` and `mv`, the last argument is the destination; with several sources, or an existing folder as destination, each source goes into it under its own name (`ls *.txt | cp backup/`).
 
 A **block** `{ … }` instead of a path is evaluated for each object: for `mkdir`, `touch` and `rm`, its result (`String`, `Path`, `File`, `FileEntry`) is the path to create or remove, instead of the object itself (`ls ../src --files | touch { $_.name }` creates the same names in the current folder, without touching the files of `../src`); for `cp` and `mv`, a block as destination gives the destination of each source, its `$_` being the object received or the `FileEntry` of a source argument (`cp *.txt { $_.name + ".bak" }`; a folder result receives the source under its name). A `null` result skips the object without error (`ls | rm { $_.ext == "tmp" ? $_.name : null }`). One block at most, never with `--property`; for `mkdir`, `touch` and `rm` it needs a pipeline input.
 
@@ -816,7 +816,7 @@ A **block** `{ … }` instead of a path is evaluated for each object: for `mkdir
 
 **Protected paths.** `rm`, and `mv` for its sources, refuse a path that is protected or contains a protected path (removing `C:\Users` would remove the home folder), as well as the current folder and its parents: `rm: protected path: C:\Windows (remove it anyway with --allow-protected)`. The list is the file `protected-paths` of the configuration folder (§8): one path per line, `~` for the home folder, `#` for comments; it is read at each execution. The shell creates it at first launch with the defaults of the platform (file-system roots, `~`, the configuration folder, and the system folders: `C:\Windows`, `C:\Program Files`…, or `/etc`, `/usr`…); if it is missing, the same defaults apply. `--allow-protected` lifts the protection for one command. Paths are compared as the file system sees them: the links of the folders above a target are resolved (an alias of `C:\Users` or `/home` is refused as they are, and `alias/..` is the parent of what `alias` points to), a protected entry that is itself a link protects what it points to, and being in a link to a folder is being in it; the link itself may be removed, since removing it removes only the link. This guards against a mistake: the *content* of a protected folder is not protected (`rm /etc/hosts` is allowed), and a path can change between the check and the removal.
 
-The native programs of the same name remain available with `^` or `native.prefer` (FR-14, FR-16).
+The native programs of the same name remain available with `^` (FR-14).
 
 CA:
 - `mkdir -p a/b/c` then `touch a/x.txt` display the created entries;
@@ -832,7 +832,7 @@ CA:
 
 ```text
 cp <source>... <destination> [-r|--recurse] [-p|--parallel <n>] [-f|--force] [-v|--verbose] [-n|--dry-run]
-rm <chemin>... [-r|--recurse] [-p|--parallel <n>] [-f|--force] [-v|--verbose] [-n|--dry-run] [--allow-protected]
+rm <path>... [-r|--recurse] [-p|--parallel <n>] [-f|--force] [-v|--verbose] [-n|--dry-run] [--allow-protected]
 ```
 
 - **Result**: the same as in sequential mode, with the same checks (protected paths, existing targets…) and the same errors.
@@ -859,14 +859,14 @@ CA:
 
 ```text
 to-json [-c|--compact] [-l|--lines] [--depth <n>]
-from-json [--property <nom>]
+from-json [--property <name>]
 to-csv [-d|--delimiter <char>] [--no-header]
-from-csv [-d|--delimiter <char>] [--no-header] [--property <nom>]
+from-csv [-d|--delimiter <char>] [--no-header] [--property <name>]
 ```
 
 No external library: the writers and parsers are part of PowerJ. The four cmdlets change nothing on disk and run in preview (FR-66).
 - **No file name.** To write a file, redirect their text: `ls | select name size | to-json > files.json`.
-- **Pipeline only.** To read one, pipe it: `cat files.json | from-json`. A `String` received is always text, never a file name. With `--property <nom>`, that property of each object received holds the text: `cat files.json -c | from-json --property content`.
+- **Pipeline only.** To read one, pipe it: `cat files.json | from-json`. A `String` received is always text, never a file name. With `--property <name>`, that property of each object received holds the text: `cat files.json -c | from-json --property content`.
 
 **`to-json`** turns the objects received into JSON text.
 - **Output**: by default, one `String` emitted at the end, holding an indented array of all the objects, **always an array**, even for a single object. `--compact` writes it on one line, and `-l`/`--lines` emits one compact `String` per object as they arrive (JSON Lines).
@@ -914,11 +914,11 @@ CA:
 #### FR-74 — `ps`, `kill`: processes
 
 ```text
-ps [nom...] [-u|--user <utilisateur>]
+ps [name...] [-u|--user <user>]
 kill [pid...] [-f|--force] [-w|--wait] [-v|--verbose] [-n|--dry-run]
 ```
 
-Both cmdlets use the JDK (`ProcessHandle`), without native calls, and behave the same on every platform. The native programs remain available with `^ps`, `^kill` or `native.prefer` (FR-14, FR-16).
+Both cmdlets use the JDK (`ProcessHandle`), without native calls, and behave the same on every platform. The native programs remain available with `^ps` and `^kill` (FR-14).
 
 **`ps`** lists the processes, sorted by pid, as `ProcessEntry` objects:
 
@@ -929,7 +929,7 @@ public record ProcessEntry(long pid, Long parent, String name, String command, S
 ```
 
 - **Filters**:
-  - `nom` keeps the processes whose name matches one of the patterns: wildcards, case ignored, `.exe` optional on Windows (`ps notepad`);
+  - `name` keeps the processes whose name matches one of the patterns: wildcards, case ignored, `.exe` optional on Windows (`ps notepad`);
   - `-u` keeps those of a user.
 - **Unknown values**: information the system does not give is `null`. On Windows without administrator rights, this is the case for the command and the user of other users' processes.
 - **Limitations**: the memory and the state of a process are not available from the JDK.
@@ -950,7 +950,7 @@ public record ProcessEntry(long pid, Long parent, String name, String command, S
 CA:
 - `ps | first 5` displays `pid name user cpu start`; `ps java` lists the Java processes, PowerJ included;
 - `ps java | sort cpu --desc | first 3`;
-- a process started for the test: `ps <nom> | kill -n` lists it and leaves it alive; `ps <nom> | kill -w -v` stops it and displays it;
+- a process started for the test: `ps <name> | kill -n` lists it and leaves it alive; `ps <name> | kill -w -v` stops it and displays it;
 - `kill 999999`: `kill: no process 999999`; `kill (ProcessHandle.current().pid())`: `kill: cannot stop PowerJ itself (use exit)`.
 
 #### FR-76 — Perf mode and `perf`: where a pipeline spends its time
@@ -1029,7 +1029,7 @@ Acceptance criteria (CA), checked by `docs/acceptance/fx-grid.md`:
 #### FR-78 — `join`: join objects by key
 
 ```text
-join --right <bloc> [--left <bloc>] (--key <clé> | --left-key <clé> [--right-key <clé>]) [-o|--outer]
+join --right <block> [--left <block>] (--key <key> | --left-key <key> [--right-key <key>]) [-o|--outer]
 ```
 
 Emits one **`Row`** per pair made of a left object and a right object with the same key: a left object that matches three right objects gives three rows.
@@ -1110,10 +1110,11 @@ accessible via `$last`; `$exit` is `$last.exitCode`; `$?` is `true` if the code 
 | *(not set)* or `auto` | Default: output code page of the Windows console (e.g. `cp850` on a French Windows); UTF-8 on Linux/macOS. |
 | a Java charset name (`UTF-8`, `cp850`, `windows-1252`…) | Used for all native commands. |
 
-A program-specific value can be given by **`POWERJ_NATIVE_ENCODING_<NOM>`**, where `<NOM>` is the executable name in uppercase, without extension: `POWERJ_NATIVE_ENCODING_GIT=UTF-8` (git produces UTF-8 whereas `ipconfig` uses the console code page). The variable is set in the Windows environment or in the session with `env --set` (FR-36b), and applies from the next command onward. An invalid charset name produces an explicit error when the command is launched. The native → native stream is never decoded (FR-37).
+A program-specific value can be given by **`POWERJ_NATIVE_ENCODING_<NAME>`**, where `<NAME>` is the executable name in uppercase, without extension: `POWERJ_NATIVE_ENCODING_GIT=UTF-8` (git produces UTF-8 whereas `ipconfig` uses the console code page). The variable is set in the Windows environment or in the session with `env --set` (FR-36b), and applies from the next command onward. An invalid charset name produces an explicit error when the command is launched. The native → native stream is never decoded (FR-37).
 - CA: on a French Windows, `ipconfig | where { $_.contains("Adresse") }` displays accented characters correctly without any configuration; `env --set POWERJ_NATIVE_ENCODING_GIT=UTF-8` then `git log --oneline | where { $_.contains("é") }`.
 
 **FR-40 — Arguments.** Arguments are passed as is after variable and wildcard expansion (wildcard expansion on existing paths, which can be disabled by putting the argument in quotes). On Windows, the command line is built according to the quoting rules of `CommandLineToArgvW`.
+- **Status: partial.** Variables and `~` (FR-62) are expanded; **wildcards are not**: `^ls *.txt` passes `*.txt` to the program as written, so on Linux and macOS, where programs expect the shell to expand, the cmdlets (`ls --filter`, `cat *.txt`) or `sh -c` are the way. The quoting of the Windows command line is `ProcessBuilder`'s.
 
 ### 3.11 Errors
 
@@ -1152,7 +1153,7 @@ PJ> java.time.DayOfWeek.MONDAY
 MONDAY
 ```
 
-**Lexical rule (disambiguation from commands).** In command position, a word of the form `ident(.ident)+` is a **Java expression** if it is **immediately** followed by `(` (no space), or if it denotes a class or a static field of a known class. Otherwise, command resolution (FR-13) applies. Thus `java -version` and `notepad.exe fichier.txt` remain native commands, while `java.lang.Math.max(1, 2)` is a Java call. When in doubt, an expression can always be put in parentheses: `(Math.max(1, 2))`.
+**Lexical rule (disambiguation from commands).** In command position, a word of the form `ident(.ident)+` is a **Java expression** if it is **immediately** followed by `(` (no space), or if it denotes a class or a static field of a known class. Otherwise, command resolution (FR-13) applies. Thus `java -version` and `notepad.exe file.txt` remain native commands, while `java.lang.Math.max(1, 2)` is a Java call. When in doubt, an expression can always be put in parentheses: `(Math.max(1, 2))`.
 
 **FR-47 — Default imports.** The most useful JDK packages are **imported automatically**: their classes can be used directly by their simple name, without `import`.
 
@@ -1179,7 +1180,7 @@ PJ> new BigDecimal("0.1").add(new BigDecimal("0.2"))
 0.3
 ```
 
-**FR-48 — Instantiation.** `new Classe(args)` calls a public constructor: `new java.io.File("C:\\temp")`, `new StringBuilder("ab").reverse()`.
+**FR-48 — Instantiation.** `new Class(args)` calls a public constructor: `new java.io.File("C:\\temp")`, `new StringBuilder("ab").reverse()`.
 
 **FR-49 — Instance calls.** Every value exposes its public methods: `$l.size()`, `"abc".toUpperCase().length()`, `$f[0].path.toFile().length()`, `(ls)[0].modified.atZone(ZoneId.systemDefault()).year`. Properties (FR-28) and calls can be combined freely. A method call can appear anywhere an expression is expected, including inside the `{ }` blocks of `where`.
 
@@ -1273,7 +1274,7 @@ Java code that writes to `System.out` / `System.err` (`System.out.println("x")`)
 
 **FR-59 — Terminal and history always restored.** History is written after each command (FR-09), so an abrupt stop loses nothing. On exit, including on a fatal JVM error or when the window is closed, a shutdown hook restores the terminal to its initial state (raw mode disabled, colors reset).
 
-**FR-60 — Diagnostic log.** Internal errors and warnings are logged to `~/.powerj/logs/powerj.log` (rotation, 5 files maximum), in English whatever the language of the messages (FR-61). `--debug` also displays these details on screen.
+**FR-60 — Diagnostic log.** Internal errors and warnings are logged to `~/.powerj/logs/powerj.<n>.log` (rotation, 5 files maximum), in English whatever the language of the messages (FR-61). `--debug` also displays these details on screen.
 
 ### 3.15 Language (internationalization)
 
@@ -1517,15 +1518,16 @@ Yves   Hello Yves!   2026-10-07 10:12:03
 powerj/                         (parent POM, packaging pom)
 ├── powerj-api/                 Public API for cmdlets (no dependencies)
 ├── powerj-fs/                  File tree walk, sequential or parallel in virtual threads (FR-64)
-├── powerj-core/                Lexer, parser, AST, resolution, evaluator, pipeline,
-│                               object access, Java interop, formatting,
-│                               native execution
-├── powerj-cmdlets/             Built-in cmdlets (ls, grep, where, map, collect, env)
-├── powerj-shell/               JLine REPL, completion, highlighting, main
+├── powerj-core/                Lexer, parser, AST, resolution, evaluator, pipeline, Java interop,
+│                               completion, formatting, native execution, perf mode (by layers, §5.6)
+├── powerj-cmdlets/             The 28 built-in cmdlets (§3.9)
+├── powerj-shell/               Entry point and composition root, JLine REPL, scripts, profile,
+│                               adapters of completion and highlighting
 ├── powerj-fx/                  Optional module, not in the distribution: JavaFX cmdlets (`grid`, FR-77)
+├── powerj-architecture/        Architecture rules (ArchUnit): tests only
 ├── powerj-coverage/            Test coverage of all the modules (JaCoCo report and threshold, NFR-05)
-├── powerj-sample-module/       Sample third-party module (greet)
-└── powerj-dist/                jlink + jpackage → powerj.exe
+├── powerj-dist/                jlink + jpackage → powerj.exe
+└── examples/greet/             Example third-party module (greet), not shipped
 ```
 
 All modules are **JPMS modules** (`module-info.java`).
@@ -1535,7 +1537,7 @@ All modules are **JPMS modules** (`module-info.java`).
 ```text
 input line
   → Lexer         (sealed interface Token, records)
-  → Parser        (AST: sealed interface Node, records)
+  → Parser        (AST: sealed hierarchy `Ast`, records)
   → Resolution    (cmdlet / native / built-in, option binding)
   → Pipeline      (one stage = one virtual thread, bounded queues between stages)
   → Formatting    (table / list) → terminal
@@ -1555,14 +1557,14 @@ input line
 - **Argument conversion**: conversion table (FR-50) expressed as a `switch` on types; overload selection by specificity score.
 - **Lambdas and method references → functional interfaces**: implementation via `java.lang.reflect.Proxy` of the single abstract method (`default` methods delegated through `InvocationHandler.invokeDefault`); lambda parameters (or `$_`) bound by `ScopedValue` on each call.
 - **Unrolling** (FR-30b): applied to the output of each stage by the pipeline executor.
-- **Interceptions** (FR-58): table of redirected or refused methods (`System.exit`, `Runtime.halt`, `System.setOut`…), consulted when resolving a call; cancellation token check (FR-57) on each block invocation.
+- **Interceptions** (FR-58): `CallPolicy` decides what happens to `System.exit`, `Runtime.exit`/`halt` (an exit request of the session) and `System.setOut`/`setErr`/`setIn` (refused); `JavaInvoker` asks it for every Java call, however it was written (direct call, method reference, lambda, `Method.invoke`). A guard against accidents, not a sandbox. Cancellation check (FR-57) on each block invocation.
 
 ### 5.5 Dependencies
 
 | Library | Usage |
 |---|---|
-| JLine 3 | Terminal, line editing, history, completion, highlighting (native Windows terminal via FFM) |
-| JUnit 5, AssertJ | Tests |
+| JLine 4 | Terminal, line editing, history, completion, highlighting (native Windows terminal via FFM): the only runtime dependency |
+| JUnit 5, AssertJ, ArchUnit | Tests |
 
 Any new dependency must be justified and approved.
 
@@ -1575,20 +1577,18 @@ Java's new features are used **where they bring a concrete benefit**:
 | Feature | Usage in PowerJ |
 |---|---|
 | **Records** | Output objects (`FileEntry`, `NativeRun`), cmdlet parameters, tokens, AST nodes, history entries. Validation in compact constructors. |
-| **Sealed interfaces** | Closed hierarchies: `Token`, `Node` (AST), `Resolved` (`CmdletCall` / `NativeCall` / `Builtin`), `Value`. The compiler guarantees exhaustive handling. |
+| **Sealed interfaces** | Closed hierarchies: `Token`, `Ast`, `Resolved` (`BuiltinCall` / `CmdletCall` / `NativeCall` / `Unknown`), `Outcome`, `TypeInfo`. The compiler guarantees exhaustive handling. |
 | **Pattern matching `switch` + record patterns + `_`** | Expression evaluator, formatter, completion engine: `case BinaryOp(var l, Op.GT, var r) -> …`, `case FileEntry(var name, _, _, _, true, _) -> …`. |
 | **Virtual threads** | One pipeline stage = one virtual thread; reading the stdout/stderr streams of native processes. |
-| **Structured Concurrency** | Pipeline lifecycle: global cancellation on Ctrl+C or blocking error — as soon as the API is final (in the meantime: cascading cancellation through the queues, §5.3). |
 | **Scoped Values** | Immutable session context per execution, instead of `ThreadLocal`. |
-| **Stream Gatherers** | Custom stream operations in the pipeline (windowing, `first`/`last`, deduplication — useful as soon as the backlog cmdlets arrive). |
 | **FFM API** | Windows console access (via JLine); reading the PE header to detect GUI applications, without JNI. |
 | **Sequenced Collections** | History (`getFirst`/`getLast`/`reversed`), ordered columns. |
 | **Reflection, `Proxy`, `ClassValue`** | Java interoperability: method/constructor calls with per-type cache, conversion of `{ }` blocks into functional interfaces (`MethodHandles`: possible optimization later). |
 | **`ClassValue`** | Cache of member metadata per type, without classloader leaks (third-party modules). |
-| **Module import declarations, flexible constructors** | Code readability. |
-| **Primitive patterns** | In the evaluator for numeric comparisons, once finalized (still in preview in JDK 25). |
 
-**Rule:** a feature still in *preview* in JDK 25 is enabled (`--enable-preview`) only after PM approval. The list above is rechecked against the JEPs actually delivered in JDK 25 at the start of step 0.
+**Considered and not used:** Structured Concurrency (preview in JDK 25; the cascading cancellation through the queues, §5.3, does the job), Stream Gatherers, module import declarations, flexible constructors, primitive patterns.
+
+**Rule:** a feature still in *preview* in JDK 25 is enabled (`--enable-preview`) only after PM approval; none is.
 
 ---
 
@@ -1598,10 +1598,10 @@ Java's new features are used **where they bring a concrete benefit**:
 - `mvn verify`: compilation, tests, coverage (JaCoCo): each module records its tests, and `powerj-coverage` merges them, writes the report (`powerj-coverage/target/site/jacoco-aggregate/`) and fails the build below the NFR-05 threshold; `-Djacoco.skip=true` turns it off.
 - `powerj-dist` module:
   1. **jlink**: Java runtime containing **all the `java.se` modules** (required so that the whole standard API can be called, §3.13), without the development tools (`--strip-debug --no-header-files --no-man-pages`);
-  2. **jpackage `--type app-image`** then **`--type exe`** (WiX Toolset): `powerj.exe` + installer with icon, addition to the `PATH`, Start menu entry, console mode (`--win-console`).
+  2. **jpackage `--type app-image`** then **`--type exe`** (WiX Toolset): `powerj.exe` + installer (per user, with a folder chooser), Start menu entry and desktop shortcut, console mode (`--win-console`). The installer does not add PowerJ to the `PATH`.
 - **GitHub Actions CI**:
-  - `build` job (Linux): `mvn verify` on every push and PR;
-  - `package-windows` job (`windows-latest`): produces the installer and the portable `powerj/` folder as **downloadable artifacts** on every push to a release branch.
+  - `Build and tests (Linux)`: `mvn -Pdist verify`, then the smoke tests of the packaged launcher (`ci/smoke/*.sh`, the graphical one under Xvfb), on every push to `main` and every pull request;
+  - `Exe and installer (Windows)` (`windows-latest`): the same build, the smoke tests of `powerj.exe`, and the installer and the portable `powerj/` folder as **downloadable artifacts**.
 - `powerj-fx` is built with the others (`mvn verify`) and produces `powerj-fx/target/powerj-fx-<version>-<platform>.zip`, kept as an artifact of the CI on Linux and on Windows; it is not part of the application image, which stays free of JavaFX (FR-77).
 - Linux/macOS launchers (`jpackage --type app-image`) as a bonus, non-blocking.
 
@@ -1615,7 +1615,7 @@ User folder `~/.powerj/` (created on first launch):
 |---|---|
 | `history` | Command history (FR-09). |
 | `modules/` | Third-party module jars (§4.4). |
-| `config.properties` | `history.size=10000`, `language=en` (or `fr`, FR-61), `native.prefer=find,sort`, `colors.cmdlet=green`, `modules.nativeAccess.<module>=true` (consent to load a module that uses native code, §4.4)… Java properties syntax (a backslash in a value is written twice); a file that cannot be read is reported on the standard error at startup and the default settings apply. |
+| `config.properties` | `history.size=10000`, `language=en` (or `fr`, FR-61), `modules.nativeAccess.<module>=true` (consent to load a module that uses native code, §4.4)… Java properties syntax (a backslash in a value is written twice); a file that cannot be read is reported on the standard error at startup and the default settings apply. |
 | `logs/` | Diagnostic log, in English (FR-60). |
 | `protected-paths` | Paths that `rm` and `mv` refuse to remove (FR-72): one per line, `~` for the home folder, `#` for comments; created at first launch with the defaults of the platform. |
 | `fx-grid.properties` | Position and size of the window of `grid` (`x`, `y`, `width`, `height`), written when the window is closed (FR-77). |
@@ -1627,7 +1627,7 @@ Environment variables read by PowerJ:
 |---|---|
 | `POWERJ_HOME` | Location of the configuration folder (default `~/.powerj`). |
 | `POWERJ_NATIVE_ENCODING` | Encoding of native commands (FR-40b). |
-| `POWERJ_NATIVE_ENCODING_<NOM>` | Encoding for a specific executable (FR-40b). |
+| `POWERJ_NATIVE_ENCODING_<NAME>` | Encoding for a specific executable (FR-40b). |
 | `POWERJ_LANG` | Language of the messages, `en` or `fr` (FR-61); takes precedence over the `language` key of `config.properties`, and is overridden by the system property `-Dpowerj.language`. |
 
 ---
@@ -1638,7 +1638,7 @@ Environment variables read by PowerJ:
 |---|---|
 | NFR-01 | Startup time: no requirement in v1 (a few seconds is acceptable). Optimization (JDK AOT cache, background class indexing) is planned for a later phase. |
 | NFR-02 | Imperceptible typing latency; completion < 50 ms. |
-| NFR-03 | Windows 10/11 x64 first; UTF-8 end to end (console in code page 65001). |
+| NFR-03 | Windows 10/11 x64 and Linux x64 are the tested platforms (the CI builds and runs both on every push); UTF-8 end to end (console in code page 65001). |
 | NFR-04 | `ls -r` on 100,000 files without running out of memory (streaming). |
 | NFR-05 | Test coverage ≥ 80% of the lines and of the branches, for PowerJ as a whole and for the built-in cmdlets (`io.powerj.cmdlets`), on Linux and on Windows; checked by `mvn verify` (JaCoCo, `powerj-coverage` module). |
 | NFR-06 | No raw Java exception displayed to the user outside debug mode. |
@@ -1764,7 +1764,7 @@ Each step:
 
 Delivered with step 5 (same PR, same exe).
 
-**Content:** FR-33b (lambdas `f ->` and `(a, b) ->`, lambdas without braces in Java calls, method references `Classe::méthode`, `$x::méthode`, `Classe::new`, text blocks `"""…"""`), strict booleans (`where`, `&&`, `||`, `!`, ternary), removal of `$a` / `$b` / `$args`, `map` cmdlet (FR-36c). Update of acceptance tests 4 and 5 and of the specification examples.
+**Content:** FR-33b (lambdas `f ->` and `(a, b) ->`, lambdas without braces in Java calls, method references `Class::method`, `$x::method`, `Class::new`, text blocks `"""…"""`), strict booleans (`where`, `&&`, `||`, `!`, ternary), removal of `$a` / `$b` / `$args`, `map` cmdlet (FR-36c). Update of acceptance tests 4 and 5 and of the specification examples.
 
 **Acceptance test:**
 1. `ls -r | where { f -> f.size > 1mb && !f.dir }`.
@@ -1841,50 +1841,50 @@ Version 2 will introduce scripting (`if`, `foreach`, functions, `.pj` files).
 ### 12.1 Grammar (EBNF, v1)
 
 ```ebnf
-script        = ligne { ( ";" | "&&" | "||" | "&" ) ligne } [ ";" | "&" ] ;   (* "&": background, FR-75 *)
-ligne         = import | [ affectation | pipeline ] [ redirection* ] ;
-import        = "import" nom_qualifie [ ".*" ] ;
-affectation   = variable "=" pipeline ;
-pipeline      = etape { "|" etape } ;
-etape         = expr_java | commande | "(" pipeline ")" ;
-(* expr_java is tried first: nom_qualifie directly followed by "(", "new",
+script            = line { ( ";" | "&&" | "||" | "&" ) line } [ ";" | "&" ] ;   (* "&": background, FR-75 *)
+line              = import | [ assignment | pipeline ] [ redirection* ] ;
+import            = "import" qualified_name [ ".*" ] ;
+assignment        = variable "=" pipeline ;
+pipeline          = stage { "|" stage } ;
+stage             = java_expression | command | "(" pipeline ")" ;
+(* java_expression is tried first: qualified_name directly followed by "(", "new",
    cast, or a name designating a known class/static field (FR-46) *)
-expr_java     = postfixe ;
-commande      = [ "^" ] nom { argument } ;
-argument      = option | valeur | bloc ;
-option        = "-" lettre { lettre } | "--" ident [ "=" valeur ] | "--" ;
-valeur        = chaine | nombre | unite | variable_acces | liste | mot ;
-bloc          = "{" ( lambda | expression ) "}" ;
-lambda        = params "->" expression ;                 (* FR-33b *)
-params        = ident | "(" [ ident { "," ident } ] ")" ;
-redirection   = ( ">" | ">>" | "2>" | "2>>" ) chemin | "2>&1" ;
+java_expression   = postfix ;
+command           = [ "^" ] name { argument } ;
+argument          = option | value | block ;
+option            = "-" letter { letter } | "--" ident [ "=" value ] | "--" ;
+value             = string | number | unit | variable_access | list | word ;
+block             = "{" ( lambda | expression ) "}" ;
+lambda            = params "->" expression ;                 (* FR-33b *)
+params            = ident | "(" [ ident { "," ident } ] ")" ;
+redirection       = ( ">" | ">>" | "2>" | "2>>" ) path | "2>&1" ;
 
-expression    = ou [ "?" expression ":" expression ] ;
-ou            = et { "||" et } ;
-et            = egalite { "&&" egalite } ;
-egalite       = comparaison [ ( "==" | "!=" ) comparaison ] ;
-comparaison   = somme [ ( "<" | "<=" | ">" | ">=" ) somme ] ;
-somme         = produit { ( "+" | "-" ) produit } ;
-produit       = unaire { ( "*" | "/" | "%" ) unaire } ;
-unaire        = [ "-" | "!" ] [ cast ] postfixe ;
-cast          = "[" nom_qualifie "]" ;
-postfixe      = primaire { "." ident [ arguments ] | "*." ident [ arguments ] | "::" ident | "[" expression "]" } ;   (* "*.": each element *)
-arguments     = "(" [ arg_java { "," arg_java } ] ")" ;   (* no space before "(" *)
-arg_java      = lambda | expression | bloc ;              (* lambda, block, ref_methode → functional interface *)
-primaire      = litteral | variable | "(" pipeline ")" | liste | ref_methode
-              | "new" nom_qualifie arguments
-              | nom_qualifie [ arguments ] ;              (* class, static field or static method *)
-nom_qualifie  = ident { "." ident } ;
-ref_methode   = ( nom_qualifie | variable ) "::" ( ident | "new" ) ;
-variable_acces= postfixe ;
-variable      = "$" ( ident | "_" | "?" ) ;
-liste         = "[" [ expression { "," expression } ] "]" ;
-litteral      = chaine | caractere | nombre | unite | "true" | "false" | "null" | "now" ;
-unite         = nombre ( "b" | "kb" | "mb" | "gb" | "tb" | "s" | "m" | "h" | "d" ) ;
-chaine        = '"' { car | echappement | "$" ident | "$(" pipeline ")" } '"' | bloc_texte ;
-echappement   = "\\" ( "\\" | '"' | "n" | "t" | "r" | "$" | "u" hex hex hex hex ) ;
-caractere     = "'" ( car | echappement ) "'" ;
-mot           = { car_sans_espace } ;   (* unquoted argument: taken as is, literal "\" *)
+expression        = or_expression [ "?" expression ":" expression ] ;
+or_expression     = and_expression { "||" and_expression } ;
+and_expression    = equality { "&&" equality } ;
+equality          = comparison [ ( "==" | "!=" ) comparison ] ;
+comparison        = sum [ ( "<" | "<=" | ">" | ">=" ) sum ] ;
+sum               = product { ( "+" | "-" ) product } ;
+product           = unary { ( "*" | "/" | "%" ) unary } ;
+unary             = [ "-" | "!" ] [ cast ] postfix ;
+cast              = "[" qualified_name "]" ;
+postfix           = primary { "." ident [ arguments ] | "*." ident [ arguments ] | "::" ident | "[" expression "]" } ;   (* "*.": each element *)
+arguments         = "(" [ java_argument { "," java_argument } ] ")" ;   (* no space before "(" *)
+java_argument     = lambda | expression | block ;              (* lambda, block, method_reference → functional interface *)
+primary           = literal | variable | "(" pipeline ")" | list | method_reference
+                    | "new" qualified_name arguments
+                    | qualified_name [ arguments ] ;              (* class, static field or static method *)
+qualified_name    = ident { "." ident } ;
+method_reference  = ( qualified_name | variable ) "::" ( ident | "new" ) ;
+variable_access   = postfix ;
+variable          = "$" ( ident | "_" | "?" ) ;
+list              = "[" [ expression { "," expression } ] "]" ;
+literal           = string | character | number | unit | "true" | "false" | "null" | "now" ;
+unit              = number ( "b" | "kb" | "mb" | "gb" | "tb" | "s" | "m" | "h" | "d" ) ;
+string            = '"' { char | escape | "$" ident | "$(" pipeline ")" } '"' | text_block ;
+escape            = "\\" ( "\\" | '"' | "n" | "t" | "r" | "$" | "u" hex hex hex hex ) ;
+character         = "'" ( char | escape ) "'" ;
+word              = { non_blank_char } ;   (* unquoted argument: taken as is, literal "\" *)
 ```
 
 ### 12.2 Sample sessions (scope: `ls` + `where` + native commands)
@@ -1907,7 +1907,7 @@ PJ C:\dev> (ls)*.name.stream().map({ $_.toUpperCase() }).sorted().toList()
 | Cmdlet | Description | Planned output record |
 |---|---|---|
 | ~~`cat`~~ | Read files — **done** (FR-65) | `String`, `CatLine`, `CatContent` |
-| `find` | Advanced search (`--name --since --size --type`) | `FileEntry` |
+| ~~`find`~~ | Advanced search — **cancelled** (`ls -r --filter`, `where` and `^find` cover it) | `FileEntry` |
 | ~~`cp`, `mv`, `rm`, `mkdir`, `touch`~~ | File operations — **done** (FR-72) | `FileEntry`, `FileOperation` |
 | ~~`ps`, `kill`~~ | Processes — **done** (FR-74) | `ProcessEntry` |
 | ~~`select`~~ | Attribute projection — **done** (FR-69); `--expand` not done | `Row` |
@@ -1918,12 +1918,12 @@ PJ C:\dev> (ls)*.name.stream().map({ $_.toUpperCase() }).sorted().toList()
 | ~~`group`~~ | Grouping — **done** (FR-71) | `Group` |
 | ~~`join`~~ | Join of two sources by key — **done** (FR-78) | `Row` |
 | ~~`count`, `measure`~~ | Aggregates (count, sum, average, min, max) — **done** (FR-70) | `Long`, `Row` |
-| `uniq` | Deduplication | unchanged |
+| ~~`uniq`~~ | Deduplication — **cancelled** (`group` covers it) | unchanged |
 | `tee` | Copy into a variable | unchanged |
 | `table`, `tree` | Display formats | — |
 | ~~`from-json`, `to-json`, `from-csv`, `to-csv`~~ | Conversions — **done** (FR-73) | `Row` / `String` |
 | `http`, `ping` | Network | `HttpResponse`, `PingResult` |
-| `env` | Environment variables | `EnvVar` |
+| ~~`env`~~ | Environment variables — **done** (FR-36b) | `EnvVar` |
 | `open` | Open with the associated application | — |
 | ~~`grid`~~ | Table window with sort, filter and selection (`Out-GridView`) — **done**, optional module `powerj-fx` (FR-77) | unchanged with `--pass-thru` |
 

@@ -23,7 +23,7 @@ import io.powerj.core.error.PjException;
 import io.powerj.core.i18n.Messages;
 
 /**
- * Java calls from the shell (specification FR-48 to FR-50, FR-53): instance and static methods,
+ * Java calls from the shell (specification FR-48 to FR-50, FR-53): instance calls (FR-49) and static methods,
  * constructors. Among the applicable overloads (with varargs), the one requiring the cheapest
  * conversions is chosen, then the most specific; a remaining tie is an ambiguity.
  */

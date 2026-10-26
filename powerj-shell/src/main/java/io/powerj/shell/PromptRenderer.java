@@ -6,7 +6,7 @@ import org.jline.utils.AttributedStyle;
 
 import io.powerj.core.runtime.Session;
 
-/** {@code PJ <dir>> }, {@code PJ? <dir>> } in preview mode (FR-66), {@code PJ% <dir>> } in perf mode (FR-76). */
+/** The prompt (FR-01): {@code PJ <dir>> }, {@code PJ? <dir>> } in preview mode (FR-66), {@code PJ% <dir>> } in perf mode (FR-76). */
 final class PromptRenderer {
 
     private final Session session;

@@ -180,6 +180,15 @@ structures, functions) can be built on it. The work is organised in phases (revi
   how to add a cmdlet), [SECURITY.md](SECURITY.md) (what is a guard-rail and what is trusted, how to report),
   [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (modules, layers, how a line runs, which test keeps each rule) and
   [docs/adr/](docs/adr/) (the decisions behind the structure).
+- **The specification says what the code does** (C-35): the cmdlet count, the module list, JLine 4, the log file name, the
+  CI jobs, the Java features that are used and those that are not, the installer (it does not add PowerJ to the `PATH`),
+  the grammar and the synopses in English. **FR-16 (`native.prefer`) and `colors.cmdlet` are withdrawn**: they were
+  specified, cited as escape hatches, and never built; `^name` is the way to a native program. **FR-40 is marked
+  partial**: wildcards in the arguments of a native program are not expanded.
+- **`SpecificationTraceabilityTest`**: every requirement of the specification is cited by the code, a test or a smoke
+  script (unless it is marked withdrawn), nothing cites a requirement that does not exist, and the specification only
+  mentions requirements it defines. Twelve requirements that nothing cited now are, `FR-04e` (a name the specification
+  never had) became FR-34, and `CmdletNamesTest` checks the naming rule FR-12.
 - **English names** for the acceptance sheets: `docs/recettes/etape-N.md` is now `docs/acceptance/step-N.md`; the failure
   messages of the CI and the description of the project are in English too (C-36).
 

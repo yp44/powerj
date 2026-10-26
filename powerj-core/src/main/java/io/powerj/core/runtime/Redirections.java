@@ -15,7 +15,7 @@ import io.powerj.core.lang.RedirectedStream;
 
 /**
  * The files of a statement's redirections: {@code >} / {@code >>} for the values, {@code 2>} / {@code 2>>} for the
- * errors (FR-04e). Each is empty when the statement does not redirect that stream.
+ * errors (FR-34). Each is empty when the statement does not redirect that stream.
  *
  * @param out file that receives the values of the last stage
  * @param err file that receives the errors of every stage

@@ -12,7 +12,10 @@ import org.jline.reader.impl.history.DefaultHistory;
 import org.jline.terminal.Terminal;
 import org.jline.utils.InfoCmp.Capability;
 
-/** Builds the JLine line reader configured for PowerJ (specification §3.2 and §3.3). */
+/**
+ * Builds the JLine line reader configured for PowerJ (specification §3.2 and §3.3): Emacs editing (FR-05), history
+ * navigation (FR-06) and the incremental reverse search of Ctrl+R (FR-07).
+ */
 final class ShellReader {
 
     static final String CONTINUATION_PROMPT = ">> ";

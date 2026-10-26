@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# The session of a user, through the standard input of the launcher: the exit code of the last native command is the
-# exit code of the shell.
+# The session of a user, through the standard input of the launcher (the session examples of FR-55): the exit code of
+# the last native command is the exit code of the shell.
 . "$(dirname "$0")/common.sh"
 
 cat > "$WORK/smoke.txt" <<'SCRIPT'

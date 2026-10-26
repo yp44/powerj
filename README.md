@@ -210,7 +210,7 @@ Messages, help, completion and errors in **English or French**; commands and opt
 
 The image is produced in `powerj-dist/target/jpackage/powerj/` (launcher `bin/powerj` on Linux/macOS, `powerj.exe` on Windows), with a zip archive in `powerj-dist/target/`. It embeds its own Java runtime containing all the `java.se` modules: nothing else needs to be installed on the target machine.
 
-Optionally, on Windows, an `.exe` installer (adds PowerJ to the `PATH` and the Start menu) is built with `mvnw.cmd -Pdist,installer verify` and requires [WiX](https://wixtoolset.org/) (`dotnet tool install --global wix --version 5.0.2`). The GitHub Actions CI builds and smoke-tests the launcher on every push, and produces the Windows installer as a downloadable artifact.
+Optionally, on Windows, an `.exe` installer (per user, with a Start menu entry and a desktop shortcut; it does not add PowerJ to the `PATH`) is built with `mvnw.cmd -Pdist,installer verify` and requires [WiX](https://wixtoolset.org/) (`dotnet tool install --global wix --version 5.0.2`). The GitHub Actions CI builds and smoke-tests the launcher on every push, and produces the Windows installer as a downloadable artifact.
 
 ### Run
 
@@ -275,7 +275,7 @@ set POWERJ_LANG=en                      # Windows (cmd.exe), before launching po
 
 ### Modules
 
-All modules are JPMS modules (`module-info.java`); the only runtime dependency is [JLine 3](https://github.com/jline/jline3) (the optional `powerj-fx` module also needs JavaFX).
+All modules are JPMS modules (`module-info.java`); the only runtime dependency is [JLine 4](https://github.com/jline/jline3) (the optional `powerj-fx` module also needs JavaFX).
 
 | Module | Role |
 |---|---|
@@ -313,7 +313,7 @@ The whole line runs under the `Supervisor`, which catches any `Throwable` and ha
 
 ### The shell
 
-`Main` resolves the configuration folder, the language and the mode: no argument starts the `Repl`, `-c` or a file starts `ScriptMode`. The `Repl` reads lines with JLine (history, Ctrl+R, editing), expands `!!`/`!n` (`HistoryExpander`), runs the profile on startup, and routes Ctrl+C to `Supervisor.cancel()` so that a command is interrupted without leaving the shell.
+`Main` is one call to `ShellBootstrap`, the composition root: it reads the arguments, resolves the configuration folder and the language, builds the `Session`, and starts an interactive run (no argument) or a script run (`-c`, a file, or standard input). The `Repl` is the read loop: it reads lines with JLine (history, Ctrl+R, editing), expands `!!`/`!n` (`HistoryExpander`), runs the profile on startup, and routes Ctrl+C to `Supervisor.cancel()` so that a command is interrupted without leaving the shell. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) has the whole picture.
 
 ### Parsing
 
@@ -407,7 +407,7 @@ The v1 cmdlet roadmap is done ([roadmap](docs/plans/cmdlet-roadmap.md), end-to-e
 - [Contributing](CONTRIBUTING.md): building, the gates of `verify`, how we work, the language policy, adding a cmdlet. [Security policy](SECURITY.md).
 - [Acceptance checklists](docs/acceptance/) for each development step, and [plans](docs/plans/) of the latest iterations.
 - [Example module `greet`](examples/greet/README.md).
-- [Architecture review](docs/REVUE-ARCHITECTURE.md) (in French): strengths, findings, target organization, design patterns and a phased refactoring plan; Phase 0 (the safety net) is done, see its §11. [Changelog](CHANGELOG.md).
+- [Architecture review](docs/REVUE-ARCHITECTURE.md) (in French): strengths, findings, target organization, design patterns and a phased refactoring plan; Phases 0 to 4 are done, see its §11 to §15. [Changelog](CHANGELOG.md).
 - [Module `powerj-fx` and `grid`](docs/plans/fx-grid.md): plan, decisions and [acceptance checklist](docs/acceptance/fx-grid.md).
 
 Coming from PowerShell? A few equivalences (full table in [§12.4](docs/SPECIFICATION.md#124-powershell--powerj-mapping)):

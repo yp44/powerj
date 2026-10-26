@@ -14,7 +14,7 @@ import io.powerj.core.i18n.Messages;
 import io.powerj.core.nativeexec.Platform;
 
 /**
- * Built-in commands: {@code cd}, {@code pwd}, {@code exit} (specification FR-04, FR-04b), {@code which} (FR-13),
+ * Built-in commands: {@code cd}, {@code pwd}, {@code exit} (specification FR-04, FR-04b), {@code which} (FR-13, FR-15),
  * {@code import} (FR-47) and {@code mod-load}, {@code mod-list} (FR-77). The last three need a part of the
  * interpreter; they are built from it.
  */
@@ -65,7 +65,7 @@ public final class Builtins {
         return List.of();
     }
 
-    /** {@code which name…}: what each name stands for, as execution would resolve it (FR-13). */
+    /** {@code which name…}: what each name stands for, as execution would resolve it (FR-13, FR-15). */
     public static Builtin which(Supplier<CommandResolution> resolution) {
         return (names, session) -> {
             if (names.isEmpty()) {

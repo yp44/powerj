@@ -17,7 +17,8 @@ import io.powerj.core.java.PreviewGuard;
 
 /**
  * Where the errors of a line go: the terminal, the file of a {@code 2>} redirection, or the preview that collects them
- * (FR-66). It also remembers whether the line hit a blocking error, which stops a script (FR-04d).
+ * (FR-66). It also remembers whether the line hit a blocking error, which stops a script (FR-04d): of the two
+ * categories of errors (FR-41), a non-blocking one is reported and the pipeline goes on, a blocking one stops it.
  */
 final class ErrorReporter {
 

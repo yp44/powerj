@@ -102,7 +102,7 @@ public final class Repl {
     }
 
     private int loop(BuildInfo buildInfo) {
-        out.println(buildInfo.banner());
+        out.println(buildInfo.banner()); // the banner, then the prompt (FR-01)
         moduleWarnings.forEach(errors::print);
         out.flush();
         profileRunner.run(profile, runProfile);

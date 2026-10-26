@@ -2,7 +2,7 @@ package io.powerj.core.runtime;
 
 /**
  * Keyboard input of the shell's console, suspended while a native program reads the console directly
- * (vim, ssh, python…): otherwise the line editor's background reading thread (JLine, permanent under
+ * (vim, ssh, python…; FR-39b): otherwise the line editor's background reading thread (JLine, permanent under
  * Windows) would steal some of the keys typed for the program.
  */
 public interface ConsoleInput {
