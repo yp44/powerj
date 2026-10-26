@@ -58,6 +58,11 @@ repository: one issue per gap or decision, each with a *Context*, a *To do*, a *
 there before starting something, and open an issue (or comment on the existing one) rather than adding a `TODO`
 to the code or a line to a document.
 
+- A new issue starts from one of the templates in [.github/ISSUE_TEMPLATE/](.github/ISSUE_TEMPLATE/): *Bug report*
+  (a form: the line, the output, `powerj --version`, the system), *Feature or change*, *Decision needed* (options and a
+  recommendation, for what waits for the maintainer) and *Task or technical debt*. The last three have the shape of the
+  existing issues: Context, To do or Proposal or Options, Done when, References. A security problem is not an issue: see
+  [SECURITY.md](SECURITY.md).
 - Labels say what kind of work it is (`decision` and `maintainer-action` need the maintainer; `release`, `security`,
   `ci`, `fx`, `cmdlet`, `spec`, `tech-debt`, `performance`, `quality`, `accessibility`, `epic`, `v2`…).
 - Work on an issue in a commit or a pull request that says `Refs #nn`; the one that finishes it says `Fixes #nn`.
