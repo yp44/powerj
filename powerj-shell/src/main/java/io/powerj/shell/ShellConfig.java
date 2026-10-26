@@ -1,10 +1,6 @@
 package io.powerj.shell;
 
 import java.io.IOException;
-import java.io.Reader;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.Properties;
 import java.util.function.Consumer;
@@ -50,12 +46,10 @@ public record ShellConfig(int historySize, String language) {
      *             is not known yet: it is read from this file)
      */
     public static ShellConfig load(Path file, Consumer<String> warn) {
-        var props = new Properties();
-        try (Reader in = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
-            props.load(in);
-        } catch (NoSuchFileException _) {
-            return defaults();
-        } catch (IOException | IllegalArgumentException e) {
+        Properties props;
+        try {
+            props = new ConfigFile(file).read();
+        } catch (IOException e) {
             LOG.log(Level.WARNING, "Cannot read " + file + ", using default settings", e);
             warn.accept(Messages.get("config.unusable", file, e.getMessage()));
             return defaults();

@@ -123,4 +123,41 @@ class ConfigFileTest {
         assertThat(ConfigFile.keyOf("   ")).isNull();
         assertThat(ConfigFile.keyOf("")).isNull();
     }
+
+    /** Two settings recorded at the same time (two consents, two instances) must both be there afterwards. */
+    @Test
+    void settingsRecordedAtTheSameTimeAreAllKept() throws Exception {
+        int writers = 12;
+        var barrier = new java.util.concurrent.CyclicBarrier(writers);
+        var failures = new java.util.concurrent.ConcurrentLinkedQueue<Throwable>();
+        var threads = new java.util.ArrayList<Thread>();
+        for (int i = 0; i < writers; i++) {
+            int n = i;
+            threads.add(Thread.ofPlatform().start(() -> {
+                try {
+                    var own = config(); // an instance of its own, as two parts of the shell have
+                    barrier.await();
+                    own.set("key" + n, "value" + n);
+                } catch (Throwable t) {
+                    failures.add(t);
+                }
+            }));
+        }
+        for (Thread thread : threads) {
+            thread.join();
+        }
+
+        assertThat(failures).isEmpty();
+        for (int i = 0; i < writers; i++) {
+            assertThat(config().get("key" + i)).as("key" + i).contains("value" + i);
+        }
+    }
+
+    @Test
+    void theWholeFileCanBeRead() throws IOException {
+        Files.writeString(tmp.resolve("config.properties"), "a=1\nb = two\n");
+
+        assertThat(config().read()).containsEntry("a", "1").containsEntry("b", "two").hasSize(2);
+        assertThat(new ConfigFile(tmp.resolve("absent")).read()).isEmpty();
+    }
 }

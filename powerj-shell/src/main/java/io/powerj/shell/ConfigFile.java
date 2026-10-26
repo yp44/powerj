@@ -18,6 +18,9 @@ import java.util.Properties;
  */
 final class ConfigFile {
 
+    /** One lock for every instance: two of them on the same file are as likely as one. */
+    private static final Object WRITE_LOCK = new Object();
+
     private final Path file;
 
     ConfigFile(Path file) {
@@ -29,25 +32,40 @@ final class ConfigFile {
     }
 
     /**
-     * Value of {@code key}, empty if the file or the key is missing.
+     * Every setting of the file; empty if the file is missing.
      *
      * @throws IOException if the file cannot be read, or is not valid properties syntax (a malformed unicode escape,
      *                     typically a Windows path written with single backslashes)
      */
-    Optional<String> get(String key) throws IOException {
+    Properties read() throws IOException {
         var props = new Properties();
         try (Reader in = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
             props.load(in);
         } catch (NoSuchFileException _) {
-            return Optional.empty();
+            // no file, no setting
         } catch (IllegalArgumentException e) {
-            throw new IOException("Malformed " + file + ": " + e.getMessage(), e);
+            throw new IOException(e.getMessage(), e);
         }
-        return Optional.ofNullable(props.getProperty(key));
+        return props;
     }
 
-    /** Records {@code key=value}, creating the file if needed. */
+    /** Value of {@code key}, empty if the file or the key is missing; see {@link #read()} for what can fail. */
+    Optional<String> get(String key) throws IOException {
+        return Optional.ofNullable(read().getProperty(key));
+    }
+
+    /**
+     * Records {@code key=value}, creating the file if needed. Changes made at the same time by several parts of this
+     * process do not lose one another (the file is read, changed and replaced under one lock); another process that
+     * writes at the same moment is not protected.
+     */
     void set(String key, String value) throws IOException {
+        synchronized (WRITE_LOCK) {
+            replace(key, value);
+        }
+    }
+
+    private void replace(String key, String value) throws IOException {
         List<String> lines = new ArrayList<>();
         try {
             lines.addAll(Files.readAllLines(file, StandardCharsets.UTF_8));
