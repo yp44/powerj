@@ -45,7 +45,7 @@
         <!-- Per-module coverage floor, overridden by each module (see the jacoco plugin below). -->
         <coverage.module.line>0.00</coverage.module.line>
         <coverage.module.branch>0.00</coverage.module.branch>
-        <javafx.version>25.0.5</javafx.version>
+        <javafx.version>27.0.1</javafx.version>
     </properties>
 
     <dependencyManagement>
