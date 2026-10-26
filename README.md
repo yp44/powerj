@@ -218,8 +218,10 @@ Optionally, on Windows, an `.exe` installer (adds PowerJ to the `PATH` and the S
 |---|---|
 | `powerj` | Interactive shell (runs `~/.powerj/profile.pj` first) |
 | `powerj --no-profile` | Interactive shell without the startup profile |
+| `powerj --version` | Prints the version and exits |
+| `powerj --help` | Prints the usage and exits |
 | `powerj -c "ls -r \| where size > 1mb"` | Runs one line, then exits |
-| `powerj script.pj` | Runs a file line by line, then exits |
+| `powerj script.pj` | Runs a file, then exits (a command may span several lines, as in the profile) |
 | `ls /etc \| powerj -c 'where { $_.endsWith(".conf") }'` | Standard input feeds the first stage as `String` lines |
 | `powerj --debug …` | Also prints the detailed diagnostic log to the console |
 

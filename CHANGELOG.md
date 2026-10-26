@@ -153,6 +153,27 @@ structures, functions) can be built on it. The work is organised in phases (revi
   `BlockStat`, `NativeStat`, `PhaseStat`, `JvmStat`, `HotMethod`, `GcStat`, `AllocStat` and `LineStat` are in
   `io.powerj.api.perf`.
 
+### Added, changed and fixed (Phase 4, composition root and shell)
+
+- **`powerj --version` and `powerj --help`** answer without starting the shell and without creating the home folder.
+- **A script run with `powerj file.pj` reads multi-line commands** like the interactive shell and `profile.pj` do: a
+  pipeline that continues on the next line, or a block over several lines, was run one line at a time and failed (C-20).
+- **The shell starts in one place** (step 4.1): `ShellBootstrap` reads the command line, finds the home folder once,
+  installs the log, reads the settings, sets the language and builds the one session. `Main` is a call. What the shell
+  reads from the process is gathered in `Environment`, and an architecture rule says nothing else reads it, so a shell
+  can be started in a test with a folder and a few streams.
+- **The modes are a State** (step 4.2): `ShellMode` and `ModeController` say that the preview and the perf modes exclude
+  each other; they no longer know each other.
+- **`Repl` is a read loop** (steps 4.3 and 4.4): the assembly (interpreter, completion, modes, prompt) is
+  `InteractiveShell`, the prompt, the error lines and the profile have their own classes, the
+  "latest request wins" monitor of the preview is `LatestWinsRunner`. A terminal that fails while a line is read ends the
+  shell with code 1 instead of escaping, and the Ctrl+C handler is put back when the loop ends.
+- **`config.properties` has one reader and one writer** (step 4.3): two settings recorded at the same time are both kept
+  (a lock in the process; another process writing at the same moment is still not protected).
+- **The shell no longer uses the classes of the cmdlets** (step 4.5): `CmdletProvider.initialize(configDirectory)` lets a
+  module create its default files when the shell starts (the built-in cmdlets write the list of protected paths that way),
+  and `powerj-cmdlets` exports its package to the core only.
+
 ### Examined, not changed
 - **The seven `Messages` classes stay** (C-10, step 1.4). Replacing them with one helper in `powerj-api` was tried on a
   two-module experiment: `ResourceBundle.getBundle(…, module)` called from another module fails unless the owner of the
@@ -160,9 +181,8 @@ structures, functions) can be built on it. The work is organised in phases (revi
   class is the minimal form that works with JPMS, and the model `examples/greet` gives to module authors.
 
 ### Planned (review §8)
-Phases 1 to 3 are done (reports in the review, §12 to §14). The API members deprecated in 0.2 (`Cmdlet.previewable`,
+Phases 1 to 4 are done (reports in the review, §12 to §15). The API members deprecated in 0.2 (`Cmdlet.previewable`,
 `Cmdlet.columns`) are removed no sooner than 0.3.0.
-- **Phase 4 — composition root.** `ShellBootstrap`, `--version`/`--help`, a smaller `Repl`.
 - **Phase 5 — industrialisation.** Release workflow, SBOM, mutation tests, benchmarks, documentation (ADR, C4).
 
 ## [0.1.0] — never released (baseline)

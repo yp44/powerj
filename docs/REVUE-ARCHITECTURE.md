@@ -355,7 +355,7 @@ Ordre imposé par les dépendances ; chaque sous-étape ramène le build au vert
 | 3.4 | `powerj-api` : package `api.perf`, interfaces de capacité, `ctx.service(...)`, `UsageException`, `ctx.property(...)`, `environment()` immuable ; anciennes méthodes `@Deprecated(forRemoval = true, since = "0.2")` avec adaptateur, une version de recouvrement, japicmp en garde |
 | 3.5 | Optionnel : promouvoir `lang` en module `powerj-lang` (zéro dépendance, 1 919 l.) — seulement si 3.2 est verte et stable |
 
-### Phase 4 — Composition et shell *(≈ 7 j)*
+### Phase 4 — Composition et shell *(≈ 7 j ; **terminée, voir § 15**)*
 
 | Étape | Action |
 |---|---|
@@ -637,3 +637,63 @@ Ce que la phase a appris :
 | `$liste[-1]` typé comme le premier élément ; `Scanner.next()` autorisé à l'aperçu | trouvés par les tests de caractérisation, sans conséquence aujourd'hui | à corriger avec la règle ci-dessus |
 | `shell` → `cmdlets` (1 ligne), `Language.current` (1 ligne) | inchangé | 4.5 / 4.1 |
 | `CmdletProvider.messages`, `Option.min`, `ConfigAware`, `lang` en module | voir 3.4b, 3.4c, 3.5 | 5 ou jamais |
+
+## 15. Phase 4 : composition et shell (terminée)
+
+### 15.1 Statut des étapes
+
+| Étape | Statut | Ce qui a été fait | Écart avec le plan (§ 8) |
+|---|---|---|---|
+| 4.1 racine de composition | ✅ | **`Environment`** (un record) rassemble ce que le shell lit du processus : variables, les trois propriétés qui comptent, dossiers, langue du système, flux standard. **`ShellBootstrap`** lit la ligne de commande, trouve le dossier personnel **une fois**, installe le journal, lit les réglages, fixe la langue, construit **la** `Session`, puis lance `InteractiveRun` ou `ScriptRun` ; le terminal et le journal sont des paramètres, donc un test démarre un shell avec un dossier, quelques flux et un faux terminal. **`Main` : 193 → 16 lignes** (un appel). `--version` et `--help` répondent sans démarrer le shell ni créer le dossier. `DiagnosticLog` ne pose plus de propriété système (son propre `Formatter`, niveau toujours en anglais) et rend compte par un `Consumer`. Une règle ArchUnit dit que **seuls `Environment`, `SystemTerminals` et `Main` lisent le processus** (`getenv`, `getProperty`, `console`, `exit`, `System.in/out/err`) ; elle a trouvé d'elle-même le `System.setProperty` du journal. `ShellBootstrapTest` (15 : ligne de commande, dossier, réglages inutilisables, langue, scripts, shell interactif sur un terminal de test, profil) ; six mutants tués ; les tests de fumée du lanceur (Linux et Windows) vérifient `--version` et `--help` | **`Language.current` reste statique** : le passer en paramètre toucherait les 262 lectures de `Messages` ; la règle « un champ statique est `final` » garde sa ligne gelée. `Language.set` est donc le seul effet global qui reste dans `execute` |
+| 4.2 modes | ✅ | `ShellMode` (`NORMAL`, `PREVIEW`, `PERF`) et **`ModeController`** : un mode à la fois, entrer dans un mode quitte l'autre (sa propre fonction de sortie, avant l'entrée), et le prompt demande au contrôleur. `Previewer` et `Perfer` s'enregistrent et **ne se connaissent plus** : plus de `onEnter(perf::off)`, plus de `previewer.toggle()` dans `Perfer`. Le mode perf peut se terminer seul (`POWERJ_PERF_AUTOEXIT=1`), ce que l'ancien prompt voyait parce qu'il interrogeait l'interpréteur : `PerfMode.onAutoExit` le dit (par `Interpreter` et `LineMeasuring`) et le contrôleur suit. `ModeControllerTest` (7), quatre mutants tués, deux tests de `PerfModeTest` (core) | Le changement dans le cœur (un rappel) n'était pas prévu : il a été vu par le test de bout en bout `autoExitEndsTheModeAfterOneLine`, qui échouait |
+| 4.3 `Repl` éclaté | ✅ | (a) **Un script lancé par `powerj fichier.pj` lit les commandes sur plusieurs lignes** comme le profil et le shell (C-20) : `ls |` puis `count` échouait. (b) **`Repl` : 297 → 151 lignes.** Il ne construit plus rien : `InteractiveShell.create` assemble l'interpréteur, la complétion, les modes et le prompt sur un `PreviewLineReader` (plus de `instanceof LineReaderImpl` qui désactivait des fonctions en silence) ; `PromptRenderer`, `ErrorPrinter`, `ProfileRunner` et `HistoryCommand` en sortent ; la boucle prend un `LineEditor` d'une méthode. Un terminal qui échoue (`IOError`) termine le shell avec le code 1 au lieu de s'échapper, et le gestionnaire de Ctrl+C est **remis en place** à la fin. `ReplLoopTest` (8, la boucle pilotée par une suite d'événements : ligne, Ctrl+C, Ctrl+D, terminal qui échoue), quatre mutants tués ; `PromptRendererTest` (3), `ErrorPrinterTest` (2) ; une règle ArchUnit dit que la boucle ne connaît ni le lecteur concret ni les modes. (c) **`ConfigFile` est l'unique lecteur et scripteur de `config.properties`** : `ShellConfig` ne relit plus le format à sa façon, et `set` change le fichier sous un verrou (douze réglages écrits en même temps en perdaient, rouge trois fois sur trois, aucun avec le verrou) | **`OutcomeReporter` et `ConsoleInputAdapter` ne sont pas faits.** Les trois `switch (Outcome)` n'ont pas la même politique (le shell affiche et continue, le profil s'arrête sur Ctrl+C, le script rend un code) : une abstraction commune serait un paramètre par cas. `ProfileRunner` n'est pas réutilisé pour les scripts : ils partagent la **lecture** (`Profile.commands`), pas l'exécution, parce que leurs codes de sortie diffèrent. `LineEditor` est une interface fonctionnelle d'une méthode, non une interface de plusieurs. Le verrou ne protège pas d'un second processus qui écrit au même moment |
+| 4.4 `LatestWinsRunner` | ✅ | Le moniteur écrit à la main dans `Previewer` (`wait`/`notifyAll`, quatre compteurs, un fil d'échéance, un fil de travail lancé à la demande) devient **`LatestWinsRunner<Q, R>`** : chaque demande remplace la précédente, une pause laisse finir la frappe, un fil évalue la dernière, l'évaluation dépassée ou trop longue est interrompue (ce qu'elle avait produit est son résultat), et un résultat n'est remis que si sa demande est encore la dernière. `Previewer` : 314 → 252 lignes. `LatestWinsRunnerTest` (12) attend l'état attendu au lieu de dormir ; six mutants tués, dont un survivant qui a donné le test de la pause (50 ms d'écart contre une pause de 1 s) | **Pas partagé avec le `Debouncer` de `powerj-fx`**, contrairement à ce que disait le plan : celui-ci retarde une action sur le fil du toolkit (ni fil de travail, ni interruption, ni échéance), et les deux modules ne peuvent pas dépendre l'un de l'autre. **L'horloge n'est pas injectable** : les tests utilisent le temps réel avec de larges marges |
+| 4.5 le shell ne connaît plus `cmdlets` | ✅ | Le shell n'utilisait `ProtectedPaths` que pour le nom du fichier et son contenu par défaut, écrit dans le dossier personnel au démarrage : c'est l'affaire des cmdlets qui le lisent. **`CmdletProvider.initialize(configDirectory)`** (méthode `default` de l'API, additive) est appelée une fois par fournisseur au démarrage avec le dossier de configuration ; un fournisseur qui échoue est signalé (`module.initializeFailed`) et son module se charge quand même ; les modules chargés au démarrage sont prévenus aussi. `BuiltinCmdlets` écrit la liste des chemins protégés si elle manque (un fichier modifié n'est jamais touché) ; `PowerJHome` ne la connaît plus. `powerj-cmdlets` n'exporte plus qu'au cœur ; **la règle ArchUnit qui interdit au shell d'utiliser `cmdlets` n'est plus gelée** (son entrée du magasin disparaît). `RegistryInitializeTest` (6), deux tests de `ModuleLoaderTest`, `ProtectedPathsTest`, `ShellBootstrapTest` ; six mutants tués (un équivalent, un premier appel redondant, a été supprimé) ; les tests de fumée du lanceur passent avec l'export réduit | Le `requires io.powerj.cmdlets` du shell **reste** (avec un commentaire) : c'est ce qui met le module dans l'image, et le retirer demanderait `--bind-services` côté `jlink`, qu'on ne peut pas essayer d'ici sur toutes les plateformes |
+
+Mesures après la phase 4 : **1 689 tests** (729 pour `core`, 253 pour `shell`, dont 70 nouveaux de ce lot), `Main` 193 → 16 lignes, `Repl` 297 → 151, `Previewer` 314 → 252, avertissements du compilateur inchangés à 32.
+
+### 15.2 La dette gelée
+
+La règle « le shell ne dépend pas de `cmdlets` » passe sans rien geler. Reste, dans le magasin ArchUnit, une seule règle :
+
+| Règle gelée | Lignes | Cause | Repris en |
+|---|---|---|---|
+| un champ statique est `final` | 1 | `Language.current` | non planifié (voir 4.1) |
+
+### 15.3 Bilan de la phase
+
+| | Avant (fin de Phase 3) | Après |
+|---|---|---|
+| `Main` | 193 lignes, appelle `System.exit`, intestable | **16 lignes**, un appel ; `ShellBootstrap` est testable (15 tests) |
+| Lectures du processus dans le shell | `System.getenv` ×8, propriétés ×13, `System.console`, flux | **trois classes** (`Environment`, `SystemTerminals`, `Main`), vérifié par ArchUnit |
+| `Session` construite / `PowerJHome` résolu | 2 fois chacun | **1 fois** |
+| `--version`, `--help` | n'existent pas | présents, testés, vérifiés sur le lanceur |
+| Modes aperçu et perf | deux classes qui se tiennent l'une l'autre | un `ModeController` ; elles s'ignorent |
+| `Repl` | 297 lignes, construit tout, devine le lecteur par `instanceof` | **151 lignes**, boucle de lecture ; l'assemblage est `InteractiveShell` |
+| Terminal qui échoue en lisant | l'exception s'échappe | code 1, journal |
+| Gestionnaire Ctrl+C | jamais remis | remis à la fin de la boucle |
+| Script `.pj` multi-lignes | échoue (une ligne à la fois) | marche comme le profil |
+| Lecteurs de `config.properties` | 2, écriture sans verrou | 1, écriture sous verrou (douze écritures simultanées gardées) |
+| Moniteur de l'aperçu | écrit à la main dans `Previewer`, testable en tapant | `LatestWinsRunner`, 12 tests |
+| Classes de `cmdlets` utilisées par le shell | 1 (`ProtectedPaths`) | **0**, règle ArchUnit non gelée |
+| Dette ArchUnit gelée | 2 lignes | **1 ligne** |
+| Tests | 1 619 | **1 689** (2 ignorés) |
+| Commits de la phase | — | 8 (sept étapes dont 4.3 en trois, et ce rapport) |
+
+Ce que la phase a appris :
+
+1. **Une racine de composition rend le démarrage testable, et le test trouve ce que la lecture ne voit pas.** Quinze tests de démarrage qui étaient impossibles (`Main` appelait `System.exit`) ; la règle qui interdit de lire le processus a trouvé en passant le `System.setProperty` du journal, que personne n'avait relevé.
+2. **Un état à deux propriétaires dérive.** Le contrôleur de modes et l'interpréteur savaient chacun si le mode perf était actif ; l'auto-sortie du mode perf (l'interpréteur le coupe seul) les a désaccordés, et c'est un test de bout en bout existant qui l'a montré.
+3. **Un mutant survivant désigne souvent du code en trop** : le premier appel de `initialize` était couvert par le second, et le test du délai de `LatestWinsRunner` n'existait pas parce que le fil de travail met plus de temps à démarrer qu'une rafale de demandes.
+4. **Ne pas abstraire ce qui n'est pas pareil** : les trois `switch (Outcome)` et les deux « debouncers » se ressemblent et ne sont pas la même chose ; les unifier aurait fait des classes à paramètres.
+
+### 15.4 Ce que la phase laisse ouvert (et où c'est repris)
+
+| Reste | Pourquoi | Repris en |
+|---|---|---|
+| `Language.current` statique, `Language.set` dans `ShellBootstrap` | 262 lectures de `Messages` | non planifié |
+| `OutcomeReporter`, `ConsoleInputAdapter` | voir 4.3 | non planifié |
+| Horloge injectable pour `LatestWinsRunner` | les tests utilisent le temps réel avec de larges marges | à faire si un test devient instable |
+| `Platform` injectable, détection du dossier personnel dupliquée entre `SessionState` et `ProtectedPaths` | inchangé depuis la Phase 1 | 5 |
+| Verrou de `config.properties` entre processus | `FileChannel.lock` pour un cas rare | à juger |
+| `requires io.powerj.cmdlets` du shell | sert à mettre le module dans l'image | 5 (avec `--bind-services`, si le build le permet) |
