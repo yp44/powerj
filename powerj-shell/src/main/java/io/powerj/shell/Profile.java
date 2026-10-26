@@ -11,7 +11,7 @@ import java.util.List;
 /**
  * Startup profile {@code profile.pj} (specification FR-63): commands run when the interactive shell starts.
  * Blank lines and {@code #} comments are ignored; a command spans several lines with the same rule as the
- * interactive continuation (FR-02).
+ * interactive continuation (FR-02). The scripts of the non-interactive mode are read the same way.
  */
 final class Profile {
 

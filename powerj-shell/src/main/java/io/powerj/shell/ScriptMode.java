@@ -53,13 +53,14 @@ final class ScriptMode {
         interpreter.loadModules(dir).forEach(errors);
     }
 
-    /** Executes the lines in order; blank lines and {@code #} comments are ignored. */
+    /**
+     * Executes the commands in order; blank lines and {@code #} comments are ignored, and a command may span several
+     * lines with the rule of the interactive shell and of the profile (FR-02): {@code ls |} continues on the next line.
+     */
     int run(List<String> lines) {
         int code = 0;
-        for (String line : lines) {
-            if (line.isBlank() || line.strip().startsWith("#")) {
-                continue;
-            }
+        for (Profile.Command command : Profile.commands(lines)) {
+            String line = command.text();
             NativeRun nativeBefore = session.lastNative().orElse(null);
             Outcome outcome = supervisor.run(line, () -> {
                 interpreter.execute(line);
