@@ -107,7 +107,7 @@ Parallel errors follow the sequential walk:
 
 **Docs**:
 - FR-72 gets a paragraph and its syntax lines, §11 gets row 21, and `docs/plans/cmdlet-roadmap.md` gets a note;
-- `docs/recettes/fileops.md` gets rows for `-p` and a timing on a large tree;
+- `docs/acceptance/fileops.md` gets rows for `-p` and a timing on a large tree;
 - the README cmdlet table mentions `-p` for `cp`/`rm`.
 
 ## Tests

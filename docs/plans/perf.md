@@ -89,7 +89,7 @@ perf [<n>] [--view stages|blocks|natives|phases|jvm|lines] [-a|--all]
   - Alt+V and Alt+P switch each other off.
 - **Completion**: `--view` values come from the enum option. The properties of the rows after a `perf` stage are not proposed (the cmdlet emits several record types).
 - **`Values.duration`**: durations under a millisecond are shown in microseconds or nanoseconds (`1.4 µs`), so the blocks are readable; the other durations are unchanged.
-- Docs and README in the implementation commits: FR-76 (the first commit), `docs/recettes/perf.md`, §11 row 25, scope sentence (~l.408), README (feature section after Preview mode, cmdlets table).
+- Docs and README in the implementation commits: FR-76 (the first commit), `docs/acceptance/perf.md`, §11 row 25, scope sentence (~l.408), README (feature section after Preview mode, cmdlets table).
 
 ## Part B — JFR (iteration 26)
 Counters say *which* stage is slow; Java Flight Recorder says *why* (hot methods, allocations, GC pauses), for about 1–2% overhead. Decisions taken with the user: JFR is **always on** in perf mode (no switch to turn it off); delivered in its own branch and PR after part A was merged.

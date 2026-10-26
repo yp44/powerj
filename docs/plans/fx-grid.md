@@ -74,7 +74,7 @@ The root rule (80 % of lines and branches, `powerj-coverage`) must keep passing,
 | R6 | Monocle for JavaFX 25 may not exist (versions lag). | Look for a compatible `openjfx-monocle`. | `view` excluded from the threshold, see above. **Settled in phase 1: no Monocle for 25, Xvfb instead.** |
 
 ## Results of phase 1 (risks)
-Checked on Linux (Temurin 25, JavaFX 25.0.5, Xvfb, the real `jpackage` launcher), see the checklist `docs/recettes/fx-grid.md`:
+Checked on Linux (Temurin 25, JavaFX 25.0.5, Xvfb, the real `jpackage` launcher), see the checklist `docs/acceptance/fx-grid.md`:
 
 | # | Result |
 |---|---|
@@ -88,7 +88,7 @@ Checked on Linux (Temurin 25, JavaFX 25.0.5, Xvfb, the real `jpackage` launcher)
 Other numbers: the module zip is 7.6 MB (8.4 MB unpacked); the distribution measured with JDK 25 is 103 MB (not 92 MB: that figure came from a JDK 21 runtime).
 
 ## Phases
-Each phase ends with a state that builds, passes `./mvnw verify`, and **can be tried by hand** with the steps given. The manual checklist grows into `docs/recettes/fx-grid.md` as the phases land.
+Each phase ends with a state that builds, passes `./mvnw verify`, and **can be tried by hand** with the steps given. The manual checklist grows into `docs/acceptance/fx-grid.md` as the phases land.
 
 ### Phase 1 — Skeleton, packaging, an empty window (answers R1-R4) — **done**
 **Goal:** prove that the module installs by copying a folder, and that a JavaFX window opens from PowerJ.
@@ -259,7 +259,7 @@ PJ ~> echo | grid                     # empty input: an empty table, not an erro
 
 ### Phase 8 — Documentation, CI and wrap-up — **done** (except the Windows run)
 - `docs/SPECIFICATION.md`: new **FR-77 — Graphical cmdlets (module `fx`), `grid`** (syntax, options, records, acceptance criteria), §4.4 (a module with dependencies, example `fx`), §5.1 module list, §11 row 26, §12.3.
-- `docs/recettes/fx-grid.md`: the manual checklists of phases 1-7 merged, in the format of `grep.md`.
+- `docs/acceptance/fx-grid.md`: the manual checklists of phases 1-7 merged, in the format of `grep.md`.
 - `README.md`: "Optional graphical module" section (what it is, why it is not in the distribution, how to install it, the cost: ~8-9 MB zip / ~32 MB installed) and the cmdlet in the table.
 - `examples/` is untouched: `greet` remains the minimal template, `powerj-fx` is the realistic one (dependencies, i18n, config).
 - CI (`.github/workflows/ci.yml`): build `powerj-fx` on `ubuntu` and `windows`, run the unit tests (headless), upload `powerj-fx-*.zip` as an artifact; if Monocle works (R6), run the `fx-ui` profile under `xvfb` on Linux.
@@ -269,7 +269,7 @@ PJ ~> echo | grid                     # empty input: an empty table, not an erro
 **What was done, and what was decided:**
 - **Specification:** FR-77 (the module, `grid`, its options, columns, sort, filter, progressive loading, use of the table, `--pass-thru`, acceptance criteria), §4.4 (a module with dependencies), §5.1 (module list), §7 (the zip), §8 (`fx-grid.properties`), §11 (row 26), §12.3 (`grid` done) and §12.4 (`Out-GridView`).
 - **README:** the cmdlet in the table, a section "Graphical table (optional module)" with the installation, the cost (about 8 MB to download, 32 MB installed), the main behaviours; the module list, the configuration table, the status and the documentation links.
-- **Checklist** `docs/recettes/fx-grid.md`: rows 1 to 108 in the order of the phases, with a closing section on where it was run and what it does not cover.
+- **Checklist** `docs/acceptance/fx-grid.md`: rows 1 to 108 in the order of the phases, with a closing section on where it was run and what it does not cover.
 - **CI** (`.github/workflows/ci.yml`): on Linux, a smoke test under `xvfb-run` (consent message with no answer, refusal, loading, `help grid`, a window that opens without any message, the message without a display) and the zip kept as an artifact; on Windows, consent, loading and `help grid` only (a window is not opened there: it was not possible to check what the Windows runner allows), and the zip kept as an artifact. The Linux script was run locally as it stands.
 - **Coverage:** the rule of `powerj-coverage` (90 % of lines and branches for `io.powerj.fx`, `io.powerj.fx.grid`, `io.powerj.fx.model`, `io.powerj.fx.runtime`) holds, with the `view` package excluded and listed in the report.
 - **Not done:** the profile `fx-ui` of UI tests (Monocle does not exist for JavaFX 25, and the real-window checks were done by hand under Xvfb, with a script that is not part of the repository); `--no-focus`; a run on Windows and macOS.

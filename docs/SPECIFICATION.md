@@ -1014,7 +1014,7 @@ Acceptance criteria (CA):
 
 **`--pass-thru`.** A column of check boxes comes first (it is not a column of the data). `Select all` ticks the rows **found by the filter**, `Unselect all` unticks them; the other rows are not touched. The tick belongs to the row: a filter or a sort does not change it. `OK` gives back to the pipeline **the objects received** that are ticked, **the ones a filter hides included**, in the order of the table (the sort, otherwise the order of arrival); `Cancel`, the cross, Esc, Ctrl+C or OK with nothing ticked give nothing. With `--single` ticking a row unticks the other and `Select all` is not shown. The cmdlet is `passThrough` (completion knows the type of the objects after it).
 
-Acceptance criteria (CA), checked by `docs/recettes/fx-grid.md`:
+Acceptance criteria (CA), checked by `docs/acceptance/fx-grid.md`:
 - Unpacking the zip into `~/.powerj/modules/` then `mod-list` lists `io.powerj.fx` with `[grid]`, after the question of §4.4; `ls | grid` opens a window at once and gives the prompt back.
 - Without a display, `ls | grid` fails with the message above, a second try says it failed earlier, and the shell keeps working. `grid` alone is an error.
 - `ls | grid` shows `name`, `size`, `modified`, `dir`; sizes readable and right-aligned; `greet --name Ada | grid` (a record of another module) shows its columns; `1 row`, `No result` and `0 rows` are handled.
@@ -1811,26 +1811,26 @@ The backlog cmdlets (§12.3) are added **one per mini-iteration**, each with a s
 
 | Mini-iteration | Cmdlet / feature | Specification | Acceptance test |
 |---|---|---|---|
-| 8 | `collect` | FR-36d | `docs/recettes/etape-8-collect.md` |
-| 9 | i18n (en/fr) | FR-61 | `docs/recettes/i18n.md` |
-| 10 | `~` = `HOME` | FR-62 | `docs/recettes/tilde.md` |
-| 11 | `profile.pj` | FR-63 | `docs/recettes/profile.md` |
-| 12 | `grep` and `powerj-fs` | FR-64 | `docs/recettes/grep.md` |
-| 13 | `cat` | FR-65 | `docs/recettes/cat.md` |
-| 14 | Preview mode (Alt+V) | FR-66 | `docs/recettes/preview.md` |
-| 15 | `sort` | FR-67 | `docs/recettes/sort.md` |
-| 16 | `first`, `last`, `range`, `stopInput` | FR-68 | `docs/recettes/first-last-range.md` |
-| 17 | `select`, `Row` | FR-69 | `docs/recettes/select.md` |
-| 18 | `count`, `measure` | FR-70 | `docs/recettes/count-measure.md` |
-| 19 | `group` | FR-71 | `docs/recettes/group.md` |
-| 20 | `mkdir`, `touch`, `cp`, `mv`, `rm` | FR-72 | `docs/recettes/fileops.md` |
-| 21 | `cp -r -p`, `rm -r -p` (parallel) | FR-72b | `docs/recettes/fileops.md` |
-| 22 | `to-json`, `from-json`, `to-csv`, `from-csv` | FR-73 | `docs/recettes/json-csv.md` |
-| 23 | `ps`, `kill` | FR-74 | `docs/recettes/ps-kill.md` |
-| 24 | Background execution `&`, `jobs` | FR-75 | `docs/recettes/background.md` |
-| 25 | Perf mode (Alt+P), `perf` | FR-76 | `docs/recettes/perf.md` |
-| 26 | Optional JavaFX module `powerj-fx`, `grid` (table, sort, filter, progressive loading, `--pass-thru`) | FR-77 | `docs/recettes/fx-grid.md` |
-| 27 | `join` (inner and left outer join by key) | FR-78 | `docs/recettes/join.md` |
+| 8 | `collect` | FR-36d | `docs/acceptance/step-8-collect.md` |
+| 9 | i18n (en/fr) | FR-61 | `docs/acceptance/i18n.md` |
+| 10 | `~` = `HOME` | FR-62 | `docs/acceptance/tilde.md` |
+| 11 | `profile.pj` | FR-63 | `docs/acceptance/profile.md` |
+| 12 | `grep` and `powerj-fs` | FR-64 | `docs/acceptance/grep.md` |
+| 13 | `cat` | FR-65 | `docs/acceptance/cat.md` |
+| 14 | Preview mode (Alt+V) | FR-66 | `docs/acceptance/preview.md` |
+| 15 | `sort` | FR-67 | `docs/acceptance/sort.md` |
+| 16 | `first`, `last`, `range`, `stopInput` | FR-68 | `docs/acceptance/first-last-range.md` |
+| 17 | `select`, `Row` | FR-69 | `docs/acceptance/select.md` |
+| 18 | `count`, `measure` | FR-70 | `docs/acceptance/count-measure.md` |
+| 19 | `group` | FR-71 | `docs/acceptance/group.md` |
+| 20 | `mkdir`, `touch`, `cp`, `mv`, `rm` | FR-72 | `docs/acceptance/fileops.md` |
+| 21 | `cp -r -p`, `rm -r -p` (parallel) | FR-72b | `docs/acceptance/fileops.md` |
+| 22 | `to-json`, `from-json`, `to-csv`, `from-csv` | FR-73 | `docs/acceptance/json-csv.md` |
+| 23 | `ps`, `kill` | FR-74 | `docs/acceptance/ps-kill.md` |
+| 24 | Background execution `&`, `jobs` | FR-75 | `docs/acceptance/background.md` |
+| 25 | Perf mode (Alt+P), `perf` | FR-76 | `docs/acceptance/perf.md` |
+| 26 | Optional JavaFX module `powerj-fx`, `grid` (table, sort, filter, progressive loading, `--pass-thru`) | FR-77 | `docs/acceptance/fx-grid.md` |
+| 27 | `join` (inner and left outer join by key) | FR-78 | `docs/acceptance/join.md` |
 
 Version 2 will introduce scripting (`if`, `foreach`, functions, `.pj` files).
 
@@ -1934,7 +1934,7 @@ find src --name *.java --since 7d | where { $_.size > 2kb } | group { $_.path.pa
     | sort count --desc | first 5 | to-json > rapport.json
 ```
 
-With the cmdlets of the roadmap (`find` was cancelled), the end-to-end check is `docs/recettes/pipeline-v1.md`.
+With the cmdlets of the roadmap (`find` was cancelled), the end-to-end check is `docs/acceptance/pipeline-v1.md`.
 
 ### 12.4 PowerShell → PowerJ mapping
 

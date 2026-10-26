@@ -45,4 +45,4 @@ join --right <block> [--left <block>] (--key <key> | --left-key <key> [--right-k
 ## Tests
 - `JoinTest`: inner join and multiplication, different keys and blocks, default right key, `-o`, `-o` with an empty right side, `null` keys and `1`/`1L`, `right_` prefix, records and plain values with sizes, head of a pipeline, key errors, blocking errors.
 - `BuiltinCmdletsTest.joinMultipliesTheObjectsByKey`: the real shell with two CSV files.
-- Manual acceptance test: `docs/recettes/join.md`.
+- Manual acceptance test: `docs/acceptance/join.md`.

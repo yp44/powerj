@@ -31,7 +31,7 @@ Target pipeline at the end (§12.3):
 - `preview = true` only for side-effect-free cmdlets; otherwise `previewable(params)` returns `false` when the options change something.
 - Cancellation: rethrow `CancellationException`, and check `Thread.interrupted()` in long loops (as in `grep` and `cat`).
 - Tests: `powerj-cmdlets/src/test/java/io/powerj/cmdlets/<Name>Test.java` with `TestContext` (simulated compiler) and `@TempDir`; REPL tests in `powerj-shell` when core code changes.
-- Docs: §12.3 row struck through as "done", a row in the §11 mini-iteration table (after 14), the scope sentence (~l.406), an acceptance checklist `docs/recettes/<name>.md` (format of `grep.md`), the README Cmdlets table, and README "Status and roadmap".
+- Docs: §12.3 row struck through as "done", a row in the §11 mini-iteration table (after 14), the scope sentence (~l.406), an acceptance checklist `docs/acceptance/<name>.md` (format of `grep.md`), the README Cmdlets table, and README "Status and roadmap".
 - Verification: `./mvnw -pl powerj-cmdlets -am test`, then `./mvnw verify`, then the manual checklist with `powerj -c "…"` and `help <name>`.
 
 ---
@@ -95,7 +95,7 @@ Target pipeline at the end (§12.3):
 - Tests: `ps` sees `ProcessHandle.current()`, name filtering, killing a process started by the test, an unknown PID (non-blocking error).
 
 ## Wrap-up (in the phase 10 PR) — done
-- An end-to-end acceptance checklist for the §12.3 target pipeline: `docs/recettes/pipeline-v1.md`.
+- An end-to-end acceptance checklist for the §12.3 target pipeline: `docs/acceptance/pipeline-v1.md`.
 - README "Status and roadmap": the v1 backlog is done (`tee`, `http`, `open`, `table`/`tree` remain), and the next step is v2 control structures.
 
 ## Order and dependencies

@@ -10,7 +10,7 @@
     <packaging>pom</packaging>
 
     <name>PowerJ</name>
-    <description>Shell interactif orienté objet en Java</description>
+    <description>Object-oriented interactive shell in Java</description>
 
     <modules>
         <module>powerj-api</module>

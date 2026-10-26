@@ -101,7 +101,7 @@ select <column>...
     - `Row` in the extension API (§4.2), and in the object model (§3.7) next to `Collected`;
     - §12.3 row struck through as done, with `--expand` noted as not done;
     - row 17 of the §11 table and the scope sentence.
-  - `docs/recettes/select.md`.
+  - `docs/acceptance/select.md`.
   - `README.md` (Cmdlets table, module row, roadmap).
   - `docs/plans/cmdlet-roadmap.md` (phase 3 without `--expand`).
 

@@ -72,7 +72,7 @@ Docs:
   - the §12.3 backlog row is struck through as done;
   - row 15 in the §11 mini-iteration table;
   - `sort` is mentioned in the scope sentence of §3.9.
-- `docs/recettes/sort.md`: an acceptance checklist in the format of `grep.md`.
+- `docs/acceptance/sort.md`: an acceptance checklist in the format of `grep.md`.
 - `README.md`: a row in the Cmdlets table, and the "Status and roadmap" update.
 
 ## Tests

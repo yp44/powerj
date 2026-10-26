@@ -61,7 +61,7 @@ public record Job(int id, long pid, String command, Instant start, boolean runni
 
 ## Docs
 - Specification: new **FR-75 — Background execution** (§3.10, next to FR-39); grammar §12.1 (`script = statement { ( ";" | "&&" | "||" | "&" ) statement } [ "&" ]`); chaining table; §11 row 24; PowerShell mapping §12.4 (`Start-Process`); the list "What stops the preview".
-- `docs/recettes/background.md` (manual checklist).
+- `docs/acceptance/background.md` (manual checklist).
 - README: `xeyes &` and `jobs`.
 
 ## Tests

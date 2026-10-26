@@ -24,4 +24,4 @@ A "killer feature" discussed with the user: see the results of a pipeline while 
 - `PreviewTest` (core): previewable cmdlets and blocks, limit on an endless cmdlet, pure Java calls, formatted lines; cmdlet without `preview`, options (`previewable`), built-in, native, Java outside the set (also in a lambda, a constructor, a parallel stream, a lazy value displayed, a block converted before the preview), collection mutators, assignment/redirection/several commands, `System.exit`, stream variable, errors not displayed, interruption.
 - `PreviewModeTest` (shell, in-memory terminal): Alt+V and prompt, results below the line, stage under the cursor, native command stopped and run on Enter, cmdlet table.
 - `PreviewCutTest`, `CompletionsTest.previewModeOffersOnlyWhatCanRunInAPreview`.
-- Acceptance checklist: `docs/recettes/preview.md`.
+- Acceptance checklist: `docs/acceptance/preview.md`.

@@ -115,7 +115,7 @@
                         <configuration>
                             <dataFile>${coverage.data}</dataFile>
                             <!-- The JavaFX nodes cannot be run without a display: they are wiring only, and the manual
-                                 checklist (docs/recettes/fx-grid.md) covers them. They stay in the report, at 0%. -->
+                                 checklist (docs/acceptance/fx-grid.md) covers them. They stay in the report, at 0%. -->
                             <excludes>
                                 <exclude>io/powerj/fx/view/**</exclude>
                             </excludes>

@@ -136,11 +136,11 @@ jobs:
           cmd /c "powerj-dist\target\jpackage\powerj\powerj.exe < smoke.txt > out.txt 2>&1"
           $code = $LASTEXITCODE
           Get-Content out.txt
-          if ($code -ne 3) { throw "code retour attendu 3, obtenu $code" }
-          foreach ($attendu in 'C:\Windows', 'ligne : deux', 'secours', 'cmdlet (io.powerj.cmdlets)', 'System32',
+          if ($code -ne 3) { throw "expected exit code 3, got $code" }
+          foreach ($expected in 'C:\Windows', 'ligne : deux', 'secours', 'cmdlet (io.powerj.cmdlets)', 'System32',
                                'filtre : Windows', 'tri : [a, b]', 'java : 7', 'lambda : 2', 'reference : A',
                                'collect : 1') {
-            if (-not (Select-String -Path out.txt -SimpleMatch $attendu -Quiet)) { throw "absent de la sortie : $attendu" }
+            if (-not (Select-String -Path out.txt -SimpleMatch $expected -Quiet)) { throw "missing from the output: $expected" }
           }
           # The expected exit code 3 of powerj.exe must not become the step's exit code.
           exit 0
@@ -151,27 +151,27 @@ jobs:
           $app = "powerj-dist\target\jpackage\powerj"
           $java = Get-ChildItem $app -Recurse -Filter java.exe | Where-Object { $_.FullName -like '*runtime*bin*' } | Select-Object -First 1
           $modules = & $java.FullName --list-modules
-          if (-not ($modules -match '^jdk\.jfr@')) { throw "jdk.jfr absent de l'image" }
-          if (-not ($modules -match '^jdk\.management@')) { throw "jdk.management absent de l'image" }
+          if (-not ($modules -match '^jdk\.jfr@')) { throw "jdk.jfr is not in the image" }
+          if (-not ($modules -match '^jdk\.management@')) { throw "jdk.management is not in the image" }
           # The profiler is only resolved when asked: without this option the perf mode has no recording.
           $cfg = Get-ChildItem $app -Recurse -Filter powerj.cfg | Select-Object -First 1
-          if (-not (Select-String -Path $cfg.FullName -SimpleMatch '--add-modules=jdk.jfr' -Quiet)) { throw "option --add-modules=jdk.jfr absente de powerj.cfg" }
+          if (-not (Select-String -Path $cfg.FullName -SimpleMatch '--add-modules=jdk.jfr' -Quiet)) { throw "option --add-modules=jdk.jfr is not in powerj.cfg" }
 
       - name: Smoke test of the non-interactive mode
         shell: pwsh
         run: |
           $pj = "powerj-dist\target\jpackage\powerj\powerj.exe"
           & $pj -c '^cmd /c exit 3'
-          if ($LASTEXITCODE -ne 3) { throw "code retour attendu 3, obtenu $LASTEXITCODE" }
-          'where { $_.endsWith(".txt") }' | Set-Content filtre.pj
-          $lignes = 'x.txt', 'y.log', 'z.txt' | & $pj filtre.pj
-          $lignes
-          if (($lignes -join ',') -ne 'x.txt,z.txt') { throw "filtrage de l'entrée standard incorrect : $lignes" }
-          # --version et --help répondent sans démarrer le shell.
+          if ($LASTEXITCODE -ne 3) { throw "expected exit code 3, got $LASTEXITCODE" }
+          'where { $_.endsWith(".txt") }' | Set-Content filter.pj
+          $lines = 'x.txt', 'y.log', 'z.txt' | & $pj filter.pj
+          $lines
+          if (($lines -join ',') -ne 'x.txt,z.txt') { throw "standard input filtering is wrong: $lines" }
+          # --version and --help answer without starting the shell.
           $version = & $pj --version
-          if (-not ($version -match '^PowerJ .* \(Java ')) { throw "--version incorrect : $version" }
-          $aide = (& $pj --help) -join ' '
-          if (-not ($aide -match 'usage: powerj' -and $aide -match '--version' -and $aide -match '--help')) { throw "--help incorrect : $aide" }
+          if (-not ($version -match '^PowerJ .* \(Java ')) { throw "--version is wrong: $version" }
+          $help = (& $pj --help) -join ' '
+          if (-not ($help -match 'usage: powerj' -and $help -match '--version' -and $help -match '--help')) { throw "--help is wrong: $help" }
           exit 0
 
       - name: Smoke test of the third-party modules
@@ -181,40 +181,40 @@ jobs:
           $env:POWERJ_HOME = "$env:RUNNER_TEMP\pjhome"
           New-Item -ItemType Directory -Force "$env:POWERJ_HOME\modules" | Out-Null
           Copy-Item examples\greet\target\greet.jar "$env:POWERJ_HOME\modules\"
-          $lignes = & $pj -c 'greet -n Yves -c 2 | map { g -> g.message }'
-          $lignes
-          if (($lignes -join ',') -ne 'Hello Yves!,Hello Yves!') { throw "greet incorrect : $lignes" }
+          $lines = & $pj -c 'greet -n Yves -c 2 | map { g -> g.message }'
+          $lines
+          if (($lines -join ',') -ne 'Hello Yves!,Hello Yves!') { throw "greet is wrong: $lines" }
           $env:POWERJ_LANG = 'fr'
           $fr = & $pj -c 'greet -n Yves'
           $fr
-          if (-not ($fr -match 'Bonjour Yves !')) { throw "greet en français incorrect : $fr" }
+          if (-not ($fr -match 'Bonjour Yves !')) { throw "greet in French is wrong: $fr" }
           $fr = & $pj -c 'nope' 2>&1 | Out-String
           $fr
-          if (-not ($fr -match 'commande inconnue : nope')) { throw "message français absent : $fr" }
+          if (-not ($fr -match 'commande inconnue : nope')) { throw "French message missing: $fr" }
           Remove-Item Env:POWERJ_LANG
           $modules = & $pj -c 'mod-list'
           $modules
-          if (-not ($modules -match 'com.example.greet')) { throw "mod-list ne liste pas com.example.greet" }
+          if (-not ($modules -match 'com.example.greet')) { throw "mod-list does not list com.example.greet" }
           exit 0
 
       - name: Smoke test of the graphical module (powerj-fx)
         shell: pwsh
         run: |
-          # Chargement et consentement seulement : l'ouverture d'une fenêtre se vérifie à la main (docs/recettes/fx-grid.md).
+          # Loading and consent only: opening a window is checked by hand (docs/acceptance/fx-grid.md).
           $pj = "$PWD\powerj-dist\target\jpackage\powerj\powerj.exe"
           $env:POWERJ_HOME = "$env:RUNNER_TEMP\fxhome"
           New-Item -ItemType Directory -Force "$env:POWERJ_HOME\modules" | Out-Null
           Expand-Archive (Get-ChildItem powerj-fx\target\powerj-fx-*-win.zip).FullName "$env:POWERJ_HOME\modules"
-          $refus = & $pj -c 'mod-list' 2>&1 | Out-String
-          $refus
-          if (-not ($refus -match 'modules.nativeAccess.io.powerj.fx=true')) { throw "consentement absent : $refus" }
+          $refusal = & $pj -c 'mod-list' 2>&1 | Out-String
+          $refusal
+          if (-not ($refusal -match 'modules.nativeAccess.io.powerj.fx=true')) { throw "consent is missing: $refusal" }
           Set-Content "$env:POWERJ_HOME\config.properties" 'modules.nativeAccess.io.powerj.fx=true'
           $modules = & $pj -c 'mod-list' | Out-String
           $modules
-          if (-not ($modules -match 'io.powerj.fx')) { throw "mod-list ne liste pas io.powerj.fx" }
-          $aide = & $pj -c 'help grid' | Out-String
-          $aide
-          if (-not ($aide -match '--max-rows')) { throw "help grid sans --max-rows : $aide" }
+          if (-not ($modules -match 'io.powerj.fx')) { throw "mod-list does not list io.powerj.fx" }
+          $help = & $pj -c 'help grid' | Out-String
+          $help
+          if (-not ($help -match '--max-rows')) { throw "help grid has no --max-rows: $help" }
           exit 0
 
       - name: Graphical module powerj-fx

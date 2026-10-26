@@ -82,25 +82,25 @@ Out of scope for v1: control structures (`if`, `foreach`, functions — planned 
 
 | Cmdlet | What it does | Acceptance checklist |
 |---|---|---|
-| `ls` | Lists files as `FileEntry` records (`-r` recursive, `-a` hidden, `--filter *.java`, `-d` dirs, `-p 16` parallel walk) | [etape-3](docs/recettes/etape-3.md) |
-| `grep` | Java regex search in files and folders, or in the pipeline objects; `GrepMatch` records with highlighted matches and capture groups | [grep](docs/recettes/grep.md) |
-| `cat` | Reads files as lines (`-l`), one text (`-t`), numbered `CatLine` records (`-n`) or a `CatContent` (`-c`) | [cat](docs/recettes/cat.md) |
-| `where` | Filters objects: `where { $_.size > 1mb }`, `where { f -> f.dir }`, short form `where name == usr` | [etape-4](docs/recettes/etape-4.md) |
-| `map` | Transforms objects: `map { f -> f.name }`, `map FileEntry::name` | [etape-5b](docs/recettes/etape-5b.md) |
-| `sort` | Sorts objects by keys: `sort size --desc`, `sort dir name`, `sort { $_.name.length() }`, `-i` ignores case | [sort](docs/recettes/sort.md) |
-| `first`, `last` | The first / last objects: `ls -r \| first 5` stops the walk as soon as it has them | [first-last-range](docs/recettes/first-last-range.md) |
-| `range` | Objects between two bounds: positions (`range --from 5 --to 10`), regular expressions on a property (`range --from Paul --to Peter --property name`) or blocks, `--exclude`, `--repeat` | [first-last-range](docs/recettes/first-last-range.md) |
-| `select` | Chooses and computes columns: `select name size`, `select file=name kb={ $_.size / 1kb }`; first in a pipeline it gives one row: `select content={(cat a.txt)}`; the `Row`s are tables and their columns stay properties (`\| sort kb -d`) | [select](docs/recettes/select.md) |
-| `count`, `measure` | Count the objects (`ls -r \| count`); count, sum, average, min and max of a property (`ls -r \| measure size`, sizes in readable form) | [count-measure](docs/recettes/count-measure.md) |
-| `group` | Groups by key: `ls -r \| group ext \| sort count -d \| first 5`; one `Group(key, count, items)` per key, several keys allowed, `-n` keeps only the counts | [group](docs/recettes/group.md) |
-| `join` | Joins the pipeline objects with those of another source by key: `cat a.csv \| from-csv \| join -r { (cat b.csv \| from-csv) } -k id`; one `Row` per matching pair, `--left-key`/`--right-key` when the keys differ, `-o` keeps the objects without a match | [join](docs/recettes/join.md) |
-| `mkdir`, `touch`, `cp`, `mv`, `rm` | File operations, also from the pipeline (`ls --filter *.tmp \| rm -v`); `-n` dry run, `-f` to overwrite, `-r` for folders, `-p <n>` to copy or remove a tree in virtual threads (`cp`, `rm`); `rm` and `mv` refuse the protected paths listed in `~/.powerj/protected-paths` | [fileops](docs/recettes/fileops.md) |
-| `to-json`, `from-json`, `to-csv`, `from-csv` | JSON and CSV: `ls \| select name size \| to-json > files.json`, `cat files.json \| from-json \| where { $_.size > 1kb }`, `cat data.csv \| from-csv -d ";"`; always an array, JSON Lines with `-l`, CSV values as strings, objects as `Row`s | [json-csv](docs/recettes/json-csv.md) |
-| `ps`, `kill` | Processes as objects: `ps java \| sort cpu --desc \| first 3`, `ps notepad \| kill -n`, then `ps notepad \| kill -w`; `-f` forcible stop, `-v` shows what was stopped | [ps-kill](docs/recettes/ps-kill.md) |
-| `perf` | What perf mode (Alt+P) measured, as records: `perf \| sort active -d \| first 1`, `perf --view blocks`, `perf --view hot`, `perf --save f.jfr`; views `stages`, `blocks`, `natives`, `phases`, `jvm`, `lines`, `hot`, `gc`, `alloc` | [perf](docs/recettes/perf.md) |
-| `grid` | **Optional module** `powerj-fx`: shows the objects in a JavaFX window, with sorting and filtering by column, loading while the pipeline runs, copy, and `--pass-thru` to send the ticked rows on: `ls -r \| grid`, `ps \| grid --columns pid,name`, `ls -r \| grid --pass-thru \| rm` | [fx-grid](docs/recettes/fx-grid.md) |
-| `collect` | Gathers a pipeline into one list: `(ls -r \| collect).size()` | [etape-8](docs/recettes/etape-8-collect.md) |
-| `env` | Reads and sets environment variables (`env --set MAVEN_OPTS=-Xmx2g`) | [etape-3](docs/recettes/etape-3.md) |
+| `ls` | Lists files as `FileEntry` records (`-r` recursive, `-a` hidden, `--filter *.java`, `-d` dirs, `-p 16` parallel walk) | [step-3](docs/acceptance/step-3.md) |
+| `grep` | Java regex search in files and folders, or in the pipeline objects; `GrepMatch` records with highlighted matches and capture groups | [grep](docs/acceptance/grep.md) |
+| `cat` | Reads files as lines (`-l`), one text (`-t`), numbered `CatLine` records (`-n`) or a `CatContent` (`-c`) | [cat](docs/acceptance/cat.md) |
+| `where` | Filters objects: `where { $_.size > 1mb }`, `where { f -> f.dir }`, short form `where name == usr` | [step-4](docs/acceptance/step-4.md) |
+| `map` | Transforms objects: `map { f -> f.name }`, `map FileEntry::name` | [step-5b](docs/acceptance/step-5b.md) |
+| `sort` | Sorts objects by keys: `sort size --desc`, `sort dir name`, `sort { $_.name.length() }`, `-i` ignores case | [sort](docs/acceptance/sort.md) |
+| `first`, `last` | The first / last objects: `ls -r \| first 5` stops the walk as soon as it has them | [first-last-range](docs/acceptance/first-last-range.md) |
+| `range` | Objects between two bounds: positions (`range --from 5 --to 10`), regular expressions on a property (`range --from Paul --to Peter --property name`) or blocks, `--exclude`, `--repeat` | [first-last-range](docs/acceptance/first-last-range.md) |
+| `select` | Chooses and computes columns: `select name size`, `select file=name kb={ $_.size / 1kb }`; first in a pipeline it gives one row: `select content={(cat a.txt)}`; the `Row`s are tables and their columns stay properties (`\| sort kb -d`) | [select](docs/acceptance/select.md) |
+| `count`, `measure` | Count the objects (`ls -r \| count`); count, sum, average, min and max of a property (`ls -r \| measure size`, sizes in readable form) | [count-measure](docs/acceptance/count-measure.md) |
+| `group` | Groups by key: `ls -r \| group ext \| sort count -d \| first 5`; one `Group(key, count, items)` per key, several keys allowed, `-n` keeps only the counts | [group](docs/acceptance/group.md) |
+| `join` | Joins the pipeline objects with those of another source by key: `cat a.csv \| from-csv \| join -r { (cat b.csv \| from-csv) } -k id`; one `Row` per matching pair, `--left-key`/`--right-key` when the keys differ, `-o` keeps the objects without a match | [join](docs/acceptance/join.md) |
+| `mkdir`, `touch`, `cp`, `mv`, `rm` | File operations, also from the pipeline (`ls --filter *.tmp \| rm -v`); `-n` dry run, `-f` to overwrite, `-r` for folders, `-p <n>` to copy or remove a tree in virtual threads (`cp`, `rm`); `rm` and `mv` refuse the protected paths listed in `~/.powerj/protected-paths` | [fileops](docs/acceptance/fileops.md) |
+| `to-json`, `from-json`, `to-csv`, `from-csv` | JSON and CSV: `ls \| select name size \| to-json > files.json`, `cat files.json \| from-json \| where { $_.size > 1kb }`, `cat data.csv \| from-csv -d ";"`; always an array, JSON Lines with `-l`, CSV values as strings, objects as `Row`s | [json-csv](docs/acceptance/json-csv.md) |
+| `ps`, `kill` | Processes as objects: `ps java \| sort cpu --desc \| first 3`, `ps notepad \| kill -n`, then `ps notepad \| kill -w`; `-f` forcible stop, `-v` shows what was stopped | [ps-kill](docs/acceptance/ps-kill.md) |
+| `perf` | What perf mode (Alt+P) measured, as records: `perf \| sort active -d \| first 1`, `perf --view blocks`, `perf --view hot`, `perf --save f.jfr`; views `stages`, `blocks`, `natives`, `phases`, `jvm`, `lines`, `hot`, `gc`, `alloc` | [perf](docs/acceptance/perf.md) |
+| `grid` | **Optional module** `powerj-fx`: shows the objects in a JavaFX window, with sorting and filtering by column, loading while the pipeline runs, copy, and `--pass-thru` to send the ticked rows on: `ls -r \| grid`, `ps \| grid --columns pid,name`, `ls -r \| grid --pass-thru \| rm` | [fx-grid](docs/acceptance/fx-grid.md) |
+| `collect` | Gathers a pipeline into one list: `(ls -r \| collect).size()` | [step-8](docs/acceptance/step-8-collect.md) |
+| `env` | Reads and sets environment variables (`env --set MAVEN_OPTS=-Xmx2g`) | [step-3](docs/acceptance/step-3.md) |
 
 Built-in commands: `cd` (`cd -`, `cd ~`, `cd D:`), `pwd`, `which`, `help` (`help ls`, `help java.util.List`, `help members $x`), `history` (plus `!!`, `!n`, `!text`), `import`, `mod-load`, `mod-list`, `jobs`, `exit [code]`.
 
@@ -134,7 +134,7 @@ Persistent history with prefix search on ↑/↓, **Ctrl+R** reverse search, **T
 
 ### Preview mode
 
-Press **Alt+V**: the prompt becomes `PJ?` and the first results of the line appear **below it while you type**, before Enter, for the pipeline stage under the cursor. Only what changes nothing runs: cmdlets declared `preview = true` and a fixed set of JDK methods; a native command, a built-in command, a Java call that could change something, an assignment or a redirection pauses the preview with the reason. Enter executes the line as usual. Details: FR-66 in the specification, checklist [preview](docs/recettes/preview.md).
+Press **Alt+V**: the prompt becomes `PJ?` and the first results of the line appear **below it while you type**, before Enter, for the pipeline stage under the cursor. Only what changes nothing runs: cmdlets declared `preview = true` and a fixed set of JDK methods; a native command, a built-in command, a Java call that could change something, an assignment or a redirection pauses the preview with the reason. Enter executes the line as usual. Details: FR-66 in the specification, checklist [preview](docs/acceptance/preview.md).
 
 ```text
 PJ? C:\dev> ls -r --filter *.java | where { f -> f.size > 10kb }█
@@ -146,7 +146,7 @@ Parser.java       12.4 KB   2026-10-12 09:41  false
 
 ### Perf mode
 
-Press **Alt+P**: the prompt becomes `PJ%` and each line you run is measured. A gray summary follows the output: the time of every stage of the pipeline split into **active** (its own work), **starved** (waiting for the previous stage) and **blocked** (waiting for the next one), the objects in and out, the time spent displaying, and what the JVM did. The **bottleneck** is the stage with the most active time. Alt+P again leaves the mode; perf and preview modes exclude each other. The Java Flight Recorder profiles each measured line, so the summary also names the hottest methods of the bottleneck. Afterwards, the `perf` cmdlet gives the details as records that a pipeline can process, and `perf --save f.jfr` keeps the recording of a line for JDK Mission Control. Details: FR-76 in the specification, checklist [perf](docs/recettes/perf.md).
+Press **Alt+P**: the prompt becomes `PJ%` and each line you run is measured. A gray summary follows the output: the time of every stage of the pipeline split into **active** (its own work), **starved** (waiting for the previous stage) and **blocked** (waiting for the next one), the objects in and out, the time spent displaying, and what the JVM did. The **bottleneck** is the stage with the most active time. Alt+P again leaves the mode; perf and preview modes exclude each other. The Java Flight Recorder profiles each measured line, so the summary also names the hottest methods of the bottleneck. Afterwards, the `perf` cmdlet gives the details as records that a pipeline can process, and `perf --save f.jfr` keeps the recording of a line for JDK Mission Control. Details: FR-76 in the specification, checklist [perf](docs/acceptance/perf.md).
 
 ```text
 PJ% ~/dev> ls -r / | where { $_.size > 1mb } | sort size -d | first 5
@@ -248,8 +248,8 @@ PowerJ keeps its files in `~/.powerj/` (`%USERPROFILE%\.powerj\` on Windows, or 
 |---|---|
 | `history` | Command history (UTF-8), reloaded at startup |
 | `config.properties` | `history.size=10000`, `language=en` (or `fr`), `modules.nativeAccess.<module>=true` (consent to load a module that uses native code, asked once). Java properties syntax: a backslash in a value is written twice. A file that cannot be read is reported at startup and the defaults apply |
-| `profile.pj` | Commands run when the interactive shell starts: `$proj = Path.of("/home/me/dev")`, `import java.time.*`, `env --set MAVEN_OPTS=-Xmx2g` — errors show their line and never prevent startup ([profile](docs/recettes/profile.md)) |
-| `protected-paths` | Paths that `rm` and `mv` refuse to remove (one per line, `~` for the home folder); written with the defaults of the platform on first launch, then yours to edit ([fileops](docs/recettes/fileops.md)) |
+| `profile.pj` | Commands run when the interactive shell starts: `$proj = Path.of("/home/me/dev")`, `import java.time.*`, `env --set MAVEN_OPTS=-Xmx2g` — errors show their line and never prevent startup ([profile](docs/acceptance/profile.md)) |
+| `protected-paths` | Paths that `rm` and `mv` refuse to remove (one per line, `~` for the home folder); written with the defaults of the platform on first launch, then yours to edit ([fileops](docs/acceptance/fileops.md)) |
 | `modules/` | Third-party module jars, or folders (a module and its dependencies), loaded at startup |
 | `fx-grid.properties` | Position and size of the window of `grid`, written when it is closed |
 | `logs/` | Diagnostic log, always in English |
@@ -264,7 +264,7 @@ PowerJ keeps its files in `~/.powerj/` (`%USERPROFILE%\.powerj\` on Windows, or 
 | `POWERJ_NATIVE_ENCODING`, `POWERJ_NATIVE_ENCODING_<NAME>` | Encoding of the output of native commands, globally or for one program |
 | `NO_COLOR` | Disables colors |
 
-**Language.** By default PowerJ follows the display language of the system (French → French, anything else → English). Precedence: system property `-Dpowerj.language`, then `POWERJ_LANG`, then the `language` key of `config.properties`, then the system ([i18n](docs/recettes/i18n.md)).
+**Language.** By default PowerJ follows the display language of the system (French → French, anything else → English). Precedence: system property `-Dpowerj.language`, then `POWERJ_LANG`, then the `language` key of `config.properties`, then the system ([i18n](docs/acceptance/i18n.md)).
 
 ```text
 POWERJ_LANG=fr powerj                   # Linux / macOS
@@ -378,7 +378,7 @@ The complete example lives in [`examples/greet`](examples/greet) (also built by 
 ./mvnw verify
 ```
 
-Unit and integration tests use JUnit 5 and AssertJ: lexer, parser, option binding, Java interop, pipeline, completion, native commands, module loading, the built-in cmdlets, and the REPL driven through a scripted terminal. Tests force English messages so that they do not depend on the machine, and pass on Linux and on Windows. The CI additionally runs a smoke test against the packaged launcher. Each development step has a manual acceptance checklist in [`docs/recettes/`](docs/recettes/).
+Unit and integration tests use JUnit 5 and AssertJ: lexer, parser, option binding, Java interop, pipeline, completion, native commands, module loading, the built-in cmdlets, and the REPL driven through a scripted terminal. Tests force English messages so that they do not depend on the machine, and pass on Linux and on Windows. The CI additionally runs a smoke test against the packaged launcher. Each development step has a manual acceptance checklist in [`docs/acceptance/`](docs/acceptance/).
 
 **Coverage.** `./mvnw verify` measures the coverage with JaCoCo and fails below **80% of the lines and of the branches**, for PowerJ as a whole and for the built-in cmdlets (`io.powerj.cmdlets`). The tests of every module count for every module. The report is in `powerj-coverage/target/site/jacoco-aggregate/index.html` (the CI publishes it as the `coverage-report` artifact); `-Djacoco.skip=true` skips the measure. Each module also keeps a floor for the coverage of its own tests (a ratchet: it goes up, never down).
 
@@ -398,15 +398,15 @@ PowerJ is in active development (version `0.2.0-SNAPSHOT`). Implemented so far:
 - perf mode (Alt+P) and the `perf` cmdlet: where a pipeline spends its time;
 - the optional JavaFX module `powerj-fx` and its `grid` cmdlet: a window with a sortable, filterable table, progressive loading, copy and `--pass-thru`.
 
-The v1 cmdlet roadmap is done ([roadmap](docs/plans/cmdlet-roadmap.md), end-to-end check in [pipeline-v1](docs/recettes/pipeline-v1.md)). Still in the backlog ([§12.3](docs/SPECIFICATION.md#123-cmdlet-backlog-outside-the-current-scope)): `uniq`, `find`, `tee`, `table`/`tree`, `http`/`ping`, `open`. Next: a scripting language with control structures in v2. The step-by-step plan is in [§11 of the specification](docs/SPECIFICATION.md#11-iterative-development-plan).
+The v1 cmdlet roadmap is done ([roadmap](docs/plans/cmdlet-roadmap.md), end-to-end check in [pipeline-v1](docs/acceptance/pipeline-v1.md)). Still in the backlog ([§12.3](docs/SPECIFICATION.md#123-cmdlet-backlog-outside-the-current-scope)): `uniq`, `find`, `tee`, `table`/`tree`, `http`/`ping`, `open`. Next: a scripting language with control structures in v2. The step-by-step plan is in [§11 of the specification](docs/SPECIFICATION.md#11-iterative-development-plan).
 
 ## Documentation
 
 - [Specification](docs/SPECIFICATION.md): functional requirements, grammar, extension API, architecture.
-- [Acceptance checklists](docs/recettes/) for each development step, and [plans](docs/plans/) of the latest iterations.
+- [Acceptance checklists](docs/acceptance/) for each development step, and [plans](docs/plans/) of the latest iterations.
 - [Example module `greet`](examples/greet/README.md).
 - [Architecture review](docs/REVUE-ARCHITECTURE.md) (in French): strengths, findings, target organization, design patterns and a phased refactoring plan; Phase 0 (the safety net) is done, see its §11. [Changelog](CHANGELOG.md).
-- [Module `powerj-fx` and `grid`](docs/plans/fx-grid.md): plan, decisions and [acceptance checklist](docs/recettes/fx-grid.md).
+- [Module `powerj-fx` and `grid`](docs/plans/fx-grid.md): plan, decisions and [acceptance checklist](docs/acceptance/fx-grid.md).
 
 Coming from PowerShell? A few equivalences (full table in [§12.4](docs/SPECIFICATION.md#124-powershell--powerj-mapping)):
 
