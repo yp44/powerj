@@ -20,6 +20,7 @@ import io.powerj.core.command.CmdletRegistry;
 import io.powerj.core.error.PjException;
 import io.powerj.core.nativeexec.NativeRun;
 import io.powerj.core.nativeexec.Platform;
+import io.powerj.core.support.Waits;
 
 /** Runs real native commands ({@code sh}, {@code printf}…): tests limited to Linux/macOS. */
 class InterpreterTest {
@@ -234,7 +235,11 @@ class InterpreterTest {
                 assertThat(job.command()).isEqualTo("sleep 30");
                 assertThat(job.running()).isTrue();
             });
-            // Ctrl+C in the terminal reaches the whole process group: the background command ignores it.
+            // Ctrl+C in the terminal reaches the whole process group: the background command ignores it. The shell
+            // that starts it ignores the signal, then becomes `sleep`: signalled before that (a loaded macOS runner
+            // got there first) it would die, which no user can do within a millisecond of pressing Enter.
+            Waits.until("the shell to have become sleep",
+                    () -> sleep.info().command().map(command -> command.endsWith("sleep")).orElse(true));
             new ProcessBuilder("kill", "-INT", String.valueOf(last.pid())).start().waitFor();
             // The one wait of this suite that is a duration on purpose: "the process did NOT die" can only be
             // observed by letting some time pass (a death would be immediate).
