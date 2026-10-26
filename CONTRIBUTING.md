@@ -48,8 +48,10 @@ refreeze to make a build pass. Each rule says in its Javadoc which finding of th
 
 **API snapshot.** `powerj-api` is what third parties compile against. A change to it is deliberate: run
 `./mvnw -pl powerj-api test -Dpowerj.api.update=true`, read the diff of
-`powerj-api/src/test/resources/io/powerj/api/api-surface.txt`, and describe the change in [CHANGELOG.md](CHANGELOG.md)
-(add, never remove, unless you deprecate first with `@Deprecated(since = …, forRemoval = true)`).
+`powerj-api/src/test/resources/io/powerj/api/api-surface.txt`, and describe the change in [CHANGELOG.md](CHANGELOG.md).
+**Nothing has been published yet, so the API may still be broken**: a removed or changed member goes under "Breaking changes
+of the API", without a deprecation first. From the first release on, the rule is to add and never to remove, unless the
+member is deprecated first with `@Deprecated(since = …, forRemoval = true)` for one minor version.
 
 ## The backlog
 

@@ -15,8 +15,6 @@ public final record io.powerj.api.Attempt<T>
 public abstract @interface io.powerj.api.Bytes extends java.lang.annotation.Annotation retention=RUNTIME
 
 public abstract interface io.powerj.api.Cmdlet<P extends java.lang.Record,I,O>
-  public default boolean io.powerj.api.Cmdlet.previewable(P)
-  public default java.util.List<java.lang.String> io.powerj.api.Cmdlet.columns(java.lang.String)
   public default void io.powerj.api.Cmdlet.begin(P,io.powerj.api.CmdletContext<O>) throws java.lang.Exception
   public default void io.powerj.api.Cmdlet.end(P,io.powerj.api.CmdletContext<O>) throws java.lang.Exception
   public default void io.powerj.api.Cmdlet.process(P,I,io.powerj.api.CmdletContext<O>) throws java.lang.Exception

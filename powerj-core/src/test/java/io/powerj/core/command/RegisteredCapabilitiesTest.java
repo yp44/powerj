@@ -14,7 +14,7 @@ import io.powerj.api.Row;
 
 /**
  * The optional capabilities of a cmdlet, asked through {@link CmdletRegistry.Registered}: the interface that implements
- * them, or the deprecated default method of a cmdlet written before the interfaces existed.
+ * them, and what a cmdlet without the interface gets.
  */
 class RegisteredCapabilitiesTest {
 
@@ -33,20 +33,6 @@ class RegisteredCapabilitiesTest {
         @Override
         public List<String> columnsOf(String arguments) {
             return List.of("new:" + arguments.strip());
-        }
-    }
-
-    @CmdletInfo(name = "legacy", summary = "Overrides the deprecated defaults", preview = true)
-    @SuppressWarnings({"deprecation", "removal"})
-    static final class Legacy implements Cmdlet<Params, Void, Row> {
-        @Override
-        public boolean previewable(Params params) {
-            return !params.word().equals("change");
-        }
-
-        @Override
-        public List<String> columns(String arguments) {
-            return List.of("old:" + arguments.strip());
         }
     }
 
@@ -73,14 +59,5 @@ class RegisteredCapabilitiesTest {
     @Test
     void theColumnProviderCapabilityNamesTheColumns() {
         assertThat(registered(new Capable(), "capable").columns(" a b ")).containsExactly("new:a b");
-    }
-
-    @Test
-    void theDeprecatedDefaultsOfACmdletWrittenBeforeAreStillHonoured() {
-        var legacy = registered(new Legacy(), "legacy");
-
-        assertThat(legacy.previewable(new Params("show"))).isTrue();
-        assertThat(legacy.previewable(new Params("change"))).isFalse();
-        assertThat(legacy.columns(" a b ")).containsExactly("old:a b");
     }
 }

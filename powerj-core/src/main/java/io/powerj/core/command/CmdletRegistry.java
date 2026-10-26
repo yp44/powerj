@@ -44,22 +44,19 @@ public final class CmdletRegistry {
 
         /**
          * Preview mode (FR-66): may the cmdlet run in a preview with these parameters? Asks the {@link Previewable}
-         * capability, or the deprecated {@code Cmdlet.previewable} of a cmdlet written before it.
+         * capability; a cmdlet that does not have it can.
          */
-        @SuppressWarnings({"unchecked", "deprecation", "removal"})
+        @SuppressWarnings("unchecked")
         public boolean previewable(Record params) {
-            return cmdlet instanceof Previewable<?> capable ? ((Previewable<Record>) capable).canPreview(params)
-                    : ((Cmdlet<Record, ?, ?>) cmdlet).previewable(params);
+            return !(cmdlet instanceof Previewable<?> capable) || ((Previewable<Record>) capable).canPreview(params);
         }
 
         /**
          * Columns that the rows of the cmdlet will have, read from the text of its arguments: the {@link ColumnProvider}
-         * capability, or the deprecated {@code Cmdlet.columns} of a cmdlet written before it. Empty when none is known.
+         * capability. Empty when the cmdlet has none, or knows none.
          */
-        @SuppressWarnings({"deprecation", "removal"})
         public List<String> columns(String arguments) {
-            return cmdlet instanceof ColumnProvider provider ? provider.columnsOf(arguments)
-                    : cmdlet.columns(arguments);
+            return cmdlet instanceof ColumnProvider provider ? provider.columnsOf(arguments) : List.of();
         }
 
         /** Summary in the current language ({@code <name>.summary} of the provider's messages, FR-61). */

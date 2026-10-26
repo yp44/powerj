@@ -16,4 +16,5 @@ built-in cmdlets create their default files, so that the shell does not have to 
 ## Consequences
 The API had to grow the capabilities the built-in cmdlets used (`tryInvoke`, `state`, `property`, the `Previewable` and
 `ColumnProvider` interfaces), which is what makes it complete for others. The cost is an API that has to be kept compatible
-(`ApiSurfaceTest`, deprecation before removal). The ArchUnit rule `cmdletsAreIndependentOfTheEngine` keeps it so.
+(`ApiSurfaceTest`; once a version is published, deprecation before removal; until then it may still be broken). The
+ArchUnit rule `cmdletsAreIndependentOfTheEngine` keeps it so.

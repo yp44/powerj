@@ -125,8 +125,9 @@ streams. There is no dependency-injection framework (see ADR 0007).
 | What a cmdlet can ask of the shell | `context.service(PerfReports.class)`, `context.property("a.b")`, `context.setEnvironment(…)` | `CmdletContext` |
 | A profiler | a `Profiler` service of `powerj-core` (JFR is the one provided) | `core.perf` |
 
-The API only grows: a member is deprecated with `@Deprecated(forRemoval = true)` for a release before it goes, and
-`ApiSurfaceTest` fails when the public surface changes without its snapshot being regenerated.
+`ApiSurfaceTest` fails when the public surface changes without its snapshot being regenerated. Nothing is published yet, so
+the API may still be broken (the change is listed in the CHANGELOG); from the first release on it only grows, and a member
+is deprecated with `@Deprecated(forRemoval = true)` for a release before it goes.
 
 ## 8. `powerj-fx`
 

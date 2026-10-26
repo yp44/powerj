@@ -25,8 +25,10 @@ import org.junit.jupiter.api.Test;
  * <p>
  * Any change of the public or protected API makes this test fail: that is the point. Look at the difference, decide
  * whether it is a compatible change (new method with a {@code default}, new type) or a break (removed or changed
- * member: it must first be {@code @Deprecated(forRemoval = true)} for one minor version, see CHANGELOG.md), then
- * regenerate the snapshot with {@code ./mvnw test -pl powerj-api -Dpowerj.api.update=true} and commit it with the change.
+ * member). Until a version is published a break is allowed and goes in the "Breaking changes of the API" of
+ * CHANGELOG.md; from the first release on, the member is first {@code @Deprecated(forRemoval = true)} for one minor
+ * version. Then regenerate the snapshot with {@code ./mvnw test -pl powerj-api -Dpowerj.api.update=true} and commit it
+ * with the change.
  */
 class ApiSurfaceTest {
 
@@ -50,7 +52,7 @@ class ApiSurfaceTest {
             List<String> added = new ArrayList<>(after);
             added.removeAll(before);
             fail("""
-                    The public API changed. Removed or changed (a break unless deprecated first):
+                    The public API changed. Removed or changed (a break: fine before the first release, to deprecate first after it):
                     %s
                     Added or changed:
                     %s

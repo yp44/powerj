@@ -2,7 +2,9 @@
 
 All notable changes to PowerJ are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 the versions follow [Semantic Versioning](https://semver.org/). While the major version is 0, a minor version may change
-the extension API (`powerj-api`); such a change is announced as *deprecated* one minor version before it is removed.
+the extension API (`powerj-api`). Nothing has been published yet, so until the first release a change of the API is listed
+under "Breaking changes of the API" without a deprecation first; from the first release on, such a change is announced as
+*deprecated* one minor version before it is removed.
 
 ## [0.2.0] — in development (`0.2.0-SNAPSHOT`)
 
@@ -141,7 +143,7 @@ structures, functions) can be built on it. The work is organised in phases (revi
   - `UsageException` (an `IllegalArgumentException`) says that a cmdlet was used incorrectly; `CmdletContext.property`
     gives the block that reads a property; `CmdletContext.service(Class)` offers what only a few cmdlets need.
   - The optional abilities of a cmdlet are interfaces, `Previewable` and `ColumnProvider`; the matching default methods
-    of `Cmdlet` (`previewable`, `columns`) are deprecated for removal and still honoured.
+    of `Cmdlet` (`previewable`, `columns`) are removed (see the breaking changes below).
   - The perf types move from `io.powerj.api` to `io.powerj.api.perf`.
 - Compiler warnings: 72 → 32.
 
@@ -149,6 +151,11 @@ structures, functions) can be built on it. The work is organised in phases (revi
 
 - `CmdletContext.environment()` is a read-only copy; use `setEnvironment` and `unsetEnvironment` to change the
   environment of the session (a cmdlet that wrote to the map now gets an `UnsupportedOperationException`).
+- `Cmdlet.previewable(P)` and `Cmdlet.columns(String)` are removed: a cmdlet that must refuse the options that change
+  something implements `Previewable` (`canPreview`), one that emits `Row`s and names their columns implements
+  `ColumnProvider` (`columnsOf`). They were deprecated in this same development cycle and kept for a moment; the shell
+  no longer asks them, and a cmdlet that overrides them no longer compiles (`@Override` on a method that is gone). No
+  built-in cmdlet and no example did.
 - `CmdletContext.perfReports()` is removed: `context.service(PerfReports.class)`. `PerfReport`, `StageStat`,
   `BlockStat`, `NativeStat`, `PhaseStat`, `JvmStat`, `HotMethod`, `GcStat`, `AllocStat` and `LineStat` are in
   `io.powerj.api.perf`.
@@ -293,8 +300,7 @@ structures, functions) can be built on it. The work is organised in phases (revi
 ### Planned (review §8)
 **The backlog is kept in [GitHub issues](https://github.com/yp44/powerj/issues)** (see [CONTRIBUTING.md](CONTRIBUTING.md#the-backlog));
 this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5 are done (reports in the review, §12 to
-§16). The API members deprecated in 0.2 (`Cmdlet.previewable`, `Cmdlet.columns`) are removed no sooner than 0.3.0. What is
-open, and who decides it, is listed in §16.4 of the review and has one issue each:
+§16). What is open, and who decides it, is listed in §16.4 of the review and has one issue each:
 - **The first release** ([#47](https://github.com/yp44/powerj/issues/47)) **and how to sign it**
   ([#48](https://github.com/yp44/powerj/issues/48)). The release workflow is written ([docs/RELEASING.md](docs/RELEASING.md))
   and has never run; nothing is signed. Tagging, and the way to sign, are the maintainer's decisions.
