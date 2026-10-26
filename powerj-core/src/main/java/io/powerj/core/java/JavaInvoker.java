@@ -12,6 +12,7 @@ import java.math.BigInteger;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -79,23 +80,37 @@ public final class JavaInvoker {
         return call(policy, method, target, convertAll(method, args));
     }
 
-    /** {@code Class.name(arguments)}. */
-    public static Object invokeStatic(CallPolicy policy, Class<?> type, String name, List<Object> args) {
-        List<Executable> candidates = new ArrayList<>();
-        for (Method m : type.getMethods()) {
-            if (m.getName().equals(name) && Modifier.isStatic(m.getModifiers())
-                    && JavaClasses.accessible(m.getDeclaringClass()) && m.getDeclaringClass() == type) {
-                candidates.add(m);
-            }
-        }
-        if (candidates.isEmpty()) {
-            for (Method m : type.getMethods()) { // static methods inherited from a superclass
-                if (m.getName().equals(name) && Modifier.isStatic(m.getModifiers())
-                        && JavaClasses.accessible(m.getDeclaringClass())) {
-                    candidates.add(m);
+    /**
+     * Static methods of a class by name, found once per class (review C-26): the ones it declares itself, or if it
+     * declares none of that name, the ones it inherits. {@code getMethods()} copies every public method at each call.
+     */
+    private static final ClassValue<Map<String, List<Method>>> STATIC_METHODS = new ClassValue<>() {
+        @Override
+        protected Map<String, List<Method>> computeValue(Class<?> type) {
+            Map<String, List<Method>> declared = new HashMap<>();
+            Map<String, List<Method>> inherited = new HashMap<>();
+            for (Method m : type.getMethods()) {
+                if (Modifier.isStatic(m.getModifiers()) && JavaClasses.accessible(m.getDeclaringClass())) {
+                    inherited.computeIfAbsent(m.getName(), _ -> new ArrayList<>()).add(m);
+                    if (m.getDeclaringClass() == type) {
+                        declared.computeIfAbsent(m.getName(), _ -> new ArrayList<>()).add(m);
+                    }
                 }
             }
+            inherited.putAll(declared);
+            inherited.replaceAll((_, methods) -> List.copyOf(methods));
+            return Map.copyOf(inherited);
         }
+    };
+
+    /** The static methods of {@code type} called {@code name}, as {@link #invokeStatic} chooses among them. */
+    static List<Method> staticMethods(Class<?> type, String name) {
+        return STATIC_METHODS.get(type).getOrDefault(name, List.of());
+    }
+
+    /** {@code Class.name(arguments)}. */
+    public static Object invokeStatic(CallPolicy policy, Class<?> type, String name, List<Object> args) {
+        List<Method> candidates = staticMethods(type, name);
         if (candidates.isEmpty()) {
             throw new PjException(Messages.get("java.noStaticMethod", type.getSimpleName(), name));
         }

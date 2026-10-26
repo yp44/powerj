@@ -1,7 +1,6 @@
 package io.powerj.cmdlets;
 
 import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.RecordComponent;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -38,9 +37,10 @@ final class Properties {
      * @throws IllegalStateException if a component cannot be read
      */
     static Map<String, Object> of(Record record) {
+        RecordShape shape = RecordShape.of(record.getClass());
         Map<String, Object> values = new LinkedHashMap<>();
-        for (RecordComponent component : record.getClass().getRecordComponents()) {
-            values.put(component.getName(), read(record, component));
+        for (int i = 0; i < shape.names().size(); i++) {
+            values.put(shape.names().get(i), read(record, shape, i));
         }
         return values;
     }
@@ -49,11 +49,7 @@ final class Properties {
     static List<String> columns(Object value) {
         List<String> columns = new ArrayList<>();
         switch (value) {
-            case Record record -> {
-                for (RecordComponent component : record.getClass().getRecordComponents()) {
-                    columns.add(component.getName());
-                }
-            }
+            case Record record -> columns.addAll(RecordShape.of(record.getClass()).names());
             case Map<?, ?> map -> map.keySet().forEach(key -> columns.add(String.valueOf(key)));
             case null, default -> columns.add(VALUE);
         }
@@ -68,12 +64,9 @@ final class Properties {
     static Object get(Object value, String column) {
         switch (value) {
             case Record record -> {
-                for (RecordComponent component : record.getClass().getRecordComponents()) {
-                    if (component.getName().equals(column)) {
-                        return read(record, component);
-                    }
-                }
-                return null;
+                RecordShape shape = RecordShape.of(record.getClass());
+                int index = shape.indexOf(column);
+                return index < 0 ? null : read(record, shape, index);
             }
             case Map<?, ?> map -> {
                 if (map.containsKey(column)) {
@@ -92,19 +85,17 @@ final class Properties {
         }
     }
 
-    private static Object read(Record record, RecordComponent component) {
+    private static Object read(Record record, RecordShape shape, int index) {
+        String name = shape.names().get(index);
         try {
-            var accessor = component.getAccessor();
-            accessor.trySetAccessible();
-            return accessor.invoke(record);
+            return shape.accessor(index).invoke(record);
         } catch (InvocationTargetException e) {
             if (e.getCause() instanceof CancellationException cancelled) {
                 throw cancelled; // an accessor that was interrupted: the command is being stopped
             }
-            throw new Unreadable(Messages.get("properties.read.failed", component.getName(), e.getCause()),
-                    e.getCause());
+            throw new Unreadable(Messages.get("properties.read.failed", name, e.getCause()), e.getCause());
         } catch (IllegalAccessException e) {
-            throw new Unreadable(Messages.get("properties.read.failed", component.getName(), e), e);
+            throw new Unreadable(Messages.get("properties.read.failed", name, e), e);
         }
     }
 }

@@ -1,6 +1,5 @@
 package io.powerj.cmdlets;
 
-import java.lang.reflect.RecordComponent;
 
 import io.powerj.api.Bytes;
 
@@ -15,11 +14,6 @@ final class Sizes {
         if (value == null || property == null || !value.getClass().isRecord()) {
             return false;
         }
-        for (RecordComponent component : value.getClass().getRecordComponents()) {
-            if (component.getName().equals(property) && component.isAnnotationPresent(Bytes.class)) {
-                return true;
-            }
-        }
-        return false;
+        return RecordShape.of(value.getClass()).isBytes(property);
     }
 }

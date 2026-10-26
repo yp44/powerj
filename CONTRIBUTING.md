@@ -32,7 +32,8 @@ packaged launcher. `ci/smoke/fx.sh` needs a display (Xvfb is enough).
 | API snapshot (`powerj-api`) | the public surface of the extension API does not change by accident | see below |
 | `-Xlint:all` | warnings are reported but not yet fatal; the count is in [docs/quality/lint-baseline.md](docs/quality/lint-baseline.md) and must not rise | fix the warning |
 
-`./mvnw -Pquality verify` adds Error Prone (warnings only for now, baseline in `docs/quality/`).
+`./mvnw -Pquality verify` adds Error Prone (warnings only for now, baseline in `docs/quality/`). `./mvnw -Pbench -DskipTests package`
+builds the JMH benchmarks, which are not part of `verify` ([how to run them](docs/quality/performance.md)).
 
 **ArchUnit.** The rules are plain JUnit tests in `powerj-architecture/src/test/java`. A violation that existed when a rule
 was introduced is *frozen* in `src/test/resources/archunit_store`: it may disappear, a new one fails the build. Never

@@ -3,7 +3,6 @@ package io.powerj.core.java;
 import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.lang.reflect.RecordComponent;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -109,12 +108,9 @@ public final class PropertyAccess {
         Class<?> type = target.getClass();
         try {
             if (type.isRecord()) {
-                for (RecordComponent component : type.getRecordComponents()) {
-                    if (component.getName().equalsIgnoreCase(name)) {
-                        Method accessor = component.getAccessor();
-                        accessor.trySetAccessible();
-                        return new Lookup(true, accessor.invoke(target));
-                    }
+                Method accessor = RecordShape.of(type).accessor(name);
+                if (accessor != null) {
+                    return new Lookup(true, accessor.invoke(target));
                 }
             }
             var getter = Members.getter(type, name);

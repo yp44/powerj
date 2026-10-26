@@ -145,6 +145,13 @@
                 </plugins>
             </build>
         </profile>
+        <!-- Benchmarks (JMH), apart from the build: ./mvnw -Pbench -DskipTests package, then docs/quality/performance.md. -->
+        <profile>
+            <id>bench</id>
+            <modules>
+                <module>powerj-bench</module>
+            </modules>
+        </profile>
         <!-- Static analysis, as warnings for now (review C-32): ./mvnw -Pquality verify. Needs .mvn/jvm.config. -->
         <profile>
             <id>quality</id>

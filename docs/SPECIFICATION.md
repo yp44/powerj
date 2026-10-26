@@ -1641,12 +1641,12 @@ Environment variables read by PowerJ:
 | ID | Requirement |
 |---|---|
 | NFR-01 | Startup time: no requirement in v1 (a few seconds is acceptable). Optimization (JDK AOT cache, background class indexing) is planned for a later phase. |
-| NFR-02 | Imperceptible typing latency; completion < 50 ms. |
+| NFR-02 | Imperceptible typing latency; completion < 50 ms. Measured: 20 to 350 µs warm (`docs/quality/performance.md`). |
 | NFR-03 | Windows 10/11 x64 and Linux x64 are the tested platforms (the CI builds and runs both on every push); UTF-8 end to end (console in code page 65001). |
 | NFR-04 | `ls -r` on 100,000 files without running out of memory (streaming). |
 | NFR-05 | Test coverage ≥ 80% of the lines and of the branches, for PowerJ as a whole and for the built-in cmdlets (`io.powerj.cmdlets`), on Linux and on Windows; checked by `mvn verify` (JaCoCo, `powerj-coverage` module). |
 | NFR-06 | No raw Java exception displayed to the user outside debug mode. |
-| NFR-07 | First call of a Java method < 50 ms; subsequent calls (cached) < 1 ms. |
+| NFR-07 | First call of a Java method < 50 ms; subsequent calls (cached) < 1 ms. Measured: 28 ms on average in a fresh JVM, then under 1 µs (`docs/quality/performance.md`). |
 
 ---
 

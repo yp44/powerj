@@ -286,6 +286,7 @@ All modules are JPMS modules (`module-info.java`); the only runtime dependency i
 | `powerj-shell` | Entry point (`Main`), JLine REPL, profile, script mode, history expansion |
 | `powerj-fx` | Optional module, not in the distribution: the JavaFX cmdlets (`grid`); a template for a real third-party module (dependencies, messages, settings) |
 | `powerj-coverage` | Test coverage of all the modules: JaCoCo report and 80% threshold |
+| `powerj-bench` | JMH benchmarks, outside the default build (`-Pbench`, [numbers](docs/quality/performance.md)) |
 | `powerj-dist` | Distribution: jlink runtime + jpackage launcher / installer |
 | `examples/greet` | Example third-party module, not shipped: a template for your own cmdlets |
 

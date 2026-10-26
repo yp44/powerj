@@ -1,6 +1,5 @@
 package io.powerj.cmdlets;
 
-import java.lang.reflect.RecordComponent;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CancellationException;
@@ -75,18 +74,17 @@ public final class Kill implements Cmdlet<Kill.Params, Object, ProcessEntry> {
 
     /** Component {@code pid} of a record ({@code jobs | kill}, FR-75), or {@code null} if it has none. */
     private static Long pidOf(Record record) {
-        for (RecordComponent component : record.getClass().getRecordComponents()) {
-            if (component.getName().equals("pid")
-                    && (component.getType() == long.class || component.getType() == Long.class)) {
-                try {
-                    component.getAccessor().setAccessible(true);
-                    return (Long) component.getAccessor().invoke(record);
-                } catch (ReflectiveOperationException | RuntimeException e) {
-                    return null;
-                }
-            }
+        RecordShape shape = RecordShape.of(record.getClass());
+        int index = shape.indexOf("pid");
+        if (index < 0 || (shape.accessor(index).getReturnType() != long.class
+                && shape.accessor(index).getReturnType() != Long.class)) {
+            return null;
         }
-        return null;
+        try {
+            return (Long) shape.accessor(index).invoke(record);
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            return null;
+        }
     }
 
     private static void kill(Params p, long pid, CmdletContext<ProcessEntry> context) {

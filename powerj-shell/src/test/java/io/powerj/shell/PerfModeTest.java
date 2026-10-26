@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
@@ -82,8 +83,10 @@ class PerfModeTest {
         terminal.type(ALT_P);
         awaitUntil(() -> terminal.screen().contains("PJ% "));
         line("ls | count");
-        awaitUntil(() -> terminal.screen().contains("── perf ·"));
-        assertThat(terminal.screen()).contains("stage", "active", "count", "display", "JVM");
+        // The summary is drawn in several writes: wait for all of it, not for its first line.
+        List<String> summary = List.of("── perf ·", "stage", "active", "count", "display", "JVM");
+        awaitUntil(() -> summary.stream().allMatch(terminal.screen()::contains));
+        assertThat(terminal.screen()).contains(summary);
         assertThat(session.perfReports()).hasSize(1);
         exit();
     }

@@ -192,6 +192,14 @@ structures, functions) can be built on it. The work is organised in phases (revi
   (`NativeAccessPolicy.consent` takes the fingerprint: an internal interface). [ADR 0006](docs/adr/0006-consent-to-native-access-is-tied-to-the-content.md).
   Also fixed: the French message of that refusal showed `l''autoriser` (doubled apostrophe: the formatter does not
   unescape).
+- **Reading a property of a record is 185 times faster** (C-26, measured with JMH): `$_.size` in a `where`, `map` or `sort`
+  block cost 7 µs per object because `Class.getRecordComponents()` rebuilds its objects at every call; the accessors are now
+  found once per class (`RecordShape`, in the core and in the cmdlets). `to-csv` reads the 8 columns of a row in 0.4 µs instead
+  of 61 µs, `to-json` a record in 0.2 µs instead of 18 µs, and a static Java call takes 0.8 µs instead of 3.9 µs (the static
+  methods of a class are found once per class). `powerj-bench` (`-Pbench`) holds the benchmarks, including the first Java
+  call (28 ms, NFR-07) and one Tab (20 to 350 µs, NFR-02); the numbers and how to run them are in
+  [docs/quality/performance.md](docs/quality/performance.md). Two tests give a million reads a budget that the uncached code
+  cannot meet.
 - **JSON and CSV are checked against the standards** (C-25): the 316 small files of the JSONTestSuite (all valid ones
   accepted, all invalid ones rejected with a position, the 35 that the RFC leaves open pinned one by one), RFC 4180 section by
   section, and random values written then read back. They found and fixed: a number that does not fit a double was read as

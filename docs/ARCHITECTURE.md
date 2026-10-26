@@ -53,6 +53,7 @@ flowchart BT
 | `powerj-fx` | `api`, JavaFX | `grid`. A real third-party module that happens to live in the repository; not in the distribution. |
 | `powerj-shell` | `core`, JLine | `Main`, the composition root, the REPL, scripts, the profile, history. It also `requires cmdlets` so that the module is part of the runtime image. |
 | `powerj-architecture`, `powerj-coverage` | all | Build only: the architecture rules, and the aggregated coverage report with its thresholds. |
+| `powerj-bench` | `api`, `core`, `cmdlets` | JMH benchmarks, outside the default build (`-Pbench`): [docs/quality/performance.md](quality/performance.md). |
 | `powerj-dist` | all but `fx` | jlink runtime and jpackage launcher. |
 | `examples/greet` | `api` | An example third-party module. Not shipped. |
 
