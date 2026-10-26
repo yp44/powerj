@@ -106,7 +106,7 @@ public final class GridCmdlet implements Cmdlet<GridParams, Object, Object> {
         String title = p.title() == null || p.title().isBlank() ? Messages.get("grid.title") : p.title();
         var settings = context.configDirectory().map(dir -> dir.resolve(WindowSettings.FILE_NAME)).orElse(null);
         ColumnChoice chosen = columns;
-        context.state(Execution.class, () -> new Execution(new ObjectReader(new ScriptReader(context), p.raw()),
+        context.state(Execution.class, () -> new Execution(new ObjectReader(new ScriptReader(context), p.raw(), p.passThru()),
                 p.limit(), new WindowOptions(title, chosen, settings, p.passThru(), p.single())));
     }
 

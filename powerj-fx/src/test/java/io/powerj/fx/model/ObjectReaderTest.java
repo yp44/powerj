@@ -289,4 +289,91 @@ class ObjectReaderTest {
         Reading reading = reader.read(new java.util.ArrayList<>(List.of(1, 2)));
         assertThat(names(reading)).contains("empty");
     }
+
+    // --- the rows share what they have in common (review C-29) ---
+
+    @Test
+    void theRowsReadFromOneTypeShareTheirShape() {
+        var reader = new ObjectReader(Reflect::read);
+
+        GridRow first = reader.read(new Person("Ada", 36, Instant.EPOCH)).row();
+        GridRow second = reader.read(new Person("Alan", 41, Instant.EPOCH)).row();
+
+        assertThat(second.shape()).isSameAs(first.shape());
+        assertThat(second.get("name")).isEqualTo("Alan");
+        assertThat(reader.read(new Slow(1)).row().shape()).isNotSameAs(first.shape());
+    }
+
+    @Test
+    void theColumnsOfOneTypeAreWorkedOutOnce() {
+        var reader = new ObjectReader(Reflect::read);
+
+        Reading first = reader.read(new Person("Ada", 36, Instant.EPOCH));
+        Reading second = reader.read(new Person("Alan", 41, Instant.EPOCH));
+
+        assertThat(second.columns()).isSameAs(first.columns());
+    }
+
+    @Test
+    void theMapsWithTheSameKeysShareTheirShapeAndOthersDoNot() {
+        var reader = new ObjectReader(Reflect::read);
+        Map<String, Object> a = new LinkedHashMap<>();
+        a.put("x", 1);
+        a.put("y", 2);
+        Map<String, Object> b = new LinkedHashMap<>();
+        b.put("x", 10);
+        b.put("y", 20);
+        Map<String, Object> c = new LinkedHashMap<>();
+        c.put("y", 2);
+        c.put("x", 1);
+
+        GridRow ra = reader.read(a).row();
+        GridRow rb = reader.read(b).row();
+        GridRow rc = reader.read(c).row();
+
+        assertThat(rb.shape()).isSameAs(ra.shape());
+        assertThat(rc.shape()).isNotSameAs(ra.shape()); // the order of the keys is the order of the columns
+        assertThat(rb.values()).containsExactly(Map.entry("x", 10), Map.entry("y", 20));
+        assertThat(rc.values()).containsExactly(Map.entry("y", 2), Map.entry("x", 1));
+    }
+
+    @Test
+    void aPipelineOfMapsThatNeverRepeatTheirKeysDoesNotFillTheMemory() {
+        var reader = new ObjectReader(Reflect::read);
+
+        for (int i = 0; i < 1_000; i++) {
+            GridRow row = reader.read(Map.of("key-" + i, i)).row();
+            assertThat(row.get("key-" + i)).isEqualTo(i);
+        }
+
+        assertThat(reader.mapShapesKept()).isLessThanOrEqualTo(256);
+    }
+
+    @Test
+    void twoKeysThatReadAsTheSameColumnGiveOneValue() {
+        var reader = new ObjectReader(Reflect::read);
+        Map<Object, Object> keys = new LinkedHashMap<>();
+        keys.put(1, "number");
+        keys.put("1", "text");
+
+        GridRow row = reader.read(keys).row();
+
+        assertThat(row.values()).containsExactly(Map.entry("1", "text"));
+    }
+
+    @Test
+    void theObjectIsKeptOnlyIfAskedFor() {
+        var kept = new ObjectReader(Reflect::read, false, true);
+        var dropped = new ObjectReader(Reflect::read, false, false);
+        var person = new Person("Ada", 36, Instant.EPOCH);
+
+        assertThat(kept.read(person).row().source()).isSameAs(person);
+        assertThat(kept.read("text").row().source()).isEqualTo("text");
+        assertThat(kept.read(Map.of("a", 1)).row().source()).isEqualTo(Map.of("a", 1));
+        for (Object object : new Object[] {person, "text", Map.of("a", 1), new Entry("e", 1, "h")}) {
+            GridRow row = dropped.read(object).row();
+            assertThat(row.source()).isNull();
+            assertThat(row.values()).isNotEmpty();
+        }
+    }
 }

@@ -93,8 +93,24 @@ class GridCmdletTest {
         GridTable table = opener.show();
         assertThat(table.columns()).containsExactly(new ColumnSpec("name", ColumnKind.TEXT),
                 new ColumnSpec("age", ColumnKind.NUMBER));
-        assertThat(table.rows().stream().map(GridRow::source)).containsExactly(new Person("Ada", 36),
-                new Person("Alan", 41));
+        assertThat(table.rows().stream().map(row -> row.get("name"))).containsExactly("Ada", "Alan");
+    }
+
+    @Test
+    void theObjectsAreKeptOnlyWhenTheyWillBeGivenBack() throws Exception {
+        RecordingOpener plain = new RecordingOpener();
+        run(new GridCmdlet(plain), NO_OPTIONS, new TestContext<>(), new Person("Ada", 36));
+        assertThat(plain.show().rows().stream().map(GridRow::source)).containsExactly((Object) null);
+
+        // with --pass-thru the source of a row is what OK gives back: PassThru below checks it end to end
+        RecordingOpener kept = new RecordingOpener();
+        GridCmdlet grid = new GridCmdlet(kept);
+        TestContext<Object> context = new TestContext<>();
+        grid.begin(PASS_THRU, context);
+        grid.process(PASS_THRU, new Person("Ada", 36), context);
+        GridTable table = new GridTable();
+        kept.live().drain(table, 10);
+        assertThat(table.rows()).singleElement().extracting(GridRow::source).isEqualTo(new Person("Ada", 36));
     }
 
     @Test

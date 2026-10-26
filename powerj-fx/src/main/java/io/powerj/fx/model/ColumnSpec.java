@@ -10,8 +10,9 @@ public record ColumnSpec(String name, ColumnKind kind) {
         Objects.requireNonNull(kind, "kind");
     }
 
-    /** The column that two objects share: same name, merged kind. */
+    /** The column that two objects share: same name, merged kind. This one itself if the kind does not change. */
     ColumnSpec merge(ColumnSpec other) {
-        return new ColumnSpec(name, kind.merge(other.kind));
+        ColumnKind merged = kind.merge(other.kind);
+        return merged == kind ? this : new ColumnSpec(name, merged);
     }
 }

@@ -23,6 +23,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.ConcurrentHashMap;
 
 import io.powerj.api.Display;
 import io.powerj.api.Row;
@@ -43,16 +44,37 @@ public final class ObjectReader {
     /** Column of an object that has no named values. */
     public static final String VALUE = "value";
 
+    /** Most shapes kept for objects read as maps: a pipeline of maps whose keys never repeat must not fill the memory. */
+    private static final int MAX_MAP_SHAPES = 256;
+
+    /** What is known of a type once and for all: its columns, and the shape of the rows read from it. */
+    private record Layout(List<ColumnSpec> columns, RowShape shape) {
+
+        Layout(List<ColumnSpec> columns) {
+            this(List.copyOf(columns), RowShape.of(columns.stream().map(ColumnSpec::name).toList()));
+        }
+    }
+
     private final PropertyReader reader;
     private final boolean raw;
+    private final boolean keepSource;
+    private final Map<Class<?>, Layout> layouts = new ConcurrentHashMap<>();
+    private final Map<List<String>, RowShape> mapShapes = new ConcurrentHashMap<>();
 
     /**
-     * @param reader reads the components and getters of the objects that are not maps
-     * @param raw    sizes and durations are shown as plain numbers, without unit
+     * @param reader     reads the components and getters of the objects that are not maps
+     * @param raw        sizes and durations are shown as plain numbers, without unit
+     * @param keepSource whether a row keeps the object it was read from; only {@code --pass-thru} gives it back, and a row
+     *                   that keeps it also keeps everything it refers to
      */
-    public ObjectReader(PropertyReader reader, boolean raw) {
+    public ObjectReader(PropertyReader reader, boolean raw, boolean keepSource) {
         this.reader = reader;
         this.raw = raw;
+        this.keepSource = keepSource;
+    }
+
+    public ObjectReader(PropertyReader reader, boolean raw) {
+        this(reader, raw, true);
     }
 
     /** A reader that shows sizes and durations with their units. */
@@ -60,22 +82,32 @@ public final class ObjectReader {
         this(reader, false);
     }
 
+    /** How many shapes of maps are kept (a test of the bound). */
+    int mapShapesKept() {
+        return mapShapes.size();
+    }
+
     public Reading read(Object object) {
         return switch (object) {
             case Row row -> fromMap(object, row, row.sizeColumns());
             case Map<?, ?> map -> fromMap(object, map, Set.of());
-            case Record record -> fromProperties(object, recordColumns(record.getClass()));
+            case Record record -> fromProperties(object, layouts.computeIfAbsent(record.getClass(),
+                    type -> new Layout(recordColumns(type))));
             case null -> scalar(null);
             default -> isScalar(object) ? scalar(object) : fromBean(object);
         };
     }
 
+    private static final RowShape SCALAR = RowShape.of(List.of(VALUE));
+
+    private Object kept(Object source) {
+        return keepSource ? source : null;
+    }
+
     private Reading scalar(Object object) {
         Object value = shown(object);
         var column = new ColumnSpec(VALUE, ColumnKind.ofValue(value));
-        var values = new LinkedHashMap<String, Object>();
-        values.put(VALUE, value);
-        return new Reading(List.of(column), new GridRow(object, values), Map.of());
+        return new Reading(List.of(column), new GridRow(kept(object), SCALAR, new Object[] {value}, 0), Map.of());
     }
 
     private Reading fromMap(Object source, Map<?, ?> map, Set<String> sizeColumns) {
@@ -89,30 +121,39 @@ public final class ObjectReader {
             columns.add(new ColumnSpec(name, kind));
             values.put(name, value);
         }
-        return columns.isEmpty() ? scalar(source) : new Reading(columns, new GridRow(source, values), Map.of());
-    }
-
-    private Reading fromProperties(Object source, List<ColumnSpec> columns) {
         if (columns.isEmpty()) {
             return scalar(source);
         }
-        Map<String, Object> values = new LinkedHashMap<>();
-        Map<String, String> errors = new LinkedHashMap<>();
-        for (ColumnSpec column : columns) {
+        List<String> names = List.copyOf(values.keySet());
+        RowShape shape = mapShapes.size() < MAX_MAP_SHAPES
+                ? mapShapes.computeIfAbsent(names, RowShape::of) : mapShapes.getOrDefault(names, RowShape.of(names));
+        return new Reading(columns, new GridRow(kept(source), shape, values.values().toArray(), 0), Map.of());
+    }
+
+    private Reading fromProperties(Object source, Layout layout) {
+        if (layout.columns().isEmpty()) {
+            return scalar(source);
+        }
+        Map<String, String> errors = Map.of();
+        Object[] cells = new Object[layout.columns().size()];
+        for (int i = 0; i < cells.length; i++) {
+            String name = layout.columns().get(i).name();
             try {
-                values.put(column.name(), shown(reader.read(source, column.name())));
+                cells[i] = shown(reader.read(source, name));
             } catch (CancellationException e) {
                 throw e; // Ctrl+C is not an unreadable property
             } catch (RuntimeException e) {
-                values.put(column.name(), null);
-                errors.put(column.name(), e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
+                if (errors.isEmpty()) {
+                    errors = new LinkedHashMap<>();
+                }
+                errors.put(name, e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
             }
         }
-        return new Reading(columns, new GridRow(source, values), errors);
+        return new Reading(layout.columns(), new GridRow(kept(source), layout.shape(), cells, 0), errors);
     }
 
     private Reading fromBean(Object bean) {
-        return fromProperties(bean, beanColumns(bean.getClass()));
+        return fromProperties(bean, layouts.computeIfAbsent(bean.getClass(), type -> new Layout(beanColumns(type))));
     }
 
     /**
