@@ -245,6 +245,14 @@ structures, functions) can be built on it. The work is organised in phases (revi
 - **A software bill of materials and checksums** (C-34): `./mvnw -Psbom -DskipTests package` writes `target/bom.json`
   (CycloneDX 1.6: the shell, its modules, JLine, and the graphical module with JavaFX); the distribution zip and the zip of
   the graphical module each get a `.sha256` file that `sha256sum -c` accepts.
+- **The CI runs its checks side by side, and on macOS** (C-34): the build of Linux keeps the tests, the image and the smoke
+  tests; the tests of the real window under a virtual display, and the build without the graphical module, are jobs of their
+  own; a macOS job builds the image and runs five of the smoke tests (the layout of the bundle is `powerj.app`, which the
+  archive step of `powerj-dist` now expects). **The macOS job and the release workflow are new and unproven**: the former has
+  its first run with this change; the latter, [`release.yml`](.github/workflows/release.yml), builds the three systems on a
+  tag `vX.Y.Z`, checks that the tag is the version of the project and not a SNAPSHOT, and leaves a **draft** release with the
+  archives, the installer, the SBOM and `SHA256SUMS`; it has never run, nothing is signed, and the procedure is in
+  [docs/RELEASING.md](docs/RELEASING.md) (`versions:set` was tried on a copy).
 - **English names** for the acceptance sheets: `docs/recettes/etape-N.md` is now `docs/acceptance/step-N.md`; the failure
   messages of the CI and the description of the project are in English too (C-36).
 

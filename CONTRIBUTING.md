@@ -51,6 +51,11 @@ refreeze to make a build pass. Each rule says in its Javadoc which finding of th
 `powerj-api/src/test/resources/io/powerj/api/api-surface.txt`, and describe the change in [CHANGELOG.md](CHANGELOG.md)
 (add, never remove, unless you deprecate first with `@Deprecated(since = …, forRemoval = true)`).
 
+## Releasing
+
+[docs/RELEASING.md](docs/RELEASING.md): how a version is cut, what the release workflow builds, and what is not done yet
+(signing).
+
 ## How we work
 
 - **One step per commit**, and every commit builds and passes the tests. The history is read, not squashed.

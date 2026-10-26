@@ -208,7 +208,7 @@ Messages, help, completion and errors in **English or French**; commands and opt
 
 `powerj-fx` is built too (its zip is in `powerj-fx/target/`), but it is not part of the application image.
 
-The image is produced in `powerj-dist/target/jpackage/powerj/` (launcher `bin/powerj` on Linux/macOS, `powerj.exe` on Windows), with a zip archive in `powerj-dist/target/`. It embeds its own Java runtime containing all the `java.se` modules: nothing else needs to be installed on the target machine.
+The image is produced in `powerj-dist/target/jpackage/powerj/` (launcher `bin/powerj` on Linux, `powerj.exe` on Windows; on macOS the bundle `powerj.app`, launcher `Contents/MacOS/powerj`), with a zip archive and its `.sha256` in `powerj-dist/target/`. It embeds its own Java runtime containing all the `java.se` modules: nothing else needs to be installed on the target machine.
 
 Optionally, on Windows, an `.exe` installer (per user, with a Start menu entry and a desktop shortcut; it does not add PowerJ to the `PATH`) is built with `mvnw.cmd -Pdist,installer verify` and requires [WiX](https://wixtoolset.org/) (`dotnet tool install --global wix --version 5.0.2`). The GitHub Actions CI builds and smoke-tests the launcher on every push, and produces the Windows installer as a downloadable artifact.
 

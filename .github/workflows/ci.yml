@@ -59,9 +59,6 @@ jobs:
           sudo apt-get install -y xvfb libgtk-3-0 libxtst6 libxxf86vm1 libgl1
           ci/smoke/fx.sh
 
-      - name: UI tests of the graphical module (the real window, under xvfb)
-        run: xvfb-run -a ./mvnw -B -ntp -Pfx-ui -pl powerj-fx -am test -Dsurefire.failIfNoSpecifiedTests=false
-
       - name: Smoke test of the languages (en / fr)
         run: ci/smoke/languages.sh
 
@@ -86,6 +83,80 @@ jobs:
         with:
           name: powerj-linux-x64
           path: powerj-dist/target/powerj-*.zip
+          if-no-files-found: error
+
+  # The jobs below do not need the application image: they run beside the build, not after it.
+  fx-ui:
+    name: Window of the graphical module (Linux, xvfb)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Install a virtual display
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgtk-3-0 libxtst6 libxxf86vm1 libgl1
+
+      # The tests tagged "ui" build the real window (powerj-fx/src/test/.../GridViewUiTest); the ordinary build leaves them out.
+      - name: UI tests
+        run: xvfb-run -a ./mvnw -B -ntp -Pfx-ui -pl powerj-fx -am test -Dsurefire.failIfNoSpecifiedTests=false
+
+  without-fx:
+    name: Build without the graphical module (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      # Keeps -DskipFx alive: a platform that has no JavaFX builds and checks everything else (review C-33).
+      - name: Build and tests
+        run: ./mvnw -B -DskipFx verify
+
+  macos:
+    name: Build and launcher (macOS)
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Build, tests and application image
+        run: ./mvnw -B -Pdist verify
+
+      # jpackage makes an application bundle on macOS: the launcher is inside it. The smoke test of the profiler looks for
+      # the layout of the Linux and Windows images and is left out.
+      - name: Smoke tests of the launcher
+        run: |
+          export PJ="$PWD/powerj-dist/target/jpackage/powerj.app/Contents/MacOS/powerj"
+          ci/smoke/launcher.sh
+          ci/smoke/non-interactive.sh
+          ci/smoke/third-party-modules.sh
+          ci/smoke/languages.sh
+          ci/smoke/tilde.sh
+
+      - name: Application image (macOS)
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: powerj-macos
+          path: powerj-dist/target/powerj-*.zip*
           if-no-files-found: error
 
   windows:
