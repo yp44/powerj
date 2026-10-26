@@ -6,6 +6,7 @@ import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
@@ -109,7 +110,7 @@ public final class FilterParser {
         } catch (PatternSyntaxException e) {
             throw new Invalid(Messages.get("grid.filter.regex.invalid", e.getDescription()));
         }
-        return Parsed.of(value -> pattern.matcher(CellFormatter.fullText(value, display)).find());
+        return Parsed.of(new RegexFilter(pattern, display));
     }
 
     private static ColumnFilter contains(String text, ColumnKind display) {
@@ -291,7 +292,7 @@ public final class FilterParser {
             case Instant i -> i;
             case Date d -> d.toInstant();
             case ZonedDateTime z -> z.toInstant();
-            case java.time.OffsetDateTime o -> o.toInstant();
+            case OffsetDateTime o -> o.toInstant();
             case LocalDateTime l -> l.atZone(zone).toInstant();
             case LocalDate d -> d.atStartOfDay(zone).toInstant();
             case null, default -> null;

@@ -1,8 +1,9 @@
 package io.powerj.cmdlets;
 
+import java.lang.reflect.Array;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -11,8 +12,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.WeakHashMap;
-import java.util.concurrent.CancellationException;
 import java.util.stream.BaseStream;
 
 import io.powerj.api.Cmdlet;
@@ -21,6 +20,7 @@ import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
 import io.powerj.api.Row;
 import io.powerj.api.ScriptBlock;
+import io.powerj.api.UsageException;
 
 /**
  * {@code join}: one {@link Row} per pair of a pipeline object and an object of {@code --right} with the same key
@@ -68,24 +68,22 @@ public final class Join implements Cmdlet<Join.Params, Object, Row> {
     private record State(ScriptBlock leftKey, Map<Object, List<Object>> index, String dropped, List<String> columns) {
     }
 
-    private final Map<CmdletContext<?>, State> states = Collections.synchronizedMap(new WeakHashMap<>());
-
     @Override
     public void begin(Params p, CmdletContext<Row> context) {
         ScriptBlock right = side(p.right(), "join.right.expected");
         if (p.key() != null && (p.leftKey() != null || p.rightKey() != null)) {
-            throw new IllegalArgumentException(Messages.get("join.key.conflict"));
+            throw new UsageException(Messages.get("join.key.conflict"));
         }
         Object leftKeyArgument = p.key() != null ? p.key() : p.leftKey();
         if (leftKeyArgument == null) {
-            throw new IllegalArgumentException(Messages.get("join.key.expected"));
+            throw new UsageException(Messages.get("join.key.expected"));
         }
         Object rightKeyArgument = p.rightKey() != null ? p.rightKey() : leftKeyArgument;
         ScriptBlock leftKey = Keys.block(leftKeyArgument, context, "join.key.invalid");
         ScriptBlock rightKey = Keys.block(rightKeyArgument, context, "join.key.invalid");
         ScriptBlock left = null;
         if (context.hasInput() && p.left() != null) {
-            throw new IllegalArgumentException(Messages.get("join.left.conflict"));
+            throw new UsageException(Messages.get("join.left.conflict"));
         }
         if (!context.hasInput()) {
             left = side(p.left(), "join.left.expected");
@@ -97,22 +95,19 @@ public final class Join implements Cmdlet<Join.Params, Object, Row> {
             if (columns == null) {
                 columns = Properties.columns(object);
             }
-            Object key;
-            try {
-                key = rightKey.invoke(object);
-            } catch (CancellationException e) {
-                throw e;
-            } catch (RuntimeException e) {
-                context.error(Messages.get("pipeline.object.skipped", e.getMessage(), Where.abbreviate(object)));
+            var attempt = rightKey.tryInvoke(object);
+            if (attempt.failed()) {
+                Skipped.report(context, attempt.error(), object);
                 continue;
             }
+            Object key = attempt.value();
             if (key != null) {
                 index.computeIfAbsent(Keys.normalized(key), k -> new ArrayList<>()).add(object);
             }
         }
         String dropped = p.key() instanceof String property && !property.contains(".") ? property : null;
-        State state = new State(leftKey, index, dropped, columns == null ? List.of() : columns);
-        states.put(context, state);
+        List<String> rightColumns = columns == null ? List.of() : columns;
+        State state = context.state(State.class, () -> new State(leftKey, index, dropped, rightColumns));
         if (left != null) {
             for (Object object : objects(left, "--left")) {
                 join(state, p, object, context);
@@ -122,24 +117,16 @@ public final class Join implements Cmdlet<Join.Params, Object, Row> {
 
     @Override
     public void process(Params p, Object input, CmdletContext<Row> context) {
-        join(states.get(context), p, input, context);
-    }
-
-    @Override
-    public void end(Params p, CmdletContext<Row> context) {
-        states.remove(context);
+        join(ExecutionState.begun(context, State.class), p, input, context);
     }
 
     private static void join(State state, Params p, Object left, CmdletContext<Row> context) {
-        Object key;
-        try {
-            key = state.leftKey().invoke(left);
-        } catch (CancellationException e) {
-            throw e;
-        } catch (RuntimeException e) {
-            context.error(Messages.get("pipeline.object.skipped", e.getMessage(), Where.abbreviate(left)));
+        var attempt = state.leftKey().tryInvoke(left);
+        if (attempt.failed()) {
+            Skipped.report(context, attempt.error(), left);
             return;
         }
+        Object key = attempt.value();
         List<Object> matches = key == null ? List.of() : state.index().getOrDefault(Keys.normalized(key), List.of());
         if (matches.isEmpty()) {
             if (p.outer()) {
@@ -183,24 +170,22 @@ public final class Join implements Cmdlet<Join.Params, Object, Row> {
         if (argument instanceof ScriptBlock block) {
             return block;
         }
-        throw new IllegalArgumentException(Messages.get(expectedKey));
+        throw new UsageException(Messages.get(expectedKey));
     }
 
     /** Objects given by a side, a collection, an array or a stream being unrolled as by the pipeline (FR-30b). */
     private static List<Object> objects(ScriptBlock side, String option) {
-        Object value;
-        try {
-            value = side.invoke(null);
-        } catch (CancellationException e) {
-            throw e;
-        } catch (RuntimeException e) {
-            throw new IllegalArgumentException(Messages.get("join.side.failed", option, e.getMessage()), e);
+        var attempt = side.tryInvoke(null);
+        if (attempt.failed()) {
+            throw new UsageException(Messages.get("join.side.failed", option, attempt.error().getMessage()),
+                    attempt.error());
         }
+        Object value = attempt.value();
         List<Object> objects = new ArrayList<>();
         switch (value) {
             case null -> {
             }
-            case java.nio.file.Path path -> objects.add(path);
+            case Path path -> objects.add(path);
             case Collection<?> items -> objects.addAll(items);
             case Iterable<?> items -> items.forEach(objects::add);
             case BaseStream<?, ?> stream -> {
@@ -211,8 +196,8 @@ public final class Join implements Cmdlet<Join.Params, Object, Row> {
             case Iterator<?> iterator -> iterator.forEachRemaining(objects::add);
             case Optional<?> optional -> optional.ifPresent(objects::add);
             case Object array when array.getClass().isArray() -> {
-                for (int i = 0; i < java.lang.reflect.Array.getLength(array); i++) {
-                    objects.add(java.lang.reflect.Array.get(array, i));
+                for (int i = 0; i < Array.getLength(array); i++) {
+                    objects.add(Array.get(array, i));
                 }
             }
             default -> objects.add(value);

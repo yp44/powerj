@@ -7,7 +7,7 @@
     <parent>
         <groupId>io.powerj</groupId>
         <artifactId>powerj-parent</artifactId>
-        <version>0.1.0-SNAPSHOT</version>
+        <version>0.2.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>powerj-dist</artifactId>
@@ -26,7 +26,11 @@
         <dist.jpackage.exe>${java.home}/bin/jpackage</dist.jpackage.exe>
         <!-- Platform-specific options for the application image. -->
         <dist.platform.args></dist.platform.args>
+        <!-- Names the archive: <os>-<arch>, set by the profiles below for the machine that builds (the image is made with
+             the jlink and jpackage of the JDK that runs Maven, so it is the platform of that machine). -->
         <dist.platform>linux-x64</dist.platform>
+        <!-- What jpackage makes under dist.jpackage: a folder, but on macOS an application bundle. -->
+        <dist.image>powerj</dist.image>
     </properties>
 
     <dependencies>
@@ -51,15 +55,59 @@
             </properties>
         </profile>
 
+        <!-- Windows on ARM: after "windows", so that its name wins when both are active. -->
         <profile>
-            <id>mac</id>
+            <id>windows-arm</id>
             <activation>
                 <os>
-                    <family>mac</family>
+                    <family>windows</family>
+                    <arch>aarch64</arch>
                 </os>
             </activation>
             <properties>
-                <dist.platform>macos</dist.platform>
+                <dist.platform>windows-aarch64</dist.platform>
+            </properties>
+        </profile>
+
+        <profile>
+            <id>linux-arm</id>
+            <activation>
+                <os>
+                    <family>unix</family>
+                    <name>linux</name>
+                    <arch>aarch64</arch>
+                </os>
+            </activation>
+            <properties>
+                <dist.platform>linux-aarch64</dist.platform>
+            </properties>
+        </profile>
+
+        <profile>
+            <id>mac-intel</id>
+            <activation>
+                <os>
+                    <family>mac</family>
+                    <arch>x86_64</arch>
+                </os>
+            </activation>
+            <properties>
+                <dist.platform>macos-x64</dist.platform>
+                <dist.image>powerj.app</dist.image>
+            </properties>
+        </profile>
+
+        <profile>
+            <id>mac-arm</id>
+            <activation>
+                <os>
+                    <family>mac</family>
+                    <arch>aarch64</arch>
+                </os>
+            </activation>
+            <properties>
+                <dist.platform>macos-aarch64</dist.platform>
+                <dist.image>powerj.app</dist.image>
             </properties>
         </profile>
 
@@ -73,7 +121,7 @@
                         <artifactId>build-helper-maven-plugin</artifactId>
                         <version>3.6.1</version>
                         <executions>
-                            <!-- jpackage requires a numeric version (0.1.0, without -SNAPSHOT). -->
+                            <!-- jpackage requires a numeric version (0.2.0, without -SNAPSHOT). -->
                             <execution>
                                 <id>parse-version</id>
                                 <goals>
@@ -112,13 +160,21 @@
                                 <configuration>
                                     <target>
                                         <delete dir="${dist.jpackage}"/>
+                                        <!-- macOS refuses an app-version whose first number is 0 (CFBundleVersion): while the
+                                             project is at 0.x, the bundle says 1.x (the version command of the launcher tells the truth). -->
+                                        <condition property="dist.app.major" value="1" else="${parsedVersion.majorVersion}">
+                                            <and>
+                                                <os family="mac"/>
+                                                <equals arg1="${parsedVersion.majorVersion}" arg2="0"/>
+                                            </and>
+                                        </condition>
                                         <exec executable="${dist.jpackage.exe}" failonerror="true">
                                             <arg value="--type"/>
                                             <arg value="app-image"/>
                                             <arg value="--name"/>
                                             <arg value="powerj"/>
                                             <arg value="--app-version"/>
-                                            <arg value="${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.incrementalVersion}"/>
+                                            <arg value="${dist.app.major}.${parsedVersion.minorVersion}.${parsedVersion.incrementalVersion}"/>
                                             <arg value="--vendor"/>
                                             <arg value="PowerJ"/>
                                             <arg value="--module-path"/>
@@ -129,7 +185,7 @@
                                             <arg value="--add-modules"/>
                                             <!-- jdk.unsupported: Ctrl+C interception by JLine (sun.misc.Signal).
                                                  jdk.jfr, jdk.management: the profiler of the perf mode (FR-76). -->
-                                            <arg value="java.se,jdk.unsupported,jdk.jfr,jdk.management"/>
+                                            <arg value="java.se,jdk.unsupported,jdk.jfr,jdk.management,io.powerj.cmdlets"/>
                                             <!-- JLine accesses the native console (FFM / native library). -->
                                             <arg value="--java-options"/>
                                             <arg value="--enable-native-access=org.jline.terminal.ffm,org.jline.nativ,io.powerj.core"/>
@@ -145,8 +201,11 @@
                                             <arg line="${dist.platform.args}"/>
                                         </exec>
                                         <zip destfile="${project.build.directory}/powerj-${project.version}-${dist.platform}.zip">
-                                            <zipfileset dir="${dist.jpackage}" includes="powerj/**" filemode="755"/>
+                                            <zipfileset dir="${dist.jpackage}" includes="${dist.image}/**" filemode="755"/>
                                         </zip>
+                                        <!-- powerj-<version>-<platform>.zip.sha256, in the format of sha256sum -c. -->
+                                        <checksum file="${project.build.directory}/powerj-${project.version}-${dist.platform}.zip"
+                                                  algorithm="SHA-256" fileext=".sha256" format="MD5SUM"/>
                                     </target>
                                 </configuration>
                             </execution>

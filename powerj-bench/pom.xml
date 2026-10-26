@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.powerj</groupId>
+        <artifactId>powerj-parent</artifactId>
+        <version>0.2.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>powerj-bench</artifactId>
+    <name>PowerJ Benchmarks</name>
+    <description>
+        JMH benchmarks of the paths that a pipeline runs once per object (reading a property, calling a Java method) and of
+        the latencies that the specification states (NFR-02: completion, NFR-07: first Java call). Not part of the default
+        build: ./mvnw -Pbench package, then see docs/quality/performance.md. Classpath, not modules: the benchmarks reach
+        into package-private code on purpose.
+    </description>
+
+    <properties>
+        <jmh.version>1.37</jmh.version>
+        <!-- No artifact, no tests, no coverage. -->
+        <maven.install.skip>true</maven.install.skip>
+        <maven.deploy.skip>true</maven.deploy.skip>
+        <jacoco.skip>true</jacoco.skip>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.powerj</groupId>
+            <artifactId>powerj-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.powerj</groupId>
+            <artifactId>powerj-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.powerj</groupId>
+            <artifactId>powerj-cmdlets</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.openjdk.jmh</groupId>
+            <artifactId>jmh-core</artifactId>
+            <version>${jmh.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.openjdk.jmh</groupId>
+                            <artifactId>jmh-generator-annprocess</artifactId>
+                            <version>${jmh.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+            <!-- The class path of the benchmarks, for: java -cp "target/classes:$(cat target/classpath.txt)" … -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>classpath</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>build-classpath</goal>
+                        </goals>
+                        <configuration>
+                            <outputFile>${project.build.directory}/classpath.txt</outputFile>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

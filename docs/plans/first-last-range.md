@@ -111,7 +111,7 @@ Changed in `powerj-api` / `powerj-core`: `CmdletContext.stopInput()`, `CmdletRun
 
 Docs:
 - `docs/SPECIFICATION.md`: new section **FR-68** (after FR-67), `stopInput` in the extension API (§4.2), §12.3 rows (`first`/`last` done, `range` added), row 16 in the §11 table, the scope sentence.
-- `docs/recettes/first-last-range.md`: acceptance checklist.
+- `docs/acceptance/first-last-range.md`: acceptance checklist.
 - `README.md`: Cmdlets table, roadmap.
 - `docs/plans/cmdlet-roadmap.md`: phase 2 = `first`, `last`, `range`.
 

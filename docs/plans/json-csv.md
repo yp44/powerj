@@ -131,7 +131,7 @@ Other changes:
 
 Docs:
 - FR-73 in the specification (with §11 row 22, and §12.3 struck through);
-- `docs/recettes/json-csv.md`;
+- `docs/acceptance/json-csv.md`;
 - README;
 - roadmap (FR number 75 → 73).
 

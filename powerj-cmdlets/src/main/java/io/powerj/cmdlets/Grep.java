@@ -13,7 +13,6 @@ import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,8 +27,8 @@ import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
 import io.powerj.api.ScriptBlock;
 import io.powerj.api.Span;
+import io.powerj.api.UsageException;
 import io.powerj.fs.FileWalker;
-import io.powerj.fs.WalkError;
 
 /**
  * {@code grep}: searches a regular expression ({@link Pattern} syntax) in files, or filters the pipeline
@@ -87,17 +86,17 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
     /** Bytes read to recognize a binary file (one containing a NUL byte), skipped. */
     private static final int BINARY_PROBE = 8192;
 
-    /** State of each running execution: the same cmdlet can be used in several pipelines at once. */
-    private final Map<Params, Search> searches = Collections.synchronizedMap(new IdentityHashMap<>());
+    private static Search search(Params params, CmdletContext<Object> context) {
+        return context.state(Search.class, () -> new Search(params, context));
+    }
 
     @Override
     public void begin(Params params, CmdletContext<Object> context) {
-        Search search = new Search(params, context);
-        searches.put(params, search);
+        Search search = search(params, context);
         if (!params.paths().isEmpty()) {
             List<Path> roots = new ArrayList<>();
             for (String argument : params.paths()) {
-                roots.addAll(FileArguments.expand(argument, params.all(), context, error -> report(error, context),
+                roots.addAll(FileArguments.expand(argument, params.all(), context, error -> FileArguments.report(error, context),
                         "grep.no.match"));
             }
             search.files(roots, context);
@@ -108,7 +107,7 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
 
     @Override
     public void process(Params params, Object input, CmdletContext<Object> context) {
-        Search search = searches.computeIfAbsent(params, p -> new Search(p, context));
+        Search search = search(params, context);
         Path file = params.property() == null ? FileArguments.file(input, context) : null;
         if (file == null) {
             search.filter(input, context);
@@ -116,19 +115,6 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
             // a directory received without -r is skipped: ls -r already emits its files
             search.files(List.of(file), context);
         }
-    }
-
-    @Override
-    public void end(Params params, CmdletContext<Object> context) {
-        searches.remove(params);
-    }
-
-    private static void report(WalkError error, CmdletContext<?> context) {
-        context.error(switch (error.kind()) {
-            case ACCESS_DENIED -> Messages.get("grep.access.denied", error.path());
-            case NOT_FOUND -> Messages.get("grep.not.found", error.path());
-            case IO -> Messages.get("grep.read.failed", error.path(), error.message());
-        });
     }
 
     /** One execution of {@code grep}: compiled pattern and settings of the walk. */
@@ -145,17 +131,15 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
         private final FileWalker walker;
 
         Search(Params params, CmdletContext<?> context) {
-            if (params.parallel() != null && params.parallel() < 1) {
-                throw new IllegalArgumentException(Messages.get("grep.parallel.invalid", params.parallel()));
-            }
+            int parallelism = FileOps.parallelism(params.parallel());
             if (params.maxDepth() != null && params.maxDepth() < 1) {
-                throw new IllegalArgumentException(Messages.get("grep.maxDepth.invalid", params.maxDepth()));
+                throw new UsageException(Messages.get("grep.maxDepth.invalid", params.maxDepth()));
             }
             try {
                 pattern = Pattern.compile(params.pattern(),
                         params.ignoreCase() ? Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE : 0);
             } catch (PatternSyntaxException e) {
-                throw new IllegalArgumentException(Messages.get("grep.pattern.invalid", params.pattern(),
+                throw new UsageException(Messages.get("grep.pattern.invalid", params.pattern(),
                         e.getDescription(), e.getIndex()));
             }
             invert = params.invert();
@@ -167,37 +151,35 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
             int maxDepth = params.maxDepth() != null ? params.maxDepth()
                     : params.recurse() ? Integer.MAX_VALUE : 1;
             walker = FileWalker.builder().maxDepth(maxDepth).includeHidden(params.all()).order(FileArguments.BY_NAME)
-                    .parallelism(params.parallel() == null ? 1 : params.parallel()).build();
+                    .parallelism(parallelism).build();
         }
 
         private static ScriptBlock property(String name, CmdletContext<?> context) {
-            if (!Where.PROPERTY.matcher(name).matches()) {
-                throw new IllegalArgumentException(Messages.get("where.property.invalid", name));
+            if (!Texts.isPropertyPath(name)) {
+                throw new UsageException(Messages.get("where.property.invalid", name));
             }
-            return context.compile("$_." + name);
+            return context.property(name);
         }
 
         /** Searches the files below the roots; the lines of a file are emitted together, in order. */
         void files(List<Path> roots, CmdletContext<Object> context) {
             walker.walk(roots, this::search, matches -> matches.forEach(context::emit),
-                    error -> report(error, context));
+                    error -> FileArguments.report(error, context));
         }
 
         /** Lets the object through if its text (or that of its property) matches. */
         void filter(Object input, CmdletContext<Object> context) {
             Object value = input;
             if (property != null) {
-                try {
-                    value = property.invoke(input);
-                } catch (CancellationException e) {
-                    throw e;
-                } catch (RuntimeException e) {
-                    context.error(Messages.get("pipeline.object.skipped", e.getMessage(), Where.abbreviate(input)));
+                var attempt = property.tryInvoke(input);
+                if (attempt.failed()) {
+                    Skipped.report(context, attempt.error(), input);
                     return;
                 }
+                value = attempt.value();
             }
             String text = value == null ? "" : value.toString();
-            if (pattern.matcher(text).find() != invert) {
+            if (pattern.matcher(new InterruptibleText(text)).find() != invert) {
                 context.emit(input);
             }
         }
@@ -224,7 +206,7 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
                         throw new CancellationException();
                     }
                     if (singleMatch && invert) {
-                        if (pattern.matcher(text).find()) {
+                        if (pattern.matcher(new InterruptibleText(text)).find()) {
                             return null; // the file matches: excluded, not read further
                         }
                         continue;
@@ -258,7 +240,7 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
 
         /** Line as a {@link GrepMatch} if it is kept, otherwise {@code null}. */
         GrepMatch match(Path path, int number, String text) {
-            Matcher matcher = pattern.matcher(text);
+            Matcher matcher = pattern.matcher(new InterruptibleText(text));
             if (!matcher.find()) {
                 return invert ? new GrepMatch(path, number, text, List.of(), List.of(), Map.of()) : null;
             }

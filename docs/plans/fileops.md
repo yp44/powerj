@@ -126,7 +126,7 @@ rm <path>... [-r|--recurse] [-f|--force] [-v|--verbose] [-n|--dry-run] [--allow-
 
 **Docs:**
 - `docs/SPECIFICATION.md`: **FR-72**, `configDirectory()` in §4.2, `protected-paths` in §8, the §12.3 rows, row 20 of §11.
-- `docs/recettes/fileops.md`.
+- `docs/acceptance/fileops.md`.
 - `README.md`.
 - `docs/plans/cmdlet-roadmap.md`: phases 6 and 7 cancelled.
 

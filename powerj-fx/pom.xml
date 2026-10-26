@@ -7,7 +7,7 @@
     <parent>
         <groupId>io.powerj</groupId>
         <artifactId>powerj-parent</artifactId>
-        <version>0.1.0-SNAPSHOT</version>
+        <version>0.2.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>powerj-fx</artifactId>
@@ -22,6 +22,9 @@
              -Djavafx.platform=win builds the module for another platform. -->
         <javafx.platform>linux</javafx.platform>
         <fx.module>${project.build.directory}/module</fx.module>
+        <!-- Coverage floor of the tests of this module alone, outside the view package (parent pom, jacoco module-check). -->
+        <coverage.module.line>0.99</coverage.module.line>
+        <coverage.module.branch>0.97</coverage.module.branch>
     </properties>
 
     <dependencies>
@@ -82,11 +85,34 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
-                    <compilerArgs>
+                    <compilerArgs combine.children="append">
                         <arg>--module-version</arg>
                         <arg>${project.version}</arg>
                     </compilerArgs>
                 </configuration>
+            </plugin>
+            <!-- The tests tagged "ui" build the real window and need a display: -Pfx-ui under xvfb-run runs them, and only them. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <excludedGroups>ui</excludedGroups>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <executions>
+                    <!-- The JavaFX nodes cannot run without a display (see powerj-coverage): outside the floor. -->
+                    <execution>
+                        <id>module-check</id>
+                        <configuration>
+                            <excludes>
+                                <exclude>io/powerj/fx/view/**</exclude>
+                            </excludes>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <!-- JavaFX loads native libraries: the shell asks the user before loading the module (FR-77) and then enables
                  native access for the modules of its folder. -->
@@ -137,6 +163,8 @@
                                 <zip destfile="${project.build.directory}/powerj-fx-${project.version}-${javafx.platform}.zip">
                                     <zipfileset dir="${fx.module}" includes="fx/**"/>
                                 </zip>
+                                <checksum file="${project.build.directory}/powerj-fx-${project.version}-${javafx.platform}.zip"
+                                          algorithm="SHA-256" fileext=".sha256" format="MD5SUM"/>
                             </target>
                         </configuration>
                     </execution>
@@ -146,6 +174,22 @@
     </build>
 
     <profiles>
+        <!-- The tests of the window itself, which need a display: xvfb-run -a ./mvnw -Pfx-ui -pl powerj-fx -am test -->
+        <profile>
+            <id>fx-ui</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <excludedGroups combine.self="override"/>
+                            <groups>ui</groups>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
         <profile>
             <id>fx-windows</id>
             <activation>

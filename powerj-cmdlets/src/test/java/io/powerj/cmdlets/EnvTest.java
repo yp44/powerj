@@ -107,7 +107,7 @@ class EnvTest {
 
     @Test
     void onlyReadingIsPreviewed() {
-        assertThat(new Env().previewable(new Env.Params("PATH", null, null, null, null, null))).isTrue();
-        assertThat(new Env().previewable(new Env.Params(null, "A=1", null, null, null, null))).isFalse();
+        assertThat(new Env().canPreview(new Env.Params("PATH", null, null, null, null, null))).isTrue();
+        assertThat(new Env().canPreview(new Env.Params(null, "A=1", null, null, null, null))).isFalse();
     }
 }

@@ -11,7 +11,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 
-import org.jline.reader.LineReader;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,9 +18,9 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 import io.powerj.core.BuildInfo;
-import io.powerj.core.exec.CmdletRegistry;
-import io.powerj.core.exec.Session;
-import io.powerj.core.exec.Supervisor;
+import io.powerj.core.command.CmdletRegistry;
+import io.powerj.core.runtime.Session;
+import io.powerj.core.runtime.Supervisor;
 
 /** Preview mode in the shell (FR-66): Alt+V, {@code PJ?} prompt, results below the line. */
 @Timeout(60)
@@ -34,7 +33,7 @@ class PreviewModeTest {
     Path tmp;
 
     private TestTerminal terminal;
-    private LineReader reader;
+    private PreviewLineReader reader;
     private CompletableFuture<Integer> code;
     private Path cwd;
 
@@ -44,7 +43,7 @@ class PreviewModeTest {
         var home = new PowerJHome(tmp.resolve("home")).createDirectories();
         terminal = TestTerminal.interactive();
         reader = ShellReader.create(terminal.terminal(), home, ShellConfig.defaults());
-        var repl = new Repl(reader, new Supervisor(), new Session(tmp, cwd, System.getenv()), CmdletRegistry.discover());
+        var repl = InteractiveShell.create(reader, new Supervisor(), new Session(tmp, cwd, System.getenv()), CmdletRegistry.discover());
         terminal.startTyping();
         code = new CompletableFuture<>();
         Thread.ofVirtual().start(() -> code.complete(repl.run(new BuildInfo("0.1.0", Runtime.Version.parse("25")))));

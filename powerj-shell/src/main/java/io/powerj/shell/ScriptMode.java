@@ -1,19 +1,20 @@
 package io.powerj.shell;
 
 import java.io.PrintWriter;
+import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 
-import io.powerj.core.exec.CmdletRegistry;
-import io.powerj.core.exec.Interpreter;
-import io.powerj.core.exec.NativeRun;
-import io.powerj.core.exec.Outcome;
-import io.powerj.core.exec.Session;
-import io.powerj.core.exec.ShellIo;
-import io.powerj.core.exec.Supervisor;
+import io.powerj.core.command.CmdletRegistry;
+import io.powerj.core.runtime.Interpreter;
+import io.powerj.core.nativeexec.NativeRun;
+import io.powerj.core.runtime.Outcome;
+import io.powerj.core.runtime.Session;
+import io.powerj.core.runtime.ShellIo;
+import io.powerj.core.runtime.Supervisor;
 
 /**
  * Non-interactive mode (specification FR-04d): {@code powerj -c "line"} or {@code powerj file.pj}. No
@@ -43,22 +44,23 @@ final class ScriptMode {
     }
 
     /** Consent for the modules that use native code (FR-77): a script never asks, only the recorded answers count. */
-    void nativeAccess(java.nio.file.Path configFile) {
+    void nativeAccess(Path configFile) {
         interpreter.nativeAccess(new NativeAccessConsent(new ConfigFile(configFile), null, errors));
     }
 
     /** Loads third-party modules (§4.4); warnings go to the error output. */
-    void loadModules(java.nio.file.Path dir) {
+    void loadModules(Path dir) {
         interpreter.loadModules(dir).forEach(errors);
     }
 
-    /** Executes the lines in order; blank lines and {@code #} comments are ignored. */
+    /**
+     * Executes the commands in order; blank lines and {@code #} comments are ignored, and a command may span several
+     * lines with the rule of the interactive shell and of the profile (FR-02): {@code ls |} continues on the next line.
+     */
     int run(List<String> lines) {
         int code = 0;
-        for (String line : lines) {
-            if (line.isBlank() || line.strip().startsWith("#")) {
-                continue;
-            }
+        for (Profile.Command command : Profile.commands(lines)) {
+            String line = command.text();
             NativeRun nativeBefore = session.lastNative().orElse(null);
             Outcome outcome = supervisor.run(line, () -> {
                 interpreter.execute(line);

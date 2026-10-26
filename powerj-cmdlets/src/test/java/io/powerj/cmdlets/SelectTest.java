@@ -60,7 +60,7 @@ class SelectTest {
         return new FileEntry(name, size, Instant.EPOCH, Path.of("/tmp", name), false, FileEntry.extensionOf(name, false));
     }
 
-    private List<Row> select(List<Object> columns, Object... inputs) {
+    private List<Row> select(List<Object> columns, Object... inputs) throws Exception {
         var select = new Select();
         var params = new Select.Params(columns);
         select.begin(params, context);
@@ -68,6 +68,7 @@ class SelectTest {
             select.process(params, input, context);
         }
         select.end(params, context);
+        context.closeStates();
         return context.emitted;
     }
 
@@ -76,7 +77,7 @@ class SelectTest {
     }
 
     @Test
-    void propertiesInTheirOrder() {
+    void propertiesInTheirOrder() throws Exception {
         List<Row> rows = select(columns("size", "name"), file("a.txt", 10), file("b.txt", 20));
         assertThat(rows).hasSize(2);
         assertThat(rows.getFirst().keySet()).containsExactly("size", "name");
@@ -85,13 +86,13 @@ class SelectTest {
     }
 
     @Test
-    void aPathIsNamedByItsLastSegment() {
+    void aPathIsNamedByItsLastSegment() throws Exception {
         List<Row> rows = select(columns("path.fileName"), file("a.txt", 10));
         assertThat(rows.getFirst()).containsOnlyKeys("fileName").containsEntry("fileName", Path.of("a.txt"));
     }
 
     @Test
-    void renamedAndComputedColumns() {
+    void renamedAndComputedColumns() throws Exception {
         var kb = block("$_.size / 1024", f -> ((FileEntry) f).size() / 1024);
         List<Row> rows = select(columns("file=name", "kb=", kb), file("a.txt", 4096));
         assertThat(rows.getFirst().keySet()).containsExactly("file", "kb");
@@ -99,7 +100,7 @@ class SelectTest {
     }
 
     @Test
-    void unnamedBlocksAreNumbered() {
+    void unnamedBlocksAreNumbered() throws Exception {
         var length = block("$_.length()", s -> ((String) s).length());
         var upper = block("$_.toUpperCase()", s -> ((String) s).toUpperCase());
         List<Row> rows = select(columns(length, upper), "ab");
@@ -107,7 +108,7 @@ class SelectTest {
     }
 
     @Test
-    void aMissingPropertyGivesAnEmptyCellAndOneError() {
+    void aMissingPropertyGivesAnEmptyCellAndOneError() throws Exception {
         List<Row> rows = select(columns("name", "nmae"), file("a.txt", 1), file("b.txt", 2));
         assertThat(rows).hasSize(2);
         assertThat(rows.getFirst()).containsEntry("nmae", null).containsEntry("name", "a.txt");
@@ -115,7 +116,7 @@ class SelectTest {
     }
 
     @Test
-    void aFailingBlockGivesAnEmptyCellAndOneError() {
+    void aFailingBlockGivesAnEmptyCellAndOneError() throws Exception {
         var boom = block("$_.boom", s -> {
             throw new IllegalStateException("boom");
         });
@@ -125,14 +126,14 @@ class SelectTest {
     }
 
     @Test
-    void sizeColumnsComeFromBytesComponents() {
+    void sizeColumnsComeFromBytesComponents() throws Exception {
         var kb = block("$_.size", f -> ((FileEntry) f).size());
         Row row = select(columns("name", "size", "bytes=size", "kb=", kb), file("a.txt", 1)).getFirst();
         assertThat(row.sizeColumns()).containsExactlyInAnyOrder("size", "bytes");
     }
 
     @Test
-    void atTheHeadOfAPipelineItGivesOneRowFromBlocksOnly() {
+    void atTheHeadOfAPipelineItGivesOneRowFromBlocksOnly() throws Exception {
         context.hasInput = false;
         var content = block("(cat file.txt)", current -> "text of " + current);
         var other = block("(cat another.txt)", current -> "other");
@@ -145,7 +146,7 @@ class SelectTest {
     }
 
     @Test
-    void atTheHeadOfAPipelineAPropertyIsAnEmptyCellAndOneError() {
+    void atTheHeadOfAPipelineAPropertyIsAnEmptyCellAndOneError() throws Exception {
         context.hasInput = false;
         context.compiler = source -> block(source, current -> {
             throw new IllegalStateException("no current object");
@@ -197,9 +198,9 @@ class SelectTest {
 
     @Test
     void columnsReadFromTheArgumentsForCompletion() {
-        assertThat(new Select().columns(" a b.c d=e f={ x { y } } { z } --on-error stop"))
+        assertThat(new Select().columnsOf(" a b.c d=e f={ x { y } } { z } --on-error stop"))
                 .containsExactly("a", "c", "d", "f", "column1");
-        assertThat(new Select().columns(" name kb={ $_.size")).containsExactly("name", "kb"); // still being typed
-        assertThat(new Select().columns("")).isEmpty();
+        assertThat(new Select().columnsOf(" name kb={ $_.size")).containsExactly("name", "kb"); // still being typed
+        assertThat(new Select().columnsOf("")).isEmpty();
     }
 }

@@ -2,6 +2,7 @@ package io.powerj.fx.model;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -99,8 +100,8 @@ public final class LiveTable {
     }
 
     /** The rows validated with OK, empty if the window was closed in another way (or is still open). */
-    public java.util.Optional<List<GridRow>> accepted() {
-        return java.util.Optional.ofNullable(accepted);
+    public Optional<List<GridRow>> accepted() {
+        return Optional.ofNullable(accepted);
     }
 
     /** Runs {@code action} when {@link #close()} is called (at once if it was). It runs on the thread that closes. */

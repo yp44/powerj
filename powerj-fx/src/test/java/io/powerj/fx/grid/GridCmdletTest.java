@@ -9,6 +9,8 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+import io.powerj.fx.Threads;
+
 import io.powerj.api.CmdletInfo;
 import io.powerj.fx.model.ColumnKind;
 import io.powerj.fx.model.ColumnSpec;
@@ -91,8 +93,63 @@ class GridCmdletTest {
         GridTable table = opener.show();
         assertThat(table.columns()).containsExactly(new ColumnSpec("name", ColumnKind.TEXT),
                 new ColumnSpec("age", ColumnKind.NUMBER));
-        assertThat(table.rows().stream().map(GridRow::source)).containsExactly(new Person("Ada", 36),
-                new Person("Alan", 41));
+        assertThat(table.rows().stream().map(row -> row.get("name"))).containsExactly("Ada", "Alan");
+    }
+
+    @Test
+    void theObjectsAreKeptOnlyWhenTheyWillBeGivenBack() throws Exception {
+        RecordingOpener plain = new RecordingOpener();
+        run(new GridCmdlet(plain), NO_OPTIONS, new TestContext<>(), new Person("Ada", 36));
+        assertThat(plain.show().rows().stream().map(GridRow::source)).containsExactly((Object) null);
+
+        // with --pass-thru the source of a row is what OK gives back: PassThru below checks it end to end
+        RecordingOpener kept = new RecordingOpener();
+        GridCmdlet grid = new GridCmdlet(kept);
+        TestContext<Object> context = new TestContext<>();
+        grid.begin(PASS_THRU, context);
+        grid.process(PASS_THRU, new Person("Ada", 36), context);
+        GridTable table = new GridTable();
+        kept.live().drain(table, 10);
+        assertThat(table.rows()).singleElement().extracting(GridRow::source).isEqualTo(new Person("Ada", 36));
+    }
+
+    @Test
+    void theWindowOfACommandThatDidNotFinishIsClosedWithIt() throws Exception {
+        RecordingOpener opener = new RecordingOpener();
+        GridCmdlet grid = new GridCmdlet(opener);
+        TestContext<Object> context = new TestContext<>();
+        grid.begin(NO_OPTIONS, context);
+        grid.process(NO_OPTIONS, new Person("Ada", 36), context);
+        assertThat(opener.live().isClosed()).isFalse();
+
+        context.closeStates(); // what the shell does when the command is cancelled or fails: end() was never reached
+
+        assertThat(opener.live().isClosed()).isTrue();
+    }
+
+    @Test
+    void theWindowOfAFinishedCommandOutlivesIt() throws Exception {
+        RecordingOpener opener = new RecordingOpener();
+        TestContext<Object> context = new TestContext<>();
+        run(new GridCmdlet(opener), NO_OPTIONS, context, new Person("Ada", 36));
+
+        context.closeStates(); // what the shell does when the command is over
+
+        assertThat(opener.live().isClosed()).isFalse();
+    }
+
+    @Test
+    void aCommandThatNeverOpenedAWindowHasNothingToClose() throws Exception {
+        TestContext<Object> context = new TestContext<>();
+        new GridCmdlet(new RecordingOpener()).begin(NO_OPTIONS, context);
+
+        context.closeStates();
+    }
+
+    @Test
+    void processNeedsBegin() {
+        assertThatThrownBy(() -> new GridCmdlet(new RecordingOpener()).process(NO_OPTIONS, "x", new TestContext<>()))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("begin was not called");
     }
 
     @Test
@@ -317,7 +374,7 @@ class GridCmdletTest {
                 done.completeExceptionally(e);
             }
         });
-        Thread.sleep(300);
+        Threads.awaitParked(stage);
         assertThat(done).isNotDone();                       // the prompt is not given back
         assertThat(opener.live().state()).isEqualTo(LiveTable.State.COMPLETE);
         opener.live().close();                              // the user closes the window
@@ -344,7 +401,7 @@ class GridCmdletTest {
             }
         });
         stage.start();
-        Thread.sleep(300);
+        Threads.awaitParked(stage);
         stage.interrupt();                                  // Ctrl+C
         stage.join(5_000);
         assertThat(failure.get()).isInstanceOf(InterruptedException.class);
@@ -409,7 +466,7 @@ class GridCmdletTest {
     void passThruWaitsForTheWindowLikeWait() throws Exception {
         PassThru run = new PassThru(PASS_THRU, "a", "b");
         run.windowShown();
-        Thread.sleep(200);
+        Threads.awaitParked(run.stage);
         assertThat(run.done).isNotDone();                 // the prompt is not given back
         assertThat(run.context.emitted).isEmpty();
         run.ok(1);

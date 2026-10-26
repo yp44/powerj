@@ -10,16 +10,16 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
-import io.powerj.api.AllocStat;
-import io.powerj.api.BlockStat;
-import io.powerj.api.GcStat;
-import io.powerj.api.HotMethod;
-import io.powerj.api.JvmStat;
-import io.powerj.api.LineStat;
-import io.powerj.api.NativeStat;
-import io.powerj.api.PerfReport;
-import io.powerj.api.PhaseStat;
-import io.powerj.api.StageStat;
+import io.powerj.api.perf.AllocStat;
+import io.powerj.api.perf.BlockStat;
+import io.powerj.api.perf.GcStat;
+import io.powerj.api.perf.HotMethod;
+import io.powerj.api.perf.JvmStat;
+import io.powerj.api.perf.LineStat;
+import io.powerj.api.perf.NativeStat;
+import io.powerj.api.perf.PerfReport;
+import io.powerj.api.perf.PhaseStat;
+import io.powerj.api.perf.StageStat;
 
 class PerfTest {
 
@@ -206,6 +206,20 @@ class PerfTest {
     }
 
     @Test
+    void saveNeverReplacesAFileThatExists(@org.junit.jupiter.api.io.TempDir Path tmp) throws Exception {
+        var recording = Files.writeString(tmp.resolve("source.jfr"), "new recording");
+        var precious = Files.writeString(tmp.resolve("precious.jfr"), "a file of the user");
+        var ctx = new TestContext<Object>(tmp);
+        ctx.perfReports = List.of(report(4, "line 4", recording));
+
+        new Perf().begin(new Perf.Params(null, null, false, Path.of("precious.jfr")), ctx);
+
+        assertThat(precious).hasContent("a file of the user");
+        assertThat(ctx.emitted).isEmpty();
+        assertThat(ctx.errors).singleElement().asString().contains("already exists").contains("precious.jfr");
+    }
+
+    @Test
     void saveWithoutARecordingOrWithOtherOptionsIsAnError() throws Exception {
         keep(1);
         run(new Perf.Params(null, null, false, Path.of("x.jfr")));
@@ -218,7 +232,7 @@ class PerfTest {
 
     @Test
     void savingIsNotAllowedInAPreview() {
-        assertThat(new Perf().previewable(new Perf.Params(null, null, false, null))).isTrue();
-        assertThat(new Perf().previewable(new Perf.Params(null, null, false, Path.of("x.jfr")))).isFalse();
+        assertThat(new Perf().canPreview(new Perf.Params(null, null, false, null))).isTrue();
+        assertThat(new Perf().canPreview(new Perf.Params(null, null, false, Path.of("x.jfr")))).isFalse();
     }
 }

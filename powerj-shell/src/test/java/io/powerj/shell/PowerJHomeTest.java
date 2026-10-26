@@ -38,14 +38,12 @@ class PowerJHomeTest {
     }
 
     @Test
-    void createDirectoriesWritesTheProtectedPathsOnceAndKeepsAnEditedFile() throws Exception {
+    void theFilesOfTheCmdletsAreTheirOwnBusiness() throws Exception {
         var home = new PowerJHome(tmp.resolve("h")).createDirectories();
 
-        assertThat(home.protectedPathsFile()).isEqualTo(tmp.resolve("h/protected-paths"));
-        assertThat(Files.readAllLines(home.protectedPathsFile())).contains("~", home.dir().toString());
-        Files.writeString(home.protectedPathsFile(), "# mine\n");
-        home.createDirectories();
-        assertThat(Files.readString(home.protectedPathsFile())).isEqualTo("# mine\n");
+        try (var files = Files.list(home.dir())) {
+            assertThat(files.map(f -> f.getFileName().toString())).containsExactly("logs");
+        }
     }
 
     @Test

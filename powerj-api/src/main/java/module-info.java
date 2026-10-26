@@ -4,4 +4,5 @@
  */
 module io.powerj.api {
     exports io.powerj.api;
+    exports io.powerj.api.perf;
 }

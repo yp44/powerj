@@ -1,12 +1,12 @@
 package io.powerj.cmdlets;
 
-import java.util.concurrent.CancellationException;
 
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
 import io.powerj.api.ScriptBlock;
+import io.powerj.api.UsageException;
 
 /**
  * {@code map}: transforms each object of the pipeline, like {@code Stream.map} (specification FR-36c).
@@ -31,23 +31,19 @@ public final class MapCmdlet implements Cmdlet<MapCmdlet.Params, Object, Object>
     @Override
     public void begin(Params p, CmdletContext<Object> context) {
         if (!(p.function() instanceof ScriptBlock)) {
-            throw new IllegalArgumentException(Messages.get("map.function.expected"));
+            throw new UsageException(Messages.get("map.function.expected"));
         }
     }
 
     @Override
     public void process(Params p, Object input, CmdletContext<Object> context) {
-        Object result;
-        try {
-            result = ((ScriptBlock) p.function()).invoke(input);
-        } catch (CancellationException e) {
-            throw e;
-        } catch (RuntimeException e) {
-            context.error(Messages.get("pipeline.object.skipped", e.getMessage(), Where.abbreviate(input)));
+        var result = ((ScriptBlock) p.function()).tryInvoke(input);
+        if (result.failed()) {
+            Skipped.report(context, result.error(), input);
             return;
         }
-        if (result != null) {
-            context.emit(result);
+        if (result.value() != null) {
+            context.emit(result.value());
         }
     }
 }

@@ -3,17 +3,16 @@ package io.powerj.cmdlets;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.MathContext;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.WeakHashMap;
-import java.util.concurrent.CancellationException;
 
+import io.powerj.api.Attempt;
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
+import io.powerj.api.ColumnProvider;
 import io.powerj.api.Option;
 import io.powerj.api.Row;
 import io.powerj.api.ScriptBlock;
@@ -31,7 +30,7 @@ import io.powerj.api.ScriptBlock;
         summary = "Counts and sums the objects or a property, with average, minimum and maximum",
         examples = {"ls -r | measure size", "ls | measure modified", "env | measure { $_.value.length() }",
                 "(ls -r | measure size).sum", "List.of(3, 1, 2) | measure"})
-public final class Measure implements Cmdlet<Measure.Params, Object, Row> {
+public final class Measure implements Cmdlet<Measure.Params, Object, Row>, ColumnProvider {
 
     /** Parameters of {@code measure}. */
     public record Params(
@@ -56,29 +55,30 @@ public final class Measure implements Cmdlet<Measure.Params, Object, Row> {
         }
     }
 
-    private final Map<CmdletContext<?>, State> states = Collections.synchronizedMap(new WeakHashMap<>());
+    private static State state(Params p, CmdletContext<Row> context) {
+        return context.state(State.class, () -> {
+            ScriptBlock key = p.key() == null ? null : Keys.block(p.key(), context, "measure.key.invalid");
+            return new State(key, new SortComparator(false, context::error));
+        });
+    }
 
     @Override
     public void begin(Params p, CmdletContext<Row> context) {
-        ScriptBlock key = p.key() == null ? null : Keys.block(p.key(), context, "measure.key.invalid");
-        states.put(context, new State(key, new SortComparator(false, context::error)));
+        state(p, context); // compiles the key before anything is read
     }
 
     @Override
     public void process(Params p, Object input, CmdletContext<Row> context) {
-        State state = states.get(context);
+        State state = state(p, context);
         if (state.size == null) {
             state.size = p.key() instanceof String property && Sizes.isSizeProperty(input, property);
         }
-        Object value;
-        try {
-            value = state.key == null ? input : state.key.invoke(input);
-        } catch (CancellationException e) {
-            throw e;
-        } catch (RuntimeException e) {
-            context.error(Messages.get("pipeline.object.skipped", e.getMessage(), Where.abbreviate(input)));
+        var measured = state.key == null ? Attempt.succeeded(input) : state.key.tryInvoke(input);
+        if (measured.failed()) {
+            Skipped.report(context, measured.error(), input);
             return;
         }
+        Object value = measured.value();
         if (value == null) {
             return;
         }
@@ -99,7 +99,7 @@ public final class Measure implements Cmdlet<Measure.Params, Object, Row> {
 
     @Override
     public void end(Params p, CmdletContext<Row> context) {
-        State state = states.remove(context);
+        State state = state(p, context);
         boolean numbers = state.numeric && state.count > 0;
         Map<String, Object> values = new LinkedHashMap<>();
         values.put("count", state.count);
@@ -114,7 +114,7 @@ public final class Measure implements Cmdlet<Measure.Params, Object, Row> {
 
     /** The columns of the row emitted by {@link #end}, whatever the arguments. */
     @Override
-    public List<String> columns(String arguments) {
+    public List<String> columnsOf(String arguments) {
         return List.of("count", "sum", "average", "min", "max");
     }
 

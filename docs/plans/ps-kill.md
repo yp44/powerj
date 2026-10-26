@@ -96,12 +96,12 @@ Other changes:
 
 Docs:
 - FR-74 in the specification, §11 row 23, §12.3 struck through, and the scope sentence;
-- `docs/recettes/ps-kill.md`;
+- `docs/acceptance/ps-kill.md`;
 - README;
 - roadmap.
 
 **Wrap-up of the roadmap** (planned for this PR):
-- `docs/recettes/pipeline-v1.md`: an end-to-end checklist of the §12.3 target pipeline with the cmdlets now available. `find` was cancelled, so it uses `ls -r --filter *.java | where { $_.modified > … }`;
+- `docs/acceptance/pipeline-v1.md`: an end-to-end checklist of the §12.3 target pipeline with the cmdlets now available. `find` was cancelled, so it uses `ls -r --filter *.java | where { $_.modified > … }`;
 - README "Status and roadmap": the v1 cmdlet backlog is done (`uniq`, `find`, `tee`, `http`, `open`, `table`/`tree` remain), and the next step is v2 control structures.
 
 ## Tests

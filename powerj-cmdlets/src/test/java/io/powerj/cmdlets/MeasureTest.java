@@ -40,7 +40,7 @@ class MeasureTest {
         };
     }
 
-    private Row measure(Object key, Object... inputs) {
+    private Row measure(Object key, Object... inputs) throws Exception {
         var measure = new Measure();
         var params = new Measure.Params(key);
         measure.begin(params, context);
@@ -48,6 +48,7 @@ class MeasureTest {
             measure.process(params, input, context);
         }
         measure.end(params, context);
+        context.closeStates();
         assertThat(context.emitted).hasSize(1);
         return context.emitted.getFirst();
     }
@@ -58,7 +59,7 @@ class MeasureTest {
     }
 
     @Test
-    void integers() {
+    void integers() throws Exception {
         Row row = measure(null, 3, 1, 2L);
         assertThat(row.keySet()).containsExactly("count", "sum", "average", "min", "max");
         assertThat(row).containsEntry("count", 3L).containsEntry("sum", 6L).containsEntry("average", 2.0)
@@ -67,26 +68,26 @@ class MeasureTest {
     }
 
     @Test
-    void aDecimalValueGivesADoubleSum() {
+    void aDecimalValueGivesADoubleSum() throws Exception {
         Row row = measure(null, 1, 2.5, 3L);
         assertThat(row).containsEntry("sum", 6.5).containsEntry("max", 3L);
         assertThat((double) row.get("average")).isCloseTo(2.1667, org.assertj.core.data.Offset.offset(0.001));
     }
 
     @Test
-    void sumsBeyondTheRangeOfALongStayExact() {
+    void sumsBeyondTheRangeOfALongStayExact() throws Exception {
         Row row = measure(null, Long.MAX_VALUE, 2L);
         assertThat(row.get("sum")).isEqualTo(BigInteger.valueOf(Long.MAX_VALUE).add(BigInteger.TWO));
     }
 
     @Test
-    void nullValuesAreLeftOut() {
+    void nullValuesAreLeftOut() throws Exception {
         Row row = measure(null, 4, null, 2);
         assertThat(row).containsEntry("count", 2L).containsEntry("sum", 6L).containsEntry("average", 3.0);
     }
 
     @Test
-    void stringsHaveAMinAndAMaxButNoSum() {
+    void stringsHaveAMinAndAMaxButNoSum() throws Exception {
         Row row = measure(null, "pear", "apple", "fig");
         assertThat(row).containsEntry("count", 3L).containsEntry("sum", null).containsEntry("average", null)
                 .containsEntry("min", "apple").containsEntry("max", "pear");
@@ -94,13 +95,13 @@ class MeasureTest {
     }
 
     @Test
-    void notANumberLeavesTheSumEmpty() {
+    void notANumberLeavesTheSumEmpty() throws Exception {
         Row row = measure(null, 1.0, Double.NaN);
         assertThat(row).containsEntry("count", 2L).containsEntry("sum", null);
     }
 
     @Test
-    void aSizePropertyGivesSizeColumns() {
+    void aSizePropertyGivesSizeColumns() throws Exception {
         Row row = measure("size", file("a", 100, 1), file("b", 300, 2));
         assertThat(row).containsEntry("count", 2L).containsEntry("sum", 400L).containsEntry("average", 200.0)
                 .containsEntry("min", 100L).containsEntry("max", 300L);
@@ -108,7 +109,7 @@ class MeasureTest {
     }
 
     @Test
-    void datesHaveAMinAndAMax() {
+    void datesHaveAMinAndAMax() throws Exception {
         Row row = measure("modified", file("a", 1, 50), file("b", 1, 10), file("c", 1, 30));
         assertThat(row).containsEntry("min", Instant.ofEpochSecond(10)).containsEntry("max", Instant.ofEpochSecond(50))
                 .containsEntry("sum", null);
@@ -116,14 +117,14 @@ class MeasureTest {
     }
 
     @Test
-    void aBlockKeyIsNotASize() {
+    void aBlockKeyIsNotASize() throws Exception {
         Row row = measure(block("$_.size", f -> ((FileEntry) f).size()), file("a", 100, 1));
         assertThat(row).containsEntry("sum", 100L);
         assertThat(row.sizeColumns()).isEmpty();
     }
 
     @Test
-    void aFailingKeySkipsTheObject() {
+    void aFailingKeySkipsTheObject() throws Exception {
         var key = block("$_.boom", v -> {
             if (v.equals(2)) {
                 throw new IllegalStateException("boom");
@@ -136,14 +137,14 @@ class MeasureTest {
     }
 
     @Test
-    void noValue() {
+    void noValue() throws Exception {
         Row row = measure(null);
         assertThat(row).containsEntry("count", 0L).containsEntry("sum", null).containsEntry("average", null)
                 .containsEntry("min", null).containsEntry("max", null);
     }
 
     @Test
-    void valuesThatCannotBeComparedAreReportedOnce() {
+    void valuesThatCannotBeComparedAreReportedOnce() throws Exception {
         Row row = measure(null, "b", 1, "a", 2);
         assertThat(row).containsEntry("count", 4L).containsEntry("sum", null);
         assertThat(context.errors).singleElement().asString().contains("cannot compare");
@@ -157,7 +158,7 @@ class MeasureTest {
     }
 
     @Test
-    void countCountsEveryObject() {
+    void countCountsEveryObject() throws Exception {
         var count = new Count();
         var params = new Count.Params();
         var counted = new TestContext<Long>(Path.of("."));
@@ -174,7 +175,7 @@ class MeasureTest {
     }
 
     @Test
-    void decimalsOfEveryClassAreSummedExactly() {
+    void decimalsOfEveryClassAreSummedExactly() throws Exception {
         Row row = measure(null, new java.math.BigDecimal("0.1"), 0.2f, new java.math.BigInteger("3"), (short) 1,
                 (byte) 1);
         assertThat(row.get("count")).isEqualTo(5L);

@@ -1,17 +1,15 @@
 package io.powerj.cmdlets;
 
-import java.util.Collections;
-import java.util.Map;
-import java.util.WeakHashMap;
-import java.util.concurrent.CancellationException;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
+import io.powerj.api.Attempt;
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
 import io.powerj.api.ScriptBlock;
+import io.powerj.api.UsageException;
 
 /**
  * {@code range}: the objects between two bounds (specification FR-68). A bound is a position (from 1) without
@@ -79,21 +77,18 @@ public final class Range implements Cmdlet<Range.Params, Object, Object> {
         }
     }
 
-    private final Map<CmdletContext<?>, State> states = Collections.synchronizedMap(new WeakHashMap<>());
-
     @Override
     public void begin(Params p, CmdletContext<Object> context) {
         if (p.include() && p.exclude()) {
-            throw new IllegalArgumentException(Messages.get("range.include.exclude"));
+            throw new UsageException(Messages.get("range.include.exclude"));
         }
         ScriptBlock property = p.property() == null ? null : Keys.block(p.property(), context, "range.property.invalid");
         Bound from = bound("--from", p.from(), property, p.ignoreCase());
         Bound to = bound("--to", p.to(), property, p.ignoreCase());
         if (p.repeat() && !(from instanceof Match || from instanceof Condition)) {
-            throw new IllegalArgumentException(Messages.get("range.repeat.position"));
+            throw new UsageException(Messages.get("range.repeat.position"));
         }
-        var state = new State(from, to);
-        states.put(context, state);
+        State state = context.state(State.class, () -> new State(from, to));
         long first = from instanceof Position(long n) ? n : 1;
         if (to instanceof Position(long n) && n < first) {
             state.done = true; // --to before --from: nothing to emit
@@ -103,51 +98,50 @@ public final class Range implements Cmdlet<Range.Params, Object, Object> {
 
     @Override
     public void process(Params p, Object input, CmdletContext<Object> context) {
-        State state = states.get(context);
+        State state = ExecutionState.begun(context, State.class);
         state.index++;
         if (state.done) {
             return; // the input was stopped
         }
         boolean include = !p.exclude();
-        try {
-            if (!state.open) {
-                if (!matches(state.from, input, state.index)) {
-                    return;
-                }
-                state.open = true;
-                // A position --to already reached closes the range on its opening object (as sed does).
-                if (state.to instanceof Position(long n) && state.index >= n) {
-                    if (include) {
-                        context.emit(input);
-                    }
-                    close(state, p, context);
-                    return;
-                }
-                if (include) {
-                    context.emit(input);
-                }
-                return; // --to is tested from the next object
+        if (!state.open) {
+            var opens = matches(state.from, input, state.index);
+            if (opens.failed()) {
+                Skipped.report(context, opens.error(), input); // FR-68: neither emitted nor used as a bound
+                return;
             }
-            if (state.to != null && matches(state.to, input, state.index)) {
+            if (!opens.value()) {
+                return;
+            }
+            state.open = true;
+            // A position --to already reached closes the range on its opening object (as sed does).
+            if (state.to instanceof Position(long n) && state.index >= n) {
                 if (include) {
                     context.emit(input);
                 }
                 close(state, p, context);
                 return;
             }
-        } catch (CancellationException e) {
-            throw e;
-        } catch (RuntimeException e) {
-            // FR-68: an evaluation error is non-blocking; the object is neither emitted nor used as a bound.
-            context.error(Messages.get("pipeline.object.skipped", e.getMessage(), Where.abbreviate(input)));
-            return;
+            if (include) {
+                context.emit(input);
+            }
+            return; // --to is tested from the next object
+        }
+        if (state.to != null) {
+            var closes = matches(state.to, input, state.index);
+            if (closes.failed()) {
+                Skipped.report(context, closes.error(), input);
+                return;
+            }
+            if (closes.value()) {
+                if (include) {
+                    context.emit(input);
+                }
+                close(state, p, context);
+                return;
+            }
         }
         context.emit(input);
-    }
-
-    @Override
-    public void end(Params p, CmdletContext<Object> context) {
-        states.remove(context);
     }
 
     private static void close(State state, Params p, CmdletContext<Object> context) {
@@ -158,14 +152,12 @@ public final class Range implements Cmdlet<Range.Params, Object, Object> {
         }
     }
 
-    private static boolean matches(Bound bound, Object input, long index) {
+    private static Attempt<Boolean> matches(Bound bound, Object input, long index) {
         return switch (bound) {
-            case Position(long n) -> index == n;
-            case Match(ScriptBlock property, Pattern regex) -> {
-                Object value = property.invoke(input);
-                yield value != null && regex.matcher(String.valueOf(value)).find();
-            }
-            case Condition(ScriptBlock block) -> block.test(input);
+            case Position(long n) -> Attempt.succeeded(index == n);
+            case Match(ScriptBlock property, Pattern regex) -> property.tryInvoke(input).map(value ->
+                    value != null && regex.matcher(new InterruptibleText(String.valueOf(value))).find());
+            case Condition(ScriptBlock block) -> block.tryTest(input);
         };
     }
 
@@ -183,7 +175,7 @@ public final class Range implements Cmdlet<Range.Params, Object, Object> {
                 return new Match(property, Pattern.compile(text,
                         ignoreCase ? Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE : 0));
             } catch (PatternSyntaxException e) {
-                throw new IllegalArgumentException(Messages.get("grep.pattern.invalid", text, e.getDescription(),
+                throw new UsageException(Messages.get("grep.pattern.invalid", text, e.getDescription(),
                         e.getIndex()));
             }
         }
@@ -191,10 +183,10 @@ public final class Range implements Cmdlet<Range.Params, Object, Object> {
         try {
             position = Long.parseLong(text);
         } catch (NumberFormatException e) {
-            throw new IllegalArgumentException(Messages.get("range.not.position", option, text));
+            throw new UsageException(Messages.get("range.not.position", option, text));
         }
         if (position < 1) {
-            throw new IllegalArgumentException(Messages.get("range.position.invalid", option, text));
+            throw new UsageException(Messages.get("range.position.invalid", option, text));
         }
         return new Position(position);
     }

@@ -11,8 +11,11 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BiConsumer;
+import java.util.regex.PatternSyntaxException;
 
 import io.powerj.api.CmdletContext;
+import io.powerj.api.UsageException;
 import io.powerj.fs.FileTrees;
 import io.powerj.fs.WalkError;
 
@@ -44,7 +47,7 @@ final class FileOps {
         for (Object path : paths) {
             if (path instanceof io.powerj.api.ScriptBlock b) {
                 if (block != null) {
-                    throw new IllegalArgumentException(Messages.get("fileops.block.twice"));
+                    throw new UsageException(Messages.get("fileops.block.twice"));
                 }
                 block = b;
             } else {
@@ -52,20 +55,36 @@ final class FileOps {
             }
         }
         if (block != null && property != null) {
-            throw new IllegalArgumentException(Messages.get("fileops.block.property"));
+            throw new UsageException(Messages.get("fileops.block.property"));
         }
         if (block != null && !context.hasInput()) {
-            throw new IllegalArgumentException(Messages.get("fileops.block.needs.input", block.source()));
+            throw new UsageException(Messages.get("fileops.block.needs.input", block.source()));
         }
         return new Arguments(words, block);
     }
 
+    /**
+     * Wildcards of the commands that change files ignore case where file names do (Windows) and only there:
+     * {@code rm README*} must not remove {@code readme.md} on Linux or macOS, as in a shell there (review C-22).
+     * {@code ls readme* | rm} is the way to ask for the other rule, with the list in plain sight.
+     */
+    static final boolean WILDCARDS_IGNORE_CASE = HostOs.WINDOWS;
+
     /** Paths of an argument: the path itself, or the matches of a wildcard on its last element. */
     static List<Path> expand(String argument, CmdletContext<?> context) {
+        return expand(argument, WILDCARDS_IGNORE_CASE, context);
+    }
+
+    /** Paths of an argument, with the given case rule for the wildcard. */
+    static List<Path> expand(String argument, boolean ignoreCase, CmdletContext<?> context) {
         try {
-            return FileArguments.expand(argument, false, context, error -> report(error, context), "fileops.no.match");
+            return FileArguments.expand(argument, false, ignoreCase, context, error -> report(error, context),
+                    "fileops.no.match");
         } catch (InvalidPathException e) {
             context.error(Messages.get("fileops.invalid.path", argument, e.getMessage()));
+            return List.of();
+        } catch (PatternSyntaxException e) {
+            context.error(Messages.get("fileops.invalid.pattern", argument, e.getDescription()));
             return List.of();
         }
     }
@@ -121,7 +140,7 @@ final class FileOps {
      * cannot be read or removed is reported. Returns {@code true} if everything was removed.
      */
     static boolean deleteTree(Path root, int parallelism, boolean dryRun, boolean describe, CmdletContext<?> context,
-                              java.util.function.BiConsumer<Path, FileEntry> removed) {
+                              BiConsumer<Path, FileEntry> removed) {
         return FileTrees.delete(root, parallelism, dryRun,
                 entry -> removed.accept(entry.path(),
                         describe ? FileEntries.of(entry.path(), entry.attributes()) : null),
@@ -140,7 +159,7 @@ final class FileOps {
     /** Checks the value of {@code -p/--parallel}: {@code null} is sequential. */
     static int parallelism(Integer parallel) {
         if (parallel != null && parallel < 1) {
-            throw new IllegalArgumentException(Messages.get("fileops.parallel.invalid", parallel));
+            throw new UsageException(Messages.get("fileops.parallel.invalid", parallel));
         }
         return parallel == null ? 1 : parallel;
     }

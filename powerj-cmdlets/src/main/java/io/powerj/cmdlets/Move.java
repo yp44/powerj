@@ -1,9 +1,6 @@
 package io.powerj.cmdlets;
 
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-import java.util.WeakHashMap;
 
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
@@ -34,21 +31,19 @@ public final class Move implements Cmdlet<Move.Params, Object, Object> {
             String property) {
     }
 
-    private final Map<CmdletContext<?>, Transfer> transfers = Collections.synchronizedMap(new WeakHashMap<>());
-
     @Override
     public void begin(Params p, CmdletContext<Object> context) {
-        transfers.put(context, new Transfer(new Transfer.Options(true, true, 1, p.force(), p.verbose(), p.dryRun(),
-                p.allowProtected()), p.paths(), p.property(), context));
+        context.state(Transfer.class, () -> new Transfer(new Transfer.Options(true, true, 1, p.force(), p.verbose(),
+                p.dryRun(), p.allowProtected()), p.paths(), p.property(), context));
     }
 
     @Override
     public void process(Params p, Object input, CmdletContext<Object> context) {
-        transfers.get(context).add(input, context);
+        ExecutionState.begun(context, Transfer.class).add(input, context);
     }
 
     @Override
     public void end(Params p, CmdletContext<Object> context) {
-        transfers.remove(context).run(context);
+        ExecutionState.begun(context, Transfer.class).run(context);
     }
 }

@@ -7,7 +7,7 @@
     <parent>
         <groupId>io.powerj</groupId>
         <artifactId>powerj-parent</artifactId>
-        <version>0.1.0-SNAPSHOT</version>
+        <version>0.2.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>powerj-coverage</artifactId>
@@ -42,10 +42,6 @@
         <dependency>
             <groupId>io.powerj</groupId>
             <artifactId>powerj-cmdlets</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.powerj</groupId>
-            <artifactId>powerj-fx</artifactId>
         </dependency>
         <dependency>
             <groupId>io.powerj</groupId>
@@ -115,7 +111,7 @@
                         <configuration>
                             <dataFile>${coverage.data}</dataFile>
                             <!-- The JavaFX nodes cannot be run without a display: they are wiring only, and the manual
-                                 checklist (docs/recettes/fx-grid.md) covers them. They stay in the report, at 0%. -->
+                                 checklist (docs/acceptance/fx-grid.md) covers them. They stay in the report, at 0%. -->
                             <excludes>
                                 <exclude>io/powerj/fx/view/**</exclude>
                             </excludes>
@@ -184,4 +180,22 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- The optional JavaFX module, unless -DskipFx (see the parent pom). -->
+        <profile>
+            <id>fx</id>
+            <activation>
+                <property>
+                    <name>!skipFx</name>
+                </property>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>io.powerj</groupId>
+                    <artifactId>powerj-fx</artifactId>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
 </project>

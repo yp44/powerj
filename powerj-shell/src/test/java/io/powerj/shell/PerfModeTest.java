@@ -6,11 +6,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 
-import org.jline.reader.LineReader;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,9 +18,9 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 import io.powerj.core.BuildInfo;
-import io.powerj.core.exec.CmdletRegistry;
-import io.powerj.core.exec.Session;
-import io.powerj.core.exec.Supervisor;
+import io.powerj.core.command.CmdletRegistry;
+import io.powerj.core.runtime.Session;
+import io.powerj.core.runtime.Supervisor;
 
 /** Perf mode in the shell (FR-76): Alt+P, {@code PJ%} prompt, summary after the line, {@code perf}. */
 @Timeout(60)
@@ -33,7 +33,7 @@ class PerfModeTest {
     Path tmp;
 
     private TestTerminal terminal;
-    private LineReader reader;
+    private PreviewLineReader reader;
     private CompletableFuture<Integer> code;
     private Path cwd;
     private Session session;
@@ -45,7 +45,7 @@ class PerfModeTest {
         terminal = TestTerminal.interactive();
         reader = ShellReader.create(terminal.terminal(), home, ShellConfig.defaults());
         session = new Session(tmp, cwd, System.getenv());
-        var repl = new Repl(reader, new Supervisor(), session, CmdletRegistry.discover());
+        var repl = InteractiveShell.create(reader, new Supervisor(), session, CmdletRegistry.discover());
         terminal.startTyping();
         code = new CompletableFuture<>();
         Thread.ofVirtual().start(() -> code.complete(repl.run(new BuildInfo("0.1.0", Runtime.Version.parse("25")))));
@@ -83,8 +83,10 @@ class PerfModeTest {
         terminal.type(ALT_P);
         awaitUntil(() -> terminal.screen().contains("PJ% "));
         line("ls | count");
-        awaitUntil(() -> terminal.screen().contains("── perf ·"));
-        assertThat(terminal.screen()).contains("stage", "active", "count", "display", "JVM");
+        // The summary is drawn in several writes: wait for all of it, not for its first line.
+        List<String> summary = List.of("── perf ·", "stage", "active", "count", "display", "JVM");
+        awaitUntil(() -> summary.stream().allMatch(terminal.screen()::contains));
+        assertThat(terminal.screen()).contains(summary);
         assertThat(session.perfReports()).hasSize(1);
         exit();
     }

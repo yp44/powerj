@@ -50,7 +50,7 @@ class RangeTest {
     }
 
     /** Runs as the shell does (no more objects after stopInput); returns the number of objects read. */
-    private int run(Range.Params params, Object... inputs) {
+    private int run(Range.Params params, Object... inputs) throws Exception {
         var range = new Range();
         range.begin(params, context);
         int read = 0;
@@ -62,6 +62,7 @@ class RangeTest {
             range.process(params, input, context);
         }
         range.end(params, context);
+        context.closeStates();
         return read;
     }
 
@@ -70,7 +71,7 @@ class RangeTest {
     }
 
     @Test
-    void positions() {
+    void positions() throws Exception {
         run(params("3", null), letters());
         assertThat(context.emitted).containsExactly("c", "d", "e", "f");
         assertThat(context.stopInputCalls).isZero();
@@ -82,7 +83,7 @@ class RangeTest {
     }
 
     @Test
-    void fromAndToPositions() {
+    void fromAndToPositions() throws Exception {
         assertThat(run(params(2, "4"), letters())).isEqualTo(4);
         assertThat(context.emitted).containsExactly("b", "c", "d");
         context.emitted.clear();
@@ -92,14 +93,14 @@ class RangeTest {
     }
 
     @Test
-    void toBeforeFromEmitsNothing() {
+    void toBeforeFromEmitsNothing() throws Exception {
         assertThat(run(params(4, 2), letters())).isZero();
         assertThat(context.emitted).isEmpty();
         assertThat(context.stopInputCalls).isEqualTo(1);
     }
 
     @Test
-    void regularExpressionsOnAProperty() {
+    void regularExpressionsOnAProperty() throws Exception {
         var people = new Object[] {new Person("Anna", 1), new Person("Paula", 2), new Person("Bob", 3),
                 new Person("Peter", 4), new Person("Carl", 5)};
         assertThat(run(byName("Paul", "Peter"), people)).isEqualTo(4);
@@ -111,28 +112,28 @@ class RangeTest {
     }
 
     @Test
-    void ignoreCase() {
+    void ignoreCase() throws Exception {
         var people = new Object[] {new Person("anna", 1), new Person("paul", 2), new Person("bob", 3)};
         run(new Range.Params("PAUL", null, "name", true, false, false, false), people);
         assertThat(context.emitted).extracting(o -> ((Person) o).name()).containsExactly("paul", "bob");
     }
 
     @Test
-    void aNumberWithPropertyIsARegularExpression() {
+    void aNumberWithPropertyIsARegularExpression() throws Exception {
         var people = new Object[] {new Person("a", 10), new Person("b", 25), new Person("c", 30)};
         run(new Range.Params(25, null, "age", false, false, false, false), people);
         assertThat(context.emitted).extracting(o -> ((Person) o).name()).containsExactly("b", "c");
     }
 
     @Test
-    void nullPropertyNeverMatches() {
+    void nullPropertyNeverMatches() throws Exception {
         var people = new Object[] {new Person(null, 1), new Person("Paul", 2)};
         run(byName("^", null), people);
         assertThat(context.emitted).extracting(o -> ((Person) o).name()).containsExactly("Paul");
     }
 
     @Test
-    void blockConditions() {
+    void blockConditions() throws Exception {
         var begin = block("$_.equals(\"BEGIN\")", s -> s.equals("BEGIN"));
         var end = block("$_.equals(\"END\")", s -> s.equals("END"));
         run(params(begin, end), "x", "BEGIN", "1", "END", "y");
@@ -140,14 +141,14 @@ class RangeTest {
     }
 
     @Test
-    void toIsTestedFromTheObjectAfterTheOpening() {
+    void toIsTestedFromTheObjectAfterTheOpening() throws Exception {
         var p = block("$_.startsWith(\"P\")", s -> ((String) s).startsWith("P"));
         run(params(p, p), "a", "Paul", "b", "Peter", "c");
         assertThat(context.emitted).containsExactly("Paul", "b", "Peter");
     }
 
     @Test
-    void conditionThenPosition() {
+    void conditionThenPosition() throws Exception {
         var b = block("$_.equals(\"b\")", s -> s.equals("b"));
         run(params(b, 4), letters());
         assertThat(context.emitted).containsExactly("b", "c", "d");
@@ -159,7 +160,7 @@ class RangeTest {
     }
 
     @Test
-    void exclude() {
+    void exclude() throws Exception {
         var p = block("$_.startsWith(\"P\")", s -> ((String) s).startsWith("P"));
         run(new Range.Params(p, p, null, false, false, true, false), "a", "Paul", "b", "Peter", "c");
         assertThat(context.emitted).containsExactly("b");
@@ -168,7 +169,7 @@ class RangeTest {
     }
 
     @Test
-    void repeatEmitsEveryRangeAndReadsEverything() {
+    void repeatEmitsEveryRangeAndReadsEverything() throws Exception {
         var begin = block("$_.equals(\"BEGIN\")", s -> s.equals("BEGIN"));
         var end = block("$_.equals(\"END\")", s -> s.equals("END"));
         int read = run(new Range.Params(begin, end, null, false, false, false, true),
@@ -201,7 +202,7 @@ class RangeTest {
     }
 
     @Test
-    void aFailingConditionSkipsTheObject() {
+    void aFailingConditionSkipsTheObject() throws Exception {
         var boom = block("$_.boom", s -> {
             if (s.equals("b")) {
                 throw new IllegalStateException("boom");
@@ -214,7 +215,7 @@ class RangeTest {
     }
 
     @Test
-    void positionsCountSkippedObjects() {
+    void positionsCountSkippedObjects() throws Exception {
         var boom = block("$_.boom", s -> {
             if (s.equals("b")) {
                 throw new IllegalStateException("boom");
@@ -235,7 +236,7 @@ class RangeTest {
     }
 
     @Test
-    void positionsAndExcludedBounds() {
+    void positionsAndExcludedBounds() throws Exception {
         run(new Range.Params(2, 4, null, false, false, true, false), letters());
         assertThat(context.emitted).containsExactly("c");
     }

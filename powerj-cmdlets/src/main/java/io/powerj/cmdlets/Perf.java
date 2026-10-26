@@ -1,17 +1,21 @@
 package io.powerj.cmdlets;
 
 import java.io.IOException;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
-import io.powerj.api.PerfReport;
+import io.powerj.api.Previewable;
+import io.powerj.api.UsageException;
+import io.powerj.api.perf.PerfReport;
+import io.powerj.api.perf.PerfReports;
 
 /**
  * {@code perf}: what was measured in perf mode (Alt+P), as records to process in a pipeline (specification FR-76).
@@ -19,7 +23,7 @@ import io.powerj.api.PerfReport;
 @CmdletInfo(name = "perf", preview = true, category = "System", summary = "Shows what perf mode measured",
         examples = {"perf", "perf | sort active -d | first 1", "perf 2 --view blocks", "perf --view jvm --all",
                 "perf --view lines | sort total -d | first 5", "perf --view hot", "perf --save ~/slow.jfr"})
-public final class Perf implements Cmdlet<Perf.Params, Void, Object> {
+public final class Perf implements Cmdlet<Perf.Params, Void, Object>, Previewable<Perf.Params> {
 
     /** What {@code perf} lists. */
     public enum View { STAGES, BLOCKS, NATIVES, PHASES, JVM, LINES, HOT, GC, ALLOC }
@@ -38,7 +42,7 @@ public final class Perf implements Cmdlet<Perf.Params, Void, Object> {
 
     /** Writing a file is a side effect: not in a preview. */
     @Override
-    public boolean previewable(Params p) {
+    public boolean canPreview(Params p) {
         return p.save() == null;
     }
 
@@ -46,15 +50,15 @@ public final class Perf implements Cmdlet<Perf.Params, Void, Object> {
     public void begin(Params p, CmdletContext<Object> context) {
         View view = p.view() == null ? View.STAGES : p.view();
         if (p.line() != null && p.line() < 1) {
-            throw new IllegalArgumentException(Messages.get("perf.line.invalid", p.line()));
+            throw new UsageException(Messages.get("perf.line.invalid", p.line()));
         }
         if (p.line() != null && p.all()) {
-            throw new IllegalArgumentException(Messages.get("perf.line.all"));
+            throw new UsageException(Messages.get("perf.line.all"));
         }
         if (p.save() != null && (p.view() != null || p.all())) {
-            throw new IllegalArgumentException(Messages.get("perf.save.exclusive"));
+            throw new UsageException(Messages.get("perf.save.exclusive"));
         }
-        List<PerfReport> kept = context.perfReports();
+        List<PerfReport> kept = context.service(PerfReports.class).map(PerfReports::reports).orElse(List.of());
         if (kept.isEmpty()) {
             context.error(Messages.get("perf.none"));
             return;
@@ -62,7 +66,7 @@ public final class Perf implements Cmdlet<Perf.Params, Void, Object> {
         List<PerfReport> selected;
         if (p.all() || view == View.LINES && p.line() == null) {
             selected = new ArrayList<>(kept);
-            java.util.Collections.reverse(selected);
+            Collections.reverse(selected);
         } else {
             // The number of a line is the one of the line column: it does not go back when old lines are dropped.
             int n = p.line() == null ? kept.getFirst().line() : p.line();
@@ -108,8 +112,10 @@ public final class Perf implements Cmdlet<Perf.Params, Void, Object> {
             target = target.resolve("perf-" + report.line() + ".jfr");
         }
         try {
-            Files.copy(recording, target, StandardCopyOption.REPLACE_EXISTING);
+            Files.copy(recording, target); // never replaces: a recording is not worth losing a file for
             context.emit(target);
+        } catch (FileAlreadyExistsException e) {
+            context.error(Messages.get("perf.save.exists", target));
         } catch (IOException e) {
             context.error(Messages.get("perf.save.failed", target, e.getMessage()));
         }

@@ -1,10 +1,7 @@
 package io.powerj.cmdlets;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-import java.util.WeakHashMap;
 
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
@@ -29,21 +26,18 @@ public final class Collect implements Cmdlet<Collect.Params, Object, Collected> 
     public record Params() {
     }
 
-    /** Received objects, per execution (the context is specific to each execution; released if it is cancelled). */
-    private final Map<CmdletContext<?>, List<Object>> received = Collections.synchronizedMap(new WeakHashMap<>());
-
-    @Override
-    public void begin(Params p, CmdletContext<Collected> context) {
-        received.put(context, new ArrayList<>());
+    /** Received objects. */
+    private static final class Received {
+        final List<Object> objects = new ArrayList<>();
     }
 
     @Override
     public void process(Params p, Object input, CmdletContext<Collected> context) {
-        received.get(context).add(input);
+        context.state(Received.class, Received::new).objects.add(input);
     }
 
     @Override
     public void end(Params p, CmdletContext<Collected> context) {
-        context.emit(new Collected<>(received.remove(context)));
+        context.emit(new Collected<>(context.state(Received.class, Received::new).objects));
     }
 }

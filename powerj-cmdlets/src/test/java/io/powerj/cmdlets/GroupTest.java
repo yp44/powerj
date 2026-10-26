@@ -45,7 +45,7 @@ class GroupTest {
         return new FileEntry(name, 1, Instant.EPOCH, Path.of("/tmp", name), dir, FileEntry.extensionOf(name, dir));
     }
 
-    private List<Group> group(boolean noItems, List<Object> keys, Object... inputs) {
+    private List<Group> group(boolean noItems, List<Object> keys, Object... inputs) throws Exception {
         var group = new GroupCmdlet();
         var params = new GroupCmdlet.Params(keys, noItems);
         group.begin(params, context);
@@ -53,6 +53,7 @@ class GroupTest {
             group.process(params, input, context);
         }
         group.end(params, context);
+        context.closeStates();
         return context.emitted;
     }
 
@@ -61,7 +62,7 @@ class GroupTest {
     }
 
     @Test
-    void groupsByAPropertyInFirstSeenOrder() {
+    void groupsByAPropertyInFirstSeenOrder() throws Exception {
         var b = file("B.java", false);
         var r = file("README.md", false);
         var a = file("A.java", false);
@@ -73,14 +74,14 @@ class GroupTest {
     }
 
     @Test
-    void withoutKeyTheObjectsThemselvesAreGrouped() {
+    void withoutKeyTheObjectsThemselvesAreGrouped() throws Exception {
         List<Group> groups = group(false, null, "error", "ok", "error");
         assertThat(groups).extracting(Group::key).containsExactly("error", "ok");
         assertThat(groups).extracting(Group::count).containsExactly(2L, 1L);
     }
 
     @Test
-    void severalKeysGiveAListKey() {
+    void severalKeysGiveAListKey() throws Exception {
         List<Group> groups = group(false, keys("ext", "dir"), file("a.java", false), file("src", true),
                 file("b.java", false));
         assertThat(groups).extracting(Group::key).containsExactly(List.of("java", false), List.of("", true));
@@ -88,14 +89,14 @@ class GroupTest {
     }
 
     @Test
-    void integralNumbersAreComparedByValue() {
+    void integralNumbersAreComparedByValue() throws Exception {
         List<Group> groups = group(false, null, 1, 1L, (short) 1, 2);
         assertThat(groups).extracting(Group::count).containsExactly(3L, 1L);
         assertThat(groups.getFirst().key()).isEqualTo(1); // the first value seen is kept as the key
     }
 
     @Test
-    void nullKeysFormAGroup() {
+    void nullKeysFormAGroup() throws Exception {
         var key = block("$_.x", v -> v.equals("none") ? null : v);
         List<Group> groups = group(false, keys(key), "a", "none", "none");
         assertThat(groups).extracting(Group::key).containsExactly("a", null);
@@ -103,7 +104,7 @@ class GroupTest {
     }
 
     @Test
-    void noItemsKeepsOnlyTheCounts() {
+    void noItemsKeepsOnlyTheCounts() throws Exception {
         List<Group> groups = group(true, keys("ext"), file("a.java", false), file("b.java", false));
         assertThat(groups).singleElement().satisfies(g -> {
             assertThat(g.count()).isEqualTo(2);
@@ -112,7 +113,7 @@ class GroupTest {
     }
 
     @Test
-    void aFailingKeySkipsTheObject() {
+    void aFailingKeySkipsTheObject() throws Exception {
         var key = block("$_.boom", v -> {
             if (v.equals("x")) {
                 throw new IllegalStateException("boom");
@@ -125,7 +126,7 @@ class GroupTest {
     }
 
     @Test
-    void invalidKeysAndEmptyInput() {
+    void invalidKeysAndEmptyInput() throws Exception {
         assertThatThrownBy(() -> group(false, keys("bad!"))).isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("bad!");
         assertThatThrownBy(() -> group(false, keys(42))).isInstanceOf(IllegalArgumentException.class)

@@ -34,16 +34,16 @@ public final class Lexer {
     private static final Set<String> KEYWORDS = Set.of("true", "false", "null", "now");
 
     private final String input;
-    private final Predicate<String> staticNames;
+    private final ParseContext context;
     private int pos;
 
-    private Lexer(String input, Predicate<String> staticNames) {
+    private Lexer(String input, ParseContext context) {
         this.input = input;
-        this.staticNames = staticNames;
+        this.context = context;
     }
 
     public static List<Token> tokenize(String input) {
-        return tokenize(input, _ -> false);
+        return tokenize(input, ParseContext.NONE);
     }
 
     /**
@@ -51,7 +51,11 @@ public final class Lexer {
      *                    ({@code Math.PI}): at the start of a statement, they are expressions (FR-46)
      */
     public static List<Token> tokenize(String input, Predicate<String> staticNames) {
-        return new Lexer(input, staticNames).run();
+        return tokenize(input, ParseContext.of(staticNames));
+    }
+
+    public static List<Token> tokenize(String input, ParseContext context) {
+        return new Lexer(input, context).run();
     }
 
     private List<Token> run() {
@@ -87,19 +91,19 @@ public final class Lexer {
         }
         if (startsWith("2>&1")) {
             pos += 4;
-            return new Token.Redirection(Token.Stream.ERR_TO_OUT, false);
+            return new Token.Redirection(RedirectedStream.ERR_TO_OUT, false);
         }
         if (startsWith(">=") || startsWith("==")) {
             pos += 2;
             return new Token.Word(input.substring(pos - 2, pos)); // operators of the short form of where
         }
         if (startsWith("2>>") || startsWith(">>")) {
-            var stream = c == '2' ? Token.Stream.ERR : Token.Stream.OUT;
+            var stream = c == '2' ? RedirectedStream.ERR : RedirectedStream.OUT;
             pos += c == '2' ? 3 : 2;
             return new Token.Redirection(stream, true);
         }
         if (startsWith("2>") || c == '>') {
-            var stream = c == '2' ? Token.Stream.ERR : Token.Stream.OUT;
+            var stream = c == '2' ? RedirectedStream.ERR : RedirectedStream.OUT;
             pos += c == '2' ? 2 : 1;
             return new Token.Redirection(stream, false);
         }
@@ -127,9 +131,9 @@ public final class Lexer {
                 return assignment;
             }
         }
-        if (head ? expressionAt(input, pos, staticNames) : argumentExpressionAt()) {
+        if (head ? expressionAt(input, pos, context) : argumentExpressionAt()) {
             var scanned = ExpressionParser.scan(input, pos,
-                    head ? ExpressionParser.Mode.STATEMENT : ExpressionParser.Mode.ARGUMENT, staticNames);
+                    head ? ExpressionParser.Mode.STATEMENT : ExpressionParser.Mode.ARGUMENT, context);
             pos = scanned.end();
             return new Token.Expr(scanned.value());
         }
@@ -145,7 +149,7 @@ public final class Lexer {
         while (end < input.length() && (Character.isLetterOrDigit(input.charAt(end)) || input.charAt(end) == '_')) {
             end++;
         }
-        int after = ExpressionParser.skipBlanks(input, end);
+        int after = Scanning.skipBlanks(input, end);
         if (after < input.length() && input.charAt(after) == '=' && !input.startsWith("==", after)) {
             String name = input.substring(pos + 1, end);
             pos = after + 1;
@@ -162,6 +166,10 @@ public final class Lexer {
      * ({@code java -version}, {@code notepad.exe x}).
      */
     public static boolean expressionAt(String input, int at, Predicate<String> staticNames) {
+        return expressionAt(input, at, ParseContext.of(staticNames));
+    }
+
+    public static boolean expressionAt(String input, int at, ParseContext context) {
         if (at >= input.length()) {
             return false;
         }
@@ -184,7 +192,7 @@ public final class Lexer {
             return true;
         }
         if (word.equals("new") && end < input.length() && isBlank(input.charAt(end))) {
-            int next = ExpressionParser.skipBlanks(input, end);
+            int next = Scanning.skipBlanks(input, end);
             return next < input.length() && isIdentifierStart(input.charAt(next));
         }
         Matcher qualified = QUALIFIED.matcher(input).region(at, input.length());
@@ -193,9 +201,9 @@ public final class Lexer {
             if (chainEnd < input.length() && input.charAt(chainEnd) == '(') {
                 return true;
             }
-            return chainEnd == end && staticNames.test(input.substring(at, chainEnd));
+            return chainEnd == end && context.startsExpression(input.substring(at, chainEnd));
         }
-        return ExpressionParser.isParameter(staticNames, word);
+        return context.isParameter(word);
     }
 
     /** As an argument: variable, string, group, block, or attached Java call ({@code Path.of("x")}). */
@@ -301,8 +309,8 @@ public final class Lexer {
     }
 
     /** String starting at {@code start}, with its parts, and the position following it. */
-    static Scanned<List<StringPart>> stringAt(String input, int start, Predicate<String> staticNames) {
-        var lexer = new Lexer(input, staticNames);
+    static Scanned<List<StringPart>> stringAt(String input, int start, ParseContext context) {
+        var lexer = new Lexer(input, context);
         lexer.pos = start;
         List<StringPart> parts = lexer.string();
         return new Scanned<>(parts, lexer.pos);
@@ -339,7 +347,7 @@ public final class Lexer {
                             text.setLength(0);
                         }
                         if (peek() == '(') {
-                            var group = ExpressionParser.group(input, pos, staticNames);
+                            var group = ExpressionParser.group(input, pos, context);
                             pos = group.end();
                             parts.add(new StringPart.Embedded(group.value()));
                         } else {
@@ -395,7 +403,7 @@ public final class Lexer {
             quoted.append(c);
         }
         quoted.append('"');
-        return stringAt(quoted.toString(), 0, staticNames).value();
+        return stringAt(quoted.toString(), 0, context).value();
     }
 
     private boolean escaped(int at) {

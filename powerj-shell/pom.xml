@@ -7,11 +7,17 @@
     <parent>
         <groupId>io.powerj</groupId>
         <artifactId>powerj-parent</artifactId>
-        <version>0.1.0-SNAPSHOT</version>
+        <version>0.2.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>powerj-shell</artifactId>
     <name>PowerJ Shell</name>
+
+    <properties>
+        <!-- Coverage floor of the tests of this module alone (parent pom, jacoco module-check). -->
+        <coverage.module.line>0.83</coverage.module.line>
+        <coverage.module.branch>0.78</coverage.module.branch>
+    </properties>
 
     <dependencies>
         <dependency>
@@ -25,6 +31,12 @@
         <dependency>
             <groupId>org.jline</groupId>
             <artifactId>jline-reader</artifactId>
+        </dependency>
+        <!-- Used directly (Main, Repl: Terminal, TerminalBuilder, AttributedString…): declared, not only inherited from
+             jline-reader. -->
+        <dependency>
+            <groupId>org.jline</groupId>
+            <artifactId>jline-terminal</artifactId>
         </dependency>
         <!-- Native terminal (Windows console, Unix pty) through the FFM API, without JNI. -->
         <dependency>

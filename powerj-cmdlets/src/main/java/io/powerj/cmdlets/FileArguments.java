@@ -15,6 +15,7 @@ import java.util.Locale;
 import java.util.function.Consumer;
 
 import io.powerj.api.CmdletContext;
+import io.powerj.api.UsageException;
 import io.powerj.fs.FileWalker;
 import io.powerj.fs.Globs;
 import io.powerj.fs.WalkError;
@@ -30,9 +31,18 @@ final class FileArguments {
 
     /**
      * Paths designated by an argument: a path, or the matches of a wildcard on its last element, in name order.
-     * A wildcard without match reports the error {@code noMatchKey}.
+     * A wildcard without match reports the error {@code noMatchKey}. Names are matched without regard to case.
      */
     static List<Path> expand(String argument, boolean includeHidden, CmdletContext<?> context,
+                             Consumer<WalkError> onError, String noMatchKey) {
+        return expand(argument, includeHidden, true, context, onError, noMatchKey);
+    }
+
+    /**
+     * Like {@link #expand(String, boolean, CmdletContext, Consumer, String)}, with the case rule of the wildcard:
+     * {@code ignoreCase} {@code false} matches the names in the case in which they are written.
+     */
+    static List<Path> expand(String argument, boolean includeHidden, boolean ignoreCase, CmdletContext<?> context,
                              Consumer<WalkError> onError, String noMatchKey) {
         if (!Globs.isPattern(argument)) {
             try {
@@ -43,7 +53,7 @@ final class FileArguments {
         }
         int separator = Math.max(argument.lastIndexOf('/'), argument.lastIndexOf('\\'));
         String dir = separator < 0 ? "." : argument.substring(0, separator + 1);
-        PathMatcher pattern = Globs.matcher(argument.substring(separator + 1));
+        PathMatcher pattern = Globs.matcher(argument.substring(separator + 1), ignoreCase);
         List<Path> matches = new ArrayList<>();
         FileWalker.builder().maxDepth(1).includeHidden(includeHidden).order(BY_NAME).build()
                 .walk(context.currentDirectory().resolve(dir).normalize(),
@@ -52,6 +62,15 @@ final class FileArguments {
             context.error(Messages.get(noMatchKey, argument));
         }
         return matches;
+    }
+
+    /** Reports a failure of the walk of a folder as a non-blocking error (shared by {@code ls}, {@code cat}, {@code grep}). */
+    static void report(WalkError error, CmdletContext<?> context) {
+        context.error(switch (error.kind()) {
+            case ACCESS_DENIED -> Messages.get("files.access.denied", error.path());
+            case NOT_FOUND -> Messages.get("files.not.found", error.path());
+            case IO -> Messages.get("files.read.failed", error.path(), error.message());
+        });
     }
 
     /** File designated by a pipeline object ({@link FileEntry}, {@link Path}, {@link File}), or {@code null}. */
@@ -72,7 +91,7 @@ final class FileArguments {
         try {
             return Charset.forName(encoding);
         } catch (IllegalCharsetNameException | UnsupportedCharsetException _) {
-            throw new IllegalArgumentException(Messages.get(unknownKey, encoding));
+            throw new UsageException(Messages.get(unknownKey, encoding));
         }
     }
 }

@@ -210,7 +210,7 @@ class JsonTest {
     void aDocumentCutOverManyPieces() {
         JsonSplitter splitter = new JsonSplitter();
         List<Object> values = new ArrayList<>();
-        for (String line : List.of("﻿{", "  \"a\": \"}]{[\\\"\",", "  \"b\": [1,", "    2]", "}")) {
+        for (String line : List.of("\uFEFF{", "  \"a\": \"}]{[\\\"\",", "  \"b\": [1,", "    2]", "}")) {
             values.addAll(values(splitter.feed(line)));
         }
         values.addAll(values(splitter.finish()));

@@ -2,10 +2,10 @@ package io.powerj.cmdlets;
 
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
-import java.util.concurrent.CancellationException;
 
 import io.powerj.api.CmdletContext;
 import io.powerj.api.ScriptBlock;
+import io.powerj.api.UsageException;
 
 /**
  * Files designated by pipeline objects (specification FR-65, FR-72): a {@code String} (a path), a {@code Path}, a
@@ -51,10 +51,10 @@ final class PipelineFiles {
     }
 
     private static ScriptBlock compile(String name, CmdletContext<?> context) {
-        if (!Where.PROPERTY.matcher(name).matches()) {
-            throw new IllegalArgumentException(Messages.get("where.property.invalid", name));
+        if (!Texts.isPropertyPath(name)) {
+            throw new UsageException(Messages.get("where.property.invalid", name));
         }
-        return context.compile("$_." + name);
+        return context.property(name);
     }
 
     /** File designated by a pipeline object, or {@code null} after reporting why there is none. */
@@ -62,14 +62,12 @@ final class PipelineFiles {
         Object value = input;
         ScriptBlock evaluated = block != null ? block : property;
         if (evaluated != null) {
-            try {
-                value = evaluated.invoke(input);
-            } catch (CancellationException e) {
-                throw e;
-            } catch (RuntimeException e) {
-                context.error(Messages.get("pipeline.object.skipped", e.getMessage(), Where.abbreviate(input)));
+            var attempt = evaluated.tryInvoke(input);
+            if (attempt.failed()) {
+                Skipped.report(context, attempt.error(), input);
                 return null;
             }
+            value = attempt.value();
         }
         if (block != null && value == null) {
             return null; // the block chose to skip this object
@@ -83,11 +81,11 @@ final class PipelineFiles {
             return null;
         }
         if (file == null && block != null) {
-            context.error(Messages.get("fileops.block.not.a.file", block.source(), Where.abbreviate(value)));
+            context.error(Messages.get("fileops.block.not.a.file", block.source(), Texts.abbreviate(value)));
         } else if (file == null) {
             context.error(property == null
-                    ? Messages.get(keys.notAFile(), Where.abbreviate(input))
-                    : Messages.get(keys.propertyNotAFile(), propertyName, Where.abbreviate(input)));
+                    ? Messages.get(keys.notAFile(), Texts.abbreviate(input))
+                    : Messages.get(keys.propertyNotAFile(), propertyName, Texts.abbreviate(input)));
         }
         return file;
     }

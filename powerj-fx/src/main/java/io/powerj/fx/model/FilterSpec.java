@@ -25,6 +25,18 @@ public final class FilterSpec {
         this.search = new LinkedHashMap<>(search);
     }
 
+    /** How many cells the filters gave up on so far: the rows they hid may include rows that match. */
+    public int abandoned() {
+        int total = 0;
+        for (Parsed parsed : columns.values()) {
+            total += parsed.abandoned();
+        }
+        for (Parsed parsed : search.values()) {
+            total += parsed.abandoned();
+        }
+        return total;
+    }
+
     public boolean isEmpty() {
         return columns.isEmpty() && search.isEmpty();
     }

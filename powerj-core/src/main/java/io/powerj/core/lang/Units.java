@@ -1,6 +1,7 @@
 package io.powerj.core.lang;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Duration;
 import java.util.Locale;
 import java.util.Optional;
@@ -43,11 +44,11 @@ public final class Units {
     }
 
     private static Long bytes(BigDecimal number, int power) {
-        return number.multiply(BigDecimal.valueOf(1024).pow(power)).setScale(0, java.math.RoundingMode.HALF_UP)
+        return number.multiply(BigDecimal.valueOf(1024).pow(power)).setScale(0, RoundingMode.HALF_UP)
                 .longValueExact();
     }
 
     private static long nanos(BigDecimal number, long factor) {
-        return number.multiply(BigDecimal.valueOf(factor)).setScale(0, java.math.RoundingMode.HALF_UP).longValueExact();
+        return number.multiply(BigDecimal.valueOf(factor)).setScale(0, RoundingMode.HALF_UP).longValueExact();
     }
 }

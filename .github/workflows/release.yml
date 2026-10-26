@@ -1,0 +1,159 @@
+name: Release
+
+# A tag of a final version (v0.2.0) builds the release on the three systems and leaves a DRAFT release: a person reads it,
+# checks the files against SHA256SUMS and publishes it. Nothing here publishes by itself, and nothing here is signed yet.
+# The workflow has not run: it is written to docs/RELEASING.md and will be tried with the first tag.
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  GH_TOKEN: ${{ github.token }}
+  GH_REPO: ${{ github.repository }}
+
+# The actions are pinned by commit, as in ci.yml; the release itself is made with the gh command of the runners.
+jobs:
+  draft:
+    name: Check the tag and open the draft release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: The tag is the version of the project, and not a SNAPSHOT
+        id: version
+        run: |
+          version="$(./mvnw -B -q help:evaluate -Dexpression=project.version -DforceStdout)"
+          tag="${GITHUB_REF_NAME#v}"
+          [ "$version" = "$tag" ] || { echo "the project is at $version and the tag says $tag" >&2; exit 1; }
+          case "$version" in *-SNAPSHOT) echo "a release is not a SNAPSHOT: $version" >&2; exit 1 ;; esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Draft release
+        run: |
+          gh release create "$GITHUB_REF_NAME" --draft --verify-tag --title "PowerJ ${{ steps.version.outputs.version }}" \
+            --notes "Changes: CHANGELOG.md. Check the downloads against SHA256SUMS before using them. Not signed."
+
+  linux:
+    name: Linux archive, graphical module and SBOM
+    needs: draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Build, tests, application image and bill of materials
+        run: ./mvnw -B -Pdist,sbom verify
+
+      - name: Smoke tests of the launcher
+        run: |
+          ci/smoke/launcher.sh
+          ci/smoke/non-interactive.sh
+          ci/smoke/third-party-modules.sh
+          ci/smoke/languages.sh
+          ci/smoke/tilde.sh
+
+      - name: Add the files to the draft
+        run: |
+          cp target/bom.json "powerj-${{ needs.draft.outputs.version }}-sbom.cdx.json"
+          gh release upload "$GITHUB_REF_NAME" --clobber powerj-dist/target/powerj-*-linux-*.zip \
+            powerj-fx/target/powerj-fx-*-linux*.zip "powerj-${{ needs.draft.outputs.version }}-sbom.cdx.json"
+
+  windows:
+    name: Windows archive, installer and graphical module
+    needs: draft
+    runs-on: windows-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Install WiX (jpackage needs it for the installer)
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix --version 5.0.2
+          wix extension add -g WixToolset.Util.wixext/5.0.2 WixToolset.UI.wixext/5.0.2
+
+      - name: Build, tests, powerj.exe and installer
+        shell: cmd
+        run: mvnw.cmd -B -Pdist,installer verify
+
+      - name: Add the files to the draft
+        shell: pwsh
+        run: |
+          $files = @(Get-ChildItem powerj-dist\target\powerj-*-windows-*.zip, powerj-dist\target\installer\*.exe,
+                     powerj-fx\target\powerj-fx-*-win.zip | ForEach-Object FullName)
+          gh release upload $env:GITHUB_REF_NAME --clobber @files
+
+  macos:
+    name: macOS archive and graphical module
+    needs: draft
+    runs-on: macos-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Build, tests and application image
+        run: ./mvnw -B -Pdist verify
+
+      - name: Add the files to the draft
+        run: |
+          gh release upload "$GITHUB_REF_NAME" --clobber powerj-dist/target/powerj-*-macos-*.zip \
+            powerj-fx/target/powerj-fx-*-mac*.zip
+
+  checksums:
+    name: SHA256SUMS of everything that was added
+    needs: [linux, windows, macos]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Compute and add SHA256SUMS
+        run: |
+          mkdir assets && cd assets
+          gh release download "$GITHUB_REF_NAME" --pattern '*'
+          rm -f *.sha256 SHA256SUMS
+          sha256sum -- * > SHA256SUMS
+          cat SHA256SUMS
+          gh release upload "$GITHUB_REF_NAME" --clobber SHA256SUMS

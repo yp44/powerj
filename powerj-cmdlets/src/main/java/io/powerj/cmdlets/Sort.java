@@ -1,12 +1,8 @@
 package io.powerj.cmdlets;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
-import java.util.WeakHashMap;
-import java.util.concurrent.CancellationException;
 
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
@@ -45,32 +41,31 @@ public final class Sort implements Cmdlet<Sort.Params, Object, Object> {
     private record State(List<ScriptBlock> keys, List<Entry> entries, SortComparator comparator) {
     }
 
-    /** State of each running execution (the context is specific to each execution; released if it is cancelled). */
-    private final Map<CmdletContext<?>, State> states = Collections.synchronizedMap(new WeakHashMap<>());
+    private static State state(Params p, CmdletContext<Object> context) {
+        return context.state(State.class, () -> new State(Keys.blocks(p.keys(), context, "sort.key.invalid"),
+                new ArrayList<>(), new SortComparator(p.ignoreCase(), context::error)));
+    }
 
     @Override
     public void begin(Params p, CmdletContext<Object> context) {
-        states.put(context, new State(Keys.blocks(p.keys(), context, "sort.key.invalid"), new ArrayList<>(),
-                new SortComparator(p.ignoreCase(), context::error)));
+        state(p, context); // compiles the keys before anything is read
     }
 
     @Override
     public void process(Params p, Object input, CmdletContext<Object> context) {
-        State state = states.get(context);
+        State state = state(p, context);
         Object[] keys;
         if (state.keys().isEmpty()) {
             keys = new Object[] {input};
         } else {
             keys = new Object[state.keys().size()];
-            try {
-                for (int i = 0; i < keys.length; i++) {
-                    keys[i] = state.keys().get(i).invoke(input);
+            for (int i = 0; i < keys.length; i++) {
+                var key = state.keys().get(i).tryInvoke(input);
+                if (key.failed()) {
+                    Skipped.report(context, key.error(), input);
+                    return;
                 }
-            } catch (CancellationException e) {
-                throw e;
-            } catch (RuntimeException e) {
-                context.error(Messages.get("pipeline.object.skipped", e.getMessage(), Where.abbreviate(input)));
-                return;
+                keys[i] = key.value();
             }
         }
         state.entries().add(new Entry(keys, input));
@@ -78,7 +73,7 @@ public final class Sort implements Cmdlet<Sort.Params, Object, Object> {
 
     @Override
     public void end(Params p, CmdletContext<Object> context) {
-        State state = states.remove(context);
+        State state = state(p, context);
         Comparator<Entry> order = (a, b) -> {
             for (int i = 0; i < a.keys().length; i++) {
                 int result = state.comparator().compare(a.keys()[i], b.keys()[i]);

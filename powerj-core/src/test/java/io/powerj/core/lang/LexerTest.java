@@ -89,7 +89,7 @@ class LexerTest {
     void statementExpressionsAllowOperatorsButNotCommandSyntax() {
         assertThat(Lexer.tokenize("$a + 1 > out.txt")).containsExactly(
                 e(new Ast.Binary(Ast.Operator.ADD, v("a"), new Ast.Literal(1))),
-                new Token.Redirection(Token.Stream.OUT, false), w("out.txt"));
+                new Token.Redirection(RedirectedStream.OUT, false), w("out.txt"));
         assertThat(Lexer.tokenize("$a && $b")).containsExactly(e(v("a")), new Token.Separator(Connector.IF_SUCCESS),
                 e(v("b")));
         assertThat(Lexer.tokenize("($a > 1 && $b)")).hasSize(1);
@@ -118,10 +118,10 @@ class LexerTest {
                 w("a"), new Token.Separator(Connector.ALWAYS), w("b"),
                 new Token.Separator(Connector.IF_SUCCESS), w("c"),
                 new Token.Separator(Connector.IF_FAILURE), w("d"),
-                new Token.Redirection(Token.Stream.OUT, false), w("f"),
-                new Token.Redirection(Token.Stream.OUT, true), w("g"),
-                new Token.Redirection(Token.Stream.ERR, false), w("h"),
-                new Token.Redirection(Token.Stream.ERR, true), w("i"));
+                new Token.Redirection(RedirectedStream.OUT, false), w("f"),
+                new Token.Redirection(RedirectedStream.OUT, true), w("g"),
+                new Token.Redirection(RedirectedStream.ERR, false), w("h"),
+                new Token.Redirection(RedirectedStream.ERR, true), w("i"));
     }
 
     @Test
@@ -132,7 +132,7 @@ class LexerTest {
                 new Token.Separator(Connector.ALWAYS), w("b"));
         assertThat(Lexer.tokenize("a && b")).containsExactly(w("a"), new Token.Separator(Connector.IF_SUCCESS), w("b"));
         assertThat(Lexer.tokenize("cmd 2>&1 &")).containsExactly(w("cmd"),
-                new Token.Redirection(Token.Stream.ERR_TO_OUT, false), new Token.Background());
+                new Token.Redirection(RedirectedStream.ERR_TO_OUT, false), new Token.Background());
         // Inside a word, & followed by something else stays in the word (URL parameters).
         assertThat(Lexer.tokenize("curl http://x?a=1&b=2")).containsExactly(w("curl"), w("http://x?a=1&b=2"));
         assertThat(Lexer.tokenize("echo \"a & b\"")).hasSize(2);
@@ -207,7 +207,7 @@ class LexerTest {
 
     @Test
     void errorRedirectionOnlyAfterABlank() {
-        assertThat(Lexer.tokenize("a2>b")).containsExactly(w("a2"), new Token.Redirection(Token.Stream.OUT, false), w("b"));
-        assertThat(Lexer.tokenize("2>x")).containsExactly(new Token.Redirection(Token.Stream.ERR, false), w("x"));
+        assertThat(Lexer.tokenize("a2>b")).containsExactly(w("a2"), new Token.Redirection(RedirectedStream.OUT, false), w("b"));
+        assertThat(Lexer.tokenize("2>x")).containsExactly(new Token.Redirection(RedirectedStream.ERR, false), w("x"));
     }
 }

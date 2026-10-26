@@ -3,6 +3,7 @@ package io.powerj.cmdlets;
 import java.lang.reflect.Array;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
@@ -41,7 +42,7 @@ final class JsonWriter {
     /**
      * Writes {@code value}, its nested lines indented by {@code indent} levels.
      *
-     * @throws IllegalStateException if a record component cannot be read
+     * @throws Properties.Unreadable if a record component cannot be read
      */
     void write(Object value, StringBuilder out, int indent) {
         value(value, out, 0, indent);
@@ -55,7 +56,7 @@ final class JsonWriter {
             case null -> out.append("null");
             case Boolean b -> out.append(b);
             case Double d -> number(d, out);
-            case Float f -> number(f.doubleValue(), out);
+            case Float f -> number(f, out);
             case Integer _, Long _, Short _, Byte _, BigInteger _ -> out.append(value);
             case BigDecimal d -> out.append(d);
             case CharSequence text -> string(text, out);
@@ -82,7 +83,7 @@ final class JsonWriter {
     /** A map, record, collection, array or stream; a {@code Path}, though {@code Iterable}, is a scalar. */
     static boolean isContainer(Object value) {
         return value instanceof Map<?, ?> || value instanceof Record
-                || (value instanceof Iterable<?> && !(value instanceof java.nio.file.Path))
+                || (value instanceof Iterable<?> && !(value instanceof Path))
                 || value instanceof Iterator<?> || value instanceof BaseStream<?, ?> || value.getClass().isArray();
     }
 
@@ -155,6 +156,15 @@ final class JsonWriter {
         }
     }
 
+    /** A float, with the digits that identify it ({@code 0.1f} is {@code 0.1}, not the double nearest to it). */
+    private static void number(float f, StringBuilder out) {
+        if (Float.isNaN(f) || Float.isInfinite(f)) {
+            out.append("null");
+        } else {
+            out.append(f);
+        }
+    }
+
     /** A number; {@code NaN} and infinities, which JSON has not, give {@code null}. */
     private static void number(double d, StringBuilder out) {
         if (Double.isNaN(d) || Double.isInfinite(d)) {
@@ -164,7 +174,10 @@ final class JsonWriter {
         }
     }
 
-    /** A JSON string (RFC 8259): quotes, backslashes and control characters escaped, the rest as is. */
+    /**
+     * A JSON string (RFC 8259): quotes, backslashes and control characters escaped, the rest as is. A surrogate that is
+     * not part of a pair would not survive the encoding to UTF-8, so it is written as an escape.
+     */
     static void string(CharSequence text, StringBuilder out) {
         out.append('"');
         for (int i = 0; i < text.length(); i++) {
@@ -179,6 +192,11 @@ final class JsonWriter {
                 case '\f' -> out.append("\\f");
                 default -> {
                     if (c < 0x20) {
+                        out.append(String.format("\\u%04x", (int) c));
+                    } else if (Character.isHighSurrogate(c) && i + 1 < text.length()
+                            && Character.isLowSurrogate(text.charAt(i + 1))) {
+                        out.append(c).append(text.charAt(++i));
+                    } else if (Character.isSurrogate(c)) {
                         out.append(String.format("\\u%04x", (int) c));
                     } else {
                         out.append(c);

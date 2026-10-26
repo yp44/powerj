@@ -6,10 +6,14 @@ import java.util.concurrent.TimeUnit;
 
 import javafx.application.Platform;
 
+import io.powerj.fx.Messages;
 import io.powerj.fx.runtime.FxPlatform;
 
 /** The real toolkit. */
 final class JavaFxPlatform implements FxPlatform {
+
+    /** How long the toolkit has to start. */
+    private static final int STARTUP_SECONDS = 30;
 
     @Override
     public void startup() {
@@ -23,8 +27,8 @@ final class JavaFxPlatform implements FxPlatform {
         }
         Platform.setImplicitExit(false);
         try {
-            if (!ready.await(30, TimeUnit.SECONDS)) {
-                throw new IllegalStateException("the JavaFX toolkit did not start in 30 s");
+            if (!ready.await(STARTUP_SECONDS, TimeUnit.SECONDS)) {
+                throw new IllegalStateException(Messages.get("fx.toolkit.timeout", STARTUP_SECONDS));
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

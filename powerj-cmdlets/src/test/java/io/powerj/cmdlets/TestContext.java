@@ -40,7 +40,17 @@ final class TestContext<O> implements CmdletContext<O> {
 
     @Override
     public Map<String, String> environment() {
-        return environment;
+        return java.util.Collections.unmodifiableMap(environment);
+    }
+
+    @Override
+    public void setEnvironment(String name, String value) {
+        environment.put(name, value);
+    }
+
+    @Override
+    public boolean unsetEnvironment(String name) {
+        return environment.remove(name) != null;
     }
 
     @Override
@@ -70,11 +80,12 @@ final class TestContext<O> implements CmdletContext<O> {
     }
 
     /** Lines measured in perf mode, most recent first. */
-    List<io.powerj.api.PerfReport> perfReports = List.of();
+    List<io.powerj.api.perf.PerfReport> perfReports = List.of();
 
     @Override
-    public List<io.powerj.api.PerfReport> perfReports() {
-        return perfReports;
+    public <S> Optional<S> service(Class<S> type) {
+        return type == io.powerj.api.perf.PerfReports.class
+                ? Optional.of(type.cast((io.powerj.api.perf.PerfReports) () -> perfReports)) : Optional.empty();
     }
 
     /** Number of calls to {@link #stopInput()}. */
@@ -93,5 +104,23 @@ final class TestContext<O> implements CmdletContext<O> {
     @Override
     public ScriptBlock compile(String expression) {
         return compiler.apply(expression);
+    }
+
+    /** State of the execution, by kind (what {@code CmdletRunner} offers a cmdlet in the shell). */
+    private final Map<Class<?>, Object> states = new java.util.LinkedHashMap<>();
+
+    @Override
+    public <S> S state(Class<S> type, java.util.function.Supplier<? extends S> initial) {
+        return type.cast(states.computeIfAbsent(type, _ -> initial.get()));
+    }
+
+    /** Closes the states that can be, as the shell does when the execution is over. */
+    void closeStates() throws Exception {
+        for (Object state : states.values().stream().toList().reversed()) {
+            if (state instanceof AutoCloseable closeable) {
+                closeable.close();
+            }
+        }
+        states.clear();
     }
 }

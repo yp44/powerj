@@ -16,9 +16,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import io.powerj.api.Language;
-import io.powerj.core.exec.CmdletRegistry;
-import io.powerj.core.exec.Platform;
-import io.powerj.core.exec.Session;
+import io.powerj.core.command.CmdletRegistry;
+import io.powerj.core.nativeexec.Platform;
+import io.powerj.core.runtime.Session;
 
 /** Non-interactive mode: {@code powerj -c}, {@code .pj} file, standard input (FR-04d). */
 class ScriptModeTest {
@@ -112,5 +112,38 @@ class ScriptModeTest {
         assertThat(run(Optional.empty(), "ls nope", "\"after\"")).isZero();
         assertThat(run(Optional.empty(), "\"before\"", "ls nope")).isEqualTo(1);
         assertThat(errors).hasSize(2);
+    }
+
+    // --- A command may span several lines, as it does in the interactive shell and in profile.pj (review C-20) ---
+
+    @Test
+    void aPipelineContinuedOnTheNextLineIsOneCommand() {
+        assertThat(run(Optional.empty(), "\"b\" |", "map { $_ + \"!\" }")).isZero();
+        assertThat(output()).isEqualTo("b!\n");
+        assertThat(errors).isEmpty();
+    }
+
+    @Test
+    void aBlockSpanningSeveralLinesIsOneCommand() {
+        assertThat(run(Optional.empty(), "\"a\" | map {", "    $_ + \"?\"", "}", "\"next\"")).isZero();
+        assertThat(output()).isEqualTo("a?\nnext\n");
+    }
+
+    @Test
+    void commentsAndBlankLinesBetweenCommandsStillAreSkipped() {
+        assertThat(run(Optional.empty(), "# one", "\"a\"", "", "  # two", "\"b\"")).isZero();
+        assertThat(output()).isEqualTo("a\nb\n");
+    }
+
+    @Test
+    void aCommandLeftIncompleteAtTheEndIsReportedAsAnError() {
+        assertThat(run(Optional.empty(), "\"a\" |")).isEqualTo(1);
+        assertThat(errors).hasSize(1);
+    }
+
+    @Test
+    void theErrorOfAMultiLineCommandStopsTheScriptLikeAnyOther() {
+        assertThat(run(Optional.empty(), "nope |", "count", "\"never\"")).isEqualTo(1);
+        assertThat(output()).isEmpty();
     }
 }

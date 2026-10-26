@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 import org.junit.jupiter.api.Test;
@@ -62,5 +64,48 @@ class ShellConfigTest {
         var file = Files.writeString(tmp.resolve("config.properties"), "history.size=-3\n");
 
         assertThat(ShellConfig.load(file)).isEqualTo(ShellConfig.defaults());
+    }
+
+    /**
+     * Review C-11: {@code Properties.load} throws IllegalArgumentException on a malformed {@code \\uXXXX}, which a Windows path
+     * written without doubling its backslashes is. The class promises that invalid values take their default.
+     */
+    @Test
+    void aWindowsPathWithSingleBackslashesDoesNotPreventStartup() throws Exception {
+        var file = Files.writeString(tmp.resolve("config.properties"), "history.size=500\nsomething=C:\\users\\yves\n");
+
+        assertThat(ShellConfig.load(file)).isEqualTo(ShellConfig.defaults());
+    }
+
+    @Test
+    void aFileThatCannotBeUsedIsReportedToTheUser() throws Exception {
+        var file = Files.writeString(tmp.resolve("config.properties"), "something=C:\\users\\yves\n");
+        List<String> warnings = new ArrayList<>();
+
+        assertThat(ShellConfig.load(file, warnings::add)).isEqualTo(ShellConfig.defaults());
+
+        assertThat(warnings).singleElement().asString().contains(file.toString()).contains("Malformed")
+                .contains("the default settings apply").contains("a backslash must be written twice");
+    }
+
+    @Test
+    void aFileThatIsNotUtf8IsReportedToo() throws Exception {
+        var file = Files.write(tmp.resolve("config.properties"), new byte[] {'a', '=', (byte) 0xE9, '\n'});
+        List<String> warnings = new ArrayList<>();
+
+        assertThat(ShellConfig.load(file, warnings::add)).isEqualTo(ShellConfig.defaults());
+
+        assertThat(warnings).singleElement().asString().contains(file.toString());
+    }
+
+    @Test
+    void aFileThatIsUsableSaysNothing() throws Exception {
+        var file = Files.writeString(tmp.resolve("config.properties"), "history.size=500\npath=C:\\\\users\n");
+        List<String> warnings = new ArrayList<>();
+
+        assertThat(ShellConfig.load(file, warnings::add).historySize()).isEqualTo(500);
+        assertThat(ShellConfig.load(tmp.resolve("absent.properties"), warnings::add)).isEqualTo(ShellConfig.defaults());
+
+        assertThat(warnings).isEmpty();
     }
 }

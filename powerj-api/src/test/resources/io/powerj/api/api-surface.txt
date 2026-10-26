@@ -1,0 +1,302 @@
+public final record io.powerj.api.Attempt<T>
+  component T value
+  component java.lang.RuntimeException error
+  public <R> io.powerj.api.Attempt<R> io.powerj.api.Attempt.map(java.util.function.Function<? super T, ? extends R>)
+  public T io.powerj.api.Attempt.value()
+  public boolean io.powerj.api.Attempt.failed()
+  public final boolean io.powerj.api.Attempt.equals(java.lang.Object)
+  public final int io.powerj.api.Attempt.hashCode()
+  public final java.lang.String io.powerj.api.Attempt.toString()
+  public io.powerj.api.Attempt(T,java.lang.RuntimeException)
+  public java.lang.RuntimeException io.powerj.api.Attempt.error()
+  public static <T> io.powerj.api.Attempt<T> io.powerj.api.Attempt.failed(java.lang.RuntimeException)
+  public static <T> io.powerj.api.Attempt<T> io.powerj.api.Attempt.succeeded(T)
+
+public abstract @interface io.powerj.api.Bytes extends java.lang.annotation.Annotation retention=RUNTIME
+
+public abstract interface io.powerj.api.Cmdlet<P extends java.lang.Record,I,O>
+  public default void io.powerj.api.Cmdlet.begin(P,io.powerj.api.CmdletContext<O>) throws java.lang.Exception
+  public default void io.powerj.api.Cmdlet.end(P,io.powerj.api.CmdletContext<O>) throws java.lang.Exception
+  public default void io.powerj.api.Cmdlet.process(P,I,io.powerj.api.CmdletContext<O>) throws java.lang.Exception
+
+public abstract interface io.powerj.api.CmdletContext<O>
+  public abstract boolean io.powerj.api.CmdletContext.cancelled()
+  public abstract io.powerj.api.ScriptBlock io.powerj.api.CmdletContext.compile(java.lang.String)
+  public abstract java.nio.file.Path io.powerj.api.CmdletContext.currentDirectory()
+  public abstract java.util.Map<java.lang.String, java.lang.String> io.powerj.api.CmdletContext.environment()
+  public abstract java.util.Optional<java.lang.Object> io.powerj.api.CmdletContext.variable(java.lang.String)
+  public abstract void io.powerj.api.CmdletContext.emit(O)
+  public abstract void io.powerj.api.CmdletContext.error(java.lang.String)
+  public default <S> S io.powerj.api.CmdletContext.state(java.lang.Class<S>,java.util.function.Supplier<? extends S>)
+  public default <S> java.util.Optional<S> io.powerj.api.CmdletContext.service(java.lang.Class<S>)
+  public default boolean io.powerj.api.CmdletContext.hasInput()
+  public default boolean io.powerj.api.CmdletContext.unsetEnvironment(java.lang.String)
+  public default io.powerj.api.ScriptBlock io.powerj.api.CmdletContext.property(java.lang.String)
+  public default java.util.Optional<java.nio.file.Path> io.powerj.api.CmdletContext.configDirectory()
+  public default void io.powerj.api.CmdletContext.setEnvironment(java.lang.String,java.lang.String)
+  public default void io.powerj.api.CmdletContext.stopInput()
+
+public abstract @interface io.powerj.api.CmdletInfo extends java.lang.annotation.Annotation retention=RUNTIME
+  public abstract boolean io.powerj.api.CmdletInfo.comparison() default false
+  public abstract boolean io.powerj.api.CmdletInfo.passThrough() default false
+  public abstract boolean io.powerj.api.CmdletInfo.preview() default false
+  public abstract java.lang.String io.powerj.api.CmdletInfo.category() default "Misc"
+  public abstract java.lang.String io.powerj.api.CmdletInfo.name()
+  public abstract java.lang.String io.powerj.api.CmdletInfo.summary()
+  public abstract java.lang.String[] io.powerj.api.CmdletInfo.examples() default []
+
+public abstract interface io.powerj.api.CmdletProvider
+  public abstract java.util.List<io.powerj.api.Cmdlet<?, ?, ?>> io.powerj.api.CmdletProvider.cmdlets()
+  public default java.util.ResourceBundle io.powerj.api.CmdletProvider.messages(java.util.Locale)
+  public default void io.powerj.api.CmdletProvider.initialize(java.nio.file.Path) throws java.io.IOException
+
+public final class io.powerj.api.Collected<T> extends java.util.AbstractList<T> implements java.util.RandomAccess
+  public T io.powerj.api.Collected.get(int)
+  public int io.powerj.api.Collected.size()
+  public io.powerj.api.Collected(java.util.Collection<? extends T>)
+
+public abstract interface io.powerj.api.ColumnProvider
+  public abstract java.util.List<java.lang.String> io.powerj.api.ColumnProvider.columnsOf(java.lang.String)
+
+public abstract @interface io.powerj.api.Display extends java.lang.annotation.Annotation retention=RUNTIME
+  public abstract java.lang.String[] io.powerj.api.Display.columns()
+
+public abstract @interface io.powerj.api.Highlight extends java.lang.annotation.Annotation retention=RUNTIME
+  public abstract java.lang.String io.powerj.api.Highlight.value()
+
+public final class io.powerj.api.Language
+  public static final java.lang.String io.powerj.api.Language.ENVIRONMENT_VARIABLE
+  public static final java.lang.String io.powerj.api.Language.PROPERTY
+  public static java.lang.String io.powerj.api.Language.text(java.util.ResourceBundle,java.lang.String,java.lang.Object...)
+  public static java.util.Locale io.powerj.api.Language.current()
+  public static java.util.Locale io.powerj.api.Language.resolve(java.lang.String,java.lang.String,java.lang.String,java.util.Locale)
+  public static void io.powerj.api.Language.set(java.util.Locale)
+
+public abstract @interface io.powerj.api.Option extends java.lang.annotation.Annotation retention=RUNTIME
+  public abstract boolean io.powerj.api.Option.mandatory() default false
+  public abstract char io.powerj.api.Option.shortName() default '\u0000'
+  public abstract int io.powerj.api.Option.position() default -1
+  public abstract java.lang.String io.powerj.api.Option.description() default ""
+  public abstract java.lang.String io.powerj.api.Option.longName() default ""
+
+public abstract interface io.powerj.api.Previewable<P extends java.lang.Record>
+  public abstract boolean io.powerj.api.Previewable.canPreview(P)
+
+public final class io.powerj.api.Row extends java.util.AbstractMap<java.lang.String, java.lang.Object>
+  public boolean io.powerj.api.Row.containsKey(java.lang.Object)
+  public java.lang.Object io.powerj.api.Row.get(java.lang.Object)
+  public java.util.Set<java.lang.String> io.powerj.api.Row.sizeColumns()
+  public java.util.Set<java.util.Map$Entry<java.lang.String, java.lang.Object>> io.powerj.api.Row.entrySet()
+  public static io.powerj.api.Row io.powerj.api.Row.of(java.util.Map<java.lang.String, ?>)
+  public static io.powerj.api.Row io.powerj.api.Row.of(java.util.Map<java.lang.String, ?>,java.util.Set<java.lang.String>)
+
+public abstract interface io.powerj.api.ScriptBlock
+  public abstract java.lang.Object io.powerj.api.ScriptBlock.invoke(java.lang.Object)
+  public abstract java.lang.String io.powerj.api.ScriptBlock.source()
+  public default boolean io.powerj.api.ScriptBlock.test(java.lang.Object)
+  public default io.powerj.api.Attempt<java.lang.Boolean> io.powerj.api.ScriptBlock.tryTest(java.lang.Object)
+  public default io.powerj.api.Attempt<java.lang.Object> io.powerj.api.ScriptBlock.tryInvoke(java.lang.Object)
+
+public final record io.powerj.api.Span
+  component int end
+  component int start
+  public final boolean io.powerj.api.Span.equals(java.lang.Object)
+  public final int io.powerj.api.Span.hashCode()
+  public final java.lang.String io.powerj.api.Span.toString()
+  public int io.powerj.api.Span.end()
+  public int io.powerj.api.Span.start()
+  public io.powerj.api.Span(int,int)
+
+public final class io.powerj.api.UsageException extends java.lang.IllegalArgumentException
+  public io.powerj.api.UsageException(java.lang.String)
+  public io.powerj.api.UsageException(java.lang.String,java.lang.Throwable)
+
+public final record io.powerj.api.perf.AllocStat
+  component int line
+  component int stage
+  component java.lang.String type
+  component long bytes
+  public final boolean io.powerj.api.perf.AllocStat.equals(java.lang.Object)
+  public final int io.powerj.api.perf.AllocStat.hashCode()
+  public final java.lang.String io.powerj.api.perf.AllocStat.toString()
+  public int io.powerj.api.perf.AllocStat.line()
+  public int io.powerj.api.perf.AllocStat.stage()
+  public io.powerj.api.perf.AllocStat(int,int,java.lang.String,long)
+  public java.lang.String io.powerj.api.perf.AllocStat.type()
+  public long io.powerj.api.perf.AllocStat.bytes()
+
+public final record io.powerj.api.perf.BlockStat
+  component int line
+  component int stage
+  component java.lang.String source
+  component java.time.Duration average
+  component java.time.Duration first
+  component java.time.Duration max
+  component java.time.Duration total
+  component long calls
+  public final boolean io.powerj.api.perf.BlockStat.equals(java.lang.Object)
+  public final int io.powerj.api.perf.BlockStat.hashCode()
+  public final java.lang.String io.powerj.api.perf.BlockStat.toString()
+  public int io.powerj.api.perf.BlockStat.line()
+  public int io.powerj.api.perf.BlockStat.stage()
+  public io.powerj.api.perf.BlockStat(int,int,java.lang.String,long,java.time.Duration,java.time.Duration,java.time.Duration,java.time.Duration)
+  public java.lang.String io.powerj.api.perf.BlockStat.source()
+  public java.time.Duration io.powerj.api.perf.BlockStat.average()
+  public java.time.Duration io.powerj.api.perf.BlockStat.first()
+  public java.time.Duration io.powerj.api.perf.BlockStat.max()
+  public java.time.Duration io.powerj.api.perf.BlockStat.total()
+  public long io.powerj.api.perf.BlockStat.calls()
+
+public final record io.powerj.api.perf.GcStat
+  component int line
+  component java.lang.String cause
+  component java.lang.String name
+  component java.time.Duration pause
+  public final boolean io.powerj.api.perf.GcStat.equals(java.lang.Object)
+  public final int io.powerj.api.perf.GcStat.hashCode()
+  public final java.lang.String io.powerj.api.perf.GcStat.toString()
+  public int io.powerj.api.perf.GcStat.line()
+  public io.powerj.api.perf.GcStat(int,java.lang.String,java.lang.String,java.time.Duration)
+  public java.lang.String io.powerj.api.perf.GcStat.cause()
+  public java.lang.String io.powerj.api.perf.GcStat.name()
+  public java.time.Duration io.powerj.api.perf.GcStat.pause()
+
+public final record io.powerj.api.perf.HotMethod
+  component double percent
+  component int line
+  component int stage
+  component java.lang.String method
+  component long samples
+  public double io.powerj.api.perf.HotMethod.percent()
+  public final boolean io.powerj.api.perf.HotMethod.equals(java.lang.Object)
+  public final int io.powerj.api.perf.HotMethod.hashCode()
+  public final java.lang.String io.powerj.api.perf.HotMethod.toString()
+  public int io.powerj.api.perf.HotMethod.line()
+  public int io.powerj.api.perf.HotMethod.stage()
+  public io.powerj.api.perf.HotMethod(int,int,java.lang.String,long,double)
+  public java.lang.String io.powerj.api.perf.HotMethod.method()
+  public long io.powerj.api.perf.HotMethod.samples()
+
+public final record io.powerj.api.perf.JvmStat
+  component int line
+  component java.time.Duration gcTime
+  component java.time.Duration jitTime
+  component long classesLoaded
+  component long gcCount
+  component long heapPeak
+  public final boolean io.powerj.api.perf.JvmStat.equals(java.lang.Object)
+  public final int io.powerj.api.perf.JvmStat.hashCode()
+  public final java.lang.String io.powerj.api.perf.JvmStat.toString()
+  public int io.powerj.api.perf.JvmStat.line()
+  public io.powerj.api.perf.JvmStat(int,long,java.time.Duration,long,long,java.time.Duration)
+  public java.time.Duration io.powerj.api.perf.JvmStat.gcTime()
+  public java.time.Duration io.powerj.api.perf.JvmStat.jitTime()
+  public long io.powerj.api.perf.JvmStat.classesLoaded()
+  public long io.powerj.api.perf.JvmStat.gcCount()
+  public long io.powerj.api.perf.JvmStat.heapPeak()
+
+public final record io.powerj.api.perf.LineStat
+  component boolean cancelled
+  component int line
+  component java.lang.String bottleneck
+  component java.lang.String text
+  component java.time.Duration total
+  public boolean io.powerj.api.perf.LineStat.cancelled()
+  public final boolean io.powerj.api.perf.LineStat.equals(java.lang.Object)
+  public final int io.powerj.api.perf.LineStat.hashCode()
+  public final java.lang.String io.powerj.api.perf.LineStat.toString()
+  public int io.powerj.api.perf.LineStat.line()
+  public io.powerj.api.perf.LineStat(int,java.lang.String,java.time.Duration,java.lang.String,boolean)
+  public java.lang.String io.powerj.api.perf.LineStat.bottleneck()
+  public java.lang.String io.powerj.api.perf.LineStat.text()
+  public java.time.Duration io.powerj.api.perf.LineStat.total()
+
+public final record io.powerj.api.perf.NativeStat
+  component int line
+  component java.lang.Integer exitCode
+  component java.lang.String command
+  component java.time.Duration wall
+  component long pid
+  public final boolean io.powerj.api.perf.NativeStat.equals(java.lang.Object)
+  public final int io.powerj.api.perf.NativeStat.hashCode()
+  public final java.lang.String io.powerj.api.perf.NativeStat.toString()
+  public int io.powerj.api.perf.NativeStat.line()
+  public io.powerj.api.perf.NativeStat(int,java.lang.String,long,java.time.Duration,java.lang.Integer)
+  public java.lang.Integer io.powerj.api.perf.NativeStat.exitCode()
+  public java.lang.String io.powerj.api.perf.NativeStat.command()
+  public java.time.Duration io.powerj.api.perf.NativeStat.wall()
+  public long io.powerj.api.perf.NativeStat.pid()
+
+public final record io.powerj.api.perf.PerfReport
+  component boolean cancelled
+  component int line
+  component io.powerj.api.perf.JvmStat jvm
+  component java.lang.String text
+  component java.nio.file.Path recording
+  component java.time.Duration total
+  component java.util.List<io.powerj.api.perf.AllocStat> alloc
+  component java.util.List<io.powerj.api.perf.BlockStat> blocks
+  component java.util.List<io.powerj.api.perf.GcStat> gc
+  component java.util.List<io.powerj.api.perf.HotMethod> hot
+  component java.util.List<io.powerj.api.perf.NativeStat> natives
+  component java.util.List<io.powerj.api.perf.PhaseStat> phases
+  component java.util.List<io.powerj.api.perf.StageStat> stages
+  public boolean io.powerj.api.perf.PerfReport.cancelled()
+  public final boolean io.powerj.api.perf.PerfReport.equals(java.lang.Object)
+  public final int io.powerj.api.perf.PerfReport.hashCode()
+  public final java.lang.String io.powerj.api.perf.PerfReport.toString()
+  public int io.powerj.api.perf.PerfReport.line()
+  public io.powerj.api.perf.JvmStat io.powerj.api.perf.PerfReport.jvm()
+  public io.powerj.api.perf.LineStat io.powerj.api.perf.PerfReport.summary()
+  public io.powerj.api.perf.PerfReport(int,java.lang.String,java.time.Duration,boolean,java.util.List<io.powerj.api.perf.PhaseStat>,java.util.List<io.powerj.api.perf.StageStat>,java.util.List<io.powerj.api.perf.BlockStat>,java.util.List<io.powerj.api.perf.NativeStat>,io.powerj.api.perf.JvmStat,java.util.List<io.powerj.api.perf.HotMethod>,java.util.List<io.powerj.api.perf.GcStat>,java.util.List<io.powerj.api.perf.AllocStat>,java.nio.file.Path)
+  public java.lang.String io.powerj.api.perf.PerfReport.text()
+  public java.nio.file.Path io.powerj.api.perf.PerfReport.recording()
+  public java.time.Duration io.powerj.api.perf.PerfReport.total()
+  public java.util.List<io.powerj.api.perf.AllocStat> io.powerj.api.perf.PerfReport.alloc()
+  public java.util.List<io.powerj.api.perf.BlockStat> io.powerj.api.perf.PerfReport.blocks()
+  public java.util.List<io.powerj.api.perf.GcStat> io.powerj.api.perf.PerfReport.gc()
+  public java.util.List<io.powerj.api.perf.HotMethod> io.powerj.api.perf.PerfReport.hot()
+  public java.util.List<io.powerj.api.perf.NativeStat> io.powerj.api.perf.PerfReport.natives()
+  public java.util.List<io.powerj.api.perf.PhaseStat> io.powerj.api.perf.PerfReport.phases()
+  public java.util.List<io.powerj.api.perf.StageStat> io.powerj.api.perf.PerfReport.stages()
+
+public abstract interface io.powerj.api.perf.PerfReports
+  public abstract java.util.List<io.powerj.api.perf.PerfReport> io.powerj.api.perf.PerfReports.reports()
+
+public final record io.powerj.api.perf.PhaseStat
+  component int line
+  component java.lang.String name
+  component java.time.Duration time
+  public final boolean io.powerj.api.perf.PhaseStat.equals(java.lang.Object)
+  public final int io.powerj.api.perf.PhaseStat.hashCode()
+  public final java.lang.String io.powerj.api.perf.PhaseStat.toString()
+  public int io.powerj.api.perf.PhaseStat.line()
+  public io.powerj.api.perf.PhaseStat(int,java.lang.String,java.time.Duration)
+  public java.lang.String io.powerj.api.perf.PhaseStat.name()
+  public java.time.Duration io.powerj.api.perf.PhaseStat.time()
+
+public final record io.powerj.api.perf.StageStat
+  component boolean bottleneck
+  component int index
+  component int line
+  component java.lang.Long in
+  component java.lang.Long out
+  component java.lang.String command
+  component java.time.Duration active
+  component java.time.Duration blocked
+  component java.time.Duration starved
+  component java.time.Duration wall
+  public boolean io.powerj.api.perf.StageStat.bottleneck()
+  public final boolean io.powerj.api.perf.StageStat.equals(java.lang.Object)
+  public final int io.powerj.api.perf.StageStat.hashCode()
+  public final java.lang.String io.powerj.api.perf.StageStat.toString()
+  public int io.powerj.api.perf.StageStat.index()
+  public int io.powerj.api.perf.StageStat.line()
+  public io.powerj.api.perf.StageStat(int,int,java.lang.String,java.lang.Long,java.lang.Long,java.time.Duration,java.time.Duration,java.time.Duration,java.time.Duration,boolean)
+  public java.lang.Long io.powerj.api.perf.StageStat.in()
+  public java.lang.Long io.powerj.api.perf.StageStat.out()
+  public java.lang.String io.powerj.api.perf.StageStat.command()
+  public java.time.Duration io.powerj.api.perf.StageStat.active()
+  public java.time.Duration io.powerj.api.perf.StageStat.blocked()
+  public java.time.Duration io.powerj.api.perf.StageStat.starved()
+  public java.time.Duration io.powerj.api.perf.StageStat.wall()

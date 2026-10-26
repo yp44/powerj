@@ -1,0 +1,67 @@
+name: Bug report
+description: Something PowerJ does that it should not, or does not do that it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for the report. If the problem is a **security** one (a way to make PowerJ do something the user did not
+        type, a third-party module gaining rights...), do not open an issue: see the [security policy](https://github.com/yp44/powerj/security/policy).
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens
+      description: One or two sentences. What did you see, and what did you expect to see instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: |
+        The line you typed, and anything it needs (a file, a folder, a third-party module). The shortest form is best:
+        `powerj -c 'your line'` shows whether the problem needs the interactive shell.
+      render: shell
+      placeholder: |
+        powerj -c 'ls | where { $_.size > 1mb } | count'
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: What PowerJ printed
+      description: The output or the error, as text. For a crash, the log (`logs/powerj.0.log` in the PowerJ folder, `~/.powerj` by default).
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The first line of `powerj --version`.
+      placeholder: PowerJ 0.2.0-SNAPSHOT (Java 25)
+    validations:
+      required: true
+  - type: dropdown
+    id: system
+    attributes:
+      label: Operating system
+      options:
+        - Linux
+        - Windows
+        - macOS (Apple silicon)
+        - macOS (Intel)
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: details
+    attributes:
+      label: System details
+      description: Distribution or version, terminal, and how PowerJ was started (zip, installer, built from source).
+      placeholder: Zorin OS 17, GNOME Terminal, zip
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before sending
+      options:
+        - label: I looked at the [open issues](https://github.com/yp44/powerj/issues) and this is not already one of them.
+          required: true

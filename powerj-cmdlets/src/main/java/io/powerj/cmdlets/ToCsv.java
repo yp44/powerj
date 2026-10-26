@@ -1,10 +1,7 @@
 package io.powerj.cmdlets;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-import java.util.WeakHashMap;
 
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
@@ -38,16 +35,18 @@ public final class ToCsv implements Cmdlet<ToCsv.Params, Object, String> {
         }
     }
 
-    private final Map<CmdletContext<?>, State> states = Collections.synchronizedMap(new WeakHashMap<>());
+    private static State state(Params p, CmdletContext<String> context) {
+        return context.state(State.class, () -> new State(new CsvWriter(CsvWriter.delimiter(p.delimiter()))));
+    }
 
     @Override
     public void begin(Params p, CmdletContext<String> context) {
-        states.put(context, new State(new CsvWriter(CsvWriter.delimiter(p.delimiter()))));
+        state(p, context); // validates the delimiter before anything is read
     }
 
     @Override
     public void process(Params p, Object input, CmdletContext<String> context) {
-        State state = states.get(context);
+        State state = state(p, context);
         boolean first = state.columns == null;
         List<String> columns = first ? Properties.columns(input) : state.columns;
         List<Object> values = new ArrayList<>(columns.size());
@@ -55,8 +54,8 @@ public final class ToCsv implements Cmdlet<ToCsv.Params, Object, String> {
             for (String column : columns) {
                 values.add(Properties.get(input, column));
             }
-        } catch (IllegalStateException e) {
-            context.error(Messages.get("pipeline.object.skipped", e.getMessage(), Where.abbreviate(input)));
+        } catch (Properties.Unreadable e) {
+            context.error(Messages.get("pipeline.object.skipped", e.getMessage(), Texts.abbreviate(input)));
             return;
         }
         if (first) {
@@ -66,10 +65,5 @@ public final class ToCsv implements Cmdlet<ToCsv.Params, Object, String> {
             }
         }
         context.emit(state.writer.line(values));
-    }
-
-    @Override
-    public void end(Params p, CmdletContext<String> context) {
-        states.remove(context);
     }
 }

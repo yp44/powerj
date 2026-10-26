@@ -253,7 +253,12 @@ final class JsonParser {
         }
         String number = text.subSequence(first, position).toString();
         if (!integer) {
-            return Double.parseDouble(number);
+            double value = Double.parseDouble(number);
+            if (Double.isInfinite(value)) {
+                position = first;
+                throw error(Messages.get("json.number.range", number));
+            }
+            return value;
         }
         try {
             return Long.parseLong(number);

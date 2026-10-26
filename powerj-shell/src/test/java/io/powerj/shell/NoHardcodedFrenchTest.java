@@ -24,9 +24,8 @@ class NoHardcodedFrenchTest {
 
     /**
      * Literals allowed to contain French characters, as {@code path/relative/to/root:literal}, each with its
-     * justification: only internal texts never shown to the user (rules: control flow, input syntax).
+     * justification: only internal texts never shown to the user (rules: control flow, input syntax). None today.
      */
-    /** Justified exceptions, as {@code path:literal}; none today. */
     private static final Set<String> ALLOWED = Set.of();
 
     /** A string, text block or char literal of a source file. */

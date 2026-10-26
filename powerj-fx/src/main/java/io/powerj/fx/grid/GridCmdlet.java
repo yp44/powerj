@@ -1,18 +1,17 @@
 package io.powerj.fx.grid;
 
-import java.util.Collections;
 import java.util.Locale;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.WeakHashMap;
 
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.ScriptBlock;
+import io.powerj.api.UsageException;
 import io.powerj.fx.Messages;
 import io.powerj.fx.model.ColumnChoice;
 import io.powerj.fx.model.WindowSettings;
@@ -37,8 +36,12 @@ public final class GridCmdlet implements Cmdlet<GridParams, Object, Object> {
 
     private final WindowOpener opener;
 
-    /** What one execution has gathered. */
-    private static final class Execution {
+    /**
+     * What one execution has gathered. Closing it, which the shell does when the command is over, closes the window of
+     * a command that did not get as far as handing it over (Ctrl+C, an error): once {@link GridCmdlet#end} has, the
+     * window lives on its own.
+     */
+    private static final class Execution implements AutoCloseable {
         final ObjectReader reader;
         final int limit;
         final WindowOptions options;
@@ -49,15 +52,29 @@ public final class GridCmdlet implements Cmdlet<GridParams, Object, Object> {
         int count;
         boolean truncated;
         boolean stopped;
+        /** The table is complete and the window no longer depends on the command. */
+        boolean handedOver;
 
         Execution(ObjectReader reader, int limit, WindowOptions options) {
             this.reader = reader;
             this.limit = limit;
             this.options = options;
         }
+
+        @Override
+        public void close() {
+            if (!handedOver && live != null) {
+                live.close();
+            }
+        }
     }
 
-    private final Map<CmdletContext<?>, Execution> executions = Collections.synchronizedMap(new WeakHashMap<>());
+    /** The execution that {@code begin} made. */
+    private static Execution execution(CmdletContext<?> context) {
+        return context.state(Execution.class, () -> {
+            throw new IllegalStateException("begin was not called: no grid execution");
+        });
+    }
 
     public GridCmdlet() {
         this(new GridWindowOpener());
@@ -70,31 +87,32 @@ public final class GridCmdlet implements Cmdlet<GridParams, Object, Object> {
     @Override
     public void begin(GridParams p, CmdletContext<Object> context) {
         if (!context.hasInput()) {
-            throw new IllegalArgumentException(Messages.get("grid.noInput"));
+            throw new UsageException(Messages.get("grid.noInput"));
         }
         if (p.single() && !p.passThru()) {
-            throw new IllegalArgumentException(Messages.get("grid.single.needsPassThru"));
+            throw new UsageException(Messages.get("grid.single.needsPassThru"));
         }
         if (p.limit() <= 0) {
-            throw new IllegalArgumentException(Messages.get("grid.maxRows.invalid", p.limit()));
+            throw new UsageException(Messages.get("grid.maxRows.invalid", p.limit()));
         }
         ColumnChoice columns = ColumnChoice.ALL;
         if (p.columns() != null) {
             try {
                 columns = ColumnChoice.parse(p.columns());
             } catch (IllegalArgumentException e) {
-                throw new IllegalArgumentException(Messages.get("grid.columns.invalid", p.columns()), e);
+                throw new UsageException(Messages.get("grid.columns.invalid", p.columns()), e);
             }
         }
         String title = p.title() == null || p.title().isBlank() ? Messages.get("grid.title") : p.title();
         var settings = context.configDirectory().map(dir -> dir.resolve(WindowSettings.FILE_NAME)).orElse(null);
-        executions.put(context, new Execution(new ObjectReader(new ScriptReader(context), p.raw()), p.limit(),
-                new WindowOptions(title, columns, settings, p.passThru(), p.single())));
+        ColumnChoice chosen = columns;
+        context.state(Execution.class, () -> new Execution(new ObjectReader(new ScriptReader(context), p.raw(), p.passThru()),
+                p.limit(), new WindowOptions(title, chosen, settings, p.passThru(), p.single())));
     }
 
     @Override
     public void process(GridParams p, Object input, CmdletContext<Object> context) throws InterruptedException {
-        Execution execution = executions.get(context);
+        Execution execution = execution(context);
         if (execution.stopped) {
             return;
         }
@@ -125,12 +143,13 @@ public final class GridCmdlet implements Cmdlet<GridParams, Object, Object> {
 
     @Override
     public void end(GridParams p, CmdletContext<Object> context) throws InterruptedException {
-        Execution execution = executions.remove(context);
+        Execution execution = execution(context);
         if (execution.live == null) {
             execution.live = new LiveTable(LIVE_CAPACITY); // nothing arrived: the window says so
             open(execution);
         }
         execution.live.finish(execution.truncated);
+        execution.handedOver = true;
         List<String> missing = execution.options.columns().missing(execution.seenColumns);
         if (!missing.isEmpty()) {
             context.error(Messages.get("grid.columns.unknown", String.join(", ", missing)));
@@ -177,7 +196,7 @@ public final class GridCmdlet implements Cmdlet<GridParams, Object, Object> {
 
         @Override
         public Object read(Object target, String name) {
-            return blocks.computeIfAbsent(name, n -> context.compile("$_." + n)).invoke(target);
+            return blocks.computeIfAbsent(name, n -> context.property(n)).invoke(target);
         }
     }
 }

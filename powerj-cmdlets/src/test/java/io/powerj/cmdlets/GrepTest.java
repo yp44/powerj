@@ -48,20 +48,21 @@ class GrepTest {
         return new Grep.Params(pattern, List.of(), true, parallel, null, false, false, false, null, null, false, false);
     }
 
-    private List<GrepMatch> run(Grep.Params params) {
+    private List<GrepMatch> run(Grep.Params params) throws Exception {
         var grep = new Grep();
         grep.begin(params, context);
         grep.end(params, context);
+        context.closeStates();
         return context.emitted.stream().map(GrepMatch.class::cast).toList();
     }
 
-    private List<String> found(Grep.Params params) {
+    private List<String> found(Grep.Params params) throws Exception {
         return run(params).stream().map(m -> tmp.relativize(m.path()).toString().replace('\\', '/') + ":" + m.line())
                 .toList();
     }
 
     @Test
-    void searchesAFileWithAbsolutePathLineNumberAndText() {
+    void searchesAFileWithAbsolutePathLineNumberAndText() throws Exception {
         List<GrepMatch> matches = run(params("TODO", "a.txt"));
         assertThat(matches).hasSize(2);
         GrepMatch first = matches.getFirst();
@@ -75,13 +76,13 @@ class GrepTest {
     }
 
     @Test
-    void withoutRecurseOnlyTheFilesOfTheDirectory() {
+    void withoutRecurseOnlyTheFilesOfTheDirectory() throws Exception {
         assertThat(found(params("TODO"))).containsExactly("a.txt:2", "a.txt:3");
     }
 
     @ParameterizedTest
     @ValueSource(ints = {1, 8})
-    void recurseWalksSubdirectoriesSequentiallyOrInParallel(int parallel) {
+    void recurseWalksSubdirectoriesSequentiallyOrInParallel(int parallel) throws Exception {
         assertThat(found(recursive("TODO", parallel))).containsExactlyInAnyOrder("a.txt:2", "a.txt:3", "src/B.java:2");
         assertThat(context.errors).isEmpty();
     }
@@ -103,7 +104,7 @@ class GrepTest {
     }
 
     @Test
-    void ignoreCaseAndInvert() {
+    void ignoreCaseAndInvert() throws Exception {
         var ignoreCase = new Grep.Params("todo", List.of("a.txt"), false, null, null, true, false, false, null, null, false, false);
         assertThat(found(ignoreCase)).containsExactly("a.txt:2", "a.txt:3");
         assertThat(run(ignoreCase).getLast().matches()).containsExactly(new Span(5, 9), new Span(10, 14));
@@ -117,13 +118,13 @@ class GrepTest {
     }
 
     @Test
-    void maxDepthImpliesRecursion() {
+    void maxDepthImpliesRecursion() throws Exception {
         var depth2 = new Grep.Params("(?i)todo", List.of(), false, null, 2, false, false, false, null, null, false, false);
         assertThat(found(depth2)).containsExactlyInAnyOrder("a.txt:2", "a.txt:3", "src/B.java:2");
     }
 
     @Test
-    void groupsAndNamedGroupsOfTheFirstMatch() {
+    void groupsAndNamedGroupsOfTheFirstMatch() throws Exception {
         List<GrepMatch> matches = run(params("class (?<name>\\w+)(x)?", "src/B.java"));
         GrepMatch match = matches.getFirst();
         assertThat(match.groups()).containsExactly("class B", "B", null);
@@ -131,7 +132,7 @@ class GrepTest {
     }
 
     @Test
-    void binaryAndHiddenFilesAreSkippedUnlessAll() {
+    void binaryAndHiddenFilesAreSkippedUnlessAll() throws Exception {
         assertThat(found(params("TODO"))).doesNotContain("image.bin:1", ".secret:1");
         context.emitted.clear();
         var all = new Grep.Params("TODO", List.of(), false, null, null, false, false, true, null, null, false, false);
@@ -139,7 +140,7 @@ class GrepTest {
     }
 
     @Test
-    void binaryOptionDisablesTheBinaryCheck() {
+    void binaryOptionDisablesTheBinaryCheck() throws Exception {
         var binary = new Grep.Params("TODO", List.of("image.bin"), false, null, null, false, false, false,
                 "ISO-8859-1", null, true, false);
         assertThat(found(binary)).containsExactly("image.bin:1");
@@ -153,7 +154,7 @@ class GrepTest {
 
     @ParameterizedTest
     @ValueSource(ints = {1, 4})
-    void singleMatchGivesTheFirstMatchingLineOfEachFile(int parallel) {
+    void singleMatchGivesTheFirstMatchingLineOfEachFile(int parallel) throws Exception {
         assertThat(found(singleMatch(false, parallel)))
                 .containsExactlyInAnyOrder("a.txt:2", "src/B.java:2", "src/deep/C.java:1");
         assertThat(run(singleMatch(false, parallel))).allSatisfy(m -> assertThat(m.matches()).isNotEmpty());
@@ -200,7 +201,7 @@ class GrepTest {
     }
 
     @Test
-    void wildcards() {
+    void wildcards() throws Exception {
         assertThat(found(params("(?i)todo", "src/*.JAVA"))).containsExactly("src/B.java:2");
         context.emitted.clear();
         assertThat(found(params("x", "*.none"))).isEmpty();
@@ -208,7 +209,7 @@ class GrepTest {
     }
 
     @Test
-    void missingFileIsANonBlockingError() {
+    void missingFileIsANonBlockingError() throws Exception {
         assertThat(found(params("TODO", "absent.txt", "a.txt"))).containsExactly("a.txt:2", "a.txt:3");
         assertThat(context.errors).singleElement().asString().startsWith("not found: ");
     }
@@ -235,7 +236,7 @@ class GrepTest {
     }
 
     @Test
-    void filtersStringsOfThePipeline() {
+    void filtersStringsOfThePipeline() throws Exception {
         context.hasInput = true;
         var grep = new Grep();
         var params = new Grep.Params("fix", List.of(), false, null, null, true, false, false, null, null, false, false);
@@ -244,11 +245,12 @@ class GrepTest {
             grep.process(params, line, context);
         }
         grep.end(params, context);
+        context.closeStates();
         assertThat(context.emitted).containsExactly("a1 Fix crash", "c3 fix typo");
     }
 
     @Test
-    void filesOfThePipelineAreSearched() {
+    void filesOfThePipelineAreSearched() throws Exception {
         context.hasInput = true;
         var grep = new Grep();
         var params = params("TODO");
@@ -257,11 +259,12 @@ class GrepTest {
         grep.process(params, new FileEntry("B.java", 0, Instant.EPOCH, tmp.resolve("src/B.java"), false, "java"), context);
         grep.process(params, tmp.resolve("src"), context); // directory without -r: skipped
         grep.end(params, context);
+        context.closeStates();
         assertThat(context.emitted).singleElement().isInstanceOf(GrepMatch.class);
     }
 
     @Test
-    void propertyOfThePipelineObjects() {
+    void propertyOfThePipelineObjects() throws Exception {
         context.hasInput = true;
         context.compiler = source -> {
             assertThat(source).isEqualTo("$_.name");
@@ -285,6 +288,7 @@ class GrepTest {
         grep.process(params, a, context);
         grep.process(params, b, context);
         grep.end(params, context);
+        context.closeStates();
         assertThat(context.emitted).containsExactly(a);
     }
 
@@ -304,7 +308,7 @@ class GrepTest {
     }
 
     @Test
-    void propertyErrorsSkipTheObjectAndNullIsEmptyText() {
+    void propertyErrorsSkipTheObjectAndNullIsEmptyText() throws Exception {
         context.hasInput = true;
         context.compiler = source -> new ScriptBlock() {
             @Override
@@ -326,24 +330,27 @@ class GrepTest {
         grep.process(params, "none", context);
         grep.process(params, "text", context);
         grep.end(params, context);
+        context.closeStates();
         assertThat(context.emitted).containsExactly("none");
         assertThat(context.errors).containsExactly("no property name (object skipped: bad)");
     }
 
     @Test
-    void aFolderFromThePipelineIsSearchedOnlyWithADepth() {
+    void aFolderFromThePipelineIsSearchedOnlyWithADepth() throws Exception {
         context.hasInput = true;
         var grep = new Grep();
         var flat = full("todo", null, false, null, null);
         grep.begin(flat, context);
         grep.process(flat, tmp.resolve("src"), context);
         grep.end(flat, context);
+        context.closeStates();
         assertThat(context.emitted).isEmpty();
 
         var deep = full("todo", 2, false, null, null);
         grep.begin(deep, context);
         grep.process(deep, tmp.resolve("src"), context);
         grep.end(deep, context);
+        context.closeStates();
         assertThat(context.emitted).extracting(m -> ((GrepMatch) m).path().getFileName().toString())
                 .containsExactly("C.java");
     }

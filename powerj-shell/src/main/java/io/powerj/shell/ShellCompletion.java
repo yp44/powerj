@@ -13,9 +13,10 @@ import org.jline.utils.AttributedString;
 import org.jline.utils.AttributedStringBuilder;
 import org.jline.utils.AttributedStyle;
 
-import io.powerj.core.exec.Completions;
-import io.powerj.core.exec.Highlights;
-import io.powerj.core.exec.Interpreter;
+import io.powerj.core.assist.Completions;
+import io.powerj.core.assist.Highlights;
+import io.powerj.core.runtime.CommandKind;
+import io.powerj.core.runtime.Interpreter;
 
 /** Completion (Tab) and input highlighting (specification FR-08, FR-21 to FR-26), plugged into JLine. */
 final class ShellCompletion {
@@ -47,7 +48,7 @@ final class ShellCompletion {
 
         private final Interpreter interpreter;
         /** Kind of each command name, cached briefly (highlighting follows every keystroke). */
-        private final Map<String, Interpreter.CommandKind> kinds = new HashMap<>();
+        private final Map<String, CommandKind> kinds = new HashMap<>();
         private long cachedAt;
 
         Colors(Interpreter interpreter) {

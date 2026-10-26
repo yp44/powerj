@@ -1,10 +1,5 @@
 package io.powerj.cmdlets;
 
-import java.util.Collections;
-import java.util.Map;
-import java.util.WeakHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
-
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
@@ -24,13 +19,19 @@ public final class First implements Cmdlet<First.Params, Object, Object> {
             Integer count) {
     }
 
-    /** Objects still to emit, per execution. */
-    private final Map<CmdletContext<?>, AtomicInteger> remaining = Collections.synchronizedMap(new WeakHashMap<>());
+    /** Objects still to emit. */
+    private static final class Remaining {
+        int left;
+
+        Remaining(int left) {
+            this.left = left;
+        }
+    }
 
     @Override
     public void begin(Params p, CmdletContext<Object> context) {
-        int count = count(p.count());
-        remaining.put(context, new AtomicInteger(count));
+        int count = Counts.orOne(p.count());
+        context.state(Remaining.class, () -> new Remaining(count));
         if (count == 0) {
             context.stopInput();
         }
@@ -38,29 +39,13 @@ public final class First implements Cmdlet<First.Params, Object, Object> {
 
     @Override
     public void process(Params p, Object input, CmdletContext<Object> context) {
-        AtomicInteger left = remaining.get(context);
-        if (left.get() <= 0) {
+        Remaining remaining = context.state(Remaining.class, () -> new Remaining(Counts.orOne(p.count())));
+        if (remaining.left <= 0) {
             return; // the input was stopped; nothing more is emitted
         }
         context.emit(input);
-        if (left.decrementAndGet() == 0) {
+        if (--remaining.left == 0) {
             context.stopInput();
         }
-    }
-
-    @Override
-    public void end(Params p, CmdletContext<Object> context) {
-        remaining.remove(context);
-    }
-
-    /** Number of objects, 1 by default. */
-    static int count(Integer count) {
-        if (count == null) {
-            return 1;
-        }
-        if (count < 0) {
-            throw new IllegalArgumentException(Messages.get("count.negative", count));
-        }
-        return count;
     }
 }

@@ -24,9 +24,7 @@ public sealed interface Token {
     /** {@code |} (pipeline). */
     record Pipe() implements Token { }
 
-    /** Redirection {@code >}, {@code >>}, {@code 2>}, {@code 2>>}, or {@code 2>&1} ({@link Stream#ERR_TO_OUT}). */
-    record Redirection(Stream stream, boolean append) implements Token { }
+    /** Redirection {@code >}, {@code >>}, {@code 2>}, {@code 2>>}, or {@code 2>&1} ({@link RedirectedStream#ERR_TO_OUT}). */
+    record Redirection(RedirectedStream stream, boolean append) implements Token { }
 
-    /** Redirected stream; {@code ERR_TO_OUT}: errors join the output ({@code 2>&1}). */
-    enum Stream { OUT, ERR, ERR_TO_OUT }
 }

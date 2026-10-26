@@ -74,4 +74,31 @@ class ColumnKindTest {
         assertThat(ColumnKind.DATE.alignRight()).isFalse();
         assertThat(ColumnKind.UNKNOWN.alignRight()).isFalse();
     }
+
+    @Test
+    void aColumnIsBuiltAgainOnlyWhenItsKindChangesHowItLooks() {
+        // nothing known yet, then text: the same look
+        assertThat(ColumnKind.sameLook(null, ColumnKind.UNKNOWN)).isTrue();
+        assertThat(ColumnKind.sameLook(null, ColumnKind.TEXT)).isTrue();
+        assertThat(ColumnKind.sameLook(ColumnKind.UNKNOWN, ColumnKind.TEXT)).isTrue();
+        assertThat(ColumnKind.sameLook(ColumnKind.TEXT, ColumnKind.UNKNOWN)).isTrue();
+        // text that turns out to be numbers, sizes or dates looks different
+        assertThat(ColumnKind.sameLook(ColumnKind.UNKNOWN, ColumnKind.NUMBER)).isFalse();
+        assertThat(ColumnKind.sameLook(ColumnKind.TEXT, ColumnKind.DATE)).isFalse();
+        assertThat(ColumnKind.sameLook(null, ColumnKind.SIZE)).isFalse();
+        // numbers are not sizes
+        assertThat(ColumnKind.sameLook(ColumnKind.NUMBER, ColumnKind.SIZE)).isFalse();
+        assertThat(ColumnKind.sameLook(ColumnKind.NUMBER, ColumnKind.TEXT)).isFalse();
+        for (ColumnKind kind : ColumnKind.values()) {
+            assertThat(ColumnKind.sameLook(kind, kind)).as(kind.name()).isTrue();
+        }
+    }
+
+    @Test
+    void onlyNumbersAndSizesAreFilteredWithAComparisonFromAList() {
+        for (ColumnKind kind : ColumnKind.values()) {
+            assertThat(kind.hasComparisons()).as(kind.name())
+                    .isEqualTo(kind == ColumnKind.NUMBER || kind == ColumnKind.SIZE);
+        }
+    }
 }

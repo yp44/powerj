@@ -6,19 +6,19 @@
 
     <groupId>io.powerj</groupId>
     <artifactId>powerj-parent</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.2.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <name>PowerJ</name>
-    <description>Shell interactif orienté objet en Java</description>
+    <description>Object-oriented interactive shell in Java</description>
 
     <modules>
         <module>powerj-api</module>
         <module>powerj-fs</module>
         <module>powerj-core</module>
         <module>powerj-cmdlets</module>
-        <module>powerj-fx</module>
         <module>powerj-shell</module>
+        <module>powerj-architecture</module>
         <module>powerj-coverage</module>
         <module>powerj-dist</module>
         <module>examples/greet</module>
@@ -30,11 +30,21 @@
         <maven.compiler.release>${java.release}</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <!-- Fixed timestamp of the archives built by the Maven plugins (reproducible builds); set to the release date
+             when a version is released. The zip files of powerj-dist and powerj-fx are made by Ant and are not covered. -->
+        <project.build.outputTimestamp>2026-10-25T00:00:00Z</project.build.outputTimestamp>
 
         <junit.version>5.13.4</junit.version>
         <assertj.version>3.27.4</assertj.version>
         <jline.version>4.4.7</jline.version>
         <jacoco.version>0.8.15</jacoco.version>
+        <archunit.version>1.5.1</archunit.version>
+        <spotless.version>3.10.4</spotless.version>
+        <errorprone.version>2.51.0</errorprone.version>
+
+        <!-- Per-module coverage floor, overridden by each module (see the jacoco plugin below). -->
+        <coverage.module.line>0.00</coverage.module.line>
+        <coverage.module.branch>0.00</coverage.module.branch>
         <javafx.version>25.0.5</javafx.version>
     </properties>
 
@@ -77,6 +87,11 @@
             </dependency>
             <dependency>
                 <groupId>org.jline</groupId>
+                <artifactId>jline-terminal</artifactId>
+                <version>${jline.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.jline</groupId>
                 <artifactId>jline-terminal-ffm</artifactId>
                 <version>${jline.version}</version>
             </dependency>
@@ -92,8 +107,175 @@
                 <artifactId>assertj-core</artifactId>
                 <version>${assertj.version}</version>
             </dependency>
+            <dependency>
+                <groupId>com.tngtech.archunit</groupId>
+                <artifactId>archunit-junit5</artifactId>
+                <version>${archunit.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
+
+    <profiles>
+        <!-- The optional JavaFX module is part of the build unless -DskipFx is given: a platform that has no JavaFX
+             artifacts, or a machine that only wants the shell, builds and checks everything else (review C-33).
+             powerj-coverage and powerj-architecture follow the same switch. -->
+        <profile>
+            <id>fx</id>
+            <activation>
+                <property>
+                    <name>!skipFx</name>
+                </property>
+            </activation>
+            <modules>
+                <module>powerj-fx</module>
+            </modules>
+        </profile>
+        <!-- The per-module coverage floors were measured on Linux. On Windows the tests that run Unix commands are
+             skipped (56 in powerj-core alone), so the same code covers less: powerj-core measures 80% / 72% there
+             against 85% / 77% on Linux. The floors are therefore a Linux/macOS ratchet; Windows keeps the aggregate
+             threshold of powerj-coverage (80%) and the cmdlets / fx package rules. -->
+        <profile>
+            <id>windows-coverage-floors</id>
+            <activation>
+                <os>
+                    <family>windows</family>
+                </os>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.jacoco</groupId>
+                        <artifactId>jacoco-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>module-check</id>
+                                <configuration>
+                                    <skip>true</skip>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <!-- Benchmarks (JMH), apart from the build: ./mvnw -Pbench -DskipTests package, then docs/quality/performance.md. -->
+        <profile>
+            <id>bench</id>
+            <modules>
+                <module>powerj-bench</module>
+            </modules>
+        </profile>
+        <!-- Mutation testing (PIT), apart from the build because it takes minutes: it changes the code of the core, one
+             operator at a time, and counts the changes that no test notices. See docs/quality/mutation.md.
+             ./mvnw -Pmutation -pl powerj-core -am test-compile org.pitest:pitest-maven:mutationCoverage
+             -DtargetClasses='io.powerj.core.lang.*' narrows it to a package. -->
+        <profile>
+            <id>mutation</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.pitest</groupId>
+                        <artifactId>pitest-maven</artifactId>
+                        <version>1.30.0</version>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.pitest</groupId>
+                                <artifactId>pitest-junit5-plugin</artifactId>
+                                <version>1.2.3</version>
+                            </dependency>
+                        </dependencies>
+                        <configuration>
+                            <targetClasses>
+                                <param>io.powerj.core.lang.*</param>
+                                <param>io.powerj.core.runtime.*</param>
+                            </targetClasses>
+                            <targetTests>
+                                <param>io.powerj.core.*</param>
+                            </targetTests>
+                            <threads>4</threads>
+                            <!-- Messages in English whatever the machine, as for surefire. -->
+                            <jvmArgs>
+                                <value>-Dpowerj.language=en</value>
+                            </jvmArgs>
+                            <outputFormats>
+                                <outputFormat>HTML</outputFormat>
+                                <outputFormat>XML</outputFormat>
+                            </outputFormats>
+                            <timestampedReports>false</timestampedReports>
+                            <timeoutConstant>8000</timeoutConstant>
+                            <!-- With -am the goal also runs on the modules below the core, which have nothing to mutate. -->
+                            <failWhenNoMutations>false</failWhenNoMutations>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <!-- The software bill of materials of the release (review C-34): ./mvnw -Psbom -DskipTests package writes
+             target/bom.json at the root, CycloneDX 1.6, with every module and the libraries that the shell ships (JLine). -->
+        <profile>
+            <id>sbom</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.cyclonedx</groupId>
+                        <artifactId>cyclonedx-maven-plugin</artifactId>
+                        <version>2.9.1</version>
+                        <inherited>false</inherited>
+                        <executions>
+                            <execution>
+                                <id>aggregate-bom</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>makeAggregateBom</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <projectType>application</projectType>
+                            <schemaVersion>1.6</schemaVersion>
+                            <outputFormat>json</outputFormat>
+                            <outputName>bom</outputName>
+                            <includeCompileScope>true</includeCompileScope>
+                            <includeRuntimeScope>true</includeRuntimeScope>
+                            <includeProvidedScope>false</includeProvidedScope>
+                            <includeSystemScope>false</includeSystemScope>
+                            <includeTestScope>false</includeTestScope>
+                            <!-- What ships is the shell and the libraries it needs; powerj-fx is shipped apart and stays. -->
+                            <excludeArtifactId>powerj-coverage,powerj-dist,powerj-architecture,powerj-example-greet</excludeArtifactId>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <!-- Static analysis, as warnings for now (review C-32): ./mvnw -Pquality verify. Needs .mvn/jvm.config. -->
+        <profile>
+            <id>quality</id>
+            <build>
+                <pluginManagement>
+                    <plugins>
+                        <plugin>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-compiler-plugin</artifactId>
+                            <configuration>
+                                <compilerArgs combine.children="append">
+                                    <arg>-XDcompilePolicy=simple</arg>
+                                    <arg>--should-stop=ifError=FLOW</arg>
+                                    <arg>-Xplugin:ErrorProne -XepAllErrorsAsWarnings</arg>
+                                </compilerArgs>
+                                <annotationProcessorPaths>
+                                    <path>
+                                        <groupId>com.google.errorprone</groupId>
+                                        <artifactId>error_prone_core</artifactId>
+                                        <version>${errorprone.version}</version>
+                                    </path>
+                                </annotationProcessorPaths>
+                            </configuration>
+                        </plugin>
+                    </plugins>
+                </pluginManagement>
+            </build>
+        </profile>
+    </profiles>
 
     <build>
         <pluginManagement>
@@ -106,7 +288,16 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
-                    <version>3.14.0</version>
+                    <version>3.15.0</version>
+                    <configuration>
+                        <!-- All javac lint categories are reported (review C-32). They are warnings for now: the baseline is
+                             in docs/quality/lint-baseline.md; the build will fail on new ones once it is clean. A module that
+                             sets its own compilerArgs must use combine.children="append". -->
+                        <showWarnings>true</showWarnings>
+                        <compilerArgs>
+                            <arg>-Xlint:all</arg>
+                        </compilerArgs>
+                    </configuration>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
@@ -117,6 +308,13 @@
                         <systemPropertyVariables>
                             <powerj.language>en</powerj.language>
                         </systemPropertyVariables>
+                        <!-- A test that blocks (deadlock, pipeline never closed) must fail, not freeze the build (review
+                             C-31). The slowest test takes 1.5 s; one that needs more declares its own @Timeout. -->
+                        <properties>
+                            <configurationParameters>
+                                junit.jupiter.execution.timeout.default = 60 s
+                            </configurationParameters>
+                        </properties>
                     </configuration>
                 </plugin>
                 <plugin>
@@ -149,6 +347,17 @@
                     <artifactId>maven-clean-plugin</artifactId>
                     <version>3.5.0</version>
                 </plugin>
+                <!-- Not used by the build, but bound by the default lifecycle: pinned for requirePluginVersions. -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-deploy-plugin</artifactId>
+                    <version>3.1.2</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-site-plugin</artifactId>
+                    <version>3.12.1</version>
+                </plugin>
                 <plugin>
                     <groupId>org.jacoco</groupId>
                     <artifactId>jacoco-maven-plugin</artifactId>
@@ -158,6 +367,37 @@
         </pluginManagement>
 
         <plugins>
+            <!-- Formatting rules that need no judgement and that the code already follows (see .editorconfig). The
+                 whole-file google-java-format is deliberately not used: it would rewrite every file (review C-32). -->
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <version>${spotless.version}</version>
+                <configuration>
+                    <java>
+                        <includes>
+                            <include>src/main/java/**/*.java</include>
+                            <include>src/test/java/**/*.java</include>
+                        </includes>
+                        <removeUnusedImports/>
+                        <trimTrailingWhitespace/>
+                        <endWithNewline/>
+                        <indent>
+                            <spaces>true</spaces>
+                            <spacesPerTab>4</spacesPerTab>
+                        </indent>
+                    </java>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>spotless-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-enforcer-plugin</artifactId>
@@ -177,6 +417,12 @@
                                     <version>[${java.release},)</version>
                                     <message>PowerJ requires JDK ${java.release} or newer.</message>
                                 </requireJavaVersion>
+                                <!-- Review C-32: reproducible dependency and plugin resolution. -->
+                                <dependencyConvergence/>
+                                <requirePluginVersions>
+                                    <banSnapshots>true</banSnapshots>
+                                </requirePluginVersions>
+                                <banDuplicatePomDependencyVersions/>
                             </rules>
                         </configuration>
                     </execution>
@@ -194,6 +440,43 @@
                         <goals>
                             <goal>prepare-agent</goal>
                         </goals>
+                    </execution>
+                    <!-- Per-module ratchet (review C-30): the tests of a module alone must keep covering what they cover
+                         today, whatever the other modules' tests add to the aggregate of powerj-coverage. Each module
+                         sets coverage.module.line / coverage.module.branch to its measured value (floor, two decimals);
+                         raise them when coverage goes up, never lower them. A module without tests is skipped. -->
+                    <execution>
+                        <id>module-report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>module-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>${coverage.module.line}</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>BRANCH</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>${coverage.module.branch}</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

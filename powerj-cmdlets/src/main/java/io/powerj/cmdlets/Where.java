@@ -1,10 +1,7 @@
 package io.powerj.cmdlets;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CancellationException;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
 import io.powerj.api.Cmdlet;
@@ -12,6 +9,7 @@ import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
 import io.powerj.api.ScriptBlock;
+import io.powerj.api.UsageException;
 
 /**
  * {@code where}: lets through only the objects for which the condition is true (specification FR-36).
@@ -36,39 +34,33 @@ public final class Where implements Cmdlet<Where.Params, Object, Object> {
     }
 
     private static final Set<String> OPERATORS = Set.of("==", "!=", "<", "<=", ">", ">=");
-    static final Pattern PROPERTY = Pattern.compile("[\\p{L}_][\\p{L}\\p{N}_]*(\\.[\\p{L}_][\\p{L}\\p{N}_]*)*");
     private static final Pattern LITERAL = Pattern.compile(
             "-?\\d+(\\.\\d+)?(L|b|kb|mb|gb|tb|ms|s|m|h|d)?|true|false|null", Pattern.CASE_INSENSITIVE);
 
-    /** Condition of each running execution: the same cmdlet can be used in several pipelines at once. */
-    private final Map<Params, ScriptBlock> conditions = new ConcurrentHashMap<>();
+    /** The condition of this execution, compiled once. */
+    private record Compiled(ScriptBlock condition) {
+    }
+
+    private static ScriptBlock compiled(Params p, CmdletContext<Object> context) {
+        return context.state(Compiled.class, () -> new Compiled(condition(p.condition(), context))).condition();
+    }
 
     @Override
     public void begin(Params p, CmdletContext<Object> context) {
-        conditions.put(p, condition(p.condition(), context));
+        compiled(p, context); // compiles the condition before anything is read
     }
 
     @Override
     public void process(Params p, Object input, CmdletContext<Object> context) {
-        ScriptBlock condition = conditions.computeIfAbsent(p, key -> condition(key.condition(), context));
-        boolean keep;
-        try {
-            keep = condition.test(input);
-        } catch (CancellationException e) {
-            throw e;
-        } catch (RuntimeException e) {
-            // FR-36: an evaluation error is non-blocking, the object is skipped.
-            context.error(Messages.get("pipeline.object.skipped", e.getMessage(), abbreviate(input)));
+        ScriptBlock condition = compiled(p, context);
+        var keep = condition.tryTest(input);
+        if (keep.failed()) {
+            Skipped.report(context, keep.error(), input); // FR-36: an evaluation error is non-blocking
             return;
         }
-        if (keep) {
+        if (keep.value()) {
             context.emit(input);
         }
-    }
-
-    @Override
-    public void end(Params p, CmdletContext<Object> context) {
-        conditions.remove(p);
     }
 
     /** Block given as is, or block compiled from the short form. */
@@ -78,12 +70,12 @@ public final class Where implements Cmdlet<Where.Params, Object, Object> {
         }
         if (words.size() == 3 && words.get(0) instanceof String property && words.get(1) instanceof String operator
                 && OPERATORS.contains(operator)) {
-            if (!PROPERTY.matcher(property).matches()) {
-                throw new IllegalArgumentException(Messages.get("where.property.invalid", property));
+            if (!Texts.isPropertyPath(property)) {
+                throw new UsageException(Messages.get("where.property.invalid", property));
             }
             return context.compile("$_." + property + " " + operator + " " + value(words.get(2)));
         }
-        throw new IllegalArgumentException(Messages.get("where.condition.expected"));
+        throw new UsageException(Messages.get("where.condition.expected"));
     }
 
     /** Short-form value as expression text: literal as is, otherwise a quoted string. */
@@ -94,7 +86,7 @@ public final class Where implements Cmdlet<Where.Params, Object, Object> {
             case Boolean b -> b.toString();
             case String s when LITERAL.matcher(s).matches() -> s;
             case String s -> quote(s);
-            default -> throw new IllegalArgumentException(Messages.get("where.value.unsupported",
+            default -> throw new UsageException(Messages.get("where.value.unsupported",
                     value.getClass().getSimpleName()));
         };
     }
@@ -112,10 +104,5 @@ public final class Where implements Cmdlet<Where.Params, Object, Object> {
             }
         }
         return quoted.append('"').toString();
-    }
-
-    static String abbreviate(Object value) {
-        String text = String.valueOf(value);
-        return text.length() > 40 ? text.substring(0, 39) + "…" : text;
     }
 }

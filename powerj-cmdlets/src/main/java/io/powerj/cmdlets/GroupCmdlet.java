@@ -6,9 +6,8 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.WeakHashMap;
-import java.util.concurrent.CancellationException;
 
+import io.powerj.api.Attempt;
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
@@ -51,25 +50,25 @@ public final class GroupCmdlet implements Cmdlet<GroupCmdlet.Params, Object, Gro
     private record State(List<ScriptBlock> keys, Map<Object, Bucket> buckets) {
     }
 
-    private final Map<CmdletContext<?>, State> states = Collections.synchronizedMap(new WeakHashMap<>());
+    private static State state(Params p, CmdletContext<Group> context) {
+        return context.state(State.class,
+                () -> new State(Keys.blocks(p.keys(), context, "group.key.invalid"), new LinkedHashMap<>()));
+    }
 
     @Override
     public void begin(Params p, CmdletContext<Group> context) {
-        states.put(context, new State(Keys.blocks(p.keys(), context, "group.key.invalid"), new LinkedHashMap<>()));
+        state(p, context); // compiles the keys before anything is read
     }
 
     @Override
     public void process(Params p, Object input, CmdletContext<Group> context) {
-        State state = states.get(context);
-        Object key;
-        try {
-            key = key(state.keys(), input);
-        } catch (CancellationException e) {
-            throw e;
-        } catch (RuntimeException e) {
-            context.error(Messages.get("pipeline.object.skipped", e.getMessage(), Where.abbreviate(input)));
+        State state = state(p, context);
+        var attempt = key(state.keys(), input);
+        if (attempt.failed()) {
+            Skipped.report(context, attempt.error(), input);
             return;
         }
+        Object key = attempt.value();
         Bucket bucket = state.buckets().computeIfAbsent(Keys.normalized(key), k -> new Bucket(key));
         bucket.count++;
         if (!p.noItems()) {
@@ -79,24 +78,28 @@ public final class GroupCmdlet implements Cmdlet<GroupCmdlet.Params, Object, Gro
 
     @Override
     public void end(Params p, CmdletContext<Group> context) {
-        State state = states.remove(context);
+        State state = state(p, context);
         for (Bucket bucket : state.buckets().values()) {
             context.emit(new Group(bucket.key, bucket.count, Collections.unmodifiableList(bucket.items)));
         }
     }
 
     /** Key of an object: the object itself, the value of the single key, or the list of the values of the keys. */
-    private static Object key(List<ScriptBlock> keys, Object input) {
+    private static Attempt<Object> key(List<ScriptBlock> keys, Object input) {
         if (keys.isEmpty()) {
-            return input;
+            return Attempt.succeeded(input);
         }
         if (keys.size() == 1) {
-            return keys.getFirst().invoke(input);
+            return keys.getFirst().tryInvoke(input);
         }
         Object[] values = new Object[keys.size()];
         for (int i = 0; i < values.length; i++) {
-            values[i] = keys.get(i).invoke(input);
+            var value = keys.get(i).tryInvoke(input);
+            if (value.failed()) {
+                return value;
+            }
+            values[i] = value.value();
         }
-        return Collections.unmodifiableList(Arrays.asList(values));
+        return Attempt.succeeded(Collections.unmodifiableList(Arrays.asList(values)));
     }
 }

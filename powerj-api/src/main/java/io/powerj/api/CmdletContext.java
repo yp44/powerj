@@ -1,9 +1,9 @@
 package io.powerj.api;
 
 import java.nio.file.Path;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 /**
  * What the shell makes available to a cmdlet while it runs.
@@ -15,6 +15,11 @@ public interface CmdletContext<O> {
     /**
      * Writes an object to the output stream. If the user requested cancellation (Ctrl+C), throws
      * an exception that cleanly stops the cmdlet.
+     * <p>
+     * That exception is a {@link java.util.concurrent.CancellationException}, which is an
+     * {@link IllegalStateException}: a cmdlet that catches {@code RuntimeException} or {@code IllegalStateException}
+     * around {@code emit}, {@link ScriptBlock#invoke} or anything that checks {@link #cancelled()} must let it through
+     * ({@code catch (CancellationException e) { throw e; }} first), or Ctrl+C is taken for an error and the cmdlet goes on.
      */
     void emit(O value);
 
@@ -24,8 +29,31 @@ public interface CmdletContext<O> {
     /** Current directory of the session, base for relative paths. */
     Path currentDirectory();
 
-    /** Environment of the session (modifiable), passed on to native commands launched afterwards. */
+    /**
+     * Environment of the session, as it is when this is called: a read-only copy that does not follow later changes (the
+     * other stages of the pipeline and the commands launched afterwards change the real one). To change the
+     * environment, use {@link #setEnvironment} and {@link #unsetEnvironment}.
+     */
     Map<String, String> environment();
+
+    /**
+     * Sets an environment variable of the session, passed on to the native commands launched afterwards.
+     *
+     * @throws UnsupportedOperationException by default: the shell's context overrides it
+     */
+    default void setEnvironment(String name, String value) {
+        throw new UnsupportedOperationException("this context cannot change the environment");
+    }
+
+    /**
+     * Removes an environment variable of the session.
+     *
+     * @return {@code true} if the variable was set
+     * @throws UnsupportedOperationException by default: the shell's context overrides it
+     */
+    default boolean unsetEnvironment(String name) {
+        throw new UnsupportedOperationException("this context cannot change the environment");
+    }
 
     /** Value of a session variable. */
     Optional<Object> variable(String name);
@@ -42,12 +70,45 @@ public interface CmdletContext<O> {
     boolean cancelled();
 
     /**
+     * The state of this execution of the cmdlet: the object that {@code initial} made the first time it was asked for
+     * a {@code type}, and the same one on every later call, whichever of {@link Cmdlet#begin}, {@link Cmdlet#process}
+     * or {@link Cmdlet#end} asks. A counter, a list to sort, an open file: whatever belongs to one run.
+     * <p>
+     * A cmdlet is one object shared by every command that uses it, even by two stages of the same pipeline, so what
+     * belongs to one run must not be kept in a field of the cmdlet. Keeping it here makes each run independent, with no
+     * table to maintain and nothing to release in {@code end}.
+     * <p>
+     * If the state implements {@link AutoCloseable}, it is closed when the run is over, however it ended: after
+     * {@code end}, after an error, after a cancellation (Ctrl+C). {@code end} itself is only called after the last
+     * object was received: use the state for what must be released in every case, and {@code end} for what is emitted.
+     * States are closed in the reverse order of their creation.
+     *
+     * @param type    the kind of state; a cmdlet with several independent states uses one class for each
+     * @param initial makes the state the first time; it may use the parameters and the context
+     * @throws UnsupportedOperationException by default: the shell's context overrides it; a context written for a test
+     *                                       must do the same if the cmdlet under test keeps a state
+     */
+    default <S> S state(Class<S> type, Supplier<? extends S> initial) {
+        throw new UnsupportedOperationException("this context keeps no execution state");
+    }
+
+    /**
      * Compiles a PowerJ expression into a block, as if it had been typed between braces.
      * E.g. {@code compile("$_.size > 10kb")}.
      *
      * @throws IllegalArgumentException if the expression is syntactically invalid
      */
     ScriptBlock compile(String expression);
+
+    /**
+     * The block that reads a property of the received object, or a path of properties: {@code property("size")} is
+     * {@code { $_.size }} and {@code property("path.fileName")} is {@code { $_.path.fileName }}.
+     *
+     * @throws IllegalArgumentException if {@code path} is not a property name or a path of them
+     */
+    default ScriptBlock property(String path) {
+        return compile("$_." + path);
+    }
 
     /**
      * The cmdlet will read no more objects (specification FR-68b): {@link Cmdlet#process} is no longer called,
@@ -66,9 +127,12 @@ public interface CmdletContext<O> {
     }
 
     /**
-     * The lines measured in perf mode (specification FR-76), most recent first; empty when none was measured.
+     * A service that the shell offers for what only a few cmdlets need, so that the contract of every cmdlet does not
+     * grow with it ({@code context.service(PerfReports.class)}, in {@code io.powerj.api.perf}).
+     *
+     * @return the service, or empty if this shell does not offer it
      */
-    default List<PerfReport> perfReports() {
-        return List.of();
+    default <S> Optional<S> service(Class<S> type) {
+        return Optional.empty();
     }
 }

@@ -37,7 +37,7 @@ final class CsvReader {
             char c = piece.charAt(i);
             if (!started) {
                 started = true;
-                if (c == '﻿') { // byte order mark
+                if (c == '\uFEFF') { // byte order mark
                     continue;
                 }
             }

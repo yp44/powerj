@@ -6,20 +6,24 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import io.powerj.core.exec.NativeAccessPolicy;
+import io.powerj.core.command.NativeAccessPolicy;
 
 /**
  * Consent to load the modules that use native code (FR-77): the answers are the settings
- * {@code modules.nativeAccess.<module>=true|false} of {@code config.properties}, one per module. When a module has no
- * answer yet, the user is asked once (if there is a terminal to ask) and the answer is recorded.
+ * {@code modules.nativeAccess.<module>} of {@code config.properties}, one per module. A yes is
+ * {@code sha256:<fingerprint>}: it holds for the content of the module and of what is loaded with it, not for its name,
+ * so a jar that is replaced asks again (review C-24). A no is {@code false} and holds whatever the content. When a
+ * module has no answer that holds, the user is asked (if there is a terminal to ask) and the answer is recorded.
  */
 final class NativeAccessConsent implements NativeAccessPolicy {
 
     private static final Logger LOG = Logger.getLogger(NativeAccessConsent.class.getName());
     private static final Set<String> YES = Set.of("y", "yes", "o", "oui");
+    private static final Pattern DIGEST = Pattern.compile("sha256:[0-9a-f]{64}");
 
     /** Asks the user; empty if they gave no answer (Ctrl+C, end of input). */
     interface Asker {
@@ -42,34 +46,45 @@ final class NativeAccessConsent implements NativeAccessPolicy {
     }
 
     @Override
-    public Optional<Boolean> consent(String module, List<String> layer) {
+    public Optional<Boolean> consent(String module, List<String> layer, String fingerprint) {
         String setting = NativeAccessPolicy.setting(module);
-        Optional<Boolean> recorded = recorded(setting);
-        if (recorded.isPresent() || asker == null) {
-            return recorded;
+        String allowed = NativeAccessPolicy.allowed(fingerprint.toLowerCase(Locale.ROOT));
+        Optional<String> recorded = recorded(setting);
+        if (recorded.isPresent()) {
+            String value = recorded.get();
+            if (value.equals("false")) {
+                return Optional.of(false);
+            }
+            if (value.equals(allowed)) {
+                return Optional.of(true);
+            }
+            if (value.equals("true") || DIGEST.matcher(value).matches()) {
+                // A yes that does not hold: given before the answer was tied to the content, or for another version.
+                notice.accept(Messages.get("nativeAccess.stale", module));
+            }
+        }
+        if (asker == null) {
+            return Optional.empty();
         }
         Optional<Boolean> answer = asker.ask(module, layer);
-        answer.ifPresent(yes -> record(setting, yes));
+        answer.ifPresent(yes -> record(setting, yes ? allowed : "false"));
         return answer;
     }
 
-    private Optional<Boolean> recorded(String setting) {
+    /** What the file says for {@code setting}, stripped and in lower case. */
+    private Optional<String> recorded(String setting) {
         try {
-            return config.get(setting).map(value -> switch (value.strip().toLowerCase(Locale.ROOT)) {
-                case "true" -> Boolean.TRUE;
-                case "false" -> Boolean.FALSE;
-                default -> null; // not an answer: the user is asked again
-            });
+            return config.get(setting).map(value -> value.strip().toLowerCase(Locale.ROOT));
         } catch (IOException e) {
             LOG.log(Level.WARNING, "Cannot read " + config.path(), e);
             return Optional.empty();
         }
     }
 
-    private void record(String setting, boolean yes) {
+    private void record(String setting, String value) {
         try {
-            config.set(setting, Boolean.toString(yes));
-            notice.accept(Messages.get("nativeAccess.recorded", setting, yes, config.path()));
+            config.set(setting, value);
+            notice.accept(Messages.get("nativeAccess.recorded", setting, value, config.path()));
         } catch (IOException e) {
             LOG.log(Level.WARNING, "Cannot write " + config.path(), e);
             notice.accept(Messages.get("nativeAccess.recordFailed", config.path(), e.getMessage()));

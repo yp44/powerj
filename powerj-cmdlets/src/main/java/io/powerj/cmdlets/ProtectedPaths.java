@@ -8,7 +8,6 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
@@ -17,25 +16,42 @@ import java.util.Optional;
  * of the configuration folder, any folder that contains one of them, and the current folder with its parents. The
  * file holds one path per line; {@code ~} is the home folder; empty lines and lines starting with {@code #} are
  * ignored. When it is missing, the defaults of the platform apply: a missing file never means "nothing protected".
+ * <p>
+ * Paths are compared as the file system sees them: the links of the folders above a target are resolved, so an alias
+ * of a protected folder is refused as the folder is, and a protected entry that is itself a link protects what it points
+ * to. Removing a link only removes the link, so the link itself is not resolved.
+ * <p>
+ * This guards against a mistake, such as removing a whole folder by typing the wrong path. It is not an access
+ * control: the <em>content</em> of a protected folder is not protected ({@code rm /etc/hosts} is allowed), and a path
+ * can still be changed between the check and the removal.
  */
 public final class ProtectedPaths {
 
     /** Name of the file in the configuration folder. */
     public static final String FILE_NAME = "protected-paths";
 
-    private static final boolean WINDOWS = System.getProperty("os.name", "").startsWith("Windows");
-    private static final boolean MAC = System.getProperty("os.name", "").startsWith("Mac");
-
     private final List<Path> paths;
-    private final Path currentDirectory;
+    /** The current folder as written and with its links resolved (being in a link to a folder is being in it). */
+    private final List<Path> currentDirectories;
 
     ProtectedPaths(List<Path> paths, Path currentDirectory) {
-        this.paths = paths.stream().map(ProtectedPaths::key).toList();
-        this.currentDirectory = key(currentDirectory);
+        this.paths = paths.stream().flatMap(path -> keys(path).stream()).distinct().toList();
+        this.currentDirectories = keys(currentDirectory);
+    }
+
+    /**
+     * Writes the file of the configuration folder, with the defaults of the platform, if it does not exist: an existing
+     * file, edited or not, is never changed.
+     */
+    static void writeDefaultIfMissing(Path configDirectory) throws IOException {
+        Path file = configDirectory.resolve(FILE_NAME);
+        if (Files.notExists(file)) {
+            Files.write(file, defaultFile(configDirectory));
+        }
     }
 
     /** Content of the file written at first launch: comments, then the defaults of the platform. */
-    public static List<String> defaultFile(Path configDirectory) {
+    static List<String> defaultFile(Path configDirectory) {
         List<String> lines = new ArrayList<>(List.of(
                 "# Paths that rm and mv refuse to remove, nor any folder that contains one of them (PowerJ, FR-72).",
                 "# One path per line; ~ is the home folder; lines starting with # are ignored.",
@@ -51,13 +67,13 @@ public final class ProtectedPaths {
         FileSystems.getDefault().getRootDirectories().forEach(root -> entries.add(root.toString()));
         entries.add("~");
         entries.add(configDirectory == null ? "~/.powerj" : configDirectory.toAbsolutePath().normalize().toString());
-        if (WINDOWS) {
+        if (HostOs.WINDOWS) {
             entries.addAll(List.of("C:\\Windows", "C:\\Program Files", "C:\\Program Files (x86)", "C:\\ProgramData",
                     "C:\\Users"));
         } else {
             entries.addAll(List.of("/bin", "/boot", "/dev", "/etc", "/home", "/lib", "/opt", "/proc", "/root", "/sbin",
                     "/sys", "/usr", "/var"));
-            if (MAC) {
+            if (HostOs.MAC) {
                 entries.addAll(List.of("/Applications", "/Library", "/System", "/Users"));
             }
         }
@@ -98,7 +114,7 @@ public final class ProtectedPaths {
 
     /** Why {@code target} must not be removed: a message, or empty if it may be removed. */
     Optional<String> refusal(Path target) {
-        Path key = key(target);
+        Path key = RealPaths.of(target);
         for (Path path : paths) {
             if (path.equals(key)) {
                 return Optional.of(Messages.get("fileops.protected", target));
@@ -107,8 +123,10 @@ public final class ProtectedPaths {
                 return Optional.of(Messages.get("fileops.protected.contains", target, path));
             }
         }
-        if (currentDirectory.startsWith(key)) {
-            return Optional.of(Messages.get("fileops.current.directory", target));
+        for (Path current : currentDirectories) {
+            if (current.startsWith(key)) {
+                return Optional.of(Messages.get("fileops.current.directory", target));
+            }
         }
         return Optional.empty();
     }
@@ -128,9 +146,14 @@ public final class ProtectedPaths {
         return Path.of(System.getProperty("user.home")).toAbsolutePath().normalize();
     }
 
-    /** Path compared: absolute, normalized, and in lower case on Windows (case-insensitive file system). */
-    private static Path key(Path path) {
-        Path normalized = path.toAbsolutePath().normalize();
-        return WINDOWS ? Path.of(normalized.toString().toLowerCase(Locale.ROOT)) : normalized;
+    /**
+     * What a path stands for: itself, keyed as a target is (the links above it resolved, itself not followed), and what
+     * it points to if it is a link ({@code /etc} is a link to {@code /private/etc} on macOS). Keyed the same way as the
+     * targets, so that a path and its alias meet whatever the spelling of the folders (8.3 names on Windows).
+     */
+    private static List<Path> keys(Path path) {
+        Path itself = RealPaths.of(path);
+        Path pointedTo = RealPaths.ofFolder(path);
+        return itself.equals(pointedTo) ? List.of(itself) : List.of(itself, pointedTo);
     }
 }

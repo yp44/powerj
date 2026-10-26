@@ -1,0 +1,77 @@
+package io.powerj.core.runtime;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CancellationException;
+
+import io.powerj.core.java.Applicable;
+import io.powerj.core.error.PjException;
+import io.powerj.core.i18n.Messages;
+import io.powerj.core.lang.Ast.Expression;
+
+/**
+ * Parsed block or lambda, ready to be evaluated for each pipeline object or called by Java (FR-33b).
+ *
+ * @param parameters declared parameters ({@code f -> …}, {@code (a, b) -> …}), or {@code null} for a
+ *                   block without a declared parameter, whose single argument is {@code $_}
+ * @param captured   parameters of the enclosing lambdas, captured at creation as in Java
+ *                   ({@code f -> … anyMatch(e -> f.name.endsWith(e))})
+ */
+public record CompiledBlock(String source, List<String> parameters, Expression body, Evaluator evaluator,
+                     Map<String, Object> captured) implements Applicable {
+
+    /**
+     * @throws PjException          if the evaluation fails (message intended for the user)
+     * @throws CancellationException if the user requested cancellation
+     */
+    @Override
+    public Object invoke(Object current) {
+        return apply(new Object[] {current});
+    }
+
+    /** Calls the block with the arguments received from Java (or the pipeline object). */
+    @Override
+    public Object apply(Object[] args) {
+        if (parameters == null) {
+            if (args.length > 1) {
+                throw new PjException(Messages.get("block.tooManyArguments", args.length));
+            }
+            return evaluate(args.length == 0 ? null : args[0], captured);
+        }
+        if (parameters.size() != args.length) {
+            String key = "block.arity." + (parameters.size() == 1 ? "one" : "other") + "."
+                    + (args.length == 1 ? "one" : "other");
+            throw new PjException(Messages.get(key, source, parameters.size(), args.length));
+        }
+        Map<String, Object> locals = new HashMap<>(captured);
+        for (int i = 0; i < args.length; i++) {
+            locals.put(parameters.get(i), args[i] == null ? Evaluator.NULL : args[i]);
+        }
+        return evaluate(args.length == 1 ? args[0] : null, Map.copyOf(locals));
+    }
+
+    private Object evaluate(Object current, Map<String, Object> locals) {
+        if (Thread.currentThread().isInterrupted()) {
+            throw new CancellationException();
+        }
+        ExecutionObserver.StageObserver probe = ExecutionObserver.STAGE.isBound() ? ExecutionObserver.STAGE.get() : null;
+        long start = probe == null ? 0 : System.nanoTime();
+        try {
+            return ScopedValue.where(Evaluator.CURRENT, current).where(Evaluator.LOCALS, locals)
+                    .call(() -> evaluator.evaluate(body));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new CancellationException();
+        } finally {
+            if (probe != null) {
+                probe.block(source, System.nanoTime() - start); // perf mode (FR-76)
+            }
+        }
+    }
+
+    @Override
+    public String toString() {
+        return "{ " + source + " }";
+    }
+}

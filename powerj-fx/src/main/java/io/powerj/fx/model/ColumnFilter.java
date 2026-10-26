@@ -5,4 +5,9 @@ package io.powerj.fx.model;
 public interface ColumnFilter {
 
     boolean test(Object value);
+
+    /** How many cells this filter gave up on because they took too long; only a regex can. */
+    default int abandoned() {
+        return 0;
+    }
 }

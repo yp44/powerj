@@ -1,6 +1,5 @@
 package io.powerj.cmdlets;
 
-import java.util.concurrent.CancellationException;
 
 import io.powerj.api.CmdletContext;
 import io.powerj.api.ScriptBlock;
@@ -32,22 +31,19 @@ final class PipelineText {
             if (input instanceof CharSequence text) {
                 return text.toString();
             }
-            context.error(Messages.get(notTextKey, Where.abbreviate(input)));
+            context.error(Messages.get(notTextKey, Texts.abbreviate(input)));
             return null;
         }
-        Object value;
-        try {
-            value = block.invoke(input);
-        } catch (CancellationException e) {
-            throw e;
-        } catch (RuntimeException e) {
-            context.error(Messages.get("pipeline.object.skipped", e.getMessage(), Where.abbreviate(input)));
+        var attempt = block.tryInvoke(input);
+        if (attempt.failed()) {
+            Skipped.report(context, attempt.error(), input);
             return null;
         }
+        Object value = attempt.value();
         if (value == null || value instanceof CharSequence) {
             return value == null ? null : value.toString();
         }
-        context.error(Messages.get("text.property.not.text", property, Where.abbreviate(value)));
+        context.error(Messages.get("text.property.not.text", property, Texts.abbreviate(value)));
         return null;
     }
 }

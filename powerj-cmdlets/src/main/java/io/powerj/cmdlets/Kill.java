@@ -1,6 +1,5 @@
 package io.powerj.cmdlets;
 
-import java.lang.reflect.RecordComponent;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CancellationException;
@@ -10,6 +9,7 @@ import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
+import io.powerj.api.UsageException;
 
 /**
  * {@code kill}: stops processes given by pid or received from the pipeline (specification FR-74), with the JDK
@@ -37,7 +37,7 @@ public final class Kill implements Cmdlet<Kill.Params, Object, ProcessEntry> {
     public void begin(Params p, CmdletContext<ProcessEntry> context) {
         List<Object> arguments = p.pids() == null ? List.of() : p.pids();
         if (arguments.isEmpty() && !context.hasInput()) {
-            throw new IllegalArgumentException(Messages.get("kill.pid.expected"));
+            throw new UsageException(Messages.get("kill.pid.expected"));
         }
         long[] pids = new long[arguments.size()];
         for (int i = 0; i < pids.length; i++) {
@@ -56,7 +56,7 @@ public final class Kill implements Cmdlet<Kill.Params, Object, ProcessEntry> {
         try {
             return Long.parseLong(String.valueOf(argument).strip());
         } catch (NumberFormatException e) {
-            throw new IllegalArgumentException(Messages.get("kill.pid.invalid", argument));
+            throw new UsageException(Messages.get("kill.pid.invalid", argument));
         }
     }
 
@@ -68,24 +68,23 @@ public final class Kill implements Cmdlet<Kill.Params, Object, ProcessEntry> {
             case Process process -> kill(p, process.pid(), context);
             case Long _, Integer _, Short _ -> kill(p, ((Number) input).longValue(), context);
             case Record record when pidOf(record) != null -> kill(p, pidOf(record), context);
-            case null, default -> context.error(Messages.get("kill.not.process", Where.abbreviate(input)));
+            case null, default -> context.error(Messages.get("kill.not.process", Texts.abbreviate(input)));
         }
     }
 
     /** Component {@code pid} of a record ({@code jobs | kill}, FR-75), or {@code null} if it has none. */
     private static Long pidOf(Record record) {
-        for (RecordComponent component : record.getClass().getRecordComponents()) {
-            if (component.getName().equals("pid")
-                    && (component.getType() == long.class || component.getType() == Long.class)) {
-                try {
-                    component.getAccessor().setAccessible(true);
-                    return (Long) component.getAccessor().invoke(record);
-                } catch (ReflectiveOperationException | RuntimeException e) {
-                    return null;
-                }
-            }
+        RecordShape shape = RecordShape.of(record.getClass());
+        int index = shape.indexOf("pid");
+        if (index < 0 || (shape.accessor(index).getReturnType() != long.class
+                && shape.accessor(index).getReturnType() != Long.class)) {
+            return null;
         }
-        return null;
+        try {
+            return (Long) shape.accessor(index).invoke(record);
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            return null;
+        }
     }
 
     private static void kill(Params p, long pid, CmdletContext<ProcessEntry> context) {

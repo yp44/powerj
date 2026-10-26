@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.CopyOption;
 import java.nio.file.DirectoryNotEmptyException;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.LinkOption;
@@ -11,10 +12,10 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CancellationException;
 
 import io.powerj.api.CmdletContext;
 import io.powerj.api.ScriptBlock;
+import io.powerj.api.UsageException;
 
 /**
  * One execution of {@code cp} or {@code mv} (specification FR-72): sources from the arguments and the pipeline, the
@@ -46,11 +47,11 @@ final class Transfer {
     Transfer(Options options, List<Object> paths, String property, CmdletContext<?> context) {
         this.options = options;
         if (paths.isEmpty() || (paths.size() == 1 && !context.hasInput())) {
-            throw new IllegalArgumentException(Messages.get("fileops.destination.expected", options.move() ? "mv" : "cp"));
+            throw new UsageException(Messages.get("fileops.destination.expected", options.move() ? "mv" : "cp"));
         }
         for (Object path : paths.subList(0, paths.size() - 1)) {
             if (path instanceof ScriptBlock) {
-                throw new IllegalArgumentException(Messages.get("fileops.block.destination"));
+                throw new UsageException(Messages.get("fileops.block.destination"));
             }
         }
         this.files = new PipelineFiles(property, context, FileOps.KEYS);
@@ -106,15 +107,12 @@ final class Transfer {
             Path absolute = source.path().toAbsolutePath().normalize();
             Object current = source.object() instanceof Path path
                     ? FileEntries.of(path, LinkOption.NOFOLLOW_LINKS).<Object>map(e -> e).orElse(path) : source.object();
-            Object value;
-            try {
-                value = destinationBlock.invoke(current);
-            } catch (CancellationException e) {
-                throw e;
-            } catch (RuntimeException e) {
-                context.error(Messages.get("pipeline.object.skipped", e.getMessage(), Where.abbreviate(current)));
+            var destination = destinationBlock.tryInvoke(current);
+            if (destination.failed()) {
+                Skipped.report(context, destination.error(), current);
                 continue;
             }
+            Object value = destination.value();
             if (value == null) {
                 continue;
             }
@@ -127,7 +125,7 @@ final class Transfer {
                 continue;
             }
             if (target == null) {
-                context.error(Messages.get("fileops.block.not.a.file", destinationBlock.source(), Where.abbreviate(value)));
+                context.error(Messages.get("fileops.block.not.a.file", destinationBlock.source(), Texts.abbreviate(value)));
                 continue;
             }
             target = target.toAbsolutePath().normalize();
@@ -154,11 +152,13 @@ final class Transfer {
             context.error(Messages.get("fileops.is.directory", source));
             return;
         }
-        if (target.equals(source)) {
+        // Compared as the file system sees them: through an alias or a link, a folder is still copied into itself.
+        Path realTarget = RealPaths.of(target);
+        if (realTarget.equals(RealPaths.of(source))) {
             context.error(Messages.get("fileops.same.file", source));
             return;
         }
-        if (directory && target.startsWith(source)) {
+        if (directory && realTarget.startsWith(RealPaths.ofFolder(source))) {
             context.error(Messages.get("fileops.into.itself", source, target));
             return;
         }
@@ -186,23 +186,31 @@ final class Transfer {
      * Moves atomically when possible; otherwise (another file system, a folder merged with {@code -f}) copies, then
      * removes the source only if the whole copy succeeded.
      */
-    private boolean move(Path source, Path target, CmdletContext<Object> context) {
+    boolean move(Path source, Path target, CmdletContext<Object> context) {
         CopyOption[] replace = options.force()
                 ? new CopyOption[] {StandardCopyOption.REPLACE_EXISTING, LinkOption.NOFOLLOW_LINKS}
                 : new CopyOption[] {LinkOption.NOFOLLOW_LINKS};
         try {
-            try {
-                Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
-                return true;
-            } catch (AtomicMoveNotSupportedException e) {
-                Files.move(source, target, replace);
-                return true;
+            if (options.force()) {
+                // Only with -f: an atomic move replaces what is at the destination, without a word, on Unix
+                // (rename), including a file that appeared since the check (review C-21).
+                try {
+                    Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
+                    return true;
+                } catch (AtomicMoveNotSupportedException _) {
+                    // another file system: the plain move below
+                }
             }
+            Files.move(source, target, replace); // without REPLACE_EXISTING it fails if the destination exists
+            return true;
         } catch (DirectoryNotEmptyException e) {
             if (!FileOps.copyTree(source, target, 1, options.force(), context)) {
                 return false; // the source is kept
             }
             return FileOps.deleteTree(source, 1, false, false, context, (path, entry) -> { });
+        } catch (FileAlreadyExistsException e) {
+            FileOps.report(e, target, context);
+            return false;
         } catch (IOException e) {
             FileOps.report(e, source, context);
             return false;

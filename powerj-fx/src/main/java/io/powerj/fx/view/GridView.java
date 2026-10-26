@@ -56,9 +56,11 @@ import io.powerj.fx.model.ColumnKind;
 import io.powerj.fx.model.ColumnSpec;
 import io.powerj.fx.model.ColumnWidths;
 import io.powerj.fx.model.Debouncer;
+import io.powerj.fx.model.EscapeAction;
 import io.powerj.fx.model.FilterEditor;
 import io.powerj.fx.model.FilterOperator;
 import io.powerj.fx.model.GridRow;
+import io.powerj.fx.model.GridStatus;
 import io.powerj.fx.model.GridTable;
 import io.powerj.fx.model.LiveTable;
 import io.powerj.fx.model.RowSelection;
@@ -77,13 +79,9 @@ final class GridView {
     private static final int WIDTH_SAMPLE = 200;
     /** Rows read to fit a column to its content on demand. */
     private static final int FIT_SAMPLE = 2_000;
-    /** A character is about this wide, a column also has its padding. */
-    private static final double CHAR_WIDTH = 7.5;
-    private static final double PADDING = 28;
     /** Typing in a filter waits this long before the table is filtered. */
     private static final Duration FILTER_DELAY = Duration.ofMillis(200);
-    /** Width of a numeric column: the list of comparisons, and room to type a value. */
-    private static final double MIN_FILTERED_NUMBER = 150;
+    /** Width of the list of comparisons before the filter of a numeric column. */
     private static final double OPERATOR_WIDTH = 66;
     /** The table takes what arrived this often, and at most this many rows each time. */
     private static final int FEED_PERIOD_MILLIS = 100;
@@ -152,7 +150,9 @@ final class GridView {
             }
         });
 
+        table.setAccessibleText(Messages.get("grid.table.accessible"));
         search.setPromptText(Messages.get("grid.search.prompt"));
+        search.setAccessibleText(Messages.get("grid.search.accessible"));
         search.textProperty().addListener((_, _, _) -> debouncer.submit(this::refresh));
         Button clear = new Button(Messages.get("grid.clear"));
         clear.setOnAction(_ -> clearFilters());
@@ -172,6 +172,7 @@ final class GridView {
         HBox.setHgrow(search, Priority.ALWAYS);
         bar.setPadding(new Insets(6));
 
+        details.setAccessibleText(Messages.get("grid.details.accessible"));
         details.setEditable(false);
         details.setWrapText(true);
         details.setStyle("-fx-font-family: monospace;");
@@ -290,7 +291,7 @@ final class GridView {
         for (int i = 0; i < table.getColumns().size(); i++) {
             TableColumn<GridRow, ?> old = table.getColumns().get(i);
             if (spec.name().equals(old.getId())) {
-                if (sameLook(shown.get(spec.name()), spec.kind())) {
+                if (ColumnKind.sameLook(shown.get(spec.name()), spec.kind())) {
                     shown.put(spec.name(), spec.kind());
                     return;
                 }
@@ -311,13 +312,6 @@ final class GridView {
                 return;
             }
         }
-    }
-
-    /** Whether two kinds are shown the same way: only the numbers, sizes and dates look different. */
-    private static boolean sameLook(ColumnKind a, ColumnKind b) {
-        boolean plainA = a == null || a == ColumnKind.UNKNOWN || a == ColumnKind.TEXT;
-        boolean plainB = b == ColumnKind.UNKNOWN || b == ColumnKind.TEXT;
-        return a == b || plainA && plainB;
     }
 
     /** The columns the table is sorted by, in the order of the clicks. */
@@ -372,26 +366,13 @@ final class GridView {
                 return new ContextMenu(copyCell, copyRows, copyJson);
             }
         });
-        double width = ColumnWidths.chars(spec, data.rows(), WIDTH_SAMPLE) * CHAR_WIDTH + PADDING;
-        // The list of comparisons and a few characters of filter must fit under the name.
-        column.setPrefWidth(hasOperators(spec) ? Math.max(width, MIN_FILTERED_NUMBER) : width);
+        column.setPrefWidth(ColumnWidths.pixels(spec, data.rows(), WIDTH_SAMPLE));
         MenuItem fit = new MenuItem(Messages.get("grid.column.fit"));
-        fit.setOnAction(_ -> column.setPrefWidth(fitWidth(spec)));
+        fit.setOnAction(_ -> column.setPrefWidth(ColumnWidths.pixels(spec, data.rows(), FIT_SAMPLE)));
         MenuItem hide = new MenuItem(Messages.get("grid.column.hide"));
         hide.setOnAction(_ -> column.setVisible(false));
         column.setContextMenu(new ContextMenu(fit, hide));
         return column;
-    }
-
-    /** The width the content of a column needs, from the first rows. */
-    private double fitWidth(ColumnSpec spec) {
-        double width = ColumnWidths.chars(spec, data.rows(), FIT_SAMPLE) * CHAR_WIDTH + PADDING;
-        return hasOperators(spec) ? Math.max(width, MIN_FILTERED_NUMBER) : width;
-    }
-
-    /** Numbers and sizes are filtered with a comparison chosen in a list. */
-    private static boolean hasOperators(ColumnSpec spec) {
-        return spec.kind() == ColumnKind.NUMBER || spec.kind() == ColumnKind.SIZE;
     }
 
     /** The name of the column, and under it the field where its filter is typed (after a list of comparisons for numbers). */
@@ -400,18 +381,20 @@ final class GridView {
         title.setStyle("-fx-font-weight: bold;");
         TextField field = new TextField();
         field.setPromptText(Messages.get("grid.filter.prompt"));
+        field.setAccessibleText(Messages.get("grid.filter.accessible", spec.name()));
         field.setMinWidth(40);
         field.textProperty().addListener((_, _, _) -> debouncer.submit(this::refresh));
         fields.put(spec.name(), field);
         Node filter = field;
         double beside = 0;
-        if (hasOperators(spec)) {
+        if (spec.kind().hasComparisons()) {
             ComboBox<FilterOperator> operator = new ComboBox<>();
             operator.getItems().addAll(FilterOperator.values());
             operator.setValue(FilterOperator.EQUAL);
             operator.setPrefWidth(OPERATOR_WIDTH);
             operator.setMinWidth(OPERATOR_WIDTH);
             operator.setTooltip(new Tooltip(Messages.get("grid.operator.tooltip")));
+            operator.setAccessibleText(Messages.get("grid.operator.accessible", spec.name()));
             operator.valueProperty().addListener((_, _, _) -> debouncer.submit(this::refresh));
             operators.put(spec.name(), operator);
             filter = new HBox(2, operator, field);
@@ -495,16 +478,19 @@ final class GridView {
                 return;
             }
             Node focus = scene.getFocusOwner();
-            if (focus instanceof ComboBoxBase<?> list && list.isShowing()) {
-                return; // Esc closes the list
-            }
-            event.consume();
-            if (focus instanceof TextField field && !field.getText().isEmpty()) {
-                field.clear();
-                debouncer.cancel();
-                refresh();
-            } else {
-                close.run();
+            switch (EscapeAction.of(focus instanceof ComboBoxBase<?> list && list.isShowing(),
+                    focus instanceof TextField field && !field.getText().isEmpty())) {
+                case LEAVE_TO_LIST -> { } // Esc closes the list
+                case CLEAR_FIELD -> {
+                    event.consume();
+                    ((TextField) focus).clear();
+                    debouncer.cancel();
+                    refresh();
+                }
+                case CLOSE_WINDOW -> {
+                    event.consume();
+                    close.run();
+                }
             }
         });
     }
@@ -523,6 +509,8 @@ final class GridView {
         editor.setSearch(search.getText());
         showError(search, editor.searchError().orElse(null));
         data.filter(editor.spec());
+        // An invalid expression keeps the last good filter: the rows do not change, and so nothing else would say why.
+        updateStatus();
     }
 
     private void clearFilters() {
@@ -533,33 +521,20 @@ final class GridView {
         refresh();
     }
 
+    /** A colour and a tooltip for those who see them; the help text for those who hear the field; the status bar says it all. */
     private static void showError(TextField field, String error) {
         field.setStyle(error == null ? "" : ERROR_STYLE);
         field.setTooltip(error == null ? null : new Tooltip(error));
+        field.setAccessibleHelp(error);
     }
 
     private void updateStatus() {
-        int shown = data.rows().size();
-        int total = data.total();
-        String rows = shown != total ? Messages.get("grid.rows.filtered", shown, total)
-                : Messages.get(total == 1 ? "grid.rows.one" : "grid.rows", total);
         LiveTable.State state = live.state();
-        boolean paused = live.isPaused();
-        // Nothing to pause once everything has arrived (and is shown).
-        boolean over = state != LiveTable.State.LOADING && live.pending() == 0;
-        pause.setDisable(over);
-        pause.setText(Messages.get(paused ? "grid.resume" : "grid.pause"));
-        // Paused with rows still waiting: even if the input is over, the table is not complete.
-        String note = paused && !over ? Messages.get("grid.state.paused") : switch (state) {
-            case LOADING -> Messages.get("grid.state.loading");
-            case COMPLETE -> "";
-            case TRUNCATED -> Messages.get("grid.state.truncated", total);
-            case INTERRUPTED -> Messages.get("grid.state.interrupted");
-        };
-        if (selection != null) {
-            rows += "  ·  " + Messages.get("grid.selected", selection.count().get());
-        }
-        status.setText(note.isEmpty() ? rows : rows + "  ·  " + note);
-        placeholder.setText(Messages.get(state == LiveTable.State.LOADING ? "grid.loading" : "grid.empty"));
+        GridStatus now = GridStatus.of(data.rows().size(), data.total(), state, live.isPaused(), live.pending(),
+                selection == null ? -1 : selection.count().get(), editor.abandoned(), editor.problem().orElse(null));
+        pause.setDisable(now.pauseDisabled());
+        pause.setText(now.pauseLabel());
+        status.setText(now.text());
+        placeholder.setText(now.placeholder());
     }
 }

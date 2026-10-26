@@ -67,21 +67,21 @@ public final class ExpressionParser {
 
     private final String input;
     private final Mode mode;
-    private Predicate<String> staticNames;
+    private ParseContext context;
     private int pos;
     private int depth;
     private Tok lookahead;
 
-    private ExpressionParser(String input, int start, Mode mode, Predicate<String> staticNames) {
+    private ExpressionParser(String input, int start, Mode mode, ParseContext context) {
         this.input = input;
         this.pos = start;
         this.mode = mode;
-        this.staticNames = staticNames;
+        this.context = context;
     }
 
     /** Parses the complete content of a block. */
     public static Expression parse(String source) {
-        return parse(source, _ -> false);
+        return parse(source, ParseContext.NONE);
     }
 
     /**
@@ -91,7 +91,11 @@ public final class ExpressionParser {
      *                    ({@code Math.PI}), for commands placed in parentheses
      */
     public static Expression parse(String source, Predicate<String> staticNames) {
-        var parser = new ExpressionParser(source, 0, Mode.BLOCK, staticNames);
+        return parse(source, ParseContext.of(staticNames));
+    }
+
+    public static Expression parse(String source, ParseContext context) {
+        var parser = new ExpressionParser(source, 0, Mode.BLOCK, context);
         if (parser.atEnd()) {
             throw new SyntaxException(Messages.get("syntax.emptyBlock"));
         }
@@ -104,11 +108,15 @@ public final class ExpressionParser {
 
     /** Parsed block {@code { source }}: lambda ({@code f -> …}) or {@code $_} block. */
     public static Expression block(String source) {
-        return function(source, _ -> false);
+        return function(source, ParseContext.NONE);
     }
 
     /** Content of a block: lambda if the text starts with parameters and {@code ->}, otherwise {@code $_} block. */
     public static Expression function(String source, Predicate<String> staticNames) {
+        return function(source, ParseContext.of(staticNames));
+    }
+
+    public static Expression function(String source, ParseContext context) {
         Matcher header = LAMBDA_HEADER.matcher(source);
         if (header.lookingAt()) {
             List<String> parameters = parameters(header);
@@ -116,35 +124,9 @@ public final class ExpressionParser {
             if (body.isBlank()) {
                 throw new SyntaxException(Messages.get("syntax.lambdaBodyExpected"));
             }
-            return new Ast.Lambda(source.strip(), parameters, parse(body, withParameters(staticNames, parameters)));
+            return new Ast.Lambda(source.strip(), parameters, parse(body, context.withParameters(parameters)));
         }
-        return new Ast.BlockExpression(source.strip(), parse(source, staticNames));
-    }
-
-    /**
-     * Names known at the start of a parenthesized command: Java static names, plus the parameters of
-     * enclosing lambdas ({@code (f.size)} in {@code f -> …} is an expression, not the command
-     * {@code f.size}).
-     */
-    private record Names(Predicate<String> statics, Set<String> parameters) implements Predicate<String> {
-        @Override
-        public boolean test(String name) {
-            int dot = name.indexOf('.');
-            return parameters.contains(dot < 0 ? name : name.substring(0, dot)) || statics.test(name);
-        }
-    }
-
-    private static Predicate<String> withParameters(Predicate<String> staticNames, List<String> parameters) {
-        if (parameters.isEmpty()) {
-            return staticNames;
-        }
-        Set<String> names = new java.util.HashSet<>(parameters);
-        Predicate<String> statics = staticNames;
-        if (staticNames instanceof Names(var outer, var outerParameters)) {
-            names.addAll(outerParameters);
-            statics = outer;
-        }
-        return new Names(statics, Set.copyOf(names));
+        return new Ast.BlockExpression(source.strip(), parse(source, context));
     }
 
     /**
@@ -161,16 +143,6 @@ public final class ExpressionParser {
         } catch (SyntaxException e) {
             return Optional.empty();
         }
-    }
-
-    /** The names given by the caller, without the parameters of enclosing lambdas added here. */
-    static Predicate<String> syntax(Predicate<String> staticNames) {
-        return staticNames instanceof Names(var statics, var _) ? statics : staticNames;
-    }
-
-    /** Is {@code name} a parameter of an enclosing lambda? */
-    static boolean isParameter(Predicate<String> staticNames, String name) {
-        return staticNames instanceof Names(var _, var parameters) && parameters.contains(name);
     }
 
     /** {@code f ->}, {@code (a, b) ->}, {@code () ->} at the start of the text. */
@@ -199,15 +171,15 @@ public final class ExpressionParser {
      * Parses the expression starting at {@code start} in a command line, and indicates where it
      * stops.
      */
-    static Lexer.Scanned<Expression> scan(String input, int start, Mode mode, Predicate<String> staticNames) {
-        var parser = new ExpressionParser(input, start, mode, staticNames);
+    static Lexer.Scanned<Expression> scan(String input, int start, Mode mode, ParseContext context) {
+        var parser = new ExpressionParser(input, start, mode, context);
         Expression expression = mode == Mode.ARGUMENT ? parser.postfix(parser.primary()) : parser.expression();
         return new Lexer.Scanned<>(expression, parser.pos);
     }
 
     /** Group {@code ( … )} starting at {@code open}: expression or pipeline; used for {@code $( … )}. */
-    static Lexer.Scanned<Expression> group(String input, int open, Predicate<String> staticNames) {
-        var parser = new ExpressionParser(input, open, Mode.BLOCK, staticNames);
+    static Lexer.Scanned<Expression> group(String input, int open, ParseContext context) {
+        var parser = new ExpressionParser(input, open, Mode.BLOCK, context);
         Tok paren = parser.next();
         Expression expression = parser.group(paren);
         return new Lexer.Scanned<>(expression, parser.pos);
@@ -375,20 +347,20 @@ public final class ExpressionParser {
     }
 
     private Expression lambdaOrExpression() {
-        int start = skipBlanks(input, pos);
+        int start = Scanning.skipBlanks(input, pos);
         Matcher header = LAMBDA_HEADER.matcher(input).region(start, input.length());
         if (!header.lookingAt()) {
             return expression();
         }
         List<String> parameters = parameters(header);
         reset(header.end());
-        Predicate<String> enclosing = staticNames;
-        staticNames = withParameters(enclosing, parameters);
+        ParseContext enclosing = context;
+        context = enclosing.withParameters(parameters);
         Expression body;
         try {
             body = expression();
         } finally {
-            staticNames = enclosing;
+            context = enclosing;
         }
         return new Ast.Lambda(input.substring(start, pos).strip(), parameters, body);
     }
@@ -463,15 +435,15 @@ public final class ExpressionParser {
      */
     private Expression group(Tok paren) {
         int open = paren.at();
-        int close = matching(input, open);
+        int close = Scanning.matching(input, open);
         if (close < 0) {
             throw new SyntaxException(Messages.get("syntax.missingCloseParen", open + 1));
         }
-        int contentStart = skipBlanks(input, open + 1);
+        int contentStart = Scanning.skipBlanks(input, open + 1);
         if (contentStart == close) {
             throw new SyntaxException(Messages.get("syntax.emptyParentheses"));
         }
-        if (Lexer.expressionAt(input, contentStart, staticNames)) {
+        if (Lexer.expressionAt(input, contentStart, context)) {
             depth++;
             Expression inner = expression();
             depth--;
@@ -481,23 +453,23 @@ public final class ExpressionParser {
             }
             // value followed by a pipeline: ($l | where { … })
         }
-        Ast.Pipeline pipeline = Parser.pipeline(input.substring(open + 1, close), staticNames);
+        Ast.Pipeline pipeline = Parser.pipeline(input.substring(open + 1, close), context);
         reset(close + 1);
         return new Ast.SubExpression(pipeline);
     }
 
     /** {@code [type] value} (conversion) or {@code [1, 2, 3]} (list). */
     private Expression castOrList(Tok bracket) {
-        int start = skipBlanks(input, bracket.at() + 1);
+        int start = Scanning.skipBlanks(input, bracket.at() + 1);
         int end = start;
         while (end < input.length() && (Character.isJavaIdentifierPart(input.charAt(end)) || input.charAt(end) == '.')) {
             end++;
         }
-        int closing = skipBlanks(input, end);
+        int closing = Scanning.skipBlanks(input, end);
         if (end > start && Character.isJavaIdentifierStart(input.charAt(start))
                 && closing < input.length() && input.charAt(closing) == ']') {
             String type = input.substring(start, end);
-            int after = skipBlanks(input, closing + 1);
+            int after = Scanning.skipBlanks(input, closing + 1);
             if (isOperandStart(after) && (PRIMITIVES.contains(type) || Character.isUpperCase(lastPart(type).charAt(0)))) {
                 reset(closing + 1);
                 return new Ast.Cast(type, unary());
@@ -521,13 +493,13 @@ public final class ExpressionParser {
 
     /** {@code { … }}: block evaluated later ({@code ScriptBlock}). */
     private Expression block(Tok brace) {
-        int close = matching(input, brace.at());
+        int close = Scanning.matching(input, brace.at());
         if (close < 0) {
             throw new SyntaxException(Messages.get("syntax.unclosedBlock", brace.at() + 1));
         }
         String source = input.substring(brace.at() + 1, close);
         reset(close + 1);
-        return function(source, staticNames);
+        return function(source, context);
     }
 
     // --- Utilities ---
@@ -608,7 +580,7 @@ public final class ExpressionParser {
 
     private Tok peek() {
         if (lookahead == null) {
-            lookahead = scanToken(skipBlanks(input, pos));
+            lookahead = scanToken(Scanning.skipBlanks(input, pos));
         }
         return lookahead;
     }
@@ -620,14 +592,6 @@ public final class ExpressionParser {
         return token;
     }
 
-    static int skipBlanks(String input, int from) {
-        int at = from;
-        while (at < input.length() && Lexer.isBlank(input.charAt(at))) {
-            at++;
-        }
-        return at;
-    }
-
     // --- Tokenizing ---
 
     private Tok scanToken(int start) {
@@ -636,7 +600,7 @@ public final class ExpressionParser {
         }
         char c = input.charAt(start);
         if (c == '"') {
-            var scanned = Lexer.stringAt(input, start, staticNames);
+            var scanned = Lexer.stringAt(input, start, context);
             return new Text(scanned.value(), start, scanned.end());
         }
         if (c == '\'') {
@@ -760,83 +724,5 @@ public final class ExpressionParser {
             throw new SyntaxException(Messages.get("syntax.characterQuotes", open + 1));
         }
         return new Lexer.Scanned<>(value, at + 1);
-    }
-
-    /**
-     * Position of the closing symbol matching the one opened at {@code open} ({@code (}, {@code [} or
-     * {@code {}), ignoring the content of strings and characters; -1 if it is missing.
-     */
-    static int matching(String input, int open) {
-        List<Character> expected = new ArrayList<>();
-        int at = open;
-        while (at < input.length()) {
-            char c = input.charAt(at);
-            switch (c) {
-                case '(' -> expected.add(')');
-                case '[' -> expected.add(']');
-                case '{' -> expected.add('}');
-                case ')', ']', '}' -> {
-                    if (!expected.isEmpty() && expected.getLast() == c) {
-                        expected.removeLast();
-                        if (expected.isEmpty()) {
-                            return at;
-                        }
-                    }
-                }
-                case '"' -> {
-                    at = skipString(input, at);
-                    if (at < 0) {
-                        return -1;
-                    }
-                    continue;
-                }
-                case '\'' -> {
-                    int end = characterEnd(input, at);
-                    if (end > 0) {
-                        at = end;
-                        continue;
-                    }
-                }
-                default -> { }
-            }
-            at++;
-        }
-        return -1;
-    }
-
-    /** Position following the string opened at {@code open}; -1 if it is not closed. */
-    private static int skipString(String input, int open) {
-        int at = open + 1;
-        while (at < input.length()) {
-            char c = input.charAt(at);
-            if (c == '\\') {
-                at += 2;
-            } else if (c == '"') {
-                return at + 1;
-            } else if (c == '$' && at + 1 < input.length() && input.charAt(at + 1) == '(') {
-                int close = matching(input, at + 1);
-                if (close < 0) {
-                    return -1;
-                }
-                at = close + 1;
-            } else {
-                at++;
-            }
-        }
-        return -1;
-    }
-
-    /** End of a character literal ({@code 'a'}, {@code '\n'}, {@code 'é'}) at {@code open}, otherwise -1. */
-    private static int characterEnd(String input, int open) {
-        if (open + 2 < input.length() && input.charAt(open + 1) != '\\' && input.charAt(open + 2) == '\'') {
-            return open + 3;
-        }
-        if (open + 3 < input.length() && input.charAt(open + 1) == '\\' && input.charAt(open + 3) == '\'') {
-            return open + 4;
-        }
-        if (open + 7 < input.length() && input.startsWith("\\u", open + 1) && input.charAt(open + 7) == '\'') {
-            return open + 8;
-        }
-        return -1;
     }
 }

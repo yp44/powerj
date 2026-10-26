@@ -5,6 +5,7 @@ import java.util.List;
 
 import io.powerj.api.CmdletContext;
 import io.powerj.api.ScriptBlock;
+import io.powerj.api.UsageException;
 
 /**
  * Keys given to a cmdlet ({@code sort size}, {@code sort { $_.name.length() }}): a property name or path is compiled
@@ -24,10 +25,10 @@ final class Keys {
     static ScriptBlock block(Object argument, CmdletContext<?> context, String invalidKey) {
         return switch (argument) {
             case ScriptBlock block -> block;
-            case String property when Where.PROPERTY.matcher(property).matches() -> context.compile("$_." + property);
-            case String property -> throw new IllegalArgumentException(Messages.get("where.property.invalid", property));
-            case null -> throw new IllegalArgumentException(Messages.get(invalidKey, "null"));
-            default -> throw new IllegalArgumentException(Messages.get(invalidKey, argument));
+            case String property when Texts.isPropertyPath(property) -> context.property(property);
+            case String property -> throw new UsageException(Messages.get("where.property.invalid", property));
+            case null -> throw new UsageException(Messages.get(invalidKey, "null"));
+            default -> throw new UsageException(Messages.get(invalidKey, argument));
         };
     }
 

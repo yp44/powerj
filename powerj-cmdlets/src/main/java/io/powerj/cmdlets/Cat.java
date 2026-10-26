@@ -9,17 +9,14 @@ import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
-import java.util.Collections;
-import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CancellationException;
 
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
-import io.powerj.fs.WalkError;
+import io.powerj.api.UsageException;
 
 /**
  * {@code cat}: reads files, as lines or as a whole content (specification FR-65).
@@ -70,28 +67,28 @@ public final class Cat implements Cmdlet<Cat.Params, Object, Object> {
             String property) {
     }
 
-    /** State of each running execution: the same cmdlet can be used in several pipelines at once. */
-    private final Map<Params, Reading> readings = Collections.synchronizedMap(new IdentityHashMap<>());
+    private static Reading reading(Params params, CmdletContext<Object> context) {
+        return context.state(Reading.class, () -> new Reading(params, context));
+    }
 
     @Override
     public void begin(Params params, CmdletContext<Object> context) {
-        Reading reading = new Reading(params, context);
-        readings.put(params, reading);
+        Reading reading = reading(params, context);
         if (!params.paths().isEmpty()) {
             for (String argument : params.paths()) {
-                for (Path file : FileArguments.expand(argument, false, context, error -> report(error, context),
+                for (Path file : FileArguments.expand(argument, false, context, error -> FileArguments.report(error, context),
                         "cat.no.match")) {
                     reading.read(file, context);
                 }
             }
         } else if (!context.hasInput()) {
-            throw new IllegalArgumentException(Messages.get("cat.file.expected"));
+            throw new UsageException(Messages.get("cat.file.expected"));
         }
     }
 
     @Override
     public void process(Params params, Object input, CmdletContext<Object> context) {
-        Reading reading = readings.computeIfAbsent(params, p -> new Reading(p, context));
+        Reading reading = reading(params, context);
         if (params.property() == null && input instanceof FileEntry entry && entry.dir()) {
             return; // a directory listed by ls is skipped: ls -r already emits its files
         }
@@ -103,18 +100,7 @@ public final class Cat implements Cmdlet<Cat.Params, Object, Object> {
 
     @Override
     public void end(Params params, CmdletContext<Object> context) {
-        Reading reading = readings.remove(params);
-        if (reading != null) {
-            reading.finish(context);
-        }
-    }
-
-    private static void report(WalkError error, CmdletContext<?> context) {
-        context.error(switch (error.kind()) {
-            case ACCESS_DENIED -> Messages.get("cat.access.denied", error.path());
-            case NOT_FOUND -> Messages.get("cat.not.found", error.path());
-            case IO -> Messages.get("cat.read.failed", error.path(), error.message());
-        });
+        reading(params, context).finish(context);
     }
 
     /** One execution of {@code cat}: settings, line counter and content gathered. */
@@ -140,7 +126,7 @@ public final class Cat implements Cmdlet<Cat.Params, Object, Object> {
             int chosen = (params.lines() ? 1 : 0) + (params.text() ? 1 : 0) + (params.numbered() ? 1 : 0)
                     + (params.content() ? 1 : 0);
             if (chosen > 1) {
-                throw new IllegalArgumentException(Messages.get("cat.one.output"));
+                throw new UsageException(Messages.get("cat.one.output"));
             }
             return params.text() ? Mode.TEXT : params.numbered() ? Mode.NUMBERED
                     : params.content() ? Mode.CONTENT : Mode.LINES;

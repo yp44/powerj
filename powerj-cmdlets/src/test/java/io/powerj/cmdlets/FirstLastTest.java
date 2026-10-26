@@ -31,6 +31,7 @@ class FirstLastTest {
             cmdlet.process(params, input, context);
         }
         cmdlet.end(params, context);
+        context.closeStates();
         return read;
     }
 
@@ -69,6 +70,7 @@ class FirstLastTest {
         first.process(params, "a", context);
         first.process(params, "b", context); // a context without stopInput keeps sending
         first.end(params, context);
+        context.closeStates();
         assertThat(context.emitted).containsExactly("a");
     }
 

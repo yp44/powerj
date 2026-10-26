@@ -1,19 +1,18 @@
 package io.powerj.cmdlets;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.WeakHashMap;
 
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
 import io.powerj.api.Row;
+import io.powerj.api.UsageException;
 
 /**
  * {@code from-csv}: reads the CSV text received from the pipeline (specification FR-73), one {@code Row} per record,
@@ -46,21 +45,24 @@ public final class FromCsv implements Cmdlet<FromCsv.Params, Object, Row> {
         }
     }
 
-    private final Map<CmdletContext<?>, State> states = Collections.synchronizedMap(new WeakHashMap<>());
+    private static State state(Params p, CmdletContext<Row> context) {
+        return context.state(State.class, () -> {
+            char delimiter = CsvWriter.delimiter(p.delimiter());
+            if (!context.hasInput()) {
+                throw new UsageException(Messages.get("from-csv.input.expected"));
+            }
+            return new State(new PipelineText(p.property(), context, "from-csv.not.text"), new CsvReader(delimiter));
+        });
+    }
 
     @Override
     public void begin(Params p, CmdletContext<Row> context) {
-        char delimiter = CsvWriter.delimiter(p.delimiter());
-        if (!context.hasInput()) {
-            throw new IllegalArgumentException(Messages.get("from-csv.input.expected"));
-        }
-        states.put(context, new State(new PipelineText(p.property(), context, "from-csv.not.text"),
-                new CsvReader(delimiter)));
+        state(p, context); // validates the delimiter and refuses a command that has no input
     }
 
     @Override
     public void process(Params p, Object input, CmdletContext<Row> context) {
-        State state = states.get(context);
+        State state = state(p, context);
         String text = state.text.text(input, context);
         if (text == null) {
             return;
@@ -83,7 +85,7 @@ public final class FromCsv implements Cmdlet<FromCsv.Params, Object, Row> {
 
     @Override
     public void end(Params p, CmdletContext<Row> context) {
-        State state = states.remove(context);
+        State state = state(p, context);
         if (state.reader.unclosed()) {
             context.error(Messages.get("csv.quote.unclosed", state.reader.recordLine()));
         }

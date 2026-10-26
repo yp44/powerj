@@ -53,7 +53,7 @@ Registration & i18n:
 
 Docs:
 - `docs/SPECIFICATION.md`: new section **FR-65 — `cat`** after FR-64 (syntax, option table, records, CA); update §12.3 backlog row for `cat`; add row 13 to the mini-iteration table; mention `cat` in the cmdlet scope sentence (line ~373).
-- `docs/recettes/cat.md`: acceptance checklist in the grep.md format.
+- `docs/acceptance/cat.md`: acceptance checklist in the grep.md format.
 - `README.md`: add `cat` to the `powerj-cmdlets` row and a "Mini-iteration 13" sentence.
 
 ## Tests — `powerj-cmdlets/src/test/java/io/powerj/cmdlets/CatTest.java`
