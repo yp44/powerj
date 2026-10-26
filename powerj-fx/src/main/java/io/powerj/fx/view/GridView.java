@@ -559,6 +559,10 @@ final class GridView {
         if (selection != null) {
             rows += "  ·  " + Messages.get("grid.selected", selection.count().get());
         }
+        int skipped = editor.abandoned();
+        if (skipped > 0) {
+            rows += "  ·  " + Messages.get(skipped == 1 ? "grid.filter.skipped.one" : "grid.filter.skipped", skipped);
+        }
         status.setText(note.isEmpty() ? rows : rows + "  ·  " + note);
         placeholder.setText(Messages.get(state == LiveTable.State.LOADING ? "grid.loading" : "grid.empty"));
     }

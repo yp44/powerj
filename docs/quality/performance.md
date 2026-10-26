@@ -47,18 +47,20 @@ state. The first Tab of a session, before the Java class index is ready, is not 
 
 ## The grid at 100 000 rows (C-29, NFR-04)
 
-`grid` reads 100 000 objects by default (`--max-rows`). The model (`powerj-fx`, no window) was measured on a table of 100 000
-records of eight columns (text, a size, a date, booleans, numbers), through `ObjectReader` and `GridTable` in batches of
-20 000 as the window feeds them, with a property read as cheap as the shell's:
+`grid` reads 100 000 objects by default (`--max-rows`). The model (`powerj-fx`, no window) was measured on 100 000 records of
+eight columns, through `ObjectReader` and `GridTable` in batches of 20 000 as the window feeds them, with a property read as
+cheap as the shell's, on the commit before the change and on the one after it. Two fixtures: one with ordinary values (long
+text, a size, a date, a double), one with shared or cached values (small numbers, booleans, three words), in which what a row
+costs is the row.
 
 | | Before | After |
 |---|---|---|
-| reading 100 000 objects into rows (pipeline thread) | 1 020 to 1 390 ms | 83 to 180 ms |
-| memory retained per row (the rows, the values, the object kept) | 827 bytes | 387 bytes |
-| memory that a row costs by itself (a fixture of shared values) | about 520 bytes | under 100 bytes |
-| sort on a numeric column (toolkit thread) | 140 to 390 ms | 140 to 390 ms |
-| filter `=java` on a column / `/regex/` / text in every column (toolkit thread) | 22 to 110 ms | unchanged |
-| tick all 100 000 rows (toolkit thread) | 590 to 900 ms, 87 bytes each | unchanged |
+| ordinary values: reading into rows (pipeline thread) | 1 020 to 1 390 ms | 83 to 180 ms |
+| ordinary values: memory retained per row | 827 bytes | 387 bytes |
+| shared values: reading and appending | 1 019 to 1 351 ms | 101 to 416 ms (the first, cold, run) |
+| shared values: memory retained per row, the object kept | 595 bytes | 155 bytes (about 105 without the object) |
+| shared values: sort on a number, filter a column, search every column (toolkit thread) | 110 to 244, 48 to 191, 55 to 125 ms | 76 to 191, 32 to 189, 66 to 101 ms |
+| tick all 100 000 rows (toolkit thread; ordinary values) | 590 to 900 ms, 87 bytes a row | not touched |
 
 **Why.** A row held a `LinkedHashMap` of its own (about 470 bytes for eight columns, copied again each time the row was
 given its rank), and `ObjectReader` asked the class for its record components, its annotations and its getters for every
@@ -67,9 +69,9 @@ columns of a type are worked out once. A row also keeps the object it came from 
 that gives it back.
 
 **What was measured and left alone.** The sort, the filters and "tick all" take between a tenth of a second and a second on
-the toolkit thread for 100 000 rows: a pause, not a freeze, and each one follows a click or the end of a 200 ms typing
-delay. Moving them to another thread would need a filtered list that is not bound to the toolkit thread. `GridScaleTest` keeps
-the budgets: under 250 bytes a row, and each step within seconds.
+the toolkit thread for 100 000 rows, as before: a pause, not a freeze, and each one follows a click or the end of a 200 ms
+typing delay. Moving them to another thread would need a filtered list that is not bound to the toolkit thread.
+`GridScaleTest` keeps the budgets: under 250 bytes a row, and each step within seconds.
 
 ## The machine
 

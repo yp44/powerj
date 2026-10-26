@@ -110,7 +110,7 @@ public final class FilterParser {
         } catch (PatternSyntaxException e) {
             throw new Invalid(Messages.get("grid.filter.regex.invalid", e.getDescription()));
         }
-        return Parsed.of(value -> pattern.matcher(CellFormatter.fullText(value, display)).find());
+        return Parsed.of(new RegexFilter(pattern, display));
     }
 
     private static ColumnFilter contains(String text, ColumnKind display) {

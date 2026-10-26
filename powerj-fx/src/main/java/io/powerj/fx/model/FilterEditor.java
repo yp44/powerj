@@ -118,6 +118,11 @@ public final class FilterEditor {
         return spec;
     }
 
+    /** How many cells the current filters gave up on (see {@link FilterSpec#abandoned()}). */
+    public int abandoned() {
+        return spec.abandoned();
+    }
+
     private FilterSpec rebuild() {
         spec = new FilterSpec(good, searchGood);
         return spec;

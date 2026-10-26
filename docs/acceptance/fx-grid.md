@@ -210,6 +210,8 @@ With `ls | grid --pass-thru | map { $_.name }` in a folder of files `f1228.bin`,
 | 112 | With `--raw`, select rows, Ctrl+C then paste | The copied text has the same plain numbers. |
 | 113 | `help grid` | `--raw` described, in French too. |
 | 114 | `ls \| grid` | All the properties of the files are columns: `name`, `size`, `modified`, `dir` (the ones the terminal shows) then `path`, `ext`; each can be hidden in the `Columns` menu. |
+| 115 | Make cells of eighty characters (`1,` forty times, in a few rows), open them in `grid`, type `/(.*?,){11}P/` in the filter of their column | The window does **not** freeze: after a moment the table is empty and the status bar says `N cells not searched: the regular expression took too long`, N being the number of rows (the first ten give up on their own, the others are not tried) (a pattern that the JDK matches at once, such as `/(a+)+$/`, gives no message). |
+| 116 | Then replace it with `/^1,1,/` | All the rows come back, the message is gone. |
 
 ## Where this checklist was run, and what it does not cover
 
@@ -217,6 +219,7 @@ With `ls | grid --pass-thru | map { $_.name }` in a folder of files `f1228.bin`,
 - **Windows** and **macOS**: not run by the development session. On Windows the CI builds the module, loads it and checks `help grid` (it does **not** open a window); the rows that need a window are to be run by hand there. macOS is best effort.
 - Without a window manager the **title** of the window (`--title`) cannot be seen, and the focus does not move.
 - **Not implemented:** `--no-focus` (JavaFX has no reliable way to show a window without taking the focus). **Not automated:** the checks that need a real window (they are in this checklist, not in the tests); the unit tests cover the model, the cmdlet and the runtime, and `powerj-coverage` keeps them above 90 % (the `view` package is the only code outside the threshold).
+- Rows 115 and 116 (the budget of a regular expression) are checked by the tests of the model (`FilterParserTest`, `FilterEditorTest`) and were not run in a window.
 - Not measured: the memory of a window that stays open for hours, and twenty windows opened in a row (row 79).
 
 ## Automated part (CI)

@@ -34,6 +34,11 @@ public record Parsed(ColumnFilter filter, boolean negated, String error) {
         return filter != null;
     }
 
+    /** How many cells the condition gave up on (a regular expression that took too long on them). */
+    public int abandoned() {
+        return filter == null ? 0 : filter.abandoned();
+    }
+
     /** Whether a cell is kept. A filter that filters nothing keeps everything. */
     public boolean keeps(Object value) {
         return filter == null || filter.test(value) != negated;

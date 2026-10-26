@@ -218,6 +218,15 @@ structures, functions) can be built on it. The work is organised in phases (revi
   were missing and now exist: the ends of a character literal in the group scanner, and the environment of a native
   command (the child process must get the environment of the session and nothing of the JVM's). How to run it, the scores
   and how to read a survivor: [docs/quality/mutation.md](docs/quality/mutation.md).
+- **`grid` at 100 000 rows** (C-29, NFR-04), measured on the model first (`GridScaleTest`, [numbers](docs/quality/performance.md)):
+  a row is an array of values and a `RowShape` shared by the rows of one type instead of a map of its own, and the columns of a
+  type are worked out once. Reading 100 000 objects takes a tenth of what it did, a row retains 387 bytes instead of 827 (155
+  instead of 595 with plain values), and a row keeps its object only with `--pass-thru`. The sort, the filters and "tick all"
+  take 0.03 to 0.9 s on the toolkit thread for 100 000 rows, as before.
+- **A filter `/regex/` in `grid` cannot freeze the window any more** (C-18): the filter runs on the toolkit thread, which no
+  Ctrl+C reaches. Each cell now has a budget of characters read; a cell that exhausts it does not match, after ten such cells
+  the others are not tried, and the status bar says how many cells were not examined. (The JDK 25 matcher already answers
+  the textbook `(a+)+$` at once; a pattern such as `(.*?,){11}P` on forty commas still takes minutes.)
 - **English names** for the acceptance sheets: `docs/recettes/etape-N.md` is now `docs/acceptance/step-N.md`; the failure
   messages of the CI and the description of the project are in English too (C-36).
 

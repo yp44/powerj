@@ -11,6 +11,7 @@ import java.time.ZoneId;
 import java.util.Date;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 class FilterParserTest {
 
@@ -139,6 +140,62 @@ class FilterParserTest {
         assertThat(text("//").keeps("x")).isTrue();
         assertThat(text("/").keeps("a/b")).isTrue();
         assertThat(text("/").keeps("ab")).isFalse();
+    }
+
+    // --- a regex that never ends (review C-18) ---
+
+    /**
+     * The JDK now memoizes the textbook cases ({@code (a+)+$} answers at once), but eleven nested lazy loops still try every
+     * way to place eleven commas among forty: about 10^9 steps, which is minutes, for a cell of eighty characters.
+     */
+    private static final String CATASTROPHIC = "/(.*?,){11}P/";
+    private static final String CATASTROPHIC_CELL = "1,".repeat(40);
+
+    @Test
+    @Timeout(20)
+    void aRegexThatBacktracksWithoutEndGivesUpOnTheCellInsteadOfFreezing() {
+        Parsed parsed = text(CATASTROPHIC);
+
+        assertThat(parsed.keeps(CATASTROPHIC_CELL)).isFalse();
+        assertThat(parsed.abandoned()).isEqualTo(1);
+    }
+
+    @Test
+    @Timeout(20)
+    void afterAFewCellsTheRegexIsNotTriedOnTheOthersAndTheyAreCounted() {
+        Parsed parsed = text(CATASTROPHIC);
+
+        for (int i = 0; i < 5_000; i++) {
+            assertThat(parsed.keeps(CATASTROPHIC_CELL)).isFalse();
+        }
+
+        assertThat(parsed.abandoned()).isEqualTo(5_000);
+    }
+
+    @Test
+    void aRegexOnOrdinaryCellsGivesUpOnNothing() {
+        Parsed parsed = text("/^a+b$/");
+
+        assertThat(parsed.keeps("aaab")).isTrue();
+        assertThat(parsed.keeps("aaac")).isFalse();
+        assertThat(parsed.abandoned()).isZero();
+    }
+
+    @Test
+    void aLongCellIsReadWholeWhenTheRegexIsSimple() {
+        Parsed parsed = text("/needle/");
+
+        assertThat(parsed.keeps("x".repeat(2_000_000) + "needle")).isTrue();
+        assertThat(parsed.keeps("x".repeat(2_000_000))).isFalse();
+        assertThat(parsed.abandoned()).isZero();
+    }
+
+    @Test
+    void theOtherFiltersNeverGiveUp() {
+        assertThat(text("abc").abandoned()).isZero();
+        assertThat(text("=abc").abandoned()).isZero();
+        assertThat(number(">3").abandoned()).isZero();
+        assertThat(Parsed.NONE.abandoned()).isZero();
     }
 
     // --- numbers ---
