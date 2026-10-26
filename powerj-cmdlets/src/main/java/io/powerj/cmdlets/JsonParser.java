@@ -256,7 +256,7 @@ final class JsonParser {
             double value = Double.parseDouble(number);
             if (Double.isInfinite(value)) {
                 position = first;
-                throw error(Messages.get("json.number.range", excerptFrom(first)));
+                throw error(Messages.get("json.number.range", number));
             }
             return value;
         }

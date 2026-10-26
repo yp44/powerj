@@ -44,8 +44,8 @@ Then `cd C:\tmp\j`.
 | 22 | `POWERJ_LANG=fr`, then `42 \| from-json` | `from-json : pas un texte JSON : 42 (utiliser --property …)`. |
 | 23 | `"[1, 1e999]" \| from-json` | A non-blocking error at line 1, column 5: `number out of range for a double: 1e999`; nothing is read as `Infinity`. |
 | 24 | `"{\"a\": 1, \"a\": 2}" \| from-json` | One row, `a` is `2` (the last of a repeated key). |
-| 25 | `[0] \| map { _ -> 0.1f } \| to-json -c` | `[0.1]`, not `[0.10000000149011612]`. |
-| 26 | `[""] \| map { s -> s } \| select value={ $_ } \| to-csv --no-header \| from-csv --no-header` | The row comes back (`""` is written for a record of one empty field), it is not lost as an empty line. |
+| 25 | `[0] \| map { x -> Float.parseFloat("0.1") } \| to-json -c` | `[0.1]`, not `[0.10000000149011612]`. |
+| 26 | `"" \| to-csv --no-header \| from-csv --no-header \| to-json -c` | `""` is written for a record of one empty field, and `[{"c1":""}]` comes back: the row is not lost as an empty line. |
 
 ## Known limitations
 

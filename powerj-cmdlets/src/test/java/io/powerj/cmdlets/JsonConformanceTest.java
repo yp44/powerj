@@ -31,6 +31,13 @@ class JsonConformanceTest {
     }
 
     @Test
+    void theErrorOfAnOutOfRangeNumberQuotesTheNumberAndNothingAfterIt() {
+        assertThatThrownBy(() -> JsonParser.parse("[1, 1e999]")).hasMessage("number out of range for a double: 1e999");
+        assertThatThrownBy(() -> JsonParser.parse("{\"a\":-2.5E+400,\"b\":1}"))
+                .hasMessage("number out of range for a double: -2.5E+400");
+    }
+
+    @Test
     void theErrorOfAnOutOfRangeNumberSaysWhereIt() {
         assertThatThrownBy(() -> JsonParser.parse("[1,\n 1e999]")).isInstanceOfSatisfying(
                 JsonParser.JsonException.class, e -> {
