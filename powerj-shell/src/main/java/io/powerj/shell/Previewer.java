@@ -1,5 +1,6 @@
 package io.powerj.shell;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.IntSupplier;
@@ -47,14 +48,9 @@ final class Previewer {
 
     private final ModeController modes;
 
+    /** The state shared with the worker thread: what was last evaluated and the lines kept. */
     private final Object lock = new Object();
-    /** Text to evaluate, and its number: each change of the line gives a new one. */
-    private String requested;
-    private long requestedGeneration;
-    private long doneGeneration;
-    /** The worker is inside {@link Interpreter#preview}: interrupting it cancels the evaluation. */
-    private boolean evaluating;
-    private Thread worker;
+    private final LatestWinsRunner<String, PreviewResult> runner;
 
     /** Text last evaluated (to ignore redisplays that change nothing) and result lines kept when the preview stops. */
     private String lastText;
@@ -68,6 +64,11 @@ final class Previewer {
         this.width = width;
         this.colors = colors;
         this.modes = modes;
+        this.runner = new LatestWinsRunner<>(
+                text -> interpreter.preview(text, LIMIT, columns(), colors),
+                failure -> new PreviewResult.Failed(String.valueOf(failure)),
+                this::show, Duration.ofMillis(DEBOUNCE_MILLIS), Duration.ofMillis(DEADLINE_MILLIS), "powerj-preview",
+                STACK_SIZE);
         modes.register(ShellMode.PREVIEW, () -> completions.previewMode(true), this::leave);
     }
 
@@ -134,82 +135,24 @@ final class Previewer {
     }
 
     private void request(String text) {
-        synchronized (lock) {
-            requested = text;
-            requestedGeneration++;
-            if (evaluating) {
-                worker.interrupt(); // the running evaluation is out of date
-            }
-            if (text != null && worker == null) {
-                worker = Thread.ofPlatform().name("powerj-preview").daemon().stackSize(STACK_SIZE).start(this::work);
-            }
-            lock.notifyAll();
+        if (text == null) {
+            runner.cancel();
+        } else {
+            runner.submit(text);
         }
     }
 
-    /** Evaluates the latest request, after a short pause, then shows its result. */
-    private void work() {
-        while (true) {
-            String text;
-            long generation;
-            try {
-                synchronized (lock) {
-                    while (requestedGeneration == doneGeneration) {
-                        lock.wait();
-                    }
-                    generation = requestedGeneration;
-                    lock.wait(DEBOUNCE_MILLIS);
-                    if (generation != requestedGeneration) {
-                        continue; // still typing
-                    }
-                    text = requested;
-                    if (text == null) {
-                        doneGeneration = generation;
-                        continue;
-                    }
-                    evaluating = true;
-                }
-            } catch (InterruptedException _) {
-                continue;
-            }
-            PreviewResult result;
-            Thread self = Thread.currentThread();
-            Thread deadline = Thread.ofVirtual().start(() -> {
-                try {
-                    Thread.sleep(DEADLINE_MILLIS);
-                    synchronized (lock) {
-                        if (evaluating && requestedGeneration == generation) {
-                            self.interrupt();
-                        }
-                    }
-                } catch (InterruptedException _) {
-                    // evaluation finished first
-                }
-            });
-            try {
-                result = interpreter.preview(text, LIMIT, columns(), colors);
-            } catch (Throwable t) {
-                result = new PreviewResult.Failed(String.valueOf(t));
-            } finally {
-                synchronized (lock) {
-                    evaluating = false;
-                }
-                deadline.interrupt();
-                Thread.interrupted();
-            }
-            AttributedString shown;
-            try {
-                shown = render(result);
-            } catch (RuntimeException _) {
-                continue; // terminal closed
-            }
-            synchronized (lock) {
-                doneGeneration = Math.max(doneGeneration, generation);
-                if (generation != requestedGeneration || !on()) {
-                    continue; // the line has changed meanwhile, or was accepted
-                }
+    /** Shows the result of an evaluation, if it is still the one of the line and the mode is still on. */
+    private void show(PreviewResult result, LatestWinsRunner.Delivery delivery) {
+        AttributedString shown = render(result); // fails if the terminal is closed: the result is dropped
+        boolean[] displayed = {false};
+        delivery.ifLatest(() -> {
+            if (on()) {
                 reader.preview(shown);
+                displayed[0] = true;
             }
+        });
+        if (displayed[0]) {
             redisplay();
         }
     }
