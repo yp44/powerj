@@ -77,7 +77,8 @@ class ArchitectureTest {
         check(classes().that().resideInAPackage("io.powerj.fx..")
                 .should().onlyDependOnClassesThat()
                 .resideInAnyPackage("io.powerj.fx..", "io.powerj.api..", "java..", "javax..", "javafx..")
-                .because("powerj-fx is a model of a real third-party module, shipped apart from the distribution"));
+                .because("powerj-fx is a model of a real third-party module, shipped apart from the distribution")
+                .allowEmptyShould(true)); // the module is not there with -DskipFx
     }
 
     @Test
@@ -199,7 +200,8 @@ class ArchitectureTest {
         check(noClasses().that().resideInAPackage("io.powerj.fx.model..")
                 .should().dependOnClassesThat().resideInAnyPackage("javafx.scene..", "javafx.stage..",
                         "javafx.application..", "io.powerj.fx.view..")
-                .because("the model is tested without a display (docs/plans/fx-grid.md)"));
+                .because("the model is tested without a display (docs/plans/fx-grid.md)")
+                .allowEmptyShould(true)); // the module is not there with -DskipFx
     }
 
     @Test

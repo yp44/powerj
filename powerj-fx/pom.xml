@@ -163,6 +163,8 @@
                                 <zip destfile="${project.build.directory}/powerj-fx-${project.version}-${javafx.platform}.zip">
                                     <zipfileset dir="${fx.module}" includes="fx/**"/>
                                 </zip>
+                                <checksum file="${project.build.directory}/powerj-fx-${project.version}-${javafx.platform}.zip"
+                                          algorithm="SHA-256" fileext=".sha256" format="MD5SUM"/>
                             </target>
                         </configuration>
                     </execution>

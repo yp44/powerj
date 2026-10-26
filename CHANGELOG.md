@@ -236,10 +236,27 @@ structures, functions) can be built on it. The work is organised in phases (revi
   (the text of the status bar and the state of the pause button, what Esc does, when a column is rebuilt, how wide it is) moved
   to the model with tests (`GridStatus`, `EscapeAction`, `ColumnKind.sameLook`, `ColumnWidths.pixels`): 565 lines became 531,
   not the 300 aimed at, because what remains is JavaFX wiring.
+- **The graphical module is no longer on the critical path of the build** (C-33): `./mvnw -DskipFx verify` builds and checks
+  everything else (the reactor, the coverage and the architecture rules follow the switch; the two ArchUnit rules about
+  `powerj-fx` accept to find nothing then). A platform without JavaFX artifacts, or a machine that only wants the shell, no
+  longer has to build it. The archive of the distribution is named after the machine that builds it (`linux-x64`,
+  `linux-aarch64`, `macos-x64`, `macos-aarch64`, `windows-x64`, `windows-aarch64`; the choice was checked by simulating each
+  `os.name`/`os.arch`, only Linux x64 was really run).
+- **A software bill of materials and checksums** (C-34): `./mvnw -Psbom -DskipTests package` writes `target/bom.json`
+  (CycloneDX 1.6: the shell, its modules, JLine, and the graphical module with JavaFX); the distribution zip and the zip of
+  the graphical module each get a `.sha256` file that `sha256sum -c` accepts.
 - **English names** for the acceptance sheets: `docs/recettes/etape-N.md` is now `docs/acceptance/step-N.md`; the failure
   messages of the CI and the description of the project are in English too (C-36).
 
 ### Examined, not changed
+- **The `jpackage` version of a SNAPSHOT build** (C-33): jpackage only accepts digits, so a `0.2.0-SNAPSHOT` image carries
+  `0.2.0`. What tells the builds apart is `powerj --version` (`PowerJ 0.2.0-SNAPSHOT (Java 25)`) and the name of the archive;
+  an installer built from a snapshot is not meant to be distributed.
+- **A toolchain for the runtime image** (C-33): the image is made with the `jlink` and `jpackage` of the JDK that runs
+  Maven, which the Enforcer already requires to be 25 or newer; a second JDK to select adds a configuration to maintain and
+  no guarantee. The release workflow pins the JDK (step 5.9).
+- **Reproducible Ant archives** (C-33): the two zip files made by Ant (distribution, graphical module) keep the date of their
+  files; `project.build.outputTimestamp` covers the archives of the Maven plugins only. Not done.
 - **The seven `Messages` classes stay** (C-10, step 1.4). Replacing them with one helper in `powerj-api` was tried on a
   two-module experiment: `ResourceBundle.getBundle(…, module)` called from another module fails unless the owner of the
   bundle opens its package to it, which every module (third-party ones included) would have to declare. The per-module

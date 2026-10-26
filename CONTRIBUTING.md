@@ -11,7 +11,9 @@ You need **JDK 25 or newer**. Maven is not needed: the `mvnw` wrapper downloads 
 ```bash
 ./mvnw verify                          # compile, tests, every gate below
 ./mvnw -pl powerj-cmdlets -am test     # one module and what it needs: the fast loop while you work
-./mvnw -Pdist verify                   # + the application image (jlink runtime, jpackage launcher)
+./mvnw -Pdist verify                   # + the application image (jlink runtime, jpackage launcher) and its .sha256
+./mvnw -DskipFx verify                 # without the optional graphical module (a platform that has no JavaFX)
+./mvnw -Psbom -DskipTests package      # + target/bom.json, the CycloneDX bill of materials
 bash ci/smoke/launcher.sh              # then any script of ci/smoke/ against that image
 ./mvnw spotless:apply                  # fixes the formatting that `verify` would refuse
 ```

@@ -17,7 +17,6 @@
         <module>powerj-fs</module>
         <module>powerj-core</module>
         <module>powerj-cmdlets</module>
-        <module>powerj-fx</module>
         <module>powerj-shell</module>
         <module>powerj-architecture</module>
         <module>powerj-coverage</module>
@@ -117,6 +116,20 @@
     </dependencyManagement>
 
     <profiles>
+        <!-- The optional JavaFX module is part of the build unless -DskipFx is given: a platform that has no JavaFX
+             artifacts, or a machine that only wants the shell, builds and checks everything else (review C-33).
+             powerj-coverage and powerj-architecture follow the same switch. -->
+        <profile>
+            <id>fx</id>
+            <activation>
+                <property>
+                    <name>!skipFx</name>
+                </property>
+            </activation>
+            <modules>
+                <module>powerj-fx</module>
+            </modules>
+        </profile>
         <!-- The per-module coverage floors were measured on Linux. On Windows the tests that run Unix commands are
              skipped (56 in powerj-core alone), so the same code covers less: powerj-core measures 80% / 72% there
              against 85% / 77% on Linux. The floors are therefore a Linux/macOS ratchet; Windows keeps the aggregate
@@ -192,6 +205,43 @@
                             <timeoutConstant>8000</timeoutConstant>
                             <!-- With -am the goal also runs on the modules below the core, which have nothing to mutate. -->
                             <failWhenNoMutations>false</failWhenNoMutations>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <!-- The software bill of materials of the release (review C-34): ./mvnw -Psbom -DskipTests package writes
+             target/bom.json at the root, CycloneDX 1.6, with every module and the libraries that the shell ships (JLine). -->
+        <profile>
+            <id>sbom</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.cyclonedx</groupId>
+                        <artifactId>cyclonedx-maven-plugin</artifactId>
+                        <version>2.9.1</version>
+                        <inherited>false</inherited>
+                        <executions>
+                            <execution>
+                                <id>aggregate-bom</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>makeAggregateBom</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <projectType>application</projectType>
+                            <schemaVersion>1.6</schemaVersion>
+                            <outputFormat>json</outputFormat>
+                            <outputName>bom</outputName>
+                            <includeCompileScope>true</includeCompileScope>
+                            <includeRuntimeScope>true</includeRuntimeScope>
+                            <includeProvidedScope>false</includeProvidedScope>
+                            <includeSystemScope>false</includeSystemScope>
+                            <includeTestScope>false</includeTestScope>
+                            <!-- What ships is the shell and the libraries it needs; powerj-fx is shipped apart and stays. -->
+                            <excludeArtifactId>powerj-coverage,powerj-dist,powerj-architecture,powerj-example-greet</excludeArtifactId>
                         </configuration>
                     </plugin>
                 </plugins>

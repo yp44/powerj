@@ -45,10 +45,6 @@
         </dependency>
         <dependency>
             <groupId>io.powerj</groupId>
-            <artifactId>powerj-fx</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.powerj</groupId>
             <artifactId>powerj-shell</artifactId>
         </dependency>
     </dependencies>
@@ -184,4 +180,22 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- The optional JavaFX module, unless -DskipFx (see the parent pom). -->
+        <profile>
+            <id>fx</id>
+            <activation>
+                <property>
+                    <name>!skipFx</name>
+                </property>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>io.powerj</groupId>
+                    <artifactId>powerj-fx</artifactId>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
 </project>
