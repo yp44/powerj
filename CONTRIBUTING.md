@@ -34,6 +34,9 @@ packaged launcher. `ci/smoke/fx.sh` needs a display (Xvfb is enough).
 
 `./mvnw -Pquality verify` adds Error Prone (warnings only for now, baseline in `docs/quality/`). `./mvnw -Pbench -DskipTests package`
 builds the JMH benchmarks, which are not part of `verify` ([how to run them](docs/quality/performance.md)).
+`./mvnw -Pmutation … org.pitest:pitest-maven:mutationCoverage` measures what the tests of the core would notice
+([how to run it and read the survivors](docs/quality/mutation.md)); run it before and after a change to the lexer, the
+parser or the interpreter.
 
 **ArchUnit.** The rules are plain JUnit tests in `powerj-architecture/src/test/java`. A violation that existed when a rule
 was introduced is *frozen* in `src/test/resources/archunit_store`: it may disappear, a new one fails the build. Never

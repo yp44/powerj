@@ -2,6 +2,7 @@ package io.powerj.core.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -127,6 +128,20 @@ class InterpreterTest {
         run("cd ici");
         assertThat(run("pwd")).contains("ici");
         assertThat(run("sh -c pwd")).isEqualTo(tmp.resolve("ici").toRealPath() + System.lineSeparator());
+    }
+
+    @Test
+    void aNativeCommandSeesTheSessionEnvironmentAndNothingOfTheJvm() throws Exception {
+        String inherited = System.getenv().keySet().stream()
+                .filter(name -> name.matches("[A-Z][A-Z_]*") && !name.equals("PATH") && !name.equals("HOME"))
+                .findFirst().orElse(null);
+        assumeTrue(inherited != null, "the JVM has an environment variable to leave out");
+        session.environment().remove(inherited);
+        session.environment().put("POWERJ_PROBE", "from-the-session");
+
+        assertThat(run("printenv POWERJ_PROBE")).isEqualTo("from-the-session" + System.lineSeparator());
+        assertThat(run("printenv HOME")).isEqualTo(tmp.resolve("home") + System.lineSeparator());
+        assertThat(run("printenv " + inherited)).isEmpty();
     }
 
     @Test

@@ -152,6 +152,51 @@
                 <module>powerj-bench</module>
             </modules>
         </profile>
+        <!-- Mutation testing (PIT), apart from the build because it takes minutes: it changes the code of the core, one
+             operator at a time, and counts the changes that no test notices. See docs/quality/mutation.md.
+             ./mvnw -Pmutation -pl powerj-core -am test-compile org.pitest:pitest-maven:mutationCoverage
+             -DtargetClasses='io.powerj.core.lang.*' narrows it to a package. -->
+        <profile>
+            <id>mutation</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.pitest</groupId>
+                        <artifactId>pitest-maven</artifactId>
+                        <version>1.30.0</version>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.pitest</groupId>
+                                <artifactId>pitest-junit5-plugin</artifactId>
+                                <version>1.2.3</version>
+                            </dependency>
+                        </dependencies>
+                        <configuration>
+                            <targetClasses>
+                                <param>io.powerj.core.lang.*</param>
+                                <param>io.powerj.core.runtime.*</param>
+                            </targetClasses>
+                            <targetTests>
+                                <param>io.powerj.core.*</param>
+                            </targetTests>
+                            <threads>4</threads>
+                            <!-- Messages in English whatever the machine, as for surefire. -->
+                            <jvmArgs>
+                                <value>-Dpowerj.language=en</value>
+                            </jvmArgs>
+                            <outputFormats>
+                                <outputFormat>HTML</outputFormat>
+                                <outputFormat>XML</outputFormat>
+                            </outputFormats>
+                            <timestampedReports>false</timestampedReports>
+                            <timeoutConstant>8000</timeoutConstant>
+                            <!-- With -am the goal also runs on the modules below the core, which have nothing to mutate. -->
+                            <failWhenNoMutations>false</failWhenNoMutations>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
         <!-- Static analysis, as warnings for now (review C-32): ./mvnw -Pquality verify. Needs .mvn/jvm.config. -->
         <profile>
             <id>quality</id>

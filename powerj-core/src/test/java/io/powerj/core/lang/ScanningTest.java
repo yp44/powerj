@@ -68,6 +68,48 @@ class ScanningTest {
         assertThat(Scanning.matching("{ ]", 0)).isEqualTo(-1);
     }
 
+    // --- character literals, which the group scanner skips (found by mutation testing: nothing pinned their ends) ---
+
+    @Test
+    void aCharacterLiteralIsSkippedWhateverItHolds() {
+        assertThat(Scanning.matching("f('a')", 1)).isEqualTo(5);
+        assertThat(Scanning.matching("f('(')", 1)).isEqualTo(5);
+        assertThat(Scanning.matching("f('\\n')", 1)).isEqualTo(6); // '\n': a backslash and a letter
+        assertThat(Scanning.matching("f('\\'')", 1)).isEqualTo(6); // '\'' holds a quote, then ) closes
+        assertThat(Scanning.matching("f('\\u0029')", 1)).isEqualTo(10); // '\u0029' is ')' written as an escape
+        assertThat(Scanning.matching("f('é')", 1)).isEqualTo(5);
+    }
+
+    @Test
+    void aQuoteThatOpensNoCharacterLiteralIsPlainText() {
+        assertThat(Scanning.matching("(it's)", 0)).isEqualTo(5);
+        assertThat(Scanning.matching("('')", 0)).isEqualTo(3);
+        assertThat(Scanning.matching("(')", 0)).isEqualTo(2);
+        assertThat(Scanning.matching("('ab')", 0)).isEqualTo(5);
+    }
+
+    @Test
+    void aCharacterLiteralAtTheEndOfTheTextIsReadWithoutGoingBeyond() {
+        assertThat(Scanning.matching("('a'", 0)).isEqualTo(-1);
+        assertThat(Scanning.matching("('a", 0)).isEqualTo(-1);
+        assertThat(Scanning.matching("('\\n'", 0)).isEqualTo(-1);
+        assertThat(Scanning.matching("('\\n", 0)).isEqualTo(-1);
+        assertThat(Scanning.matching("('\\u0041'", 0)).isEqualTo(-1);
+        assertThat(Scanning.matching("('\\u004", 0)).isEqualTo(-1);
+        assertThat(Scanning.matching("('", 0)).isEqualTo(-1);
+    }
+
+    @Test
+    void theEndOfAStringIsFoundAtTheEdgesOfTheText() {
+        assertThat(Scanning.stringEnd("\"$\"", 0)).isEqualTo(3); // a dollar before the closing quote
+        assertThat(Scanning.stringEnd("\"$(", 0)).isEqualTo(-1);
+        assertThat(Scanning.stringEnd("\"$", 0)).isEqualTo(-1);
+        assertThat(Scanning.stringEnd("\"\\", 0)).isEqualTo(-1);
+        assertThat(Scanning.stringEnd("\"a\"", 0)).isEqualTo(3);
+        assertThat(Scanning.stringEnd("\"", 0)).isEqualTo(-1);
+        assertThat(Scanning.stringEnd("x\"a\"", 1)).isEqualTo(4);
+    }
+
     @Test
     void blanksAreSkippedInTheirVariants() {
         assertThat(Scanning.skipBlanks("  \t x", 0)).isEqualTo(4);

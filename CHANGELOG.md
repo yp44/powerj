@@ -213,6 +213,11 @@ structures, functions) can be built on it. The work is organised in phases (revi
   script (unless it is marked withdrawn), nothing cites a requirement that does not exist, and the specification only
   mentions requirements it defines. Twelve requirements that nothing cited now are, `FR-04e` (a name the specification
   never had) became FR-34, and `CmdletNamesTest` checks the naming rule FR-12.
+- **Mutation testing** (`-Pmutation`, PIT, outside the default build): `lang` and `runtime` of the core are killed at 90 %
+  and 85 % (1 418 of 1 626 mutations), against the 60 % that the review asked for. The first run found two assertions that
+  were missing and now exist: the ends of a character literal in the group scanner, and the environment of a native
+  command (the child process must get the environment of the session and nothing of the JVM's). How to run it, the scores
+  and how to read a survivor: [docs/quality/mutation.md](docs/quality/mutation.md).
 - **English names** for the acceptance sheets: `docs/recettes/etape-N.md` is now `docs/acceptance/step-N.md`; the failure
   messages of the CI and the description of the project are in English too (C-36).
 
