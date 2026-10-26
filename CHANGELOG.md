@@ -174,6 +174,15 @@ structures, functions) can be built on it. The work is organised in phases (revi
   module create its default files when the shell starts (the built-in cmdlets write the list of protected paths that way),
   and `powerj-cmdlets` exports its package to the core only.
 
+### Added and changed (Phase 5, industrialisation)
+
+- **Documents for contributors and users**: [CONTRIBUTING.md](CONTRIBUTING.md) (build, gates, habits, the language policy,
+  how to add a cmdlet), [SECURITY.md](SECURITY.md) (what is a guard-rail and what is trusted, how to report),
+  [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (modules, layers, how a line runs, which test keeps each rule) and
+  [docs/adr/](docs/adr/) (the decisions behind the structure).
+- **English names** for the acceptance sheets: `docs/recettes/etape-N.md` is now `docs/acceptance/step-N.md`; the failure
+  messages of the CI and the description of the project are in English too (C-36).
+
 ### Examined, not changed
 - **The seven `Messages` classes stay** (C-10, step 1.4). Replacing them with one helper in `powerj-api` was tried on a
   two-module experiment: `ResourceBundle.getBundle(…, module)` called from another module fails unless the owner of the

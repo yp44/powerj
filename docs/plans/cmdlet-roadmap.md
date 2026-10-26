@@ -23,13 +23,15 @@ Target pipeline at the end (§12.3):
 4. **PR to `main`**, green CI, merge. The next phase starts from the merged `main`.
 
 ## Common checklist (every phase)
+
+The maintained version of this list is "Adding a cmdlet" in [CONTRIBUTING.md](../../CONTRIBUTING.md); this one is the checklist of the original roadmap.
 - Code in `powerj-cmdlets/src/main/java/io/powerj/cmdlets/`: class with `@CmdletInfo(name, category, summary, examples, preview)` implementing `Cmdlet<Params, I, O>`, a nested `record Params` with `@Option`, and output records with `@Display` and `Objects.requireNonNull` in compact constructors.
-- Per-execution state in a synchronized map keyed by context/params (pattern of `Collect.received` and `Where.conditions`): the same instance can run in several pipelines at once.
+- Per-execution state through `context.state(Type.class, Type::new)` (pattern of `Collect.Received`), never in a field or a map: the same instance can run in several pipelines at once.
 - Registration in `BuiltinCmdlets.cmdlets()`.
 - i18n: `<name>.summary`, `<name>.option.*` and the error keys in both `messages_en.properties` and `messages_fr.properties`.
-- Errors: `IllegalArgumentException` for wrong usage (blocking; `CmdletRunner` turns it into a `PjException`), `context.error(...)` for non-blocking errors, reusing `pipeline.object.skipped` and `where.property.invalid`.
+- Errors: `UsageException` for wrong usage (blocking; `CmdletRunner` turns it into a `PjException`), `context.error(...)` for non-blocking errors, reusing `pipeline.object.skipped` and `where.property.invalid`.
 - `preview = true` only for side-effect-free cmdlets; otherwise `previewable(params)` returns `false` when the options change something.
-- Cancellation: rethrow `CancellationException`, and check `Thread.interrupted()` in long loops (as in `grep` and `cat`).
+- Cancellation: evaluate user blocks with `block.tryInvoke(…)` (it lets cancellation through), and check `Thread.interrupted()` in long loops (as in `grep` and `cat`).
 - Tests: `powerj-cmdlets/src/test/java/io/powerj/cmdlets/<Name>Test.java` with `TestContext` (simulated compiler) and `@TempDir`; REPL tests in `powerj-shell` when core code changes.
 - Docs: §12.3 row struck through as "done", a row in the §11 mini-iteration table (after 14), the scope sentence (~l.406), an acceptance checklist `docs/acceptance/<name>.md` (format of `grep.md`), the README Cmdlets table, and README "Status and roadmap".
 - Verification: `./mvnw -pl powerj-cmdlets -am test`, then `./mvnw verify`, then the manual checklist with `powerj -c "…"` and `help <name>`.

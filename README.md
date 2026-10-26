@@ -403,6 +403,8 @@ The v1 cmdlet roadmap is done ([roadmap](docs/plans/cmdlet-roadmap.md), end-to-e
 ## Documentation
 
 - [Specification](docs/SPECIFICATION.md): functional requirements, grammar, extension API, architecture.
+- [Architecture](docs/ARCHITECTURE.md): modules, layers, how a line runs, the rules and the tests that keep them; [decision records](docs/adr/).
+- [Contributing](CONTRIBUTING.md): building, the gates of `verify`, how we work, the language policy, adding a cmdlet. [Security policy](SECURITY.md).
 - [Acceptance checklists](docs/acceptance/) for each development step, and [plans](docs/plans/) of the latest iterations.
 - [Example module `greet`](examples/greet/README.md).
 - [Architecture review](docs/REVUE-ARCHITECTURE.md) (in French): strengths, findings, target organization, design patterns and a phased refactoring plan; Phase 0 (the safety net) is done, see its §11. [Changelog](CHANGELOG.md).
