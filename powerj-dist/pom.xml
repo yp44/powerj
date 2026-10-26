@@ -160,13 +160,21 @@
                                 <configuration>
                                     <target>
                                         <delete dir="${dist.jpackage}"/>
+                                        <!-- macOS refuses an app-version whose first number is 0 (CFBundleVersion): while the
+                                             project is at 0.x, the bundle says 1.x (the version command of the launcher tells the truth). -->
+                                        <condition property="dist.app.major" value="1" else="${parsedVersion.majorVersion}">
+                                            <and>
+                                                <os family="mac"/>
+                                                <equals arg1="${parsedVersion.majorVersion}" arg2="0"/>
+                                            </and>
+                                        </condition>
                                         <exec executable="${dist.jpackage.exe}" failonerror="true">
                                             <arg value="--type"/>
                                             <arg value="app-image"/>
                                             <arg value="--name"/>
                                             <arg value="powerj"/>
                                             <arg value="--app-version"/>
-                                            <arg value="${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.incrementalVersion}"/>
+                                            <arg value="${dist.app.major}.${parsedVersion.minorVersion}.${parsedVersion.incrementalVersion}"/>
                                             <arg value="--vendor"/>
                                             <arg value="PowerJ"/>
                                             <arg value="--module-path"/>
