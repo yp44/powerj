@@ -36,7 +36,7 @@
 
         <junit.version>5.13.4</junit.version>
         <assertj.version>3.27.4</assertj.version>
-        <jline.version>4.4.7</jline.version>
+        <jline.version>4.4.8</jline.version>
         <jacoco.version>0.8.15</jacoco.version>
         <archunit.version>1.5.1</archunit.version>
         <spotless.version>3.10.4</spotless.version>
