@@ -32,6 +32,10 @@ public interface LineMeasuring {
 
     void on(boolean on);
 
+    /** Told when the mode switches itself off after a line ({@code POWERJ_PERF_AUTOEXIT}); nothing by default. */
+    default void onAutoExit(Runnable action) {
+    }
+
     /**
      * Starts to measure a line if the mode is on and the line is measurable.
      *

@@ -45,9 +45,7 @@ final class Previewer {
     private final IntSupplier width;
     private final boolean colors;
 
-    private volatile boolean on;
-    /** Run when the mode is entered: the perf mode is left (FR-76). */
-    private Runnable onEnter = () -> { };
+    private final ModeController modes;
 
     private final Object lock = new Object();
     /** Text to evaluate, and its number: each change of the line gives a new one. */
@@ -63,16 +61,18 @@ final class Previewer {
     private List<AttributedString> lastLines = List.of();
 
     Previewer(PreviewLineReader reader, Interpreter interpreter, Completions completions, IntSupplier width,
-              boolean colors) {
+              boolean colors, ModeController modes) {
         this.reader = reader;
         this.interpreter = interpreter;
         this.completions = completions;
         this.width = width;
         this.colors = colors;
+        this.modes = modes;
+        modes.register(ShellMode.PREVIEW, () -> completions.previewMode(true), this::leave);
     }
 
     boolean on() {
-        return on;
+        return modes.is(ShellMode.PREVIEW);
     }
 
     /** Binds Alt+V; {@code prompt} gives the prompt to show after the switch. */
@@ -87,21 +87,16 @@ final class Previewer {
         reader.onLine(this::changed);
     }
 
-    void onEnter(Runnable action) {
-        this.onEnter = action;
-    }
-
     /** Switches the mode; the line typed is kept. */
     void toggle() {
-        on = !on;
-        if (on) {
-            onEnter.run();
-        }
-        completions.previewMode(on);
-        if (!on) {
-            request(null);
-            clear();
-        }
+        modes.toggle(ShellMode.PREVIEW);
+    }
+
+    /** The mode is left: the completion offers everything again and nothing of the preview stays below the line. */
+    private void leave() {
+        completions.previewMode(false);
+        request(null);
+        clear();
     }
 
     /** New line: nothing of the previous one stays below it. */
@@ -120,7 +115,7 @@ final class Previewer {
 
     /** The line or the cursor moved: evaluates the stage under the cursor if it changed. */
     void changed(String buffer, int cursor) {
-        if (!on) {
+        if (!on()) {
             return;
         }
         String text = PreviewCut.upToStage(buffer, cursor);
@@ -210,7 +205,7 @@ final class Previewer {
             }
             synchronized (lock) {
                 doneGeneration = Math.max(doneGeneration, generation);
-                if (generation != requestedGeneration || !on) {
+                if (generation != requestedGeneration || !on()) {
                     continue; // the line has changed meanwhile, or was accepted
                 }
                 reader.preview(shown);

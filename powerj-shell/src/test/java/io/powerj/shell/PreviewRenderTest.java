@@ -12,7 +12,7 @@ import io.powerj.core.runtime.PreviewResult;
 /** Lines shown below the input in preview mode (FR-66): banner, results, kept lines. */
 class PreviewRenderTest {
 
-    private final Previewer previewer = new Previewer(null, null, null, () -> 60, false);
+    private final Previewer previewer = new Previewer(null, null, null, () -> 60, false, new ModeController());
 
     private String render(PreviewResult result) {
         var rendered = previewer.render(result);

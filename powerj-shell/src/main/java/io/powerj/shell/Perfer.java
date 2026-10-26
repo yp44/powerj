@@ -11,8 +11,8 @@ import io.powerj.core.runtime.Interpreter;
 
 /**
  * Perf mode (FR-76): Alt+P switches between the normal mode and the perf mode, shown by the {@code PJ%} prompt. In perf
- * mode the interpreter measures each line and prints a summary after it. The perf and preview modes exclude each other,
- * as the modes of vi do.
+ * mode the interpreter measures each line and prints a summary after it. The perf and preview modes exclude each other
+ * ({@link ModeController}).
  */
 final class Perfer {
 
@@ -20,17 +20,21 @@ final class Perfer {
     static final String TOGGLE_KEY = "\033p";
     static final String TOGGLE_WIDGET = "powerj-perf-toggle";
 
-    private final Interpreter interpreter;
-    /** Preview mode, or {@code null} if the line reader cannot display it. */
-    private final Previewer previewer;
+    private final ModeController modes;
 
-    Perfer(Interpreter interpreter, Previewer previewer) {
-        this.interpreter = interpreter;
-        this.previewer = previewer;
+    Perfer(Interpreter interpreter, ModeController modes) {
+        this.modes = modes;
+        modes.register(ShellMode.PERF, () -> interpreter.perfMode(true), () -> interpreter.perfMode(false));
+        // The mode may end by itself after a line: the shell follows.
+        interpreter.onPerfAutoExit(() -> {
+            if (modes.is(ShellMode.PERF)) {
+                modes.switchTo(ShellMode.NORMAL);
+            }
+        });
     }
 
     boolean on() {
-        return interpreter.perfMode();
+        return modes.is(ShellMode.PERF);
     }
 
     /** Binds Alt+P; {@code prompt} gives the prompt to show after the switch. */
@@ -44,17 +48,8 @@ final class Perfer {
         main.bind(new Reference(TOGGLE_WIDGET), TOGGLE_KEY);
     }
 
-    /** Switches the mode; the line typed is kept. */
+    /** Switches the mode; the line typed is kept. The preview mode, if it was on, is left. */
     void toggle() {
-        boolean on = !on();
-        if (on && previewer != null && previewer.on()) {
-            previewer.toggle();
-        }
-        interpreter.perfMode(on);
-    }
-
-    /** Leaves the perf mode, because the preview mode is entered. */
-    void off() {
-        interpreter.perfMode(false);
+        modes.toggle(ShellMode.PERF);
     }
 }

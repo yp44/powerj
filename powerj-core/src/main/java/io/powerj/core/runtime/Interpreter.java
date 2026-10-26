@@ -226,6 +226,11 @@ public final class Interpreter implements CommandCatalog {
         perf.on(on);
     }
 
+    /** Told when the perf mode ends by itself after a line (FR-76, {@code POWERJ_PERF_AUTOEXIT}). */
+    public void onPerfAutoExit(Runnable action) {
+        perf.onAutoExit(action);
+    }
+
     private boolean statement(Statement statement) throws InterruptedException {
         Optional<NativeRunner.FileTarget> errTarget = Optional.empty();
         try {

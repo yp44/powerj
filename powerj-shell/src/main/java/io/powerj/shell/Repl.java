@@ -45,9 +45,8 @@ public final class Repl {
     private final PrintWriter out;
     /** Preview mode (FR-66), or {@code null} if the line reader cannot display it. */
     private final Previewer previewer;
-    /** Perf mode (FR-76), or {@code null} without a terminal. */
-    private final Perfer perfer;
     private final boolean colors;
+    private final ModeController modes = new ModeController();
     private List<String> moduleWarnings = List.of();
     private Path profile;
     private boolean runProfile;
@@ -76,19 +75,13 @@ public final class Repl {
             impl.setHighlighter(ShellCompletion.highlighter(interpreter));
         }
         if (reader instanceof PreviewLineReader previewReader && interactive) {
-            preview = new Previewer(previewReader, interpreter, completions, terminal::getWidth, colors);
+            preview = new Previewer(previewReader, interpreter, completions, terminal::getWidth, colors, modes);
             preview.bind(this::prompt);
         }
         this.previewer = preview;
-        Perfer perf = null;
         if (interactive && reader instanceof LineReaderImpl impl) {
-            perf = new Perfer(interpreter, preview);
-            perf.bind(impl, this::prompt);
-            if (preview != null) {
-                preview.onEnter(perf::off);
-            }
+            new Perfer(interpreter, modes).bind(impl, this::prompt);
         }
-        this.perfer = perf;
         // Ctrl+C during execution cancels the command without exiting the shell (FR-03);
         // during input, JLine throws UserInterruptException.
         terminal.handle(Terminal.Signal.INT, _ -> supervisor.cancel());
@@ -242,12 +235,11 @@ public final class Repl {
 
     /** {@code PJ <dir>> }, {@code PJ? <dir>> } in preview mode (FR-66), {@code PJ% <dir>> } in perf mode (FR-76). */
     String prompt() {
-        String mode = "PJ ";
-        if (previewer != null && previewer.on()) {
-            mode = marker("PJ?", AttributedStyle.CYAN);
-        } else if (perfer != null && perfer.on()) {
-            mode = marker("PJ%", AttributedStyle.YELLOW);
-        }
+        String mode = switch (modes.current()) {
+            case NORMAL -> "PJ ";
+            case PREVIEW -> marker("PJ?", AttributedStyle.CYAN);
+            case PERF -> marker("PJ%", AttributedStyle.YELLOW);
+        };
         return mode + session.currentDirectory() + "> ";
     }
 

@@ -172,6 +172,31 @@ class PerfModeTest {
     }
 
     @Test
+    void whoShowsTheModeIsToldWhenItEndsByItself() {
+        var told = new ArrayList<String>();
+        mode.onAutoExit(() -> told.add("ended while " + (mode.on() ? "on" : "off")));
+        session.environment().put(PerfMode.AUTOEXIT_VARIABLE, "1");
+        mode.on(true);
+
+        start("items").finish(false);
+
+        assertThat(told).containsExactly("ended while off"); // the mode is already off when it is told
+    }
+
+    @Test
+    void whoShowsTheModeIsNotToldOfASwitchOffThatIsNotItsOwn() {
+        var told = new ArrayList<String>();
+        mode.onAutoExit(() -> told.add("ended"));
+        session.environment().put(PerfMode.AUTOEXIT_VARIABLE, "0");
+        mode.on(true);
+
+        start("items").finish(false);
+        mode.on(false);
+
+        assertThat(told).isEmpty();
+    }
+
+    @Test
     void theModeStaysOnWithoutTheAutoExitVariable() {
         session.environment().put(PerfMode.AUTOEXIT_VARIABLE, "0");
         mode.on(true);

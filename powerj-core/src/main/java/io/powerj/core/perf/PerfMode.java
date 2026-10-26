@@ -7,6 +7,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -16,7 +17,6 @@ import io.powerj.core.i18n.Messages;
 import io.powerj.core.lang.Ast;
 import io.powerj.core.runtime.ExecutionObserver;
 import io.powerj.core.runtime.LineMeasuring;
-import io.powerj.core.runtime.ExecutionObserver;
 import io.powerj.core.runtime.Session;
 import io.powerj.core.runtime.ShellIo;
 
@@ -41,6 +41,7 @@ public final class PerfMode implements LineMeasuring {
     /** The profiler of this runtime, if it has one. */
     private final Optional<Profiler> profiler;
     private volatile boolean on;
+    private volatile Runnable autoExit = () -> { };
     /** The profiler records each measured line (part B); only a test turns it off. */
     private volatile boolean profiling = true;
     /** Folder of the profiler's recordings, created at the first one. */
@@ -82,6 +83,15 @@ public final class PerfMode implements LineMeasuring {
     /** {@code true} while the lines executed are measured. */
     public boolean on() {
         return on;
+    }
+
+    /**
+     * Told when the mode ends by itself ({@code POWERJ_PERF_AUTOEXIT=1}: after one line), so that whoever shows the mode
+     * can follow it. Not called when the mode is switched off with {@link #on(boolean)}.
+     */
+    @Override
+    public void onAutoExit(Runnable action) {
+        this.autoExit = Objects.requireNonNull(action, "action");
     }
 
     public void on(boolean on) {
@@ -150,6 +160,7 @@ public final class PerfMode implements LineMeasuring {
         } finally {
             if ("1".equals(session.environment().getOrDefault(AUTOEXIT_VARIABLE, "").strip())) {
                 on = false; // the summary is printed: the mode ends, the next prompt shows it
+                autoExit.run();
             }
             if (interrupted) {
                 Thread.currentThread().interrupt();
