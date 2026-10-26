@@ -20,7 +20,7 @@ final class ShellReader {
     private ShellReader() {
     }
 
-    static LineReader create(Terminal terminal, PowerJHome home, ShellConfig config) {
+    static PreviewLineReader create(Terminal terminal, PowerJHome home, ShellConfig config) {
         Map<String, Object> variables = new HashMap<>();
         variables.put(LineReader.HISTORY_FILE, home.historyFile());
         variables.put(LineReader.HISTORY_SIZE, config.historySize());

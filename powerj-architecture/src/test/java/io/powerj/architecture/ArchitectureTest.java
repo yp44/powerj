@@ -160,6 +160,16 @@ class ArchitectureTest {
                 .because("the process is read once, in Environment, and handed to whoever needs it"));
     }
 
+    /** [C-09] The read loop does not know which line editor feeds it, and does not guess it from its type. */
+    @Test
+    void theReadLoopDoesNotKnowTheConcreteLineEditor() {
+        check(noClasses().that().haveSimpleName("Repl")
+                .should().dependOnClassesThat().resideInAPackage("org.jline.reader.impl..")
+                .orShould().dependOnClassesThat().haveSimpleName("PreviewLineReader")
+                .orShould().dependOnClassesThat().haveSimpleName("Previewer")
+                .orShould().dependOnClassesThat().haveSimpleName("Perfer"));
+    }
+
     /** [C-09] The shell has no business with the cmdlets' classes: {@code ProtectedPaths} should live elsewhere. */
     @Test
     void shellDoesNotUseTheBuiltInCmdlets() {

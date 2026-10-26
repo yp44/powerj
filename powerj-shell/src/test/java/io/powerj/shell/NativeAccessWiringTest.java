@@ -65,7 +65,7 @@ class NativeAccessWiringTest {
     private String repl(PowerJHome home, String keys) throws Exception {
         try (var terminal = new TestTerminal(keys)) {
             var reader = ShellReader.create(terminal.terminal(), home, ShellConfig.defaults());
-            var repl = new Repl(reader, new Supervisor(), new Session(tmp, tmp, System.getenv()),
+            var repl = InteractiveShell.create(reader, new Supervisor(), new Session(tmp, tmp, System.getenv()),
                     CmdletRegistry.discover());
             repl.nativeAccess(home.configFile());
             terminal.startTyping();

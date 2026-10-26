@@ -43,7 +43,7 @@ final class InteractiveRun {
         }
         try {
             var reader = ShellReader.create(terminal, home, config);
-            var repl = new Repl(reader, new Supervisor(), session, CmdletRegistry.discover());
+            var repl = InteractiveShell.create(reader, new Supervisor(), session, CmdletRegistry.discover());
             repl.nativeAccess(home.configFile());
             repl.loadModules(home.modulesDir());
             repl.useProfile(home.profileFile(), runProfile);

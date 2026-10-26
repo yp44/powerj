@@ -52,7 +52,7 @@ class ReplTest {
         }
         try (var terminal = new TestTerminal(keys)) {
             var reader = ShellReader.create(terminal.terminal(), home, ShellConfig.defaults());
-            var repl = new Repl(reader, new Supervisor(), session(), CmdletRegistry.discover());
+            var repl = InteractiveShell.create(reader, new Supervisor(), session(), CmdletRegistry.discover());
             repl.useProfile(home.profileFile(), runProfile);
             terminal.startTyping();
             int code = repl.run(BUILD);
@@ -94,7 +94,7 @@ class ReplTest {
         home = new PowerJHome(tmp.resolve("home")).createDirectories();
         try (var terminal = TestTerminal.interactive()) {
             var reader = ShellReader.create(terminal.terminal(), home, ShellConfig.defaults());
-            var repl = new Repl(reader, new Supervisor(), session(), CmdletRegistry.discover());
+            var repl = InteractiveShell.create(reader, new Supervisor(), session(), CmdletRegistry.discover());
             terminal.startTyping();
             var code = new CompletableFuture<Integer>();
             Thread.ofVirtual().start(() -> code.complete(repl.run(BUILD)));
@@ -306,7 +306,7 @@ class ReplTest {
         java.nio.file.Files.writeString(home.modulesDir().resolve("broken.jar"), "not a jar");
         try (var terminal = new TestTerminal("exit 5" + ENTER)) {
             var reader = ShellReader.create(terminal.terminal(), home, ShellConfig.defaults());
-            var repl = new Repl(reader, new Supervisor(), session(), CmdletRegistry.discover());
+            var repl = InteractiveShell.create(reader, new Supervisor(), session(), CmdletRegistry.discover());
             repl.loadModules(home.modulesDir());
             terminal.startTyping();
             assertThat(repl.run(BUILD)).isEqualTo(5);

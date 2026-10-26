@@ -10,7 +10,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 
-import org.jline.reader.LineReader;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,7 +32,7 @@ class PerfModeTest {
     Path tmp;
 
     private TestTerminal terminal;
-    private LineReader reader;
+    private PreviewLineReader reader;
     private CompletableFuture<Integer> code;
     private Path cwd;
     private Session session;
@@ -45,7 +44,7 @@ class PerfModeTest {
         terminal = TestTerminal.interactive();
         reader = ShellReader.create(terminal.terminal(), home, ShellConfig.defaults());
         session = new Session(tmp, cwd, System.getenv());
-        var repl = new Repl(reader, new Supervisor(), session, CmdletRegistry.discover());
+        var repl = InteractiveShell.create(reader, new Supervisor(), session, CmdletRegistry.discover());
         terminal.startTyping();
         code = new CompletableFuture<>();
         Thread.ofVirtual().start(() -> code.complete(repl.run(new BuildInfo("0.1.0", Runtime.Version.parse("25")))));
