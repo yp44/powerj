@@ -125,7 +125,7 @@ final class Transfer {
                 continue;
             }
             if (target == null) {
-                context.error(Messages.get("fileops.block.not.a.file", destinationBlock.source(), Where.abbreviate(value)));
+                context.error(Messages.get("fileops.block.not.a.file", destinationBlock.source(), Texts.abbreviate(value)));
                 continue;
             }
             target = target.toAbsolutePath().normalize();

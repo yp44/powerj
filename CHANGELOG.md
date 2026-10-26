@@ -253,10 +253,25 @@ structures, functions) can be built on it. The work is organised in phases (revi
   tag `vX.Y.Z`, checks that the tag is the version of the project and not a SNAPSHOT, and leaves a **draft** release with the
   archives, the installer, the SBOM and `SHA256SUMS`; it has never run, nothing is signed, and the procedure is in
   [docs/RELEASING.md](docs/RELEASING.md) (`versions:set` was tried on a copy).
+- **Leftovers of the review, done** (step 5.10): `Where.PROPERTY` and `Where.abbreviate`, used from ten other classes, are
+  `Texts.isPropertyPath` and `Texts.abbreviate`, and the rule of `-n` that `last` took from `first` is `Counts.orOne` (with
+  tests, mutants killed). **The shell no longer `requires` the cmdlets module**: the image build adds it (`--add-modules`),
+  the service loader finds it, and the seven smoke tests pass on the image. (`--bind-services` was tried and is not the way:
+  it adds 28 modules, among them the compiler, `jlink`, `jpackage` and `jshell`, and takes the runtime from 97 to
+  163 MB.) The message of the toolkit start-up timeout of the graphical module is in the bundles.
 - **English names** for the acceptance sheets: `docs/recettes/etape-N.md` is now `docs/acceptance/step-N.md`; the failure
   messages of the CI and the description of the project are in English too (C-36).
 
 ### Examined, not changed
+- **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
+  whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes
+  would change for it); the home folder found in two places (12 lines in the core and in the cmdlets, which do not know each
+  other; sharing them needs a type in the API for a helper); `Option.min` (the two validations that repeat are one function
+  each, `FileOps.parallelism` and `Counts.orOne`; an annotation member would change the API and remove no code);
+  `FileOps.report(WalkError)` next to `FileArguments.report` (the first says what could not be modified, the second what
+  could not be read: two wordings); the lock of `config.properties` between processes (a case of two shells writing the same
+  consent at the same moment); the English exception messages of `HistoryExpander`, `SortSpec` and `ColumnChoice` (they
+  never reach the user: the line is left as it is, the callers wrap them in a bundled message).
 - **The `jpackage` version of a SNAPSHOT build** (C-33): jpackage only accepts digits, so a `0.2.0-SNAPSHOT` image carries
   `0.2.0`. What tells the builds apart is `powerj --version` (`PowerJ 0.2.0-SNAPSHOT (Java 25)`) and the name of the archive;
   an installer built from a snapshot is not meant to be distributed.

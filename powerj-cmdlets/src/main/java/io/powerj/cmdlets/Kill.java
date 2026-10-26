@@ -68,7 +68,7 @@ public final class Kill implements Cmdlet<Kill.Params, Object, ProcessEntry> {
             case Process process -> kill(p, process.pid(), context);
             case Long _, Integer _, Short _ -> kill(p, ((Number) input).longValue(), context);
             case Record record when pidOf(record) != null -> kill(p, pidOf(record), context);
-            case null, default -> context.error(Messages.get("kill.not.process", Where.abbreviate(input)));
+            case null, default -> context.error(Messages.get("kill.not.process", Texts.abbreviate(input)));
         }
     }
 

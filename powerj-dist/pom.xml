@@ -177,7 +177,7 @@
                                             <arg value="--add-modules"/>
                                             <!-- jdk.unsupported: Ctrl+C interception by JLine (sun.misc.Signal).
                                                  jdk.jfr, jdk.management: the profiler of the perf mode (FR-76). -->
-                                            <arg value="java.se,jdk.unsupported,jdk.jfr,jdk.management"/>
+                                            <arg value="java.se,jdk.unsupported,jdk.jfr,jdk.management,io.powerj.cmdlets"/>
                                             <!-- JLine accesses the native console (FFM / native library). -->
                                             <arg value="--java-options"/>
                                             <arg value="--enable-native-access=org.jline.terminal.ffm,org.jline.nativ,io.powerj.core"/>

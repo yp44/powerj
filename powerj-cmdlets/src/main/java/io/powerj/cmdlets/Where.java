@@ -34,7 +34,6 @@ public final class Where implements Cmdlet<Where.Params, Object, Object> {
     }
 
     private static final Set<String> OPERATORS = Set.of("==", "!=", "<", "<=", ">", ">=");
-    static final Pattern PROPERTY = Pattern.compile("[\\p{L}_][\\p{L}\\p{N}_]*(\\.[\\p{L}_][\\p{L}\\p{N}_]*)*");
     private static final Pattern LITERAL = Pattern.compile(
             "-?\\d+(\\.\\d+)?(L|b|kb|mb|gb|tb|ms|s|m|h|d)?|true|false|null", Pattern.CASE_INSENSITIVE);
 
@@ -71,7 +70,7 @@ public final class Where implements Cmdlet<Where.Params, Object, Object> {
         }
         if (words.size() == 3 && words.get(0) instanceof String property && words.get(1) instanceof String operator
                 && OPERATORS.contains(operator)) {
-            if (!PROPERTY.matcher(property).matches()) {
+            if (!Texts.isPropertyPath(property)) {
                 throw new UsageException(Messages.get("where.property.invalid", property));
             }
             return context.compile("$_." + property + " " + operator + " " + value(words.get(2)));
@@ -105,10 +104,5 @@ public final class Where implements Cmdlet<Where.Params, Object, Object> {
             }
         }
         return quoted.append('"').toString();
-    }
-
-    static String abbreviate(Object value) {
-        String text = String.valueOf(value);
-        return text.length() > 40 ? text.substring(0, 39) + "…" : text;
     }
 }

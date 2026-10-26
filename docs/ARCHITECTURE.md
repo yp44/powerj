@@ -39,7 +39,6 @@ flowchart BT
     cmdlets --> fs
     fx --> api
     shell --> core
-    shell -. "requires, so that it is in the runtime image" .-> cmdlets
     shell --> jline[(JLine)]
     fx --> javafx[(JavaFX)]
 ```
@@ -51,7 +50,7 @@ flowchart BT
 | `powerj-core` | `api` | The language (`lang`), the engine (`runtime`, `command`, `java`, `nativeexec`, `format`), the completion (`assist`), the profiler (`perf`). Exported to the shell only. |
 | `powerj-cmdlets` | `api`, `fs` | The built-in cmdlets, published through `provides CmdletProvider with BuiltinCmdlets`. **Never depends on `core`**, so a built-in cmdlet behaves exactly like a third-party one. |
 | `powerj-fx` | `api`, JavaFX | `grid`. A real third-party module that happens to live in the repository; not in the distribution, and left out of the build with `-DskipFx`. |
-| `powerj-shell` | `core`, JLine | `Main`, the composition root, the REPL, scripts, the profile, history. It also `requires cmdlets` so that the module is part of the runtime image. |
+| `powerj-shell` | `core`, JLine | `Main`, the composition root, the REPL, scripts, the profile, history. It does not require `cmdlets`: the built-in cmdlets are a provider found by the service loader, and the image build (`--add-modules` in `powerj-dist`) puts the module in the runtime. |
 | `powerj-architecture`, `powerj-coverage` | all | Build only: the architecture rules, and the aggregated coverage report with its thresholds. |
 | `powerj-bench` | `api`, `core`, `cmdlets` | JMH benchmarks, outside the default build (`-Pbench`): [docs/quality/performance.md](quality/performance.md). |
 | `powerj-dist` | all but `fx` | jlink runtime and jpackage launcher. |

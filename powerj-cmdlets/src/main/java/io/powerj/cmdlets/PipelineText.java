@@ -31,7 +31,7 @@ final class PipelineText {
             if (input instanceof CharSequence text) {
                 return text.toString();
             }
-            context.error(Messages.get(notTextKey, Where.abbreviate(input)));
+            context.error(Messages.get(notTextKey, Texts.abbreviate(input)));
             return null;
         }
         var attempt = block.tryInvoke(input);
@@ -43,7 +43,7 @@ final class PipelineText {
         if (value == null || value instanceof CharSequence) {
             return value == null ? null : value.toString();
         }
-        context.error(Messages.get("text.property.not.text", property, Where.abbreviate(value)));
+        context.error(Messages.get("text.property.not.text", property, Texts.abbreviate(value)));
         return null;
     }
 }

@@ -25,7 +25,7 @@ final class Keys {
     static ScriptBlock block(Object argument, CmdletContext<?> context, String invalidKey) {
         return switch (argument) {
             case ScriptBlock block -> block;
-            case String property when Where.PROPERTY.matcher(property).matches() -> context.property(property);
+            case String property when Texts.isPropertyPath(property) -> context.property(property);
             case String property -> throw new UsageException(Messages.get("where.property.invalid", property));
             case null -> throw new UsageException(Messages.get(invalidKey, "null"));
             default -> throw new UsageException(Messages.get(invalidKey, argument));

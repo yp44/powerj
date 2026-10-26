@@ -51,7 +51,7 @@ final class PipelineFiles {
     }
 
     private static ScriptBlock compile(String name, CmdletContext<?> context) {
-        if (!Where.PROPERTY.matcher(name).matches()) {
+        if (!Texts.isPropertyPath(name)) {
             throw new UsageException(Messages.get("where.property.invalid", name));
         }
         return context.property(name);
@@ -81,11 +81,11 @@ final class PipelineFiles {
             return null;
         }
         if (file == null && block != null) {
-            context.error(Messages.get("fileops.block.not.a.file", block.source(), Where.abbreviate(value)));
+            context.error(Messages.get("fileops.block.not.a.file", block.source(), Texts.abbreviate(value)));
         } else if (file == null) {
             context.error(property == null
-                    ? Messages.get(keys.notAFile(), Where.abbreviate(input))
-                    : Messages.get(keys.propertyNotAFile(), propertyName, Where.abbreviate(input)));
+                    ? Messages.get(keys.notAFile(), Texts.abbreviate(input))
+                    : Messages.get(keys.propertyNotAFile(), propertyName, Texts.abbreviate(input)));
         }
         return file;
     }

@@ -155,7 +155,7 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
         }
 
         private static ScriptBlock property(String name, CmdletContext<?> context) {
-            if (!Where.PROPERTY.matcher(name).matches()) {
+            if (!Texts.isPropertyPath(name)) {
                 throw new UsageException(Messages.get("where.property.invalid", name));
             }
             return context.property(name);

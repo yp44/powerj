@@ -27,7 +27,7 @@ public final class Last implements Cmdlet<Last.Params, Object, Object> {
     /** Last objects received. */
     private static State state(Params p, CmdletContext<Object> context) {
         return context.state(State.class, () -> {
-            int count = First.count(p.count());
+            int count = Counts.orOne(p.count());
             return new State(count, new ArrayDeque<>(Math.min(count, 1024)));
         });
     }

@@ -4,7 +4,6 @@ import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
-import io.powerj.api.UsageException;
 
 /**
  * {@code first}: the first {@code n} objects of the pipeline (specification FR-68). Once they are emitted, the previous
@@ -31,7 +30,7 @@ public final class First implements Cmdlet<First.Params, Object, Object> {
 
     @Override
     public void begin(Params p, CmdletContext<Object> context) {
-        int count = count(p.count());
+        int count = Counts.orOne(p.count());
         context.state(Remaining.class, () -> new Remaining(count));
         if (count == 0) {
             context.stopInput();
@@ -40,7 +39,7 @@ public final class First implements Cmdlet<First.Params, Object, Object> {
 
     @Override
     public void process(Params p, Object input, CmdletContext<Object> context) {
-        Remaining remaining = context.state(Remaining.class, () -> new Remaining(count(p.count())));
+        Remaining remaining = context.state(Remaining.class, () -> new Remaining(Counts.orOne(p.count())));
         if (remaining.left <= 0) {
             return; // the input was stopped; nothing more is emitted
         }
@@ -48,16 +47,5 @@ public final class First implements Cmdlet<First.Params, Object, Object> {
         if (--remaining.left == 0) {
             context.stopInput();
         }
-    }
-
-    /** Number of objects, 1 by default. */
-    static int count(Integer count) {
-        if (count == null) {
-            return 1;
-        }
-        if (count < 0) {
-            throw new UsageException(Messages.get("count.negative", count));
-        }
-        return count;
     }
 }

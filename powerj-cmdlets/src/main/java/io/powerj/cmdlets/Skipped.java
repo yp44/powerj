@@ -12,6 +12,6 @@ final class Skipped {
     }
 
     static void report(CmdletContext<?> context, RuntimeException error, Object input) {
-        context.error(Messages.get("pipeline.object.skipped", error.getMessage(), Where.abbreviate(input)));
+        context.error(Messages.get("pipeline.object.skipped", error.getMessage(), Texts.abbreviate(input)));
     }
 }
