@@ -247,9 +247,14 @@ structures, functions) can be built on it. The work is organised in phases (revi
   the graphical module each get a `.sha256` file that `sha256sum -c` accepts.
 - **The CI runs its checks side by side, and on macOS** (C-34): the build of Linux keeps the tests, the image and the smoke
   tests; the tests of the real window under a virtual display, and the build without the graphical module, are jobs of their
-  own; a macOS job builds the image and runs five of the smoke tests (the layout of the bundle is `powerj.app`, which the
-  archive step of `powerj-dist` now expects). **The macOS job and the release workflow are new and unproven**: the former has
-  its first run with this change; the latter, [`release.yml`](.github/workflows/release.yml), builds the three systems on a
+  own; a macOS job (Apple silicon) builds everything, runs the 2,142 tests, makes the image (`powerj.app`, which the archive
+  step of `powerj-dist` now expects) and runs five of the smoke tests. Its first runs found seven things that were Linux
+  only or depended on the load of the machine, all fixed: a test that took `cd` for a program that does not exist (macOS has
+  a `/usr/bin/cd`), two that looked for a path in a table cut to its width (long temporary folders), one that created
+  `readme.txt` and `README.txt` (the same file there), a race in the background Ctrl+C test, `jpackage` refusing a version
+  that starts with 0 (the bundle says 1.x while the project is 0.x), and a smoke test that expected `root` on the first line
+  of `/etc/passwd`. Not run on macOS: the profiler smoke test, the window of `grid`, the installer, Intel Macs. **The release
+  workflow is new and unproven**: [`release.yml`](.github/workflows/release.yml) builds the three systems on a
   tag `vX.Y.Z`, checks that the tag is the version of the project and not a SNAPSHOT, and leaves a **draft** release with the
   archives, the installer, the SBOM and `SHA256SUMS`; it has never run, nothing is signed, and the procedure is in
   [docs/RELEASING.md](docs/RELEASING.md) (`versions:set` was tried on a copy).

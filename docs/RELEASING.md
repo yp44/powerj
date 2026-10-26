@@ -49,7 +49,8 @@ that was published is not moved.
 
 ## What to check on the first run
 
-- `gh release upload` globs (the names of the files above) and the macOS job: the macOS image is a bundle
-  (`powerj.app`), which the archive step of `powerj-dist` now expects but nobody has run.
+- `gh release upload` globs (the names of the files above). The macOS image is a bundle (`powerj.app`) that the CI
+  builds and smoke-tests on every push; what the release adds for macOS (the archive and the graphical module going to the
+  draft) has not run.
 - `help:evaluate` in the first job needs the network; the workflow runs on a clean runner, so it has it.
 - The permissions: `contents: write` is given to the jobs that touch the release, nowhere else.

@@ -4,7 +4,7 @@
 |---|---|
 | **Document version** | 0.11 (reconciled with the code: Phase 5 of the [architecture review](REVUE-ARCHITECTURE.md)) |
 | **Status** | Living document: it describes the product as built (`0.2.0-SNAPSHOT`). Every requirement `FR-nn` is traced to the code or the tests by `SpecificationTraceabilityTest`. |
-| **Target platform** | Windows 10/11 x64 (`powerj.exe`) and Linux x64, both built and tested by the CI on every push; macOS launcher built by the `mac` profile, not tested by the CI |
+| **Target platform** | Windows 10/11 x64 (`powerj.exe`) and Linux x64, both built and tested by the CI on every push; macOS on Apple silicon (`powerj.app`) is built, tested and smoke-tested by the CI too (not the window of `grid`, not the installer, not Intel Macs) |
 | **Technical foundation** | Java 25, Maven 3.9, JLine 4 |
 
 ---
@@ -1642,7 +1642,7 @@ Environment variables read by PowerJ:
 |---|---|
 | NFR-01 | Startup time: no requirement in v1 (a few seconds is acceptable). Optimization (JDK AOT cache, background class indexing) is planned for a later phase. |
 | NFR-02 | Imperceptible typing latency; completion < 50 ms. Measured: 20 to 350 µs warm (`docs/quality/performance.md`). |
-| NFR-03 | Windows 10/11 x64 and Linux x64 are the tested platforms (the CI builds and runs both on every push); UTF-8 end to end (console in code page 65001). |
+| NFR-03 | Windows 10/11 x64 and Linux x64 are the tested platforms (the CI builds and runs both on every push), and macOS on Apple silicon runs the tests and five smoke tests; UTF-8 end to end (console in code page 65001). |
 | NFR-04 | `ls -r` on 100,000 files without running out of memory (streaming). |
 | NFR-05 | Test coverage ≥ 80% of the lines and of the branches, for PowerJ as a whole and for the built-in cmdlets (`io.powerj.cmdlets`), on Linux and on Windows; checked by `mvn verify` (JaCoCo, `powerj-coverage` module). |
 | NFR-06 | No raw Java exception displayed to the user outside debug mode. |
