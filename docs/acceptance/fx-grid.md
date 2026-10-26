@@ -212,6 +212,8 @@ With `ls | grid --pass-thru | map { $_.name }` in a folder of files `f1228.bin`,
 | 114 | `ls \| grid` | All the properties of the files are columns: `name`, `size`, `modified`, `dir` (the ones the terminal shows) then `path`, `ext`; each can be hidden in the `Columns` menu. |
 | 115 | Make cells of eighty characters (`1,` forty times, in a few rows), open them in `grid`, type `/(.*?,){11}P/` in the filter of their column | The window does **not** freeze: after a moment the table is empty and the status bar says `N cells not searched: the regular expression took too long`, N being the number of rows (the first ten give up on their own, the others are not tried) (a pattern that the JDK matches at once, such as `/(a+)+$/`, gives no message). |
 | 116 | Then replace it with `/^1,1,/` | All the rows come back, the message is gone. |
+| 117 | Type `abc` in the filter of a `size` column | The field turns pink **and** the status bar says `… · filter of size: not a size (4096, 10kb, 1.5mb, 2gb…): abc`; the rows stay those of the last good filter. Emptying the field removes both. |
+| 118 | With a screen reader (Orca, NVDA, VoiceOver), go through the window with Tab | Each field says what it is: `Search in all columns`, `Filter of the column name`, `Comparison for the column size`; the table says `Table of the objects received`; an invalid filter reads its reason as the help text. |
 
 ## Where this checklist was run, and what it does not cover
 
@@ -219,7 +221,7 @@ With `ls | grid --pass-thru | map { $_.name }` in a folder of files `f1228.bin`,
 - **Windows** and **macOS**: not run by the development session. On Windows the CI builds the module, loads it and checks `help grid` (it does **not** open a window); the rows that need a window are to be run by hand there. macOS is best effort.
 - Without a window manager the **title** of the window (`--title`) cannot be seen, and the focus does not move.
 - **Not implemented:** `--no-focus` (JavaFX has no reliable way to show a window without taking the focus). **Not automated:** the checks that need a real window (they are in this checklist, not in the tests); the unit tests cover the model, the cmdlet and the runtime, and `powerj-coverage` keeps them above 90 % (the `view` package is the only code outside the threshold).
-- Rows 115 and 116 (the budget of a regular expression) are checked by the tests of the model (`FilterParserTest`, `FilterEditorTest`) and were not run in a window.
+- Rows 115 and 116 (the budget of a regular expression) are checked by the tests of the model (`FilterParserTest`, `FilterEditorTest`) and were not run in a window. Row 117 and the names of row 118 are checked by `GridViewUiTest` (a real window under Xvfb, `-Pfx-ui`); **row 118 has not been run with a screen reader**: the tests read the accessible names and help text that the controls hold, not what a screen reader says of them.
 - Not measured: the memory of a window that stays open for hours, and twenty windows opened in a row (row 79).
 
 ## Automated part (CI)

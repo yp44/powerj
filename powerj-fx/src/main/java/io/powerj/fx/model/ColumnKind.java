@@ -56,6 +56,21 @@ public enum ColumnKind {
         return this == UNKNOWN ? other : TEXT;
     }
 
+    /**
+     * Whether a column that was shown as {@code shown} must be built again now that its kind is {@code now}: only the
+     * numbers, sizes and dates look different; nothing known yet and text look the same.
+     */
+    public static boolean sameLook(ColumnKind shown, ColumnKind now) {
+        boolean plainBefore = shown == null || shown == UNKNOWN || shown == TEXT;
+        boolean plainNow = now == UNKNOWN || now == TEXT;
+        return shown == now || plainBefore && plainNow;
+    }
+
+    /** Numbers and sizes are filtered with a comparison chosen in a list before the field. */
+    public boolean hasComparisons() {
+        return this == NUMBER || this == SIZE;
+    }
+
     /** {@code true} if the cells are aligned to the right. */
     public boolean alignRight() {
         return this == NUMBER || this == SIZE;

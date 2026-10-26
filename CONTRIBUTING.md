@@ -34,7 +34,8 @@ packaged launcher. `ci/smoke/fx.sh` needs a display (Xvfb is enough).
 
 `./mvnw -Pquality verify` adds Error Prone (warnings only for now, baseline in `docs/quality/`). `./mvnw -Pbench -DskipTests package`
 builds the JMH benchmarks, which are not part of `verify` ([how to run them](docs/quality/performance.md)).
-`./mvnw -Pmutation … org.pitest:pitest-maven:mutationCoverage` measures what the tests of the core would notice
+`xvfb-run -a ./mvnw -Pfx-ui -pl powerj-fx -am test` runs the tests of the graphical window, which need a display (a virtual one
+is enough); the ordinary build leaves them out. `./mvnw -Pmutation … org.pitest:pitest-maven:mutationCoverage` measures what the tests of the core would notice
 ([how to run it and read the survivors](docs/quality/mutation.md)); run it before and after a change to the lexer, the
 parser or the interpreter.
 

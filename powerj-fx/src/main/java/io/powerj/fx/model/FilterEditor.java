@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import io.powerj.fx.Messages;
+
 /**
  * What the user typed in the filters, and the {@link FilterSpec} that results. An expression that is not valid keeps
  * the last good filter of its field (the table does not jump while the user types) and is reported with
@@ -116,6 +118,23 @@ public final class FilterEditor {
 
     public FilterSpec spec() {
         return spec;
+    }
+
+    /**
+     * Why a filter is not applied, in a sentence that names it: the search box first, then the first column, in the order of
+     * the columns, whose expression is not valid.
+     */
+    public Optional<String> problem() {
+        if (searchError != null) {
+            return Optional.of(Messages.get("grid.search.problem", searchError));
+        }
+        for (ColumnSpec column : columns) {
+            String error = errors.get(column.name());
+            if (error != null) {
+                return Optional.of(Messages.get("grid.filter.problem", column.name(), error));
+            }
+        }
+        return Optional.empty();
     }
 
     /** How many cells the current filters gave up on (see {@link FilterSpec#abandoned()}). */

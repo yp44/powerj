@@ -227,6 +227,15 @@ structures, functions) can be built on it. The work is organised in phases (revi
   Ctrl+C reaches. Each cell now has a budget of characters read; a cell that exhausts it does not match, after ten such cells
   the others are not tried, and the status bar says how many cells were not examined. (The JDK 25 matcher already answers
   the textbook `(a+)+$` at once; a pattern such as `(.*?,){11}P` on forty commas still takes minutes.)
+- **The window of `grid` is tested, and usable without seeing colours** (C-29): `GridView` had no test at all. `GridViewUiTest`
+  builds the real window under a virtual display (`xvfb-run -a ./mvnw -Pfx-ui -pl powerj-fx -am test`, a step of the CI; the
+  ordinary build leaves these tests out) and checks that rows arrive, that Esc closes, that every field has an accessible name
+  (`Filter of the column size`, `Search in all columns`…) and that an invalid filter is named in the status bar and in the help
+  text of the field, not only by turning pink. It found a defect on its first run: an invalid expression keeps the last good
+  filter, the rows do not change, and so the status bar was never refreshed; it is now. The decisions that were in `GridView`
+  (the text of the status bar and the state of the pause button, what Esc does, when a column is rebuilt, how wide it is) moved
+  to the model with tests (`GridStatus`, `EscapeAction`, `ColumnKind.sameLook`, `ColumnWidths.pixels`): 565 lines became 531,
+  not the 300 aimed at, because what remains is JavaFX wiring.
 - **English names** for the acceptance sheets: `docs/recettes/etape-N.md` is now `docs/acceptance/step-N.md`; the failure
   messages of the CI and the description of the project are in English too (C-36).
 

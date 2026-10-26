@@ -53,4 +53,26 @@ class ColumnWidthsTest {
         var rows = List.of(new GridRow(1, Map.of("s", 14_520L)));
         assertThat(ColumnWidths.chars(size, rows, 10)).isEqualTo("14.2 KB".length());
     }
+
+    @Test
+    void theWidthInPixelsIsTheCharactersAndThePadding() {
+        double expected = ColumnWidths.chars(NAME, rows("Parser.java"), 10) * ColumnWidths.CHAR_WIDTH
+                + ColumnWidths.PADDING;
+        assertThat(ColumnWidths.pixels(NAME, rows("Parser.java"), 10)).isEqualTo(expected).isEqualTo(110.5);
+    }
+
+    @Test
+    void aNumericColumnHasRoomForItsListOfComparisonsAndAValue() {
+        var number = new ColumnSpec("n", ColumnKind.NUMBER);
+        var size = new ColumnSpec("s", ColumnKind.SIZE);
+        var narrow = List.of(new GridRow(1, Map.of("n", 5, "s", 5L)));
+
+        assertThat(ColumnWidths.pixels(number, narrow, 10)).isEqualTo(ColumnWidths.MIN_FILTERED_NUMBER);
+        assertThat(ColumnWidths.pixels(size, narrow, 10)).isEqualTo(ColumnWidths.MIN_FILTERED_NUMBER);
+        // a wide column keeps its own width, and a text column of the same width is not widened
+        var wide = new ColumnSpec("a-long-name-for-a-number-column", ColumnKind.NUMBER);
+        assertThat(ColumnWidths.pixels(wide, narrow, 10)).isGreaterThan(ColumnWidths.MIN_FILTERED_NUMBER);
+        assertThat(ColumnWidths.pixels(new ColumnSpec("t", ColumnKind.TEXT), narrow, 10))
+                .isEqualTo(ColumnWidths.MIN * ColumnWidths.CHAR_WIDTH + ColumnWidths.PADDING);
+    }
 }

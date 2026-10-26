@@ -59,6 +59,9 @@ jobs:
           sudo apt-get install -y xvfb libgtk-3-0 libxtst6 libxxf86vm1 libgl1
           ci/smoke/fx.sh
 
+      - name: UI tests of the graphical module (the real window, under xvfb)
+        run: xvfb-run -a ./mvnw -B -ntp -Pfx-ui -pl powerj-fx -am test -Dsurefire.failIfNoSpecifiedTests=false
+
       - name: Smoke test of the languages (en / fr)
         run: ci/smoke/languages.sh
 

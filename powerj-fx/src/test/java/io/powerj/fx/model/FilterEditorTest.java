@@ -306,4 +306,28 @@ class FilterEditorTest {
         assertThat(editor.spec().predicate().test(row("1,".repeat(40), 1, "2026-10-05T18:12:00Z", "ada"))).isFalse();
         assertThat(editor.abandoned()).isPositive();
     }
+
+    @Test
+    void theProblemNamesTheColumnAndWhatIsWrong() {
+        assertThat(editor.problem()).isEmpty();
+
+        editor.setColumn("size", "abc");
+        assertThat(editor.problem()).hasValue("filter of size: not a size (4096, 10kb, 1.5mb, 2gb…): abc");
+
+        editor.setColumn("size", "");
+        assertThat(editor.problem()).isEmpty();
+    }
+
+    @Test
+    void theSearchProblemComesFirstAndTheFirstColumnInTheOrderOfTheColumnsOtherwise() {
+        editor.setColumn("modified", "yesterday");
+        editor.setColumn("size", "abc");
+        assertThat(editor.problem().orElseThrow()).startsWith("filter of size: ");
+
+        editor.setSearch("/(/");
+        assertThat(editor.problem().orElseThrow()).isEqualTo("search: invalid regular expression: Unclosed group");
+
+        editor.clear();
+        assertThat(editor.problem()).isEmpty();
+    }
 }
