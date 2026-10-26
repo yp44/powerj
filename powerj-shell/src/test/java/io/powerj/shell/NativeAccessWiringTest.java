@@ -43,14 +43,34 @@ class NativeAccessWiringTest {
     private PowerJHome home() throws IOException {
         var home = new PowerJHome(tmp.resolve("home")).createDirectories();
         Files.createDirectories(home.modulesDir());
+        writeJar(home, "");
+        return home;
+    }
+
+    /** The module jar: a manifest, and an entry that is {@code extra} long, so that its content can be told apart. */
+    private static void writeJar(PowerJHome home, String extra) throws IOException {
         try (OutputStream file = Files.newOutputStream(home.modulesDir().resolve("native.jar"))) {
             var manifest = new Manifest();
             manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
             manifest.getMainAttributes().putValue("Automatic-Module-Name", "org.test.nat");
             manifest.getMainAttributes().putValue("Enable-Native-Access", "true");
-            new JarOutputStream(file, manifest).close();
+            try (var jar = new JarOutputStream(file, manifest)) {
+                if (!extra.isEmpty()) {
+                    jar.putNextEntry(new java.util.jar.JarEntry("extra.txt"));
+                    jar.write(extra.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                    jar.closeEntry();
+                }
+            }
         }
-        return home;
+    }
+
+    /** The line that the message of a refused load tells to record: the answer for the content of the jar as it is. */
+    private String lineToAllow(PowerJHome home) throws IOException {
+        Files.deleteIfExists(home.configFile());
+        var matcher = java.util.regex.Pattern.compile(java.util.regex.Pattern.quote(SETTING) + "=sha256:[0-9a-f]{64}")
+                .matcher(script(home).getFirst());
+        assertThat(matcher.find()).as("the message gives the line to record").isTrue();
+        return matcher.group();
     }
 
     private List<String> script(PowerJHome home) {
@@ -79,17 +99,38 @@ class NativeAccessWiringTest {
     void aScriptNeverAsksAndDoesNotLoadTheModule() throws Exception {
         var home = home();
         assertThat(script(home)).singleElement().asString()
-                .contains("native.jar: not loaded", SETTING + "=true");
+                .contains("native.jar: not loaded", SETTING + "=sha256:");
         assertThat(home.configFile()).doesNotExist();
     }
 
     @Test
     void aScriptFollowsTheRecordedAnswer() throws Exception {
         var home = home();
+        String allow = lineToAllow(home);
         Files.writeString(home.configFile(), SETTING + "=false\n");
         assertThat(script(home)).singleElement().asString().contains("native access refused", SETTING + "=false");
-        Files.writeString(home.configFile(), SETTING + "=true\n");
+        Files.writeString(home.configFile(), allow + "\n");
         assertThat(script(home)).singleElement().asString().contains("no cmdlet"); // accepted, then nothing to load
+    }
+
+    @Test
+    void aScriptDoesNotLoadAModuleThatChangedSinceTheAnswer() throws Exception {
+        var home = home();
+        Files.writeString(home.configFile(), lineToAllow(home) + "\n");
+        writeJar(home, "another version of the module");
+
+        assertThat(script(home)).hasSize(2).satisfies(messages -> {
+            assertThat(messages.getFirst()).contains("org.test.nat", "does not hold");
+            assertThat(messages.getLast()).contains("native.jar: not loaded", SETTING + "=sha256:");
+        });
+    }
+
+    @Test
+    void aScriptFollowsThePreviousFormatOfTheAnswerNoMore() throws Exception {
+        var home = home();
+        Files.writeString(home.configFile(), SETTING + "=true\n");
+
+        assertThat(script(home)).hasSize(2).last().asString().contains("native.jar: not loaded");
     }
 
     @Test
@@ -97,8 +138,9 @@ class NativeAccessWiringTest {
         var home = home();
         String screen = repl(home, "y" + ENTER + "exit 0" + ENTER);
         assertThat(screen).contains("The module \"org.test.nat\" uses native code", "answer recorded: " + SETTING
-                + "=true", "no cmdlet");
-        assertThat(Files.readAllLines(home.configFile())).containsExactly(SETTING + "=true");
+                + "=sha256:", "no cmdlet");
+        assertThat(Files.readAllLines(home.configFile())).singleElement().asString()
+                .matches(java.util.regex.Pattern.quote(SETTING) + "=sha256:[0-9a-f]{64}");
     }
 
     @Test

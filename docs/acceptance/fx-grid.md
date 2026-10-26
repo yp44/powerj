@@ -39,13 +39,13 @@ unzip powerj-fx/target/powerj-fx-*.zip -d ~/.powerj/modules/      # creates ~/.p
 | # | Action | Expected result |
 |---|---|---|
 | 14 | Start `powerj` in a real terminal | Before the banner: `The module "io.powerj.fx" uses native code (modules: io.powerj.fx, javafx.base, javafx.controls, javafx.graphics). Load it? [y/N]`. |
-| 15 | Answer `y` | `answer recorded: modules.nativeAccess.io.powerj.fx=true in …/config.properties`, then the banner. `mod-list` shows `io.powerj.fx`. |
+| 15 | Answer `y` | `answer recorded: modules.nativeAccess.io.powerj.fx=sha256:… in …/config.properties`, then the banner. `mod-list` shows `io.powerj.fx`. |
 | 16 | `ls \| grid` | The window opens and **no** `WARNING: A restricted method …` is printed. |
-| 17 | Quit and start again | No question. |
+| 17 | Quit and start again | No question. Change a digit of the `sha256:` value in `config.properties` and start again: `the answer recorded for io.powerj.fx does not hold for the module as it is now…`, then the question is asked again. |
 | 18 | Edit `config.properties`: `modules.nativeAccess.io.powerj.fx=false`, start again | No question; `fx: not loaded, native access refused for module io.powerj.fx (…)`; `grid` is an unknown command. Comments and other settings of the file are unchanged. |
 | 19 | Remove the line, start with `POWERJ_LANG=fr`, answer `non` | The question is in French (`[o/N]`); `modules.nativeAccess.io.powerj.fx=false` is recorded; the module is not loaded. |
 | 20 | Remove the line, answer with Ctrl+C at the question | Nothing is recorded, the module is not loaded, the shell starts. |
-| 21 | Remove the line, then `printf 'mod-list\nexit\n' \| powerj` (input is not a terminal), and `powerj -c mod-list` | No question; `fx: not loaded, module io.powerj.fx uses native code and no answer is recorded (set modules.nativeAccess.io.powerj.fx=true in config.properties to allow it)`; `config.properties` is not created. |
+| 21 | Remove the line, then `printf 'mod-list\nexit\n' \| powerj` (input is not a terminal), and `powerj -c mod-list` | No question; `fx: not loaded, module io.powerj.fx uses native code and no answer is recorded for this version of it (set modules.nativeAccess.io.powerj.fx=sha256:… in config.properties to allow it)`; `config.properties` is not created. |
 | 22 | Remove the line, move `~/.powerj/modules/fx` away, start `powerj`, move it back, then `mod-load ~/.powerj/modules/fx` and answer `y` | The question is asked by `mod-load` too; the answer is recorded and the module loads without restarting (`ls \| grid` works). |
 
 ## Build checks

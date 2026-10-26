@@ -185,6 +185,13 @@ structures, functions) can be built on it. The work is organised in phases (revi
   the grammar and the synopses in English. **FR-16 (`native.prefer`) and `colors.cmdlet` are withdrawn**: they were
   specified, cited as escape hatches, and never built; `^name` is the way to a native program. **FR-40 is marked
   partial**: wildcards in the arguments of a native program are not expanded.
+- **The consent to native access is tied to the content of the modules** (C-24): a yes is recorded as
+  `modules.nativeAccess.<module>=sha256:<fingerprint>`, the SHA-256 of every module that would be loaded together, so a
+  jar replaced by another one with the same module name, or a changed dependency, asks again; a `true` recorded by an
+  earlier build is no longer an answer; the message that says why a module was not loaded gives the line to record
+  (`NativeAccessPolicy.consent` takes the fingerprint: an internal interface). [ADR 0006](docs/adr/0006-consent-to-native-access-is-tied-to-the-content.md).
+  Also fixed: the French message of that refusal showed `l''autoriser` (doubled apostrophe: the formatter does not
+  unescape).
 - **`SpecificationTraceabilityTest`**: every requirement of the specification is cited by the code, a test or a smoke
   script (unless it is marked withdrawn), nothing cites a requirement that does not exist, and the specification only
   mentions requirements it defines. Twelve requirements that nothing cited now are, `FR-04e` (a name the specification

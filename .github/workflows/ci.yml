@@ -207,8 +207,10 @@ jobs:
           Expand-Archive (Get-ChildItem powerj-fx\target\powerj-fx-*-win.zip).FullName "$env:POWERJ_HOME\modules"
           $refusal = & $pj -c 'mod-list' 2>&1 | Out-String
           $refusal
-          if (-not ($refusal -match 'modules.nativeAccess.io.powerj.fx=true')) { throw "consent is missing: $refusal" }
-          Set-Content "$env:POWERJ_HOME\config.properties" 'modules.nativeAccess.io.powerj.fx=true'
+          # The message gives the line to put in config.properties: the answer is tied to the content of the module.
+          $allow = [regex]::Match($refusal, 'modules\.nativeAccess\.io\.powerj\.fx=sha256:[0-9a-f]{64}').Value
+          if (-not $allow) { throw "consent is missing: $refusal" }
+          Set-Content "$env:POWERJ_HOME\config.properties" $allow
           $modules = & $pj -c 'mod-list' | Out-String
           $modules
           if (-not ($modules -match 'io.powerj.fx')) { throw "mod-list does not list io.powerj.fx" }

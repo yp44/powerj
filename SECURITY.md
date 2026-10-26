@@ -40,10 +40,12 @@ It also opens the module's packages to PowerJ, which reads the annotations of it
 
 A module that uses native code (JNI, FFM) is not loaded until the user agrees: the question is asked with `[y/N]` (the
 default is no), never when there is no terminal, and the answer is kept in `config.properties` as
-`modules.nativeAccess.<module>`. Today the answer is keyed by the **name** of the module; binding it to the content of the
-jar is planned (the architecture review, Phase 5, C-24).
+`modules.nativeAccess.<module>`. A yes is tied to the **content**: it holds the SHA-256 of every module that would be loaded
+together (the jar of the module and of its dependencies), so a jar that is replaced, or a dependency that changes, asks
+again. A no holds whatever the content ([ADR 0006](docs/adr/0006-consent-to-native-access-is-tied-to-the-content.md)).
 
-PowerJ does not verify the origin or the integrity of a module. Only put in `~/.powerj/modules` jars you would run.
+PowerJ does not verify the origin of a module (there is no signature), only that the content it loads is the content the
+user agreed to when native access is at stake. Only put in `~/.powerj/modules` jars you would run.
 
 ### Native programs and files
 

@@ -14,11 +14,13 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
@@ -127,11 +129,18 @@ public final class ModuleLoader {
         List<String> declaring = declaringNativeAccess(finder, roots);
         if (!declaring.isEmpty()) {
             List<String> inLayer = configuration.modules().stream().map(ResolvedModule::name).sorted().toList();
+            String fingerprint;
+            try {
+                fingerprint = ContentFingerprint.of(locations(configuration));
+            } catch (IOException e) {
+                return Result.failure(Messages.get("module.nativeAccess.unreadable", path.getFileName(),
+                        e.getMessage()));
+            }
             for (String module : declaring) {
-                Optional<Boolean> answer = nativeAccess.consent(module, inLayer);
+                Optional<Boolean> answer = nativeAccess.consent(module, inLayer, fingerprint);
                 if (answer.isEmpty()) {
                     return Result.failure(Messages.get("module.nativeAccess.noAnswer", path.getFileName(), module,
-                            NativeAccessPolicy.setting(module)));
+                            NativeAccessPolicy.setting(module), NativeAccessPolicy.allowed(fingerprint)));
                 }
                 if (!answer.get()) {
                     return Result.failure(Messages.get("module.nativeAccess.refused", path.getFileName(), module,
@@ -184,6 +193,17 @@ public final class ModuleLoader {
             warnings.add(Messages.get("module.noCmdlet", path.getFileName(), CmdletProvider.class.getName()));
         }
         return new Result(List.copyOf(cmdlets), List.copyOf(warnings));
+    }
+
+    /** Where each module of the layer comes from, by name: the jar or the folder that the user would be trusting. */
+    private static Map<String, Path> locations(Configuration configuration) throws IOException {
+        Map<String, Path> locations = new TreeMap<>();
+        for (ResolvedModule module : configuration.modules()) {
+            URI location = module.reference().location()
+                    .orElseThrow(() -> new IOException(module.name() + " has no location"));
+            locations.put(module.name(), Path.of(location));
+        }
+        return locations;
     }
 
     /** Names of the modules among {@code roots} whose manifest has {@code Enable-Native-Access: true}. */

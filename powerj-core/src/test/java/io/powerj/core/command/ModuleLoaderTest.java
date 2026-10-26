@@ -176,6 +176,7 @@ class ModuleLoaderTest {
     private static final class RecordingPolicy implements NativeAccessPolicy {
         final List<String> asked = new ArrayList<>();
         final List<List<String>> layers = new ArrayList<>();
+        final List<String> fingerprints = new ArrayList<>();
         final java.util.Optional<Boolean> answer;
 
         RecordingPolicy(java.util.Optional<Boolean> answer) {
@@ -183,9 +184,10 @@ class ModuleLoaderTest {
         }
 
         @Override
-        public java.util.Optional<Boolean> consent(String module, List<String> layer) {
+        public java.util.Optional<Boolean> consent(String module, List<String> layer, String fingerprint) {
             asked.add(module);
             layers.add(layer);
+            fingerprints.add(fingerprint);
             return answer;
         }
     }
@@ -196,10 +198,12 @@ class ModuleLoaderTest {
     void aModuleThatUsesNativeCodeIsNotLoadedWithoutAnAnswer() throws Exception {
         hello(tmp.resolve("native.jar"), "org.test.nat", "nat", NATIVE);
         run("mod-load native.jar");
-        assertThat(errors).containsExactly(
-                "native.jar: not loaded, module org.test.nat uses native code and no answer is recorded "
-                        + "(set modules.nativeAccess.org.test.nat=true in config.properties to allow it)",
-                "mod-load: native.jar not loaded");
+        assertThat(errors).hasSize(2);
+        assertThat(errors.getFirst()).matches(java.util.regex.Pattern.quote(
+                "native.jar: not loaded, module org.test.nat uses native code and no answer is recorded for this "
+                        + "version of it (set modules.nativeAccess.org.test.nat=sha256:") + "[0-9a-f]{64}"
+                + java.util.regex.Pattern.quote(" in config.properties to allow it)"));
+        assertThat(errors.getLast()).isEqualTo("mod-load: native.jar not loaded");
         assertThat(interpreter.commandKind("nat")).isEqualTo(CommandKind.UNKNOWN);
     }
 
@@ -230,6 +234,29 @@ class ModuleLoaderTest {
     }
 
     @Test
+    void thePolicyIsToldWhichContentItAnswersFor() throws Exception {
+        var policy = new RecordingPolicy(java.util.Optional.of(true));
+        interpreter.nativeAccess(policy);
+        Path jar = tmp.resolve("native.jar");
+        hello(jar, "org.test.nat", "nat", NATIVE);
+        run("mod-load native.jar");
+        assertThat(policy.fingerprints).containsExactly(ContentFingerprint.of(Map.of("org.test.nat", jar)));
+    }
+
+    @Test
+    void theFingerprintCoversEveryModuleOfTheLayer() throws Exception {
+        var policy = new RecordingPolicy(java.util.Optional.of(true));
+        interpreter.nativeAccess(policy);
+        Path app = Files.createDirectories(tmp.resolve("app"));
+        hello(app.resolve("nat.jar"), "org.test.nat", "nat", NATIVE);
+        hello(app.resolve("dep.jar"), "org.test.dep", "dep");
+        run("mod-load app");
+        assertThat(policy.layers.getFirst()).containsExactly("org.test.dep", "org.test.nat");
+        assertThat(policy.fingerprints).containsExactly(ContentFingerprint.of(
+                Map.of("org.test.nat", app.resolve("nat.jar"), "org.test.dep", app.resolve("dep.jar"))));
+    }
+
+    @Test
     void aModuleWithoutTheAttributeIsNeverAsked() throws Exception {
         var policy = new RecordingPolicy(java.util.Optional.of(false));
         interpreter.nativeAccess(policy);
@@ -257,7 +284,7 @@ class ModuleLoaderTest {
         Path modules = Files.createDirectories(tmp.resolve("modules"));
         hello(modules.resolve("native.jar"), "org.test.nat", "nat", NATIVE);
         assertThat(interpreter.loadModules(modules)).singleElement().asString()
-                .contains("modules.nativeAccess.org.test.nat=true");
+                .contains("modules.nativeAccess.org.test.nat=sha256:");
         interpreter.nativeAccess(new RecordingPolicy(java.util.Optional.of(true)));
         Files.createDirectories(tmp.resolve("modules2"));
         hello(tmp.resolve("modules2").resolve("native2.jar"), "org.test.nat2", "nat2", NATIVE);

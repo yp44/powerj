@@ -12,7 +12,14 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+/**
+ * The consent to load a module that uses native code is given for the <em>content</em> of the module (review C-24): an
+ * answer recorded for one version of a jar does not hold for another.
+ */
 class NativeAccessConsentTest {
+
+    private static final String FINGERPRINT = "0123456789abcdef".repeat(4);
+    private static final String OTHER = "fedcba9876543210".repeat(4);
 
     @TempDir
     Path tmp;
@@ -37,65 +44,111 @@ class NativeAccessConsentTest {
         return new NativeAccessConsent(new ConfigFile(file()), null, notices::add);
     }
 
+    private Optional<Boolean> ask(NativeAccessConsent consent, String module) {
+        return consent.consent(module, List.of(module), FINGERPRINT);
+    }
+
     @Test
     void aMalformedConfigurationDoesNotPreventAskingTheUser() throws IOException {
         Files.writeString(file(), "x=C:\\users\\yves\n");
-        assertThat(consent(Optional.of(true)).consent("org.a", List.of("org.a"))).contains(true);
+        assertThat(ask(consent(Optional.of(true)), "org.a")).contains(true);
         assertThat(asked).containsExactly("org.a");
     }
 
     @Test
-    void aRecordedYesIsNotAskedAgain() throws IOException {
-        Files.writeString(file(), "modules.nativeAccess.io.powerj.fx=true\n");
-        assertThat(consent(Optional.of(false)).consent("io.powerj.fx", List.of("a"))).contains(true);
+    void aYesRecordedForThisContentIsNotAskedAgain() throws IOException {
+        Files.writeString(file(), "modules.nativeAccess.io.powerj.fx=sha256:" + FINGERPRINT + "\n");
+        assertThat(ask(consent(Optional.of(false)), "io.powerj.fx")).contains(true);
         assertThat(asked).isEmpty();
+        assertThat(notices).isEmpty();
     }
 
     @Test
-    void aRecordedNoIsNotAskedAgain() throws IOException {
+    void theRecordedDigestIsReadInAnyCase() throws IOException {
+        Files.writeString(file(), "modules.nativeAccess.org.a = SHA256:" + FINGERPRINT.toUpperCase() + " \n");
+        assertThat(ask(silent(), "org.a")).contains(true);
+    }
+
+    @Test
+    void aYesRecordedForAnotherContentIsNotAYes() throws IOException {
+        Files.writeString(file(), "modules.nativeAccess.org.a=sha256:" + OTHER + "\n");
+
+        assertThat(ask(silent(), "org.a")).isEmpty();
+        assertThat(notices).singleElement().asString().contains("org.a").contains("another version");
+    }
+
+    @Test
+    void aYesRecordedForAnotherContentIsAskedAgainAndReplaced() throws IOException {
+        Files.writeString(file(), "language=fr\nmodules.nativeAccess.org.a=sha256:" + OTHER + "\n");
+
+        assertThat(ask(consent(Optional.of(true)), "org.a")).contains(true);
+
+        assertThat(asked).containsExactly("org.a");
+        assertThat(Files.readAllLines(file()))
+                .containsExactly("language=fr", "modules.nativeAccess.org.a=sha256:" + FINGERPRINT);
+        assertThat(notices).hasSize(2); // the old answer does not hold, then the new one is recorded
+    }
+
+    @Test
+    void theOldYesThatWasNotTiedToAnyContentIsNotAYes() throws IOException {
+        Files.writeString(file(), "modules.nativeAccess.org.a=true\n");
+
+        assertThat(ask(silent(), "org.a")).isEmpty();
+        assertThat(notices).singleElement().asString().contains("org.a");
+    }
+
+    @Test
+    void aRecordedNoIsNotAskedAgainWhateverTheContent() throws IOException {
         Files.writeString(file(), "modules.nativeAccess.io.powerj.fx = FALSE \n");
-        assertThat(consent(Optional.of(true)).consent("io.powerj.fx", List.of("a"))).contains(false);
+        assertThat(ask(consent(Optional.of(true)), "io.powerj.fx")).contains(false);
         assertThat(asked).isEmpty();
+        assertThat(notices).isEmpty();
     }
 
     @Test
     void theAnswersAreKeptModuleByModule() throws IOException {
-        Files.writeString(file(), "modules.nativeAccess.org.a=true\nmodules.nativeAccess.org.b=false\n");
+        Files.writeString(file(), "modules.nativeAccess.org.a=sha256:" + FINGERPRINT
+                + "\nmodules.nativeAccess.org.b=false\nmodules.nativeAccess.org.d=sha256:" + OTHER + "\n");
         var consent = silent();
-        assertThat(consent.consent("org.a", List.of())).contains(true);
-        assertThat(consent.consent("org.b", List.of())).contains(false);
-        assertThat(consent.consent("org.c", List.of())).isEmpty();
+        assertThat(ask(consent, "org.a")).contains(true);
+        assertThat(ask(consent, "org.b")).contains(false);
+        assertThat(ask(consent, "org.c")).isEmpty();
+        assertThat(ask(consent, "org.d")).isEmpty();
     }
 
     @Test
     void withoutAnswerAndWithoutAnybodyToAskThereIsNoAnswer() {
-        assertThat(silent().consent("org.a", List.of("org.a"))).isEmpty();
+        assertThat(ask(silent(), "org.a")).isEmpty();
         assertThat(notices).isEmpty();
         assertThat(file()).doesNotExist();
     }
 
     @Test
-    void theUserIsAskedAndTheAnswerIsRecorded() throws IOException {
+    void theUserIsAskedAndTheAnswerIsRecordedWithTheContent() throws IOException {
         var consent = consent(Optional.of(true));
-        assertThat(consent.consent("org.a", List.of("javafx.base", "org.a"))).contains(true);
+        assertThat(consent.consent("org.a", List.of("javafx.base", "org.a"), FINGERPRINT)).contains(true);
         assertThat(asked).containsExactly("org.a");
         assertThat(layers).containsExactly(List.of("javafx.base", "org.a"));
-        assertThat(Files.readAllLines(file())).containsExactly("modules.nativeAccess.org.a=true");
-        assertThat(notices).containsExactly("answer recorded: modules.nativeAccess.org.a=true in " + file());
-        // The next time, the file answers.
-        assertThat(consent.consent("org.a", List.of())).contains(true);
+        assertThat(Files.readAllLines(file()))
+                .containsExactly("modules.nativeAccess.org.a=sha256:" + FINGERPRINT);
+        assertThat(notices).containsExactly(
+                "answer recorded: modules.nativeAccess.org.a=sha256:" + FINGERPRINT + " in " + file());
+        // The next time, the file answers, for the same content only.
+        assertThat(consent.consent("org.a", List.of(), FINGERPRINT)).contains(true);
         assertThat(asked).hasSize(1);
+        assertThat(consent.consent("org.a", List.of(), OTHER)).contains(true); // asked again: the double says yes
+        assertThat(asked).hasSize(2);
     }
 
     @Test
     void aRefusalIsRecordedToo() throws IOException {
-        assertThat(consent(Optional.of(false)).consent("org.a", List.of())).contains(false);
+        assertThat(ask(consent(Optional.of(false)), "org.a")).contains(false);
         assertThat(Files.readAllLines(file())).containsExactly("modules.nativeAccess.org.a=false");
     }
 
     @Test
     void noAnswerFromTheUserIsNotRecorded() {
-        assertThat(consent(Optional.empty()).consent("org.a", List.of())).isEmpty();
+        assertThat(ask(consent(Optional.empty()), "org.a")).isEmpty();
         assertThat(file()).doesNotExist();
         assertThat(notices).isEmpty();
     }
@@ -103,20 +156,30 @@ class NativeAccessConsentTest {
     @Test
     void somethingThatIsNotAnAnswerIsAskedAgainAndReplaced() throws IOException {
         Files.writeString(file(), "language=fr\nmodules.nativeAccess.org.a=maybe\n");
-        assertThat(consent(Optional.of(true)).consent("org.a", List.of())).contains(true);
-        assertThat(Files.readAllLines(file())).containsExactly("language=fr", "modules.nativeAccess.org.a=true");
+        assertThat(ask(consent(Optional.of(true)), "org.a")).contains(true);
+        assertThat(Files.readAllLines(file()))
+                .containsExactly("language=fr", "modules.nativeAccess.org.a=sha256:" + FINGERPRINT);
+    }
+
+    @Test
+    void aDigestOfTheWrongShapeIsNotAnAnswer() throws IOException {
+        for (String value : List.of("sha256:", "sha256:abc", "sha256:" + "g".repeat(64), "md5:" + FINGERPRINT,
+                FINGERPRINT)) {
+            Files.writeString(file(), "modules.nativeAccess.org.a=" + value + "\n");
+            assertThat(ask(silent(), "org.a")).as(value).isEmpty();
+        }
     }
 
     @Test
     void anUnreadableFileHasNoAnswer() throws IOException {
         Files.createDirectories(file().resolve("sub"));
-        assertThat(silent().consent("org.a", List.of())).isEmpty();
+        assertThat(ask(silent(), "org.a")).isEmpty();
     }
 
     @Test
     void theAnswerValuesForTheSessionEvenIfItCannotBeRecorded() throws IOException {
         Files.createDirectories(file().resolve("sub"));
-        assertThat(consent(Optional.of(true)).consent("org.a", List.of())).contains(true);
+        assertThat(ask(consent(Optional.of(true)), "org.a")).contains(true);
         assertThat(notices).singleElement().asString().startsWith("cannot record the answer in " + file());
     }
 
