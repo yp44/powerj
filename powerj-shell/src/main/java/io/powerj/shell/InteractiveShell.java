@@ -33,7 +33,7 @@ final class InteractiveShell {
         boolean interactive = !terminal.getType().startsWith("dumb");
         boolean colors = interactive && colors(terminal, session);
         var errors = new ErrorPrinter(terminal, out);
-        var io = new ShellIo(out, errors::print, interactive, () -> terminal.getWidth(), consoleInput(terminal),
+        var io = new ShellIo(out, errors::print, interactive, terminal::getColumns, consoleInput(terminal),
                 colors);
         var interpreter = new Interpreter(session, io, Map.of("history", new HistoryCommand(reader.getHistory())::run),
                 registry, new PerfMode(session, io, Profiler.discover()));
@@ -47,7 +47,7 @@ final class InteractiveShell {
         var prompt = new PromptRenderer(session, modes, terminal, colors);
         Runnable afterInput = () -> { };
         if (interactive) {
-            var previewer = new Previewer(reader, interpreter, completions, terminal::getWidth, colors, modes);
+            var previewer = new Previewer(reader, interpreter, completions, terminal::getColumns, colors, modes);
             previewer.bind(prompt::render);
             new Perfer(interpreter, modes).bind(reader, prompt::render);
             afterInput = previewer::reset; // stops the evaluation of the line being previewed (FR-66)

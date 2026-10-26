@@ -53,7 +53,7 @@ final class TestTerminal implements AutoCloseable {
         try {
             terminal = new ExternalTerminal(null, "test", "xterm-256color",
                     keys, output,
-                    StandardCharsets.UTF_8, Terminal.SignalHandler.SIG_DFL, true, attributes, new Size(160, 50));
+                    StandardCharsets.UTF_8, Terminal.SignalHandler.SIG_DFL, true, attributes, Size.of(160, 50));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

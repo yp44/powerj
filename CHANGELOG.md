@@ -145,7 +145,7 @@ structures, functions) can be built on it. The work is organised in phases (revi
   - The optional abilities of a cmdlet are interfaces, `Previewable` and `ColumnProvider`; the matching default methods
     of `Cmdlet` (`previewable`, `columns`) are removed (see the breaking changes below).
   - The perf types move from `io.powerj.api` to `io.powerj.api.perf`.
-- Compiler warnings: 72 → 32.
+- Compiler warnings: 72 → 29 (the shell no longer calls the deprecated `Terminal.getWidth()` and `Size(int, int)` of JLine).
 
 ### Breaking changes of the API (for code written against the 0.1.0-SNAPSHOT, which was never released)
 
