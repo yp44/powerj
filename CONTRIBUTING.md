@@ -87,7 +87,11 @@ What goes where:
 
 ## How we work
 
-- **One step per commit**, and every commit builds and passes the tests. The history is read, not squashed.
+- **One step per commit** on the branch, and every commit builds and passes the tests. The history of a branch is read
+  while the pull request is reviewed, not squashed.
+- **Squash before merging.** When a pull request is merged, its commits are first squashed into one, so that `main`
+  gets a single commit per pull request (GitHub's *Squash and merge*, or squash the branch yourself before a plain
+  merge). The squashed commit follows the commit-message rule below and keeps the `Refs #nn` / `Fixes #nn` line.
 - **A defect gets a failing test first.** Commit it red and `@Disabled` with the reason if the fix comes later; the
   fix removes the `@Disabled`.
 - **Break your own test.** After writing a test, change the code on purpose (invert a condition, drop a call) and check
