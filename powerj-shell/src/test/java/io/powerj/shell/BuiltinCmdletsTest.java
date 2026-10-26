@@ -89,7 +89,10 @@ class BuiltinCmdletsTest {
         Files.writeString(tmp.resolve("docs/pom.xml"), "<a>\n  <version>1.2.3</version>\n</a>\n");
         String table = run("grep version -r");
         assertThat(table.lines().toList().getFirst()).matches("path\\s+line\\s+text");
-        assertThat(table).contains(tmp.resolve("docs/pom.xml").toString(), "2", "<version>1.2.3</version>");
+        // the path column of the table is cut to its width, which a long temporary folder (macOS) exceeds: the path is
+        // read from the object instead
+        assertThat(table).contains("2", "<version>1.2.3</version>");
+        assertThat(run("(grep version -r).path")).isEqualTo(tmp.resolve("docs/pom.xml") + "\n");
         assertThat(run("grep \"<version>(?<v>[^<]+)\" docs/pom.xml -p 4 | map { m -> m.named.v }"))
                 .isEqualTo("1.2.3\n");
         assertThat(run("(grep -i BONJOUR notes.txt).groups[0]")).isEqualTo("bonjour\n");
