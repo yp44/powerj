@@ -1,7 +1,8 @@
 # Analysis — expanding wildcards before the arguments reach a command (issue #51, FR-40)
 
-**Status:** proposal, waiting for the maintainer's decision. Nothing is implemented; this document is the analysis the
-issue asks for ("Pick one for native programs … and, either way, for the cmdlets").
+**Status:** proposal, waiting for the maintainer's decision, except the case rule, which is decided (see
+[Case rule](#case-rule-decided-by-the-maintainer)). Nothing is implemented; this document is the analysis the issue asks
+for ("Pick one for native programs … and, either way, for the cmdlets").
 
 ## Context
 FR-40 says arguments are passed "after variable and wildcard expansion", which "can be disabled by putting the argument in
@@ -46,8 +47,8 @@ Things the implementation must handle:
   `"my docs"/*.txt` cannot be written. Names *found* by a wildcard are fine (one argument each). The issue's "directory
   name containing a space" can only be tested for found names, not for the pattern. A list is not spread into a native
   program either: `Values.text(list)` gives `[a, b]`.
-- **Case.** `Globs` ignores case everywhere (review C-22). Use the rule of the file system as `rm` does
-  (`FileOps.WILDCARDS_IGNORE_CASE`, which only lives in `powerj-cmdlets`: move it to `powerj-fs`).
+- **Case.** `Globs` ignores case by default today (review C-22). The maintainer decided otherwise: see
+  [Case rule](#case-rule-decided-by-the-maintainer).
 - **Modules.** `powerj-core` does not require `io.powerj.fs`. It needs the `requires`, the Maven dependency and a check
   of `ArchitectureTest` and of the jlink image.
 - **Limits and display.** A very long list can exceed `ARG_MAX` (error `native.startFailed`, generic). `jobs` and `$last`
@@ -75,6 +76,45 @@ Other consequences:
   `extractOnError`). Third-party cmdlets are a contract too (ADR 0003).
 - The cost of the change is lowest now: nothing is released (#47) and the API may still break (`410e41b`).
 
+## Case rule (decided by the maintainer)
+**Wildcards are case-sensitive by default; an environment variable makes them case-insensitive.** The rule is the same for
+native programs and for cmdlets. It is independent of options A to C below: the default of the cmdlets changes whichever is
+chosen.
+
+Where it stands today: `Globs.matcher(pattern)` ignores case, and `ls`, `ls --filter`, `cat`, `grep` (through
+`FileArguments.expand`) and `ps` use that default. `rm`, `cp`, `mv` and `touch` already ignore case only on Windows
+(`FileOps.WILDCARDS_IGNORE_CASE = HostOs.WINDOWS`, review C-22). I found nothing in the specification about the case of file
+wildcards; it says "case ignored" for `ps` (FR-74).
+
+Proposed shape (the name and the values are mine, to confirm):
+- **Variable `POWERJ_GLOB_IGNORE_CASE`**, like `POWERJ_NATIVE_ENCODING` (FR-40b): read from the session environment at each
+  use, so `env --set POWERJ_GLOB_IGNORE_CASE=true` applies from the next command. Cmdlets read it through
+  `CmdletContext.environment()`, so `powerj-api` does not change; the native expansion reads `Session.environment()`.
+  `true` or `1` ignores case, `false` or `0` keeps it, anything else is an explicit error, as for an invalid charset name.
+- **One helper in `powerj-fs`** that turns the variable into the `ignoreCase` flag of `Globs.matcher(pattern, ignoreCase)`.
+  It replaces `FileOps.WILDCARDS_IGNORE_CASE`, and the one-argument `Globs.matcher(pattern)` becomes case-sensitive.
+
+What changes:
+- **For the reading cmdlets, on Linux and macOS.** `ls *.txt`, `cat README*` and `grep x *.md` stop matching `notes.TXT` or
+  `readme.md`. This is a behaviour change. It brings them in line with `rm`, `cp`, `mv`, `touch` and with the native
+  programs. The tests that state the old rule must say the new one: `GlobsTest.theDefaultMatcherIgnoresCase`,
+  `FileWalkerTest.globsIgnoreCase`, and the `*.txt` case of `LsTest` that expects `notes.TXT`.
+- **On Windows, nothing.** The matcher of the platform ignores case and cannot be made sensitive
+  (`GlobsTest` already skips that test there). The variable has no effect, and native programs keep their own rules. Making
+  Windows sensitive would need a matcher of our own (glob to regular expression); not proposed.
+- **On macOS** the default file system ignores case but the rule follows the text of the pattern, as C-22 already chose:
+  `^ls *.TXT` does not list `a.txt` unless the variable is set.
+- **`ps` must keep ignoring case**, since FR-74 says so and process names are not file names. `Ps` has to ask for it
+  (`Globs.matcher(pattern, true)`) so that the new default does not change it. *Question below.*
+- **`rm`, `cp`, `mv`, `touch` with the variable set** ignore case everywhere: `rm README*` then removes `readme.md`, the
+  risk C-22 removed. It is an explicit choice of the user, and `rm -n` shows the list first; the variable's documentation
+  should say it. The other possibility is to apply the variable only to reads and natives.
+- **Tab completion** (`PathCompleter`, `ignoreCase = Platform.isWindows()`) has its own rule and is not touched.
+
+To do with it: the rule in FR-40 and the variable in the table of environment variables of the specification, a line in the
+CHANGELOG (behaviour change), and tests for the sensitive default (skipped on Windows), the variable, an invalid value, and
+`ps` unchanged. About half a day, on its own.
+
 ## Options
 | | Native programs | Cmdlets | Cost* |
 |---|---|---|---|
@@ -93,9 +133,14 @@ Other consequences:
    CHANGELOG line.
 
 ## Decisions for the maintainer
+Decided: wildcards are case-sensitive by default, and an environment variable makes them case-insensitive (above).
+
+Still open:
 - Natives: limit to Linux and macOS, with `./` before names that start with `-`?
 - Cmdlets: B (fix the sentence only) or C (declared path parameters, API change)?
 - Windows natives: confirm "left to the program", after checking the MSVC / MinGW behaviour.
+- Case: the name and values of the variable; `ps` keeps ignoring case (FR-74) or follows the variable; the variable applies
+  to `rm`, `cp`, `mv`, `touch` or only to reads and natives.
 
 ## References
 Issue #51; FR-40, FR-62; review §16.4 and C-22; `docs/acceptance/grep.md`, `ps-kill.md`, `profile.md`.
