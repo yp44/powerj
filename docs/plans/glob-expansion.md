@@ -95,8 +95,9 @@ Proposed shape (the name and the values are mine, to confirm):
   It replaces `FileOps.WILDCARDS_IGNORE_CASE`, and the one-argument `Globs.matcher(pattern)` becomes case-sensitive.
 
 What changes:
-- **For the reading cmdlets, on Linux and macOS.** `ls *.txt`, `cat README*` and `grep x *.md` stop matching `notes.TXT` or
-  `readme.md`. This is a behaviour change. It brings them in line with `rm`, `cp`, `mv`, `touch` and with the native
+- **For the reading cmdlets, on Linux and macOS.** `ls *.txt` stops matching `notes.TXT`, `cat README*` stops matching
+  `readme.md`, and `grep x *.md` stops matching `GUIDE.MD` (it still matches `readme.md`: only the case of the letters the
+  pattern spells out counts). This is a behaviour change. It brings them in line with `rm`, `cp`, `mv`, `touch` and with the native
   programs. The tests that state the old rule must say the new one: `GlobsTest.theDefaultMatcherIgnoresCase`,
   `FileWalkerTest.globsIgnoreCase`, and the `*.txt` case of `LsTest` that expects `notes.TXT`.
 - **On Windows, nothing.** The matcher of the platform ignores case and cannot be made sensitive
