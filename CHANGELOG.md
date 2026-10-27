@@ -274,6 +274,31 @@ structures, functions) can be built on it. The work is organised in phases (revi
 - **English names** for the acceptance sheets: `docs/recettes/etape-N.md` is now `docs/acceptance/step-N.md`; the failure
   messages of the CI and the description of the project are in English too (C-36).
 
+### Added and changed (wildcards, [#51](https://github.com/yp44/powerj/issues/51))
+- **Wildcards in the arguments of a native program** (FR-40, no longer marked partial). On Linux and macOS, a word written
+  without quotes that contains `*`, `?` or `[a-c]` is replaced by the names of the files it matches before the program
+  starts: `^echo *.txt` prints the names. Every element of the path may hold a wildcard (`src/*/pom.xml`), the names are
+  sorted, a word without match is passed as written, a hidden file needs a dot in the pattern, a name that starts with
+  `-` is passed as `./-name`, and a quoted text, a variable, a group or a block is never expanded. On Windows the program
+  expands its own wildcards. The expansion is not contextual, as in a Unix shell; the cmdlets keep expanding their own
+  path arguments, whatever the quoting, and a wildcard that is not a path (`ps java*`, `ls --filter *.java`,
+  `import java.util.*`) stays theirs. The analysis and the options that were not taken are in
+  [docs/plans/glob-expansion.md](docs/plans/glob-expansion.md).
+- **Wildcards keep case by default, in the cmdlets as well as in the native programs** (behaviour change; review C-22).
+  `ls *.txt`, `ls --filter`, `cat` and `grep` used to ignore case and no longer match `NOTES.TXT`; `rm`, `cp`, `mv` and
+  `touch` were already case-sensitive off Windows. The environment variable **`POWERJ_GLOB_IGNORE_CASE`** (`true` or `1`)
+  makes every wildcard ignore case, read at each use, so `env --set POWERJ_GLOB_IGNORE_CASE=true` applies at once; any
+  other value is an error where a wildcard is expanded. `ps` always ignores case (FR-74). On Windows the matcher of the
+  platform ignores case and the variable has no effect.
+- `powerj-fs`: `GlobExpander` (the expansion), `Globs.hasWildcard` (a shell also sees `[a-c]`, which `Globs.isPattern`
+  does not), `Globs.ignoreCase` and `Globs.IGNORE_CASE_VARIABLE`; **`Globs.matcher(pattern)` now keeps case**, ask for
+  `Globs.matcher(pattern, true)` to ignore it. `powerj-core` now requires `io.powerj.fs`.
+- Tests: the expansion (match, no match, quoted word, variable, hidden files, case on Linux, a name with a space, a name
+  that starts with `-`, a folder in the pattern, the current folder of the session), the variable and its wrong values in
+  the native commands and in `ls`, `grep` and `rm`; `ps` unchanged. A smoke test of the packaged launcher
+  (`ci/smoke/wildcards.sh`, in the CI and release workflows) checks that the module is in the image. Acceptance sheet:
+  [docs/acceptance/wildcards.md](docs/acceptance/wildcards.md).
+
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
   whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes
@@ -306,7 +331,6 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   and has never run; nothing is signed. Tagging, and the way to sign, are the maintainer's decisions.
 - **Code scanning** ([#50](https://github.com/yp44/powerj/issues/50)). A CodeQL workflow was added in Phase 0 and taken out
   again on the maintainer's request, to be looked at later (it is in the history, commit `cf487bb`).
-- **Wildcards in the arguments of a native program** ([#51](https://github.com/yp44/powerj/issues/51); FR-40, marked partial).
 - **Private vulnerability reporting** ([#49](https://github.com/yp44/powerj/issues/49)) has to be switched on in the
   settings of the repository (`SECURITY.md` relies on it).
 - **Phase 6**: control structures and functions ([#52](https://github.com/yp44/powerj/issues/52)), on the foundations of

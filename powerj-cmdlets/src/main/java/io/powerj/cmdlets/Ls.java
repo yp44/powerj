@@ -54,7 +54,8 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
             throw new UsageException(Messages.get("ls.dirs.files.incompatible"));
         }
         FileOps.parallelism(params.parallel()); // refuses a count below 1 before anything is listed
-        Optional<PathMatcher> filter = Optional.ofNullable(params.filter()).map(Globs::matcher);
+        Optional<PathMatcher> filter = Optional.ofNullable(params.filter())
+                .map(pattern -> Globs.matcher(pattern, FileArguments.ignoreCase(context)));
         List<String> paths = params.paths().isEmpty() ? List.of(".") : params.paths();
         for (String path : paths) {
             list(path, params, filter, context);
@@ -85,7 +86,7 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
                               CmdletContext<FileEntry> context) {
         int separator = Math.max(argument.lastIndexOf('/'), argument.lastIndexOf('\\'));
         String dir = separator < 0 ? "." : argument.substring(0, separator + 1);
-        PathMatcher pattern = Globs.matcher(argument.substring(separator + 1));
+        PathMatcher pattern = Globs.matcher(argument.substring(separator + 1), FileArguments.ignoreCase(context));
         Path base = context.currentDirectory().resolve(dir).normalize();
         List<FileEntry> matches = new ArrayList<>();
         walker(params, 1, 1).walk(base,

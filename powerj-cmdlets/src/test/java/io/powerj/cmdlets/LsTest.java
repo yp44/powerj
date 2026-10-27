@@ -2,6 +2,7 @@ package io.powerj.cmdlets;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -10,6 +11,8 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+
+import io.powerj.api.UsageException;
 
 class LsTest {
 
@@ -68,9 +71,44 @@ class LsTest {
     }
 
     @Test
-    void recursiveWithCaseInsensitiveFilter() {
+    void theFilterKeepsCaseByDefault() {
+        assumeFalse(System.getProperty("os.name").startsWith("Windows"), "the matcher of Windows ignores case");
+        assertThat(names(params(List.of(), false, true, "*.txt", false, false))).containsExactly("b.txt");
+        context.emitted.clear();
+        assertThat(names(params(List.of(), false, true, "*.TXT", false, false))).containsExactly("notes.TXT");
+    }
+
+    @Test
+    void wildcardsOfAPathKeepCaseByDefault() {
+        assumeFalse(System.getProperty("os.name").startsWith("Windows"), "the matcher of Windows ignores case");
+        assertThat(names(params(List.of("src/*.txt"), false, false, null, false, false))).isEmpty();
+        assertThat(names(params(List.of("src/*.TXT"), false, false, null, false, false))).containsExactly("notes.TXT");
+    }
+
+    @Test
+    void theVariableMakesTheFilterAndTheWildcardsIgnoreCase() {
+        context.setEnvironment("POWERJ_GLOB_IGNORE_CASE", "true");
+
         assertThat(names(params(List.of(), false, true, "*.txt", false, false))).containsExactly("notes.TXT", "b.txt");
         context.emitted.clear();
+        assertThat(names(params(List.of("src/*.txt"), false, false, null, false, false))).containsExactly("notes.TXT");
+    }
+
+    @Test
+    void aWrongValueOfTheVariableIsAUsageError() {
+        context.setEnvironment("POWERJ_GLOB_IGNORE_CASE", "maybe");
+
+        assertThatThrownBy(() -> names(params(List.of("*.txt"), false, false, null, false, false)))
+                .isInstanceOf(UsageException.class).hasMessageContaining("maybe");
+        assertThat(names(params(List.of("b.txt"), false, false, null, false, false))).containsExactly("b.txt");
+    }
+
+    @Test
+    void recursiveWithCaseInsensitiveFilter() {
+        context.setEnvironment("POWERJ_GLOB_IGNORE_CASE", "true");
+        assertThat(names(params(List.of(), false, true, "*.txt", false, false))).containsExactly("notes.TXT", "b.txt");
+        context.emitted.clear();
+        context.setEnvironment("POWERJ_GLOB_IGNORE_CASE", "false");
         assertThat(names(params(List.of(), false, true, null, false, false)))
                 .containsExactly("src", "main", "Main.java", "notes.TXT", "A.java", "b.txt");
     }

@@ -2,6 +2,7 @@ package io.powerj.cmdlets;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -202,10 +203,23 @@ class GrepTest {
 
     @Test
     void wildcards() throws Exception {
-        assertThat(found(params("(?i)todo", "src/*.JAVA"))).containsExactly("src/B.java:2");
+        assertThat(found(params("(?i)todo", "src/*.java"))).containsExactly("src/B.java:2");
         context.emitted.clear();
         assertThat(found(params("x", "*.none"))).isEmpty();
         assertThat(context.errors).containsExactly("no file matches *.none");
+    }
+
+    @Test
+    void wildcardsKeepCaseUnlessTheVariableSaysOtherwise() throws Exception {
+        assumeFalse(System.getProperty("os.name").startsWith("Windows"), "the matcher of Windows ignores case");
+        assertThat(found(params("(?i)todo", "src/*.JAVA"))).isEmpty();
+        assertThat(context.errors).containsExactly("no file matches src/*.JAVA");
+        context.errors.clear();
+
+        context.setEnvironment("POWERJ_GLOB_IGNORE_CASE", "true");
+
+        assertThat(found(params("(?i)todo", "src/*.JAVA"))).containsExactly("src/B.java:2");
+        assertThat(context.errors).isEmpty();
     }
 
     @Test

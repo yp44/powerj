@@ -1,8 +1,10 @@
 # Analysis — expanding wildcards before the arguments reach a command (issue #51, FR-40)
 
-**Status:** proposal, waiting for the maintainer's decision, except the case rule, which is decided (see
-[Case rule](#case-rule-decided-by-the-maintainer)). Nothing is implemented; this document is the analysis the issue asks
-for ("Pick one for native programs … and, either way, for the cmdlets").
+**Status:** option B (native programs) and the case rule are **implemented** (FR-40, `docs/acceptance/wildcards.md`);
+option C (cmdlets that expand only their declared path parameters, with the quoting respected) is a later decision. What
+was implemented, and the defaults taken where the questions below were still open, is in
+[Implemented](#implemented). The rest of this document is the analysis the issue asks for ("Pick one for native programs …
+and, either way, for the cmdlets"), kept as the record of the choice.
 
 ## Context
 FR-40 says arguments are passed "after variable and wildcard expansion", which "can be disabled by putting the argument in
@@ -76,6 +78,21 @@ Other consequences:
   `extractOnError`). Third-party cmdlets are a contract too (ADR 0003).
 - The cost of the change is lowest now: nothing is released (#47) and the API may still break (`410e41b`).
 
+## Contextual expansion
+A wildcard is expanded against the **file names of the current folder**, and nothing else. That is right for a path and
+wrong for anything else a wildcard can mean in PowerJ: a process name (`ps *`), a filter (`ls --filter *.java`), a Java
+package (`import java.util.*`). So the expansion has to depend on what the argument is:
+- **Native programs: not contextual, as in every Unix shell.** The shell cannot know what a program does with an argument.
+  Every unquoted word is expanded, a word without a match stays as written, and double quotes protect.
+  Words that start with `-` are expanded like the others: skipping them would change nothing, since `--include=*.c` matches
+  no file and stays as written, and a name that starts with `-` is made safe by the `./` prefix.
+- **Cmdlets: contextual, per parameter (option C).** The cmdlet declares which of its parameters are paths; only those are
+  expanded before the call, with the quoting respected. `ps *` then means "every process", and `ls --filter *.java` keeps
+  its value. This is what "resolve the wildcard before the cmdlet" can mean without breaking the table above, and it is
+  the argument against option A.
+
+So the plan is B now (natives, and the case rule), then C as its own change with an ADR.
+
 ## Case rule (decided by the maintainer)
 **Wildcards are case-sensitive by default; an environment variable makes them case-insensitive.** The rule is the same for
 native programs and for cmdlets. It is independent of options A to C below: the default of the cmdlets changes whichever is
@@ -133,15 +150,30 @@ CHANGELOG (behaviour change), and tests for the sensitive default (skipped on Wi
    Linux, a found name containing a space, a name starting with `-`; a row in the acceptance sheet; FR-40 updated; a
    CHANGELOG line.
 
+## Implemented
+- **Native programs (B).** `NativeArguments` (`powerj-core`) expands the unquoted words of a native command in
+  `PipelineExecutor.prepare`, after the preview guard, with `GlobExpander` (`powerj-fs`): every element of the path, `[a-c]`,
+  names sorted, hidden files only with a dot, `./` before a name that starts with `-`, a word without match passed as
+  written. Linux and macOS only.
+- **Case rule.** `Globs.matcher(pattern)` keeps case; the variable `POWERJ_GLOB_IGNORE_CASE` (`true`/`1`, `false`/`0`) is read
+  from the session environment by the natives (`Session`) and by the cmdlets (`CmdletContext.environment()`), and only where
+  a wildcard is expanded. `FileOps.WILDCARDS_IGNORE_CASE` is gone.
+- **Defaults taken** for what was still a question: the variable is called `POWERJ_GLOB_IGNORE_CASE`; `ps` keeps ignoring case
+  (FR-74); the variable applies to `rm`, `cp`, `mv` and `touch` too (`rm -n` shows the list first). Each is one line to
+  change.
+- **Words that start with `-`** are expanded like the others: skipping them would change nothing (see
+  [Contextual expansion](#contextual-expansion)).
+- **Not done:** wildcards in the cmdlets are as before (the last element of the path; `[a-c]` is not a wildcard for
+  them), and the quoting still does not reach them.
+
 ## Decisions for the maintainer
 Decided: wildcards are case-sensitive by default, and an environment variable makes them case-insensitive (above).
 
 Still open:
-- Natives: limit to Linux and macOS, with `./` before names that start with `-`?
-- Cmdlets: B (fix the sentence only) or C (declared path parameters, API change)?
+- Cmdlets: keep B's rule (a cmdlet expands its path arguments, whatever the quoting) or do C (declared path parameters,
+  API change, an ADR)?
 - Windows natives: confirm "left to the program", after checking the MSVC / MinGW behaviour.
-- Case: the name and values of the variable; `ps` keeps ignoring case (FR-74) or follows the variable; the variable applies
-  to `rm`, `cp`, `mv`, `touch` or only to reads and natives.
+- Case: the three defaults above, if another choice is wanted.
 
 ## References
 Issue #51; FR-40, FR-62; review §16.4 and C-22; `docs/acceptance/grep.md`, `ps-kill.md`, `profile.md`.

@@ -17,6 +17,7 @@ import java.util.regex.PatternSyntaxException;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.UsageException;
 import io.powerj.fs.FileTrees;
+import io.powerj.fs.Globs;
 import io.powerj.fs.WalkError;
 
 /** What the file operations share (specification FR-72): paths, error messages, copy and removal of trees. */
@@ -64,15 +65,12 @@ final class FileOps {
     }
 
     /**
-     * Wildcards of the commands that change files ignore case where file names do (Windows) and only there:
-     * {@code rm README*} must not remove {@code readme.md} on Linux or macOS, as in a shell there (review C-22).
-     * {@code ls readme* | rm} is the way to ask for the other rule, with the list in plain sight.
+     * Paths of an argument: the path itself, or the matches of a wildcard on its last element. Wildcards keep case unless
+     * the session says otherwise ({@link FileArguments#ignoreCase}): {@code rm README*} does not remove {@code readme.md}
+     * (review C-22) until the variable asks for it, and {@code rm -n} shows the list first.
      */
-    static final boolean WILDCARDS_IGNORE_CASE = HostOs.WINDOWS;
-
-    /** Paths of an argument: the path itself, or the matches of a wildcard on its last element. */
     static List<Path> expand(String argument, CmdletContext<?> context) {
-        return expand(argument, WILDCARDS_IGNORE_CASE, context);
+        return expand(argument, Globs.isPattern(argument) && FileArguments.ignoreCase(context), context);
     }
 
     /** Paths of an argument, with the given case rule for the wildcard. */

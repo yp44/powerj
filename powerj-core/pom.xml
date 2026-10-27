@@ -25,6 +25,10 @@
             <artifactId>powerj-api</artifactId>
         </dependency>
         <dependency>
+            <groupId>io.powerj</groupId>
+            <artifactId>powerj-fs</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>

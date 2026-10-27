@@ -19,11 +19,12 @@ class GlobsTest {
     }
 
     @Test
-    void theDefaultMatcherIgnoresCase() {
+    void theDefaultMatcherKeepsCase() {
+        assumeFalse(System.getProperty("os.name", "").startsWith("Windows"), "the matcher of Windows ignores case");
         var matcher = Globs.matcher("*.TXT");
 
-        assertThat(matcher.matches(Path.of("a.txt"))).isTrue();
-        assertThat(matcher.matches(Path.of("A.Txt"))).isTrue();
+        assertThat(matcher.matches(Path.of("a.TXT"))).isTrue();
+        assertThat(matcher.matches(Path.of("a.txt"))).isFalse();
         assertThat(matcher.matches(Path.of("a.md"))).isFalse();
     }
 
@@ -45,5 +46,44 @@ class GlobsTest {
     void anInvalidGlobIsAPatternSyntaxException() {
         assertThatThrownBy(() -> Globs.matcher("a[*", false)).isInstanceOf(PatternSyntaxException.class);
         assertThatThrownBy(() -> Globs.matcher("a[*")).isInstanceOf(PatternSyntaxException.class);
+    }
+
+    @Test
+    void aBracketExpressionIsAWildcardOfAShellButNotOfACmdlet() {
+        assertThat(Globs.hasWildcard("[ab].txt")).isTrue();
+        assertThat(Globs.hasWildcard("a[0-9]")).isTrue();
+        assertThat(Globs.hasWildcard("a*")).isTrue();
+        assertThat(Globs.hasWildcard("a?")).isTrue();
+        assertThat(Globs.isPattern("[ab].txt")).isFalse();
+    }
+
+    @Test
+    void aBracketWithoutItsClosingBracketIsNotAWildcard() {
+        assertThat(Globs.hasWildcard("[ab.txt")).isFalse();
+        assertThat(Globs.hasWildcard("a[]")).isFalse();
+        assertThat(Globs.hasWildcard("plain.txt")).isFalse();
+    }
+
+    @Test
+    void theVariableThatIgnoresCaseIsTrueOr1() {
+        assertThat(Globs.IGNORE_CASE_VARIABLE).isEqualTo("POWERJ_GLOB_IGNORE_CASE");
+        assertThat(Globs.ignoreCase("true")).isTrue();
+        assertThat(Globs.ignoreCase("TRUE")).isTrue();
+        assertThat(Globs.ignoreCase(" 1 ")).isTrue();
+        assertThat(Globs.ignoreCase("false")).isFalse();
+        assertThat(Globs.ignoreCase("0")).isFalse();
+    }
+
+    @Test
+    void withoutTheVariableCaseIsKept() {
+        assertThat(Globs.ignoreCase(null)).isFalse();
+        assertThat(Globs.ignoreCase("")).isFalse();
+        assertThat(Globs.ignoreCase("  ")).isFalse();
+    }
+
+    @Test
+    void anotherValueOfTheVariableIsRefused() {
+        assertThatThrownBy(() -> Globs.ignoreCase("yes")).isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("yes");
     }
 }

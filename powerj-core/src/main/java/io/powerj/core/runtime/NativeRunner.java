@@ -31,9 +31,9 @@ import io.powerj.core.nativeexec.Platform;
 
 /**
  * Runs a native command (specification §3.10). Streams remain streams: stdout and stderr are
- * never wrapped in an object. The arguments are passed as they are once variables and {@code ~} are expanded; the
- * quoting of the command line is left to {@link ProcessBuilder}, and wildcards are <em>not</em> expanded, which makes
- * FR-40 partial (see its status in the specification).
+ * never wrapped in an object. The arguments are passed as they are once variables, {@code ~} and, on Linux and macOS,
+ * the wildcards of the unquoted words are expanded ({@link NativeArguments}, FR-40); the quoting of the command line is
+ * left to {@link ProcessBuilder}.
  * <ul>
  *   <li>display on a real terminal: inherited stdin/stdout/stderr (colors, {@code vim}, {@code ssh});</li>
  *   <li>capture ({@code $x = cmd}): stdout read as {@code String} lines, stderr to the error stream;</li>

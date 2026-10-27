@@ -802,7 +802,7 @@ mv <source>... <destination> [-f|--force] [-v|--verbose] [-n|--dry-run] [--allow
 rm <path>... [-r|--recurse] [-f|--force] [-v|--verbose] [-n|--dry-run] [--allow-protected]
 ```
 
-The paths are arguments (wildcards on the last element: `rm *.tmp`; names are matched **in the case they are written** except on Windows, where file names ignore case: `rm README*` does not remove `readme.md` on Linux or macOS, and `ls readme* | rm` gives the other rule, with the list in plain sight) or the objects received from the pipeline, read as by `cat` (`String`, `Path`, `File`, `FileEntry`, or `--property <name>`): `ls --filter *.tmp | rm`. For `cp` and `mv`, the last argument is the destination; with several sources, or an existing folder as destination, each source goes into it under its own name (`ls *.txt | cp backup/`).
+The paths are arguments (wildcards on the last element: `rm *.tmp`; names are matched **in the case they are written**, like every wildcard (FR-40), except on Windows, where file names ignore case: `rm README*` does not remove `readme.md` on Linux or macOS; `POWERJ_GLOB_IGNORE_CASE=true` gives the other rule, and `rm -n` shows the list first) or the objects received from the pipeline, read as by `cat` (`String`, `Path`, `File`, `FileEntry`, or `--property <name>`): `ls --filter *.tmp | rm`. For `cp` and `mv`, the last argument is the destination; with several sources, or an existing folder as destination, each source goes into it under its own name (`ls *.txt | cp backup/`).
 
 A **block** `{ … }` instead of a path is evaluated for each object: for `mkdir`, `touch` and `rm`, its result (`String`, `Path`, `File`, `FileEntry`) is the path to create or remove, instead of the object itself (`ls ../src --files | touch { $_.name }` creates the same names in the current folder, without touching the files of `../src`); for `cp` and `mv`, a block as destination gives the destination of each source, its `$_` being the object received or the `FileEntry` of a source argument (`cp *.txt { $_.name + ".bak" }`; a folder result receives the source under its name). A `null` result skips the object without error (`ls | rm { $_.ext == "tmp" ? $_.name : null }`). One block at most, never with `--property`; for `mkdir`, `touch` and `rm` it needs a pipeline input.
 
@@ -1117,8 +1117,17 @@ accessible via `$last`; `$exit` is `$last.exitCode`; `$?` is `true` if the code 
 A program-specific value can be given by **`POWERJ_NATIVE_ENCODING_<NAME>`**, where `<NAME>` is the executable name in uppercase, without extension: `POWERJ_NATIVE_ENCODING_GIT=UTF-8` (git produces UTF-8 whereas `ipconfig` uses the console code page). The variable is set in the Windows environment or in the session with `env --set` (FR-36b), and applies from the next command onward. An invalid charset name produces an explicit error when the command is launched. The native → native stream is never decoded (FR-37).
 - CA: on a French Windows, `ipconfig | where { $_.contains("Adresse") }` displays accented characters correctly without any configuration; `env --set POWERJ_NATIVE_ENCODING_GIT=UTF-8` then `git log --oneline | where { $_.contains("é") }`.
 
-**FR-40 — Arguments.** Arguments are passed as is after variable and wildcard expansion (wildcard expansion on existing paths, which can be disabled by putting the argument in quotes). On Windows, the command line is built according to the quoting rules of `CommandLineToArgvW`.
-- **Status: partial** ([issue #51](https://github.com/yp44/powerj/issues/51)). Variables and `~` (FR-62) are expanded; **wildcards are not**: `^ls *.txt` passes `*.txt` to the program as written, so on Linux and macOS, where programs expect the shell to expand, the cmdlets (`ls --filter`, `cat *.txt`) or `sh -c` are the way. The quoting of the Windows command line is `ProcessBuilder`'s.
+**FR-40 — Arguments.** Arguments are passed as is after variable, `~` (FR-62) and wildcard expansion. On Windows, the command line is built according to the quoting rules of `CommandLineToArgvW` (the quoting of the command line is `ProcessBuilder`'s).
+- **Wildcards of a native program (Linux and macOS).** An argument written **without quotes** that contains `*`, `?` or a bracket expression `[a-c]` is replaced by the names of the files it matches, before the program starts, as a Unix shell does: `^echo *.txt` passes `a.txt b.txt`.
+  - Every element of the path may hold a wildcard (`src/*/pom.xml`); the names are written with the prefix of the word (`./`, `../`, an absolute path) and sorted by name, case ignored then as written. A trailing `/` keeps the folders only.
+  - A word that matches nothing, or is not a valid pattern, is passed as written (no `nullglob`): `^echo *.zip` prints `*.zip`.
+  - A name that starts with a dot is only matched by a pattern that starts with a dot. A name that starts with `-` is passed as `./-name`, so that the program does not take it for an option.
+  - A text in double quotes, the value of a variable, a group or a block is never expanded: `^echo "*.txt"` prints `*.txt`. Single quotes are not quotes in PowerJ (`'*.txt'` is a Java character): they stay in the argument.
+  - The expansion is not contextual: the shell cannot know what a program does with an argument, as in every Unix shell (`^find . -name *.txt` needs the quotes). A word that starts with `-` is expanded like the others, and `--include=*.c` stays as it is because it matches no file.
+  - **On Windows the program expands its own wildcards** (`cmd /c dir *.txt`, `findstr`): the words go through unchanged.
+- **Wildcards of the cmdlets.** A cmdlet expands the wildcards of its own path arguments (`ls *.txt`, `cat *.txt`, `grep x *.md`, `rm *.tmp`), **whatever the quoting**: `cat "*.txt"` expands too, because the cmdlet receives the text and not how it was written. A wildcard that is not a path stays the cmdlet's own (`ps java*` matches process names, `ls --filter *.java` is a filter, `import java.util.*` a package).
+- **Case.** Wildcards are **case-sensitive**, for the cmdlets and for the native programs: `*.txt` does not match `NOTES.TXT`. The environment variable `POWERJ_GLOB_IGNORE_CASE` set to `true` or `1` makes them case-insensitive (`false` or `0`, or nothing, keeps the case); another value is an error, reported where a wildcard is expanded. It is read from the session environment at each use: `env --set POWERJ_GLOB_IGNORE_CASE=true` applies from the next command. `ps` always ignores case (FR-74). On Windows the matcher of the platform ignores case and the variable has no effect.
+- CA: in a folder with `a.txt`, `b.txt`, `c.log` and `Notes.TXT`: `^echo *.txt` prints `a.txt b.txt`; `^echo "*.txt"` prints `*.txt`; `^echo *.zip` prints `*.zip`; `^echo *.TXT` prints `Notes.TXT`; `env --set POWERJ_GLOB_IGNORE_CASE=true` then `^echo *.txt` prints `a.txt b.txt Notes.TXT`. See `docs/acceptance/wildcards.md`.
 
 ### 3.11 Errors
 
@@ -1638,6 +1647,7 @@ Environment variables read by PowerJ:
 | `POWERJ_HOME` | Location of the configuration folder (default `~/.powerj`). |
 | `POWERJ_NATIVE_ENCODING` | Encoding of native commands (FR-40b). |
 | `POWERJ_NATIVE_ENCODING_<NAME>` | Encoding for a specific executable (FR-40b). |
+| `POWERJ_GLOB_IGNORE_CASE` | `true` or `1`: wildcards ignore case, in the cmdlets and in the arguments of native programs; case counts by default (FR-40). |
 | `POWERJ_LANG` | Language of the messages, `en` or `fr` (FR-61); takes precedence over the `language` key of `config.properties`, and is overridden by the system property `-Dpowerj.language`. |
 
 ---
@@ -1841,6 +1851,7 @@ The backlog cmdlets (§12.3) are added **one per mini-iteration**, each with a s
 | 25 | Perf mode (Alt+P), `perf` | FR-76 | `docs/acceptance/perf.md` |
 | 26 | Optional JavaFX module `powerj-fx`, `grid` (table, sort, filter, progressive loading, `--pass-thru`) | FR-77 | `docs/acceptance/fx-grid.md` |
 | 27 | `join` (inner and left outer join by key) | FR-78 | `docs/acceptance/join.md` |
+| 28 | Wildcards in the arguments of a native program, case rule of wildcards | FR-40 | `docs/acceptance/wildcards.md` |
 
 Version 2 will introduce scripting (`if`, `foreach`, functions, `.pj` files).
 

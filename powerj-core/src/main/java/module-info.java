@@ -7,6 +7,7 @@
 @SuppressWarnings("module") // the shell is not on the module path when the core is compiled alone
 module io.powerj.core {
     requires transitive io.powerj.api;
+    requires io.powerj.fs;
     requires java.logging;
     requires java.management;
     requires static jdk.jfr;
