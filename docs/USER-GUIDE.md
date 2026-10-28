@@ -1,5 +1,7 @@
 # PowerJ user guide — entering commands
 
+*Version française : [USER-GUIDE_fr.md](USER-GUIDE_fr.md).*
+
 This guide explains what you can type at the PowerJ prompt and how the shell reads it: how a command is called, how
 objects travel through `|`, what a complex line may contain, what `{ … }` and `( … )` mean, which variables the shell
 defines for you (`$_`, `$?`, `$exit`…) and which environment variables it reads.
