@@ -131,9 +131,52 @@ public final class Lexer {
                 return assignment;
             }
         }
+        Token token;
         if (head ? expressionAt(input, pos, context) : argumentExpressionAt()) {
             var scanned = ExpressionParser.scan(input, pos,
                     head ? ExpressionParser.Mode.STATEMENT : ExpressionParser.Mode.ARGUMENT, context);
+            pos = scanned.end();
+            token = new Token.Expr(scanned.value());
+        } else {
+            token = word();
+        }
+        return head ? token : glue(token);
+    }
+
+    /**
+     * The pieces written without a blank after {@code first} are one word (FR-32c): {@code "my docs"/*},
+     * {@code $dir/*.txt}, {@code --message="a b"}, {@code x"y"z}. Only plain text, a quoted text and a variable
+     * start or go on a compound word; a group, a block or a Java call ends the word, as before.
+     */
+    private Token glue(Token first) {
+        if (!isPiece(first) || !continues()) {
+            return first;
+        }
+        List<Token> pieces = new ArrayList<>();
+        pieces.add(first);
+        while (continues()) {
+            pieces.add(piece(pieces.getLast()));
+        }
+        return new Token.Compound(pieces);
+    }
+
+    private static boolean isPiece(Token token) {
+        return token instanceof Token.Word || token instanceof Token.Expr(var expression)
+                && (expression instanceof Ast.StringExpression || expression instanceof Ast.VariableExpression);
+    }
+
+    /** The word goes on at the current position: not at a blank, a separator, an operator or a bracket. */
+    private boolean continues() {
+        return !atEnd() && (peek() == '"' || !isWordEnd(input, pos));
+    }
+
+    /**
+     * The piece at the current position: a quoted text, a variable (only right after a quoted text or a variable:
+     * in the middle of plain text, {@code $} is a plain character as before, {@code grep foo$}), or plain text.
+     */
+    private Token piece(Token previous) {
+        if (peek() == '"' || (!(previous instanceof Token.Word) && peek() == '$' && isVariableStart(pos + 1))) {
+            var scanned = ExpressionParser.scan(input, pos, ExpressionParser.Mode.ARGUMENT, context);
             pos = scanned.end();
             return new Token.Expr(scanned.value());
         }

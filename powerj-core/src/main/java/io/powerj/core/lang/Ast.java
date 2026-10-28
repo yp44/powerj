@@ -85,6 +85,25 @@ public final class Ast {
     /** Computed argument: quoted string or variable. */
     public record ExpressionArgument(Expression expression) implements Argument { }
 
+    /**
+     * Argument made of pieces written without a blank between them: {@code "my docs"/*}, {@code $dir/*.txt},
+     * {@code --message="a b"} (FR-32c). Its text is the concatenation of the text of its pieces.
+     */
+    public record CompoundArgument(List<Piece> pieces) implements Argument {
+        public CompoundArgument {
+            pieces = List.copyOf(pieces);
+        }
+    }
+
+    /** One piece of a {@link CompoundArgument}. */
+    public sealed interface Piece { }
+
+    /** Unquoted text, taken as is: its wildcards are wildcards, and a leading {@code ~} is the home folder. */
+    public record TextPiece(String text) implements Piece { }
+
+    /** Quoted text, variable or other expression: its text is literal, never a wildcard. */
+    public record ExpressionPiece(Expression expression) implements Piece { }
+
     /** Expression: value of an argument, of a statement or of a block {@code { … }}. */
     public sealed interface Expression { }
 

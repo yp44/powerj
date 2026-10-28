@@ -6,7 +6,6 @@ import java.util.List;
 import io.powerj.core.error.PjException;
 import io.powerj.core.format.Values;
 import io.powerj.core.i18n.Messages;
-import io.powerj.core.lang.Ast;
 import io.powerj.core.nativeexec.Platform;
 import io.powerj.fs.GlobExpander;
 import io.powerj.fs.Globs;
@@ -26,20 +25,20 @@ final class NativeArguments {
     }
 
     /**
-     * @param written the arguments as the line wrote them
-     * @param values  their values, one for one ({@code ~} expanded in the words)
+     * @param words the arguments, evaluated: their value, and the wildcard pattern of an unquoted word or of the
+     *              unquoted pieces of a compound word
      * @return the arguments to give to the program
      */
-    static List<String> of(List<Ast.Argument> written, List<Object> values, Session session) {
-        List<String> arguments = new ArrayList<>(values.size());
+    static List<String> of(List<Evaluator.Word> words, Session session) {
+        List<String> arguments = new ArrayList<>(words.size());
         Boolean ignoreCase = null; // read at the first wildcard: a wrong value is no error for a line without one
-        for (int i = 0; i < values.size(); i++) {
-            String text = Values.text(values.get(i));
-            if (!Platform.isWindows() && written.get(i) instanceof Ast.WordArgument && Globs.hasWildcard(text)) {
+        for (Evaluator.Word word : words) {
+            String text = Values.text(word.value());
+            if (!Platform.isWindows() && word.pattern() != null && Globs.hasWildcard(word.pattern())) {
                 if (ignoreCase == null) {
                     ignoreCase = ignoreCase(session);
                 }
-                arguments.addAll(GlobExpander.expand(text, session.currentDirectory(), ignoreCase));
+                arguments.addAll(GlobExpander.expand(word.pattern(), text, session.currentDirectory(), ignoreCase));
             } else {
                 arguments.add(text);
             }

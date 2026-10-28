@@ -163,6 +163,9 @@ CHANGELOG (behaviour change), and tests for the sensitive default (skipped on Wi
   change.
 - **Words that start with `-`** are expanded like the others: skipping them would change nothing (see
   [Contextual expansion](#contextual-expansion)).
+- **Compound words** (issue #73, FR-32c) were done afterwards: pieces written without a blank are one word, and only the
+  unquoted pieces are wildcards, so `"my docs"/*` works and no longer reaches the root folder. The limit "a wildcard in a
+  directory name that contains a space cannot be written" of the analysis is gone.
 - **Not done:** wildcards in the cmdlets are as before (the last element of the path; `[a-c]` is not a wildcard for
   them), and the quoting still does not reach them.
 

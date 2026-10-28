@@ -129,7 +129,7 @@ The current directory belongs to the shell: it is the base for relative paths of
 
 **FR-62 — Tilde `~`.** `~` designates the home directory given by the **`HOME`** variable of the session environment; if `HOME` is not set (usual on Windows), `USERPROFILE`, then the user directory of the JVM (`user.home`). `HOME` is read at each use: `env --set HOME=D:\moi` applies at once.
 - Expanded like in bash, in every **unquoted word** argument of any command (cmdlet, built-in command, native program) and in redirection targets: `~` alone, `~/…` and `~\…` (`ls ~/docs`, `notepad ~\notes.txt`, `"x" > ~/out.txt`, `mod-load ~/greet.jar`).
-- Not expanded: inside quotes (`"~"`), in the middle of a word (`a~b`), `~user`, in Java expressions.
+- Not expanded: inside quotes (`"~"`), in the middle of a word (`a~b`), `~user`, in Java expressions. In a compound word (FR-32c) it is expanded at the start of the first piece if that is unquoted and followed by a slash (`~/"x"`); `~"x"` stays as it is.
 - Path completion (Tab) follows the same directory: `ls ~/Do<Tab>`.
 - CA: with `HOME=/home/yves`, `echo ~/x "~"` prints `/home/yves/x ~`; after `env --set HOME=/tmp`, `cd ~` goes to `/tmp`; on Windows without `HOME`, `cd ~` goes to `%USERPROFILE%`.
 
@@ -343,6 +343,14 @@ Sizes and durations in readable format (`14.2 KB`, `2 h 05 min`; the decimal sep
 - integers, decimals, `true`/`false`/`null`, sizes and durations (FR-19), `now`, lists `[1, 2, 3]`.
 
 **FR-32b — Unquoted command arguments.** A command argument written **without quotes** (`cd C:\Users`, `ls D:\photos`, `git log -n 5`) is taken **as is**: the backslash is not an escape character there, which makes it possible to type Windows paths naturally. Java escapes only apply **inside quotes**. An argument containing spaces is put between quotes, doubling the backslashes: `cd "C:\\Program Files"`.
+
+**FR-32c — Compound words.** Pieces written **without a blank between them** form **one** argument, as in a Unix shell. A piece is plain text, a text in double quotes (with its escapes and interpolations) or a variable: `"my docs"/*`, `$dir/*.txt`, `--message="a b"`, `x"y"z`, `"a""b"`, `"$home"/docs`.
+- The argument is the **text** of its pieces one after the other. A word of **one** piece is as before: a lone variable keeps its value and its type (a cmdlet can receive a `FileEntry`), a lone text stays a `String`.
+- A variable is a piece at the start of the word, or right after a quoted text or another variable (`$a$b`, `"a"$b`). In the middle of plain text `$` is a plain character, as before (`grep foo$`, `echo a$b`). `$d.txt` and `"x".txt` are still the property `txt` of the value (FR-28): write `"$d.txt"`.
+- A blank, `;`, `|`, `>`, `&&`, `&` (background, FR-75), a group `( )`, a block `{ }` and a Java call end the word, as before. The name of a command is never glued, and a line that **starts** with a text is still an expression (`"hello" > file.txt`, `"a" + "b"`).
+- Only the characters of the **plain-text** pieces are wildcards (FR-40): what a quoted text or a variable holds is literal. `~` is the home folder (FR-62) at the start of the first piece if it is unquoted and followed by a slash (`~/"x"`).
+- The target of a redirection is such a word too: `"x" > "my docs"/out.txt`.
+- CA: in a folder `my docs` holding `a.txt` and `b.txt`: `^printf "[%s]" "my docs"/*` prints `[my docs/a.txt][my docs/b.txt]`; `^printf "[%s]" --message="a b"` prints `[--message=a b]`; `^echo x"y"z` prints `xyz`; `^echo "nowhere"/*` prints `nowhere/*` and never lists `/`.
 
 **FR-33 — Operators in `{ }`: Java syntax.** Blocks use Java operators; for everything else (patterns, regular expressions, membership…), you call **the Java methods** of the objects (§3.13). There is no shell-specific operator such as `like` or `-match`.
 
@@ -1123,9 +1131,10 @@ A program-specific value can be given by **`POWERJ_NATIVE_ENCODING_<NAME>`**, wh
   - A word that matches nothing, or is not a valid pattern, is passed as written (no `nullglob`): `^echo *.zip` prints `*.zip`.
   - A name that starts with a dot is only matched by a pattern that starts with a dot. A name that starts with `-` is passed as `./-name`, so that the program does not take it for an option.
   - A text in double quotes, the value of a variable, a group or a block is never expanded: `^echo "*.txt"` prints `*.txt`. Single quotes are not quotes in PowerJ (`'*.txt'` is a Java character): they stay in the argument.
+  - In a **compound word** (FR-32c) only the unquoted pieces are wildcards: `^echo "my docs"/*` expands inside `my docs`, `"a*b"*` matches the names that start with the text `a*b`, `$d/*.txt` expands inside the folder that `$d` names, and a quoted dot counts as the dot of a hidden file (`".h"*`).
   - The expansion is not contextual: the shell cannot know what a program does with an argument, as in every Unix shell (`^find . -name *.txt` needs the quotes). A word that starts with `-` is expanded like the others, and `--include=*.c` stays as it is because it matches no file.
   - **On Windows the program expands its own wildcards** (`cmd /c dir *.txt`, `findstr`): the words go through unchanged.
-- **Wildcards of the cmdlets.** A cmdlet expands the wildcards of its own path arguments (`ls *.txt`, `cat *.txt`, `grep x *.md`, `rm *.tmp`), **whatever the quoting**: `cat "*.txt"` expands too, because the cmdlet receives the text and not how it was written. A wildcard that is not a path stays the cmdlet's own (`ps java*` matches process names, `ls --filter *.java` is a filter, `import java.util.*` a package).
+- **Wildcards of the cmdlets.** A cmdlet expands the wildcards of its own path arguments (`ls *.txt`, `cat *.txt`, `grep x *.md`, `rm *.tmp`), **whatever the quoting**: `cat "*.txt"` expands too, because the cmdlet receives the text and not how it was written. For the same reason a `*` in the quoted piece of a compound word (`ls "a*b"/x`) is still a wildcard for the cmdlet; `ls "my docs"/*.txt` works, since the cmdlet receives the one argument `my docs/*.txt`. A wildcard that is not a path stays the cmdlet's own (`ps java*` matches process names, `ls --filter *.java` is a filter, `import java.util.*` a package).
 - **Case.** Wildcards are **case-sensitive**, for the cmdlets and for the native programs: `*.txt` does not match `NOTES.TXT`. The environment variable `POWERJ_GLOB_IGNORE_CASE` set to `true` or `1` makes them case-insensitive (`false` or `0`, or nothing, keeps the case); another value is an error, reported where a wildcard is expanded. It is read from the session environment at each use: `env --set POWERJ_GLOB_IGNORE_CASE=true` applies from the next command. `ps` always ignores case (FR-74). On Windows the matcher of the platform ignores case and the variable has no effect.
 - CA: in a folder with `a.txt`, `b.txt`, `c.log` and `Notes.TXT`: `^echo *.txt` prints `a.txt b.txt`; `^echo "*.txt"` prints `*.txt`; `^echo *.zip` prints `*.zip`; `^echo *.TXT` prints `Notes.TXT`; `env --set POWERJ_GLOB_IGNORE_CASE=true` then `^echo *.txt` prints `a.txt b.txt Notes.TXT`. See `docs/acceptance/wildcards.md`.
 
@@ -1874,7 +1883,9 @@ java_expression   = postfix ;
 command           = [ "^" ] name { argument } ;
 argument          = option | value | block ;
 option            = "-" letter { letter } | "--" ident [ "=" value ] | "--" ;
-value             = string | number | unit | variable_access | list | word ;
+value             = compound_word | string | number | unit | variable_access | list | word ;
+compound_word     = piece piece { piece } ;   (* pieces without a blank: "my docs"/*, $dir/*.txt, --message="a b" (FR-32c) *)
+piece             = string | variable_access | word ;   (* a variable only at the start of the word or after a string or a variable; a word ends at '"' *)
 block             = "{" ( lambda | expression ) "}" ;
 lambda            = params "->" expression ;                 (* FR-33b *)
 params            = ident | "(" [ ident { "," ident } ] ")" ;

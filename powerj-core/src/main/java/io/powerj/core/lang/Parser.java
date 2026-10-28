@@ -188,14 +188,23 @@ public final class Parser {
     }
 
     private static boolean isArgument(Token token) {
-        return token instanceof Token.Word || token instanceof Token.Expr;
+        return token instanceof Token.Word || token instanceof Token.Expr || token instanceof Token.Compound;
     }
 
     private Argument argument(Token token) {
         return switch (token) {
             case Token.Word(var text) -> new Ast.WordArgument(text);
             case Token.Expr(var expression) -> new Ast.ExpressionArgument(expression);
+            case Token.Compound(var pieces) -> new Ast.CompoundArgument(pieces.stream().map(Parser::piece).toList());
             default -> throw unexpected(token);
+        };
+    }
+
+    private static Ast.Piece piece(Token token) {
+        return switch (token) {
+            case Token.Word(var text) -> new Ast.TextPiece(text);
+            case Token.Expr(var expression) -> new Ast.ExpressionPiece(expression);
+            default -> throw new IllegalStateException("not a piece of a word: " + token);
         };
     }
 
@@ -208,6 +217,7 @@ public final class Parser {
         return switch (token) {
             case Token.Word(var text) -> text;
             case Token.Expr _ -> "expression"; // not displayed: see unexpected
+            case Token.Compound _ -> "word"; // an argument: never unexpected as such
             case Token.AssignTo(var name) -> "$" + name + " =";
             case Token.Separator(var c) -> symbol(c);
             case Token.Pipe _ -> "|";
