@@ -30,12 +30,28 @@ final class FileArguments {
     }
 
     /**
+     * Whether the wildcards of the session ignore case: {@code true} if {@link Globs#IGNORE_CASE_VARIABLE} says so, and
+     * case counts otherwise (specification FR-40). Any value other than {@code true}, {@code 1}, {@code false} or
+     * {@code 0} is a usage error.
+     */
+    static boolean ignoreCase(CmdletContext<?> context) {
+        String value = context.environment().get(Globs.IGNORE_CASE_VARIABLE);
+        try {
+            return Globs.ignoreCase(value);
+        } catch (IllegalArgumentException _) {
+            throw new UsageException(Messages.get("glob.ignoreCase.invalid", Globs.IGNORE_CASE_VARIABLE, value));
+        }
+    }
+
+    /**
      * Paths designated by an argument: a path, or the matches of a wildcard on its last element, in name order.
-     * A wildcard without match reports the error {@code noMatchKey}. Names are matched without regard to case.
+     * A wildcard without match reports the error {@code noMatchKey}. Whether names are matched without regard to case is
+     * the rule of the session ({@link #ignoreCase(CmdletContext)}), read only for a wildcard.
      */
     static List<Path> expand(String argument, boolean includeHidden, CmdletContext<?> context,
                              Consumer<WalkError> onError, String noMatchKey) {
-        return expand(argument, includeHidden, true, context, onError, noMatchKey);
+        return expand(argument, includeHidden, Globs.isPattern(argument) && ignoreCase(context), context, onError,
+                noMatchKey);
     }
 
     /**

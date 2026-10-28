@@ -184,8 +184,8 @@ class FileWalkerTest {
     }
 
     @Test
-    void globsIgnoreCase() {
-        assertThat(Globs.matcher("*.TXT").matches(Path.of("a.txt"))).isTrue();
+    void globsAreMatchedOnTheNameOfAFile() {
+        assertThat(Globs.matcher("*.TXT", true).matches(Path.of("a.txt"))).isTrue();
         assertThat(Globs.matcher("a?.java").matches(Path.of("ab.java"))).isTrue();
         assertThat(Globs.isPattern("src/*.java")).isTrue();
         assertThat(Globs.isPattern("src/A.java")).isFalse();

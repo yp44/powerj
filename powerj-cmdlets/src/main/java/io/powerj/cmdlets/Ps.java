@@ -33,7 +33,7 @@ public final class Ps implements Cmdlet<Ps.Params, Object, ProcessEntry> {
     @Override
     public void begin(Params p, CmdletContext<ProcessEntry> context) {
         List<PathMatcher> matchers = p.names() == null ? List.of()
-                : p.names().stream().map(Globs::matcher).toList();
+                : p.names().stream().map(name -> Globs.matcher(name, true)).toList();
         long[] pids = ProcessHandle.allProcesses().mapToLong(ProcessHandle::pid).sorted().toArray();
         for (long pid : pids) {
             var process = ProcessHandle.of(pid);

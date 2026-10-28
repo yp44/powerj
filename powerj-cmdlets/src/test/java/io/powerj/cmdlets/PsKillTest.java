@@ -91,11 +91,11 @@ class PsKillTest {
 
     @Test
     void nameAndUserMatching() {
-        var java = List.of(Globs.matcher("java"));
+        var java = List.of(Globs.matcher("java", true));
         assertThat(Ps.matches("java.exe", java)).isTrue();
         assertThat(Ps.matches("JAVA", java)).isTrue();
         assertThat(Ps.matches("javaw.exe", java)).isFalse();
-        assertThat(Ps.matches("javaw.exe", List.of(Globs.matcher("java*")))).isTrue();
+        assertThat(Ps.matches("javaw.exe", List.of(Globs.matcher("java*", true)))).isTrue();
         assertThat(Ps.matches(null, java)).isFalse();
         assertThat(Ps.matches(null, List.of())).isTrue();
         assertThat(Ps.ofUser("DESKTOP\\Alice", "alice")).isTrue();

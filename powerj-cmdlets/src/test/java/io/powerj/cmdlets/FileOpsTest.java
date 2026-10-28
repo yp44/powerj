@@ -2,6 +2,7 @@ package io.powerj.cmdlets;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.IOException;
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import io.powerj.api.Cmdlet;
+import io.powerj.api.UsageException;
 
 /** {@code mkdir}, {@code touch}, {@code cp}, {@code mv} and {@code rm} (FR-72), always inside a temporary folder. */
 class FileOpsTest {
@@ -96,7 +98,7 @@ class FileOpsTest {
 
     @Test
     void wildcardsOfTheCommandsThatChangeFilesAreCaseSensitiveOffWindows() throws Exception {
-        assumeTrue(!FileOps.WILDCARDS_IGNORE_CASE, "the file system ignores case here");
+        assumeFalse(HostOs.WINDOWS, "the file system ignores case here");
         // Names that differ by more than the case: on macOS the file system ignores case and "readme.txt" and
         // "README.txt" would be one file.
         file("README.md", "r");
@@ -112,13 +114,38 @@ class FileOpsTest {
 
     @Test
     void theCaseRuleCanBeChosenWhenExpanding() throws Exception {
-        assumeTrue(!FileOps.WILDCARDS_IGNORE_CASE, "the matcher of Windows ignores case whatever is asked");
+        assumeFalse(HostOs.WINDOWS, "the matcher of Windows ignores case whatever is asked");
         file("Notes.TXT", "n");
         file("other.md", "o");
 
         assertThat(FileOps.expand("*.txt", true, context)).containsExactly(work.resolve("Notes.TXT"));
         assertThat(FileOps.expand("*.txt", false, context)).isEmpty();
         assertThat(context.errors).singleElement().asString().contains("*.txt");
+    }
+
+    @Test
+    void theVariableMakesTheWildcardsOfTheCommandsThatChangeFilesIgnoreCase() throws Exception {
+        assumeFalse(HostOs.WINDOWS, "the matcher of Windows ignores case whatever is asked");
+        file("README.md", "r");
+        file("readme.log", "r");
+        file("other.txt", "o");
+        context.setEnvironment("POWERJ_GLOB_IGNORE_CASE", "true");
+
+        rm(false, false, false, false, false, args("README*"));
+
+        assertThat(work.resolve("README.md")).doesNotExist();
+        assertThat(work.resolve("readme.log")).doesNotExist();
+        assertThat(work.resolve("other.txt")).exists();
+    }
+
+    @Test
+    void aWrongValueOfTheVariableIsAUsageErrorWhereAWildcardIsExpanded() throws Exception {
+        file("plain.txt", "p");
+        context.setEnvironment("POWERJ_GLOB_IGNORE_CASE", "maybe");
+
+        assertThatThrownBy(() -> FileOps.expand("*.txt", context)).isInstanceOf(UsageException.class)
+                .hasMessageContaining("POWERJ_GLOB_IGNORE_CASE").hasMessageContaining("maybe");
+        assertThat(FileOps.expand("plain.txt", context)).containsExactly(work.resolve("plain.txt"));
     }
 
     @Test

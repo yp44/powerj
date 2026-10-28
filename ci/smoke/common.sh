@@ -7,6 +7,7 @@
 #   ci/smoke/third-party-modules.sh      greet.jar loaded from ~/.powerj/modules
 #   ci/smoke/languages.sh                English and French messages
 #   ci/smoke/tilde.sh                    ~ is the home folder
+#   ci/smoke/wildcards.sh                wildcards in the arguments of a native command, and the case rule
 #   ci/smoke/fx.sh                       the optional JavaFX module, under a virtual display (xvfb)
 set -euo pipefail
 

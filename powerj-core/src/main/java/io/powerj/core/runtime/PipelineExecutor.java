@@ -362,7 +362,7 @@ final class PipelineExecutor {
             }
             case Resolved.NativeCall(var executable) -> {
                 PreviewGuard.deny(Messages.get("preview.off.native", command.name()));
-                List<String> textArgs = args.stream().map(Values::text).toList();
+                List<String> textArgs = NativeArguments.of(command.arguments(), args, session);
                 yield new NativeStep(new NativeRunner.Command(executable, textArgs, stage.errorsToOutput()));
             }
             case Resolved.Unknown _ -> throw unknownCommand(command);
