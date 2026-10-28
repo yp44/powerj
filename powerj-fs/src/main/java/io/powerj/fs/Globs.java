@@ -23,16 +23,60 @@ public final class Globs {
     }
 
     /**
-     * {@code true} if the text contains a wildcard that a shell expands: {@code *}, {@code ?} or a bracket expression
-     * {@code [a-c]} (with its closing bracket). {@link #isPattern} does not see the brackets: a cmdlet takes
+     * {@code true} if the glob pattern holds a wildcard that a shell expands: {@code *}, {@code ?} or a bracket
+     * expression {@code [a-c]} (with its closing bracket). A backslash escapes the next character, so
+     * {@code a\*b} holds none. {@link #isPattern} does not see the brackets, nor the escapes: a cmdlet takes
      * {@code [x].txt} as the name of a file.
      */
-    public static boolean hasWildcard(String text) {
-        if (isPattern(text)) {
-            return true;
+    public static boolean hasWildcard(String pattern) {
+        for (int i = 0; i < pattern.length(); i++) {
+            char c = pattern.charAt(i);
+            if (c == '\\') {
+                i++;
+            } else if (c == '*' || c == '?' || c == '[' && closes(pattern, i)) {
+                return true;
+            }
         }
-        int open = text.indexOf('[');
-        return open >= 0 && text.indexOf(']', open + 2) > 0;
+        return false;
+    }
+
+    /** Is the bracket at {@code open} closed by a {@code ]} after at least one character? */
+    private static boolean closes(String pattern, int open) {
+        for (int i = open + 2; i < pattern.length(); i++) {
+            char c = pattern.charAt(i);
+            if (c == '\\') {
+                i++;
+            } else if (c == ']') {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** The glob pattern that matches exactly this text: {@code a*b} becomes {@code a\*b}. */
+    public static String escape(String literal) {
+        var escaped = new StringBuilder(literal.length() + 4);
+        for (int i = 0; i < literal.length(); i++) {
+            char c = literal.charAt(i);
+            if ("\\*?[]{}".indexOf(c) >= 0) {
+                escaped.append('\\');
+            }
+            escaped.append(c);
+        }
+        return escaped.toString();
+    }
+
+    /** The text that a glob pattern without wildcard spells: {@code a\*b} becomes {@code a*b}. */
+    public static String unescape(String pattern) {
+        var text = new StringBuilder(pattern.length());
+        for (int i = 0; i < pattern.length(); i++) {
+            char c = pattern.charAt(i);
+            if (c == '\\' && i + 1 < pattern.length()) {
+                c = pattern.charAt(++i);
+            }
+            text.append(c);
+        }
+        return text.toString();
     }
 
     /**

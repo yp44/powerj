@@ -86,4 +86,31 @@ class GlobsTest {
         assertThatThrownBy(() -> Globs.ignoreCase("yes")).isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("yes");
     }
+
+    @Test
+    void aBackslashEscapesTheNextCharacterOfAPattern() {
+        assertThat(Globs.hasWildcard("a\\*b")).isFalse();
+        assertThat(Globs.hasWildcard("a\\*b*")).isTrue();
+        assertThat(Globs.hasWildcard("a\\\\*")).isTrue(); // an escaped backslash, then a star
+        assertThat(Globs.hasWildcard("\\[ab]")).isFalse();
+        assertThat(Globs.hasWildcard("[a\\]b]")).isTrue();
+    }
+
+    @Test
+    void escapeBuildsThePatternThatMatchesExactlyATextAndUnescapeGivesItBack() {
+        assertThat(Globs.escape("a*b?[c]{d}\\")).isEqualTo("a\\*b\\?\\[c\\]\\{d\\}\\\\");
+        for (String text : new String[] {"plain", "a*b", "my docs", "[x].txt", "{a,b}", "back\\slash", ""}) {
+            assertThat(Globs.hasWildcard(Globs.escape(text))).as(text).isFalse();
+            assertThat(Globs.unescape(Globs.escape(text))).as(text).isEqualTo(text);
+        }
+    }
+
+    @Test
+    void anEscapedPatternMatchesOnlyTheLiteralText() {
+        assumeFalse(System.getProperty("os.name", "").startsWith("Windows"), "a name cannot hold a star there");
+        var matcher = Globs.matcher(Globs.escape("a*b"));
+
+        assertThat(matcher.matches(Path.of("a*b"))).isTrue();
+        assertThat(matcher.matches(Path.of("aXb"))).isFalse();
+    }
 }
