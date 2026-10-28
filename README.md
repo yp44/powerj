@@ -405,6 +405,7 @@ The v1 cmdlet roadmap is done ([roadmap](docs/plans/cmdlet-roadmap.md), end-to-e
 
 ## Documentation
 
+- [User guide](docs/USER-GUIDE.md): what you can type at the prompt — calling cmdlets and programs, objects through `|`, `{ }` blocks, `( )` groups, `$_` and the other variables, the environment variables the shell reads.
 - [Specification](docs/SPECIFICATION.md): functional requirements, grammar, extension API, architecture.
 - [Architecture](docs/ARCHITECTURE.md): modules, layers, how a line runs, the rules and the tests that keep them; [decision records](docs/adr/).
 - [Contributing](CONTRIBUTING.md): building, the gates of `verify`, the backlog (GitHub issues), how we work, the language policy, adding a cmdlet. [Security policy](SECURITY.md).
