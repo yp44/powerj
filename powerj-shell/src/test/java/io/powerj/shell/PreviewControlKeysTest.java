@@ -73,6 +73,20 @@ class PreviewControlKeysTest {
         }
     }
 
+    /** A source of 200 objects that ends: more than the stages send on in a preview. */
+    @CmdletInfo(name = "many", preview = true, category = "Test", summary = "200 objects", examples = "many")
+    public static final class Many implements Cmdlet<Many.Params, Void, Thing> {
+
+        public record Params() { }
+
+        @Override
+        public void begin(Params params, CmdletContext<Thing> context) {
+            for (int i = 1; i <= 200; i++) {
+                context.emit(new Thing("thing" + i));
+            }
+        }
+    }
+
     /** A blocking cmdlet, like {@code sort}: it emits only when its input has ended. */
     @CmdletInfo(name = "tally", preview = true, category = "Test", summary = "Counts what it receives",
             examples = "stall | tally")
@@ -109,7 +123,7 @@ class PreviewControlKeysTest {
         environment.put(PreviewSettings.DEADLINE_VARIABLE, "200");
         session = new Session(tmp, cwd, environment);
         var repl = InteractiveShell.create(reader, new Supervisor(), session,
-                CmdletRegistry.of(List.of(new Stall(), new Tally())));
+                CmdletRegistry.of(List.of(new Stall(), new Many(), new Tally())));
         terminal.startTyping();
         code = new CompletableFuture<>();
         Thread.ofVirtual().start(() -> code.complete(repl.run(new BuildInfo("0.1.0", Runtime.Version.parse("25")))));
@@ -200,10 +214,10 @@ class PreviewControlKeysTest {
     }
 
     @Test
-    void theKeysActOnlyWhileTheTimeoutIsShown() throws Exception {
+    void theKeysDoNothingWhenThereIsNeitherValuesNorATimeout() throws Exception {
         terminal.type(ALT_V);
-        type("\"abc\".toUpperCase()");
-        awaitUntil(() -> terminal.screen().contains("String · 1"));
+        type("cd ."); // a built-in command: the preview is off
+        awaitUntil(() -> shown().contains("preview off"));
 
         terminal.type(ALT_UP);
         terminal.type(ALT_RIGHT);
@@ -212,6 +226,75 @@ class PreviewControlKeysTest {
 
         assertThat(variable(PreviewSettings.LIMIT_VARIABLE)).isNull();
         assertThat(variable(PreviewSettings.DEADLINE_VARIABLE)).isEqualTo("200"); // as the test set it
+        assertThat(shown()).doesNotContain("[duration");
+        exit();
+    }
+
+    @Test
+    void aKeyShowsTheMenuUnderTheValuesAndChangesNothing() throws Exception {
+        terminal.type(ALT_V);
+        type("\"abc\".toUpperCase()");
+        awaitUntil(() -> shown().contains("String · 1"));
+        assertThat(shown()).doesNotContain("[duration");
+
+        terminal.type(ALT_UP);
+
+        awaitUntil(() -> shown().contains("[duration 200 ms]  max/stage 50 · Alt+◄► choose, Alt+▲▼ change"));
+        assertThat(shown()).contains("String · 1").contains("ABC");
+        assertThat(variable(PreviewSettings.DEADLINE_VARIABLE)).isEqualTo("200"); // as the test set it
+        assertThat(variable(PreviewSettings.LIMIT_VARIABLE)).isNull();
+        exit();
+    }
+
+    @Test
+    void theNextKeysChangeTheSettingsAndTheValuesStayWithTheMenu() throws Exception {
+        terminal.type(ALT_V);
+        type("\"abc\".toUpperCase()");
+        awaitUntil(() -> shown().contains("String · 1"));
+        terminal.type(ALT_UP); // shows the menu
+        awaitUntil(() -> shown().contains("[duration 200 ms]"));
+
+        terminal.type(ALT_UP);
+
+        awaitUntil(() -> "400".equals(variable(PreviewSettings.DEADLINE_VARIABLE)));
+        awaitUntil(() -> shown().contains("[duration 400 ms]  max/stage 50") && shown().contains("ABC"));
+        terminal.type(ALT_RIGHT);
+        awaitUntil(() -> shown().contains("duration 400 ms  [max/stage 50]"));
+        terminal.type(ALT_DOWN);
+        awaitUntil(() -> "20".equals(variable(PreviewSettings.LIMIT_VARIABLE)));
+        awaitUntil(() -> shown().contains("duration 400 ms  [max/stage 20]") && shown().contains("ABC"));
+        exit();
+    }
+
+    @Test
+    void thePartialValuesOfAPreviewOfferTheMenuToo() throws Exception {
+        terminal.type(ALT_V);
+        type("many | tally");
+        awaitUntil(() -> shown().contains("partial · 50 objects max per stage"));
+        assertThat(shown()).doesNotContain("[duration");
+
+        terminal.type(ALT_UP); // shows the menu
+        awaitUntil(() -> shown().contains("[duration 200 ms]  max/stage 50"));
+        terminal.type(ALT_RIGHT);
+        terminal.type(ALT_DOWN); // 20 objects per stage: tally counts 20
+        awaitUntil(() -> shown().contains("partial · 20 objects max per stage"));
+
+        assertThat(shown()).contains("[max/stage 20]").contains("\n20");
+        exit();
+    }
+
+    @Test
+    void theMenuClosesWhenTheLineChanges() throws Exception {
+        terminal.type(ALT_V);
+        type("\"abc\".toUpperCase()");
+        awaitUntil(() -> shown().contains("String · 1"));
+        terminal.type(ALT_UP);
+        awaitUntil(() -> shown().contains("[duration 200 ms]"));
+
+        type(".length()");
+
+        awaitUntil(() -> shown().contains("Integer · 1"));
+        assertThat(shown()).doesNotContain("[duration");
         exit();
     }
 

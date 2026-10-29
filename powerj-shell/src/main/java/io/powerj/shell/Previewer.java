@@ -56,9 +56,14 @@ final class Previewer {
     /** The settings in force when the last evaluation started: what its banner says it was cut at. */
     private volatile PreviewSettings evaluatedWith = PreviewSettings.defaults();
 
-    /** The keys that change the settings, and the timeout that is shown now (they act only while there is one). */
+    /**
+     * The keys that change the settings, what is shown now (they act while it is values or a timeout), and the menu
+     * that shows the settings under the banner of values: opened by the first key, it stays open for the same text.
+     */
     private final PreviewControl control = new PreviewControl();
-    private volatile PreviewResult.TimedOut timedOutShown;
+    private volatile PreviewResult resultShown;
+    private volatile boolean menuOpen;
+    private String menuText;
 
     /** Text last evaluated (to ignore redisplays that change nothing) and result lines kept when the preview stops. */
     private String lastText;
@@ -104,8 +109,8 @@ final class Previewer {
     }
 
     /**
-     * Binds an Alt+arrow of the control. It acts only while a preview that timed out is shown; otherwise the key does what
-     * it did before, so that the editor keeps whatever it had on that key.
+     * Binds an Alt+arrow of the control. It acts while values or a timeout are shown; otherwise the key does what it did
+     * before, so that the editor keeps whatever it had on that key.
      */
     private void bindControlKey(KeyMap<Binding> main, PreviewControl.Key key) {
         Binding before = main.getBound(key.sequence());
@@ -115,8 +120,9 @@ final class Previewer {
     }
 
     private boolean controlKey(PreviewControl.Key key, Binding before) {
-        PreviewResult.TimedOut shown = timedOutShown;
-        if (shown == null || !on()) {
+        PreviewResult shown = resultShown;
+        boolean timedOut = shown instanceof PreviewResult.TimedOut;
+        if (!on() || !(timedOut || shown instanceof PreviewResult.Values)) {
             switch (before) {
                 case Reference reference -> reader.callWidget(reference.name());
                 case Widget widget -> widget.apply();
@@ -124,17 +130,28 @@ final class Previewer {
             }
             return true;
         }
-        PreviewSettings settings = interpreter.previewSettings();
-        PreviewSettings changed = control.press(key, settings);
-        if (!changed.equals(settings)) {
-            interpreter.previewSettings(changed);
-            synchronized (lock) {
-                lastText = null; // the same text is evaluated again, with the new settings
+        boolean shows = timedOut || menuOpen;
+        openMenu(); // using the control keeps the menu for the values that follow
+        if (shows) {
+            PreviewSettings settings = interpreter.previewSettings();
+            PreviewSettings changed = control.press(key, settings);
+            if (!changed.equals(settings)) {
+                interpreter.previewSettings(changed);
+                synchronized (lock) {
+                    lastText = null; // the same text is evaluated again, with the new settings
+                }
+                changed(reader.getBuffer().toString(), reader.getBuffer().cursor());
             }
-            changed(reader.getBuffer().toString(), reader.getBuffer().cursor());
-        }
+        } // else the key only shows the menu: it changes nothing
         reader.preview(render(shown)); // the chosen setting and its value, at once; the evaluation replaces the banner
         return true;
+    }
+
+    private void openMenu() {
+        synchronized (lock) {
+            menuOpen = true;
+            menuText = lastText;
+        }
     }
 
     /** Switches the mode; the line typed is kept. */
@@ -160,7 +177,8 @@ final class Previewer {
             lastText = null;
             lastLines = List.of();
         }
-        timedOutShown = null;
+        resultShown = null;
+        menuOpen = false;
         reader.preview(null);
     }
 
@@ -171,6 +189,9 @@ final class Previewer {
         }
         String text = PreviewCut.upToStage(buffer, cursor);
         synchronized (lock) {
+            if (menuOpen && !text.equals(menuText)) {
+                menuOpen = false; // another line, or another stage: the menu was for the one before
+            }
             if (text.equals(lastText)) {
                 return;
             }
@@ -199,7 +220,7 @@ final class Previewer {
         delivery.ifLatest(() -> {
             if (on()) {
                 reader.preview(shown);
-                timedOutShown = result instanceof PreviewResult.TimedOut timedOut ? timedOut : null;
+                resultShown = result;
                 displayed[0] = true;
             }
         });
@@ -249,6 +270,9 @@ final class Previewer {
                     count += " · " + Messages.get("preview.banner.errors", errors);
                 }
                 lines.add(banner(count, columns, BANNER));
+                if (menuOpen) {
+                    lines.add(menuLine(columns));
+                }
                 lines.addAll(shown);
             }
             case PreviewResult.TimedOut(var errors) -> {
@@ -290,6 +314,22 @@ final class Previewer {
         }
         return bannerOf(Messages.get("preview.banner.timedOutBrief") + skipped, control.fields(settings, true),
                 PreviewControl.help(true), columns).columnSubSequence(0, columns);
+    }
+
+    /** {@code [duration 400 ms]  max/stage 50 · Alt+◄► choose, Alt+▲▼ change}: the menu under the banner of values. */
+    private AttributedString menuLine(int columns) {
+        PreviewSettings settings = interpreter.previewSettings();
+        AttributedString full = menuOf(control.fields(settings, false), PreviewControl.help(false));
+        if (full.columnLength() <= columns) {
+            return full;
+        }
+        AttributedString brief = menuOf(control.fields(settings, true), PreviewControl.help(true));
+        return brief.columnSubSequence(0, Math.min(columns, brief.columnLength()));
+    }
+
+    private static AttributedString menuOf(AttributedString fields, String help) {
+        return new AttributedStringBuilder().append(fields).style(BANNER).append(" · ").append(help)
+                .toAttributedString();
     }
 
     private static AttributedString bannerOf(String what, AttributedString fields, String help, int columns) {

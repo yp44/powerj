@@ -38,7 +38,10 @@ In a test folder (e.g. `C:\tmp\p`), create with your editor `small.txt` (a few c
 | 20 | Type `env --set POWERJ_PREVIEW_STAGE_LIMIT=100000` and **Enter** (it is executed, the preview mode stays), then type the line of row 18 again | On a tree that takes more than 400 ms to walk: `── timed out after 400 ms · [duration 400 ms]  max/stage 100000 · Alt+◄► choose, Alt+▲▼ change ───`, not `no result`. The prompt is still `PJ? …`. |
 | 21 | Press **Alt+▲** | The chosen setting (`[duration 400 ms]`) becomes `[duration 800 ms]` and the line is previewed again with 800 ms; `env POWERJ_PREVIEW_DEADLINE_MS` says `800`. Again: 1600, 3200, then `[duration 3200 ms (max)]` and Alt+▲ no longer changes it. **Alt+▼** goes back down. |
 | 22 | Press **Alt+►**, then **Alt+▼** | `max/stage` is now the chosen one, between brackets; each Alt+▼ takes it down one step (500, 100, 50, 20, 10: a value above 500 goes down to 500) and the preview is evaluated again; with 10 or 20 objects the table appears (`partial`). **Alt+◄** chooses the duration again. |
-| 23 | With a preview that has results (`ls`), press **Alt+▲**, **Alt+◄** | Nothing changes in the settings: the keys act only while the `timed out` banner is shown. **▲** alone, with a line typed, searches the history as before. |
+| 23 | With a preview that has values (`ls`), press **Alt+▲** | A menu line appears under the banner: `[duration 400 ms]  max/stage 50 · Alt+◄► choose, Alt+▲▼ change`. Nothing is changed yet (`env POWERJ_PREVIEW_DEADLINE_MS` is unchanged). |
+| 24 | Press **Alt+▲** again, then **Alt+►** and **Alt+▼** | The duration goes to the next step, then the limit goes down one step; the values of the line are shown again each time, with the menu under the banner (with `ls -r \| group size`, the banner says `partial · 20 objects max per stage`). |
+| 25 | Type one more character | The menu is gone with the change of the line. **▲** alone, with a line typed, searches the history as before. |
+| 26 | Type `cd ..` (preview off), press **Alt+▲** | Nothing happens: the keys act only on values or a timeout. |
 
 ## Notes
 
