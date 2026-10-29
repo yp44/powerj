@@ -38,6 +38,11 @@ final class PreviewLineReader extends org.jline.reader.impl.LineReaderImpl {
         this.preview = text;
     }
 
+    /** Text shown below the line now, or {@code null}. */
+    AttributedString preview() {
+        return preview;
+    }
+
     @Override
     public String readLine(String prompt, String rightPrompt, MaskingCallback maskingCallback, String buffer) {
         leaving = false;
