@@ -9,7 +9,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -28,6 +30,10 @@ class LatestWinsRunnerTest {
     private Function<String, String> evaluation = request -> request.toUpperCase(java.util.Locale.ROOT);
 
     private LatestWinsRunner<String, String> runner(Duration debounce, Duration deadline) {
+        return runner(debounce, () -> deadline);
+    }
+
+    private LatestWinsRunner<String, String> runner(Duration debounce, Supplier<Duration> deadline) {
         return new LatestWinsRunner<>(request -> {
             evaluated.add(request);
             return evaluation.apply(request);
@@ -157,6 +163,31 @@ class LatestWinsRunnerTest {
     }
 
     @Test
+    void theDeadlineIsAskedForAtTheStartOfEachEvaluation() throws Exception {
+        evaluation = request -> {
+            try {
+                Thread.sleep(Duration.ofMillis(600)); // longer than the first deadline, shorter than the second
+            } catch (InterruptedException _) {
+                return "cut " + request;
+            }
+            return "done " + request;
+        };
+        var deadline = new AtomicReference<>(Duration.ofMillis(100));
+        var runner = runner(Duration.ofMillis(10), deadline::get);
+
+        runner.submit("first");
+        assertThat(next()).isEqualTo("cut first");
+
+        deadline.set(Duration.ofSeconds(30)); // the user chose a longer one
+        runner.submit("second");
+        assertThat(next()).isEqualTo("done second");
+
+        deadline.set(Duration.ofMillis(100)); // and a shorter one again
+        runner.submit("third");
+        assertThat(next()).isEqualTo("cut third");
+    }
+
+    @Test
     void theInterruptionDoesNotReachThePublisher() throws Exception {
         var flags = new LinkedBlockingQueue<Boolean>();
         evaluation = request -> {
@@ -169,7 +200,7 @@ class LatestWinsRunnerTest {
         };
         var runner = new LatestWinsRunner<String, String>(request -> evaluation.apply(request), Throwable::getMessage,
                 (result, delivery) -> flags.add(Thread.currentThread().isInterrupted()), Duration.ofMillis(10),
-                Duration.ofMillis(100), "test-worker", STACK);
+                () -> Duration.ofMillis(100), "test-worker", STACK);
 
         runner.submit("q");
 
@@ -197,7 +228,7 @@ class LatestWinsRunnerTest {
                     if (result.equals("first")) {
                         throw new IllegalStateException("terminal closed");
                     }
-                }, Duration.ofMillis(10), Duration.ofSeconds(10), "test-worker", STACK);
+                }, Duration.ofMillis(10), () -> Duration.ofSeconds(10), "test-worker", STACK);
 
         runner.submit("first");
         assertThat(calls.poll(20, TimeUnit.SECONDS)).isEqualTo("first");
@@ -222,7 +253,7 @@ class LatestWinsRunnerTest {
                         }
                     }
                     delivered.add(delivery.ifLatest(() -> { }));
-                }, Duration.ofMillis(10), Duration.ofSeconds(10), "test-worker", STACK);
+                }, Duration.ofMillis(10), () -> Duration.ofSeconds(10), "test-worker", STACK);
 
         runner.submit("old");
         assertThat(inPublisher.await(20, TimeUnit.SECONDS)).isTrue();

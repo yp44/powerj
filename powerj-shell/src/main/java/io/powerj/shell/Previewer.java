@@ -34,8 +34,6 @@ final class Previewer {
     private static final int MAX_LINES = 12;
     /** Pause after a keystroke before evaluating: typing fast does not start an evaluation per key. */
     private static final long DEBOUNCE_MILLIS = 60;
-    /** Evaluation time limit: beyond it, the values already received are shown. */
-    private static final long DEADLINE_MILLIS = 400;
     private static final long STACK_SIZE = 16L * 1024 * 1024;
 
     private static final AttributedStyle BANNER = AttributedStyle.DEFAULT.foreground(AttributedStyle.BRIGHT | AttributedStyle.BLACK);
@@ -74,7 +72,8 @@ final class Previewer {
                     return interpreter.preview(text, LIMIT, columns(), colors);
                 },
                 failure -> new PreviewResult.Failed(String.valueOf(failure)),
-                this::show, Duration.ofMillis(DEBOUNCE_MILLIS), Duration.ofMillis(DEADLINE_MILLIS), "powerj-preview",
+                this::show, Duration.ofMillis(DEBOUNCE_MILLIS),
+                () -> Duration.ofMillis(interpreter.previewSettings().deadlineMillis()), "powerj-preview",
                 STACK_SIZE);
         modes.register(ShellMode.PREVIEW, () -> completions.previewMode(true), this::leave);
     }
