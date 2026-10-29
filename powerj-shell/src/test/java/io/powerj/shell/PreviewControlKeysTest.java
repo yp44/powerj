@@ -5,6 +5,8 @@ import static io.powerj.shell.TestTerminal.ENTER;
 import static io.powerj.shell.TestTerminal.UP;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -16,6 +18,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 
+import org.jline.reader.LineReader;
+import org.jline.reader.Reference;
+import org.jline.reader.Widget;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,9 +31,12 @@ import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.core.BuildInfo;
+import io.powerj.core.assist.Completions;
 import io.powerj.core.command.CmdletRegistry;
+import io.powerj.core.runtime.Interpreter;
 import io.powerj.core.runtime.PreviewSettings;
 import io.powerj.core.runtime.Session;
+import io.powerj.core.runtime.ShellIo;
 import io.powerj.core.runtime.Supervisor;
 
 /**
@@ -220,6 +228,41 @@ class PreviewControlKeysTest {
         assertThat(variable(PreviewSettings.LIMIT_VARIABLE)).isNull();
         assertThat(variable(PreviewSettings.DEADLINE_VARIABLE)).isEqualTo("200"); // as the test set it
         exit();
+    }
+
+    @Test
+    void withoutATimeoutTheKeysDoWhatTheyDidBefore() throws Exception {
+        // A reader of its own, whose Alt+◄ and Alt+► already do something when the Previewer binds the keys: one key
+        // is bound to the name of a widget, the other to a widget object, as the editor can have them.
+        var other = TestTerminal.interactive();
+        try {
+            var home = new PowerJHome(tmp.resolve("home2")).createDirectories();
+            var lines = ShellReader.create(other.terminal(), home, ShellConfig.defaults());
+            var marked = new AtomicInteger();
+            var main = lines.getKeyMaps().get(LineReader.MAIN);
+            main.bind(new Reference(LineReader.BACKWARD_WORD), ALT_LEFT);
+            main.bind((Widget) () -> {
+                marked.incrementAndGet();
+                return true;
+            }, ALT_RIGHT);
+            var interpreter = new Interpreter(new Session(tmp, tmp, Map.of()),
+                    new ShellIo(new PrintWriter(new StringWriter(), true), _ -> { }, false), Map.of(),
+                    CmdletRegistry.discover());
+            new Previewer(lines, interpreter, new Completions(interpreter), () -> 160, false, new ModeController())
+                    .bind(() -> "> ");
+            other.startTyping();
+            Thread.ofVirtual().start(() -> lines.readLine("> "));
+            awaitUntil(() -> lines.isReading());
+
+            other.type("abc def");
+            awaitUntil(() -> lines.getBuffer().toString().equals("abc def"));
+            other.type(ALT_LEFT);
+            awaitUntil(() -> lines.getBuffer().cursor() == 4); // backward-word, as before
+            other.type(ALT_RIGHT);
+            awaitUntil(() -> marked.get() == 1); // the widget that was there
+        } finally {
+            other.close();
+        }
     }
 
     private static void awaitUntil(BooleanSupplier condition) throws InterruptedException {
