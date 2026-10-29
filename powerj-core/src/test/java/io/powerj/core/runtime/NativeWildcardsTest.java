@@ -153,4 +153,77 @@ class NativeWildcardsTest {
     void aNativeCommandInAPipelineExpandsToo() throws Exception {
         assertThat(run("^echo *.txt | cat")).isEqualTo("a.txt b.txt\n");
     }
+
+    // --- Compound words: pieces glued together (FR-32c, issue #73) ---
+
+    @Test
+    void aQuotedFolderFollowedByAWildcardIsOneWord() throws Exception {
+        assertThat(run("^printf \"[%s]\" \"my docs\"/*")).isEqualTo("[my docs/a note.txt]\n");
+        assertThat(errors).isEmpty();
+    }
+
+    @Test
+    void aQuotedFolderFollowedByAWildcardNeverReachesTheRoot() throws Exception {
+        assertThat(run("^echo \"nowhere\"/*")).isEqualTo("nowhere/*\n");
+        assertThat(run("^echo \"my docs\"/*.zip")).isEqualTo("my docs/*.zip\n");
+        assertThat(run("^echo \"my docs\"/* x")).isEqualTo("my docs/a note.txt x\n");
+    }
+
+    @Test
+    void aVariableFollowedByAWildcardIsOneWord() throws Exception {
+        run("$d = \"my docs\"");
+        assertThat(run("^printf \"[%s]\" $d/*.txt")).isEqualTo("[my docs/a note.txt]\n");
+        assertThat(run("^echo $d/x")).isEqualTo("my docs/x\n");
+    }
+
+    @Test
+    void whatAVariableOrAQuotedTextHoldsIsNeverAWildcard() throws Exception {
+        run("$s = \"*.t\"");
+        assertThat(run("^echo $s\"xt\"")).isEqualTo("*.txt\n");
+        assertThat(run("^echo \"*.t\"xt")).isEqualTo("*.txt\n");
+    }
+
+    @Test
+    void aQuotedStarIsLiteralAndAnUnquotedOneIsAWildcard() throws Exception {
+        Files.createFile(tmp.resolve("a*b1"));
+        Files.createFile(tmp.resolve("aXb2"));
+
+        assertThat(run("^printf \"[%s]\" \"a*b\"*")).isEqualTo("[a*b1]\n");
+        assertThat(run("^printf \"[%s]\" a\"*\"b?")).isEqualTo("[a*b1]\n");
+        assertThat(run("^printf \"[%s]\" \"a\"*")).contains("[aXb2]").contains("[a.txt]");
+    }
+
+    @Test
+    void aQuotedDotCountsAsTheDotOfAHiddenFile() throws Exception {
+        assertThat(run("^echo \".h\"*")).isEqualTo(".hidden.txt\n");
+    }
+
+    @Test
+    void anOptionWithAQuotedValueIsOneArgument() throws Exception {
+        assertThat(run("^printf \"[%s]\" --message=\"a b\"")).isEqualTo("[--message=a b]\n");
+    }
+
+    @Test
+    void plainTextAroundAQuotedTextIsOneArgument() throws Exception {
+        assertThat(run("^echo x\"y\"z")).isEqualTo("xyz\n");
+    }
+
+    @Test
+    void aBlankStillEndsTheWord() throws Exception {
+        assertThat(run("^printf \"[%s]\" \"x\" *.zip")).isEqualTo("[x][*.zip]\n");
+    }
+
+    @Test
+    void theTildeIsTheHomeFolderAtTheStartOfAWordThatIsUnquotedAndFollowedBySlash() throws Exception {
+        assertThat(run("^echo ~/\"x\"")).isEqualTo(session.home() + "/x\n");
+        assertThat(run("^echo ~\"x\"")).isEqualTo("~x\n");
+    }
+
+    @Test
+    void theTargetOfARedirectionCanBeACompoundWord() throws Exception {
+        run("\"x\" > \"my docs\"/out.txt");
+
+        assertThat(errors).isEmpty();
+        assertThat(tmp.resolve("my docs/out.txt")).exists();
+    }
 }

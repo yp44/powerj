@@ -210,4 +210,78 @@ class LexerTest {
         assertThat(Lexer.tokenize("a2>b")).containsExactly(w("a2"), new Token.Redirection(RedirectedStream.OUT, false), w("b"));
         assertThat(Lexer.tokenize("2>x")).containsExactly(new Token.Redirection(RedirectedStream.ERR, false), w("x"));
     }
+
+    // --- Compound words: pieces written without a blank (FR-32c, issue #73) ---
+
+    private static Token.Compound c(Token... pieces) {
+        return new Token.Compound(List.of(pieces));
+    }
+
+    @Test
+    void aQuotedTextFollowedByPlainTextIsOneWord() {
+        assertThat(Lexer.tokenize("echo \"my docs\"/*")).containsExactly(w("echo"), c(s("my docs"), w("/*")));
+    }
+
+    @Test
+    void aVariableFollowedByPlainTextIsOneWord() {
+        assertThat(Lexer.tokenize("ls $d/*.txt")).containsExactly(w("ls"), c(e(v("d")), w("/*.txt")));
+    }
+
+    @Test
+    void anOptionWithAQuotedValueIsOneWord() {
+        assertThat(Lexer.tokenize("git --message=\"a b\"")).containsExactly(w("git"), c(w("--message="), s("a b")));
+    }
+
+    @Test
+    void plainTextQuotedTextPlainTextIsOneWord() {
+        assertThat(Lexer.tokenize("echo x\"y\"z")).containsExactly(w("echo"), c(w("x"), s("y"), w("z")));
+        assertThat(Lexer.tokenize("echo \"a\"\"b\"")).containsExactly(w("echo"), c(s("a"), s("b")));
+    }
+
+    @Test
+    void aVariableRightAfterAQuotedTextOrAVariableIsAVariable() {
+        assertThat(Lexer.tokenize("echo \"a\"$b")).containsExactly(w("echo"), c(s("a"), e(v("b"))));
+        assertThat(Lexer.tokenize("echo $a$b")).containsExactly(w("echo"), c(e(v("a")), e(v("b"))));
+    }
+
+    @Test
+    void aDollarInTheMiddleOfPlainTextIsAPlainCharacter() {
+        assertThat(Lexer.tokenize("grep foo$ f")).containsExactly(w("grep"), w("foo$"), w("f"));
+        assertThat(Lexer.tokenize("echo a$b")).containsExactly(w("echo"), w("a$b"));
+    }
+
+    @Test
+    void aBlankEndsTheWord() {
+        assertThat(Lexer.tokenize("echo \"a\" b")).containsExactly(w("echo"), s("a"), w("b"));
+        assertThat(Lexer.tokenize("echo $d /x")).containsExactly(w("echo"), e(v("d")), w("/x"));
+    }
+
+    @Test
+    void aLoneQuotedTextOrVariableIsNotACompoundWord() {
+        assertThat(Lexer.tokenize("echo \"a\"")).containsExactly(w("echo"), s("a"));
+        assertThat(Lexer.tokenize("echo $d")).containsExactly(w("echo"), e(v("d")));
+        assertThat(Lexer.tokenize("echo abc")).containsExactly(w("echo"), w("abc"));
+    }
+
+    @Test
+    void operatorsAndSeparatorsStillEndAWord() {
+        assertThat(Lexer.tokenize("echo \"a\"|count")).containsExactly(w("echo"), s("a"), new Token.Pipe(), w("count"));
+        assertThat(Lexer.tokenize("echo \"a\">out.txt")).containsExactly(w("echo"), s("a"),
+                new Token.Redirection(RedirectedStream.OUT, false), w("out.txt"));
+        assertThat(Lexer.tokenize("echo \"a\";echo b")).containsExactly(w("echo"), s("a"),
+                new Token.Separator(Connector.ALWAYS), w("echo"), w("b"));
+        assertThat(Lexer.tokenize("echo x\"y\"&&echo")).containsExactly(w("echo"), c(w("x"), s("y")),
+                new Token.Separator(Connector.IF_SUCCESS), w("echo"));
+    }
+
+    @Test
+    void theNameOfACommandIsNeverGlued() {
+        assertThat(Lexer.tokenize("x\"y\"")).containsExactly(w("x"), s("y"));
+    }
+
+    @Test
+    void theTargetOfARedirectionCanBeACompoundWord() {
+        assertThat(Lexer.tokenize("echo x > \"my docs\"/out.txt")).containsExactly(w("echo"), w("x"),
+                new Token.Redirection(RedirectedStream.OUT, false), c(s("my docs"), w("/out.txt")));
+    }
 }

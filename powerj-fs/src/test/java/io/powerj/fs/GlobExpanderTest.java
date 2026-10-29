@@ -157,4 +157,36 @@ class GlobExpanderTest {
 
         assertThat(expand("link/*/pom.xml")).containsExactly("link/one/pom.xml", "link/two/pom.xml");
     }
+
+    // --- Patterns built from a word with quoted pieces (issue #73) ---
+
+    @Test
+    void anEscapedStarIsALiteralStarAndTheOthersAreWildcards() throws IOException {
+        Files.createFile(dir.resolve("a*b1"));
+        Files.createFile(dir.resolve("aXb2"));
+
+        assertThat(GlobExpander.expand(Globs.escape("a*b") + "*", "a*b*", dir, false)).containsExactly("a*b1");
+        assertThat(GlobExpander.expand("a?b*", "a?b*", dir, false)).containsExactly("a*b1", "aXb2");
+    }
+
+    @Test
+    void aPatternWithoutRealWildcardGivesBackTheTextOfTheWord() {
+        assertThat(GlobExpander.expand(Globs.escape("*.txt"), "*.txt", dir, false)).containsExactly("*.txt");
+        assertThat(GlobExpander.expand(Globs.escape("a.txt"), "a.txt", dir, false)).containsExactly("a.txt");
+    }
+
+    @Test
+    void anEscapedFolderNameIsLookedUpAsWritten() throws IOException {
+        Files.createDirectories(dir.resolve("my [x] docs"));
+        Files.createFile(dir.resolve("my [x] docs/n.txt"));
+
+        assertThat(GlobExpander.expand(Globs.escape("my [x] docs") + "/*", "my [x] docs/*", dir, false))
+                .containsExactly("my [x] docs/n.txt");
+    }
+
+    @Test
+    void aWordThatMatchesNothingGivesBackItsText() {
+        assertThat(GlobExpander.expand(Globs.escape("nowhere") + "/*", "nowhere/*", dir, false))
+                .containsExactly("nowhere/*");
+    }
 }

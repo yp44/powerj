@@ -31,6 +31,7 @@ import io.powerj.core.lang.ExpressionParser;
 import io.powerj.core.lang.StringPart;
 import io.powerj.core.lang.ParseContext;
 import io.powerj.core.lang.SyntaxException;
+import io.powerj.fs.Globs;
 
 /**
  * Evaluates expressions: arguments, values at the start of a line, contents of {@code { … }} blocks, Java
@@ -92,21 +93,76 @@ public final class Evaluator {
         }
     }
 
+    /**
+     * An argument evaluated: its value, and the wildcard pattern it spells (glob syntax, a backslash escapes the next
+     * character) where a shell expands wildcards (FR-40). The pattern is {@code null} for a quoted text, a variable or
+     * a block, which are never wildcards; in a compound word only the unquoted text is.
+     */
+    record Word(Object value, String pattern) { }
+
     /** Values of the arguments of a command, in order. */
     List<Object> arguments(List<Ast.Argument> arguments) throws InterruptedException {
         List<Object> values = new ArrayList<>(arguments.size());
-        for (Ast.Argument argument : arguments) {
-            values.add(argument(argument));
+        for (Word word : words(arguments)) {
+            values.add(word.value());
         }
         return values;
     }
 
-    /** Value of one argument: a bare word (with {@code ~} expanded, FR-62) or an expression. */
+    /** The arguments of a command, evaluated once, in order. */
+    List<Word> words(List<Ast.Argument> arguments) throws InterruptedException {
+        List<Word> words = new ArrayList<>(arguments.size());
+        for (Ast.Argument argument : arguments) {
+            words.add(word(argument));
+        }
+        return words;
+    }
+
+    /** Value of one argument: a bare word (with {@code ~} expanded, FR-62), an expression, or a compound word. */
     Object argument(Ast.Argument argument) throws InterruptedException {
+        return word(argument).value();
+    }
+
+    private Word word(Ast.Argument argument) throws InterruptedException {
         return switch (argument) {
-            case Ast.WordArgument(var text) -> session.expandTilde(text); // ~, ~/x (FR-62); not in quotes
-            case Ast.ExpressionArgument(var expression) -> evaluate(expression);
+            case Ast.WordArgument(var text) -> {
+                String expanded = session.expandTilde(text); // ~, ~/x (FR-62); not in quotes
+                yield new Word(expanded, plainPattern(expanded));
+            }
+            case Ast.ExpressionArgument(var expression) -> new Word(evaluate(expression), null);
+            case Ast.CompoundArgument(var pieces) -> compound(pieces);
         };
+    }
+
+    /**
+     * A word made of pieces (FR-32c): its text is the text of the pieces one after the other. Only the unquoted text
+     * can be a wildcard, so the pattern escapes what a quoted text or a variable holds. {@code ~} is the home folder
+     * at the start of the first piece if it is unquoted and followed by a slash.
+     */
+    private Word compound(List<Ast.Piece> pieces) throws InterruptedException {
+        var text = new StringBuilder();
+        var pattern = new StringBuilder();
+        for (int i = 0; i < pieces.size(); i++) {
+            switch (pieces.get(i)) {
+                case Ast.TextPiece(var plain) -> {
+                    String value = i == 0 && (plain.startsWith("~/") || plain.startsWith("~\\"))
+                            ? session.expandTilde("~") + plain.substring(1) : plain; // the slash after ~ stays
+                    text.append(value);
+                    pattern.append(plainPattern(value));
+                }
+                case Ast.ExpressionPiece(var expression) -> {
+                    String value = Values.text(evaluate(expression));
+                    text.append(value);
+                    pattern.append(Globs.escape(value));
+                }
+            }
+        }
+        return new Word(text.toString(), pattern.toString());
+    }
+
+    /** Unquoted text as a pattern: the backslash is no escape character in it (FR-32b), so it is a plain one. */
+    private static String plainPattern(String text) {
+        return text.replace("\\", "\\\\");
     }
 
     private Object eval(Expression expression) throws InterruptedException {

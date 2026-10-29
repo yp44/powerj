@@ -41,15 +41,29 @@ public final class GlobExpander {
     }
 
     /**
-     * @param word             the word as written; relative to {@code currentDirectory} unless it starts with {@code /}
+     * @param word             the word as written, a glob pattern; relative to {@code currentDirectory} unless it starts
+     *                         with {@code /}
      * @param currentDirectory the folder a relative word starts from
      * @param ignoreCase       {@code true}: {@code *.TXT} matches {@code a.txt} (see {@link Globs#matcher(String, boolean)})
      * @return the names found, or the word itself if it has no wildcard or matches nothing
      */
     public static List<String> expand(String word, Path currentDirectory, boolean ignoreCase) {
-        if (!Globs.hasWildcard(word)) {
-            return List.of(word);
+        return expand(word, word, currentDirectory, ignoreCase);
+    }
+
+    /**
+     * Like {@link #expand(String, Path, boolean)} for a word whose text is not its pattern: the parts of
+     * {@code "my docs"/*} that were quoted are escaped in the pattern ({@code my docs/*}, and {@code a\*b} for
+     * {@code "a*b"}), so that only the others are wildcards.
+     *
+     * @param pattern the pattern: a backslash escapes the next character (see {@link Globs#escape})
+     * @param text    what the word says, which is returned as it is if the pattern has no wildcard or matches nothing
+     */
+    public static List<String> expand(String pattern, String text, Path currentDirectory, boolean ignoreCase) {
+        if (!Globs.hasWildcard(pattern)) {
+            return List.of(text);
         }
+        String word = pattern;
         boolean absolute = word.startsWith("/");
         boolean directoriesOnly = word.endsWith("/");
         String path = word.substring(absolute ? 1 : 0, word.length() - (directoriesOnly ? 1 : 0));
@@ -66,17 +80,18 @@ public final class GlobExpander {
                         ? match(found, segments[i], directory, ignoreCase)
                         : literal(found, segments[i], directory);
             } catch (PatternSyntaxException _) {
-                return List.of(word); // not a pattern: a shell passes it as written
+                return List.of(text); // not a pattern: a shell passes it as written
             }
         }
         if (found.isEmpty()) {
-            return List.of(word);
+            return List.of(text);
         }
         return found.stream().map(f -> f.text().startsWith("-") ? "./" + f.text() : f.text()).toList();
     }
 
-    /** The folders found so far that hold an element called {@code name}. */
-    private static List<Found> literal(List<Found> parents, String name, boolean directory) {
+    /** The folders found so far that hold an element called {@code segment} (a pattern without wildcard). */
+    private static List<Found> literal(List<Found> parents, String segment, boolean directory) {
+        String name = Globs.unescape(segment);
         List<Found> found = new ArrayList<>();
         for (Found parent : parents) {
             Path path = parent.path().resolve(name);

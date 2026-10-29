@@ -244,4 +244,39 @@ class ParserTest {
         assertThatThrownBy(() -> Parser.parse("1 +")).isExactlyInstanceOf(SyntaxException.class)
                 .hasMessage("syntax: incomplete expression");
     }
+
+    // --- Compound words (FR-32c, issue #73) ---
+
+    private static Ast.ExpressionPiece quoted(String text) {
+        return new Ast.ExpressionPiece(new Ast.StringExpression(List.of(new StringPart.Text(text))));
+    }
+
+    @Test
+    void piecesWrittenWithoutABlankAreOneArgument() {
+        assertThat(only("echo \"my docs\"/*").body()).isEqualTo(new Command("echo", false, List.of(
+                new Ast.CompoundArgument(List.of(quoted("my docs"), new Ast.TextPiece("/*"))))));
+        assertThat(only("git --message=\"a b\" -x").body()).isEqualTo(new Command("git", false, List.of(
+                new Ast.CompoundArgument(List.of(new Ast.TextPiece("--message="), quoted("a b"))),
+                new WordArgument("-x"))));
+    }
+
+    @Test
+    void aVariablePieceKeepsItsExpression() {
+        assertThat(only("ls $d/*.txt").body()).isEqualTo(new Command("ls", false, List.of(
+                new Ast.CompoundArgument(List.of(new Ast.ExpressionPiece(new Ast.VariableExpression("d", List.of())),
+                        new Ast.TextPiece("/*.txt"))))));
+    }
+
+    @Test
+    void theTargetOfARedirectionCanBeACompoundWord() {
+        assertThat(only("echo x > \"my docs\"/out.txt").redirects()).containsExactly(
+                new Ast.Redirect(RedirectedStream.OUT, false,
+                        new Ast.CompoundArgument(List.of(quoted("my docs"), new Ast.TextPiece("/out.txt")))));
+    }
+
+    @Test
+    void aLoneQuotedTextIsStillAnExpressionArgument() {
+        assertThat(only("echo \"a\"").body()).isEqualTo(new Command("echo", false, List.of(
+                new Ast.ExpressionArgument(new Ast.StringExpression(List.of(new StringPart.Text("a")))))));
+    }
 }

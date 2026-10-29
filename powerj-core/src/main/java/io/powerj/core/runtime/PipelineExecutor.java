@@ -11,6 +11,7 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 import io.powerj.api.Collected;
 import io.powerj.api.ScriptBlock;
@@ -330,7 +331,8 @@ final class PipelineExecutor {
             }, "expression");
         }
         var command = (Ast.Command) stage.body();
-        List<Object> args = evaluator.arguments(command.arguments());
+        List<Evaluator.Word> words = evaluator.words(command.arguments());
+        List<Object> args = words.stream().map(Evaluator.Word::value).collect(Collectors.toList());
         return switch (resolution.resolve(command.name(), command.forceNative(), session)) {
             case Resolved.BuiltinCall(var name, var builtin) -> {
                 PreviewGuard.deny(Messages.get("preview.off.builtin", name));
@@ -362,7 +364,7 @@ final class PipelineExecutor {
             }
             case Resolved.NativeCall(var executable) -> {
                 PreviewGuard.deny(Messages.get("preview.off.native", command.name()));
-                List<String> textArgs = NativeArguments.of(command.arguments(), args, session);
+                List<String> textArgs = NativeArguments.of(words, session);
                 yield new NativeStep(new NativeRunner.Command(executable, textArgs, stage.errorsToOutput()));
             }
             case Resolved.Unknown _ -> throw unknownCommand(command);

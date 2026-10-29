@@ -299,6 +299,26 @@ structures, functions) can be built on it. The work is organised in phases (revi
   (`ci/smoke/wildcards.sh`, in the CI and release workflows) checks that the module is in the image. Acceptance sheet:
   [docs/acceptance/wildcards.md](docs/acceptance/wildcards.md).
 
+### Added and changed (compound words, [#73](https://github.com/yp44/powerj/issues/73))
+- **Pieces written without a blank are one word** (new requirement FR-32c; amends FR-32b, FR-40, FR-62 and the grammar).
+  A piece is plain text, a text in double quotes or a variable: `"my docs"/*`, `$dir/*.txt`, `--message="a b"`, `x"y"z`
+  used to be two or three arguments, silently, and are one now. A word of one piece is as before (a lone variable keeps its
+  value and its type). A variable is a piece at the start of a word or right after a quoted text or a variable; in the
+  middle of plain text `$` stays a plain character (`grep foo$`). A blank, `;`, `|`, `>`, `&&`, `&`, a group, a block and a
+  Java call end the word; the name of a command is never glued; a line that starts with a text is still an expression.
+- **Only the plain-text pieces are wildcards**, so `^rm -r "my docs"/*` acts inside `my docs`, and `^echo "x"/*` never
+  lists `/`: the second word `/*` was expanded against the root folder since #51 (the hazard found while documenting
+  that change). `"a*b"*` matches the names that start with the text `a*b`. The cmdlets receive the one argument
+  (`ls "my docs"/*.txt` works) and still expand what they receive. `~` is the home folder at the start of an unquoted first
+  piece followed by a slash (`~/"x"`). The target of a redirection is such a word too (`"x" > "my docs"/out.txt`).
+- Inside: `Token.Compound`, `Ast.CompoundArgument` with `TextPiece` and `ExpressionPiece`, `Evaluator.Word` (the value, and
+  the wildcard pattern), `Globs.escape` and `Globs.unescape`; `Globs.hasWildcard` and `GlobExpander` know the backslash
+  escape of a pattern (`GlobExpander.expand(pattern, text, …)`). In an unquoted word the backslash is still a plain
+  character (FR-32b).
+- Not done: Tab completion after a text in quotes that is closed (`"my docs"/su<Tab>` proposes nothing, as before; inside the
+  quotes it works). Tests: lexer, parser, native commands, `Globs`, `GlobExpander`; acceptance rows 19 to 29 of
+  [docs/acceptance/wildcards.md](docs/acceptance/wildcards.md); `ci/smoke/wildcards.sh`.
+
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
   whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes
