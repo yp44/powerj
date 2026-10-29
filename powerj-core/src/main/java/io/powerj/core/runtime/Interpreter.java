@@ -278,6 +278,16 @@ public final class Interpreter implements CommandCatalog {
         return preview.preview(line, limit, width, colors);
     }
 
+    /** The settings of the preview mode (FR-66) as the environment of the session holds them now. */
+    public PreviewSettings previewSettings() {
+        return PreviewSettings.from(session.environment());
+    }
+
+    /** Sets the preview mode's settings in the environment of the session; the next preview uses them. */
+    public void previewSettings(PreviewSettings settings) {
+        settings.writeTo(session.environment());
+    }
+
     /** {@code true} if the last executed line hit a blocking error (not just a failure). */
     public boolean hadBlockingError() {
         return reporter.hadBlocking();
