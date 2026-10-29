@@ -36,16 +36,19 @@ class PreviewTest {
     @CmdletInfo(name = "items", preview = true, summary = "Produces test objects")
     static final class Items implements Cmdlet<Items.Params, Void, Item> {
 
-        record Params(@Option(shortName = 'n') int count, @Option boolean forever) { }
+        record Params(@Option(shortName = 'n') int count, @Option boolean forever, @Option boolean stall) { }
 
-        /** Set once {@code --forever} has emitted its first object: the preview is then running. */
+        /** Set once the source has emitted its first object: the preview is then running. */
         static volatile java.util.concurrent.CountDownLatch emitting = new java.util.concurrent.CountDownLatch(1);
 
         @Override
-        public void begin(Params params, CmdletContext<Item> context) {
+        public void begin(Params params, CmdletContext<Item> context) throws InterruptedException {
             for (int i = 1; params.forever() || i <= (params.count() == 0 ? 3 : params.count()); i++) {
                 context.emit(new Item("item" + i, i * 10));
                 emitting.countDown();
+            }
+            if (params.stall()) {
+                Thread.sleep(java.time.Duration.ofMinutes(10)); // a source that has no more to say but does not end
             }
         }
     }
@@ -281,7 +284,7 @@ class PreviewTest {
         Items.emitting = new java.util.concurrent.CountDownLatch(1);
         var result = CompletableFuture.supplyAsync(() -> {
             started.complete(Thread.currentThread());
-            return interpreter.preview("items --forever | keep { i -> false }", 10, 120, false);
+            return interpreter.preview("items --stall | keep { i -> false }", 10, 120, false);
         });
         Thread worker = started.get(5, TimeUnit.SECONDS);
         assertThat(Items.emitting.await(10, TimeUnit.SECONDS)).as("the preview is running").isTrue();

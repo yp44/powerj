@@ -105,6 +105,12 @@ final class PreviewMode {
         if (guard.reason() != null) {
             return new PreviewResult.Off(guard.reason());
         }
+        if (Thread.currentThread().isInterrupted()) {
+            // The pipeline waits for its stages without letting itself be interrupted, then gives the interruption back
+            // instead of throwing: it still is the time limit that stopped the evaluation.
+            more = true;
+            interrupted = true;
+        }
         List<Object> shown;
         synchronized (values) {
             shown = new ArrayList<>(values.subList(0, Math.min(limit, values.size())));

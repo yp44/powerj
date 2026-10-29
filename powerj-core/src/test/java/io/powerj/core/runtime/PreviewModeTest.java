@@ -226,6 +226,20 @@ class PreviewModeTest {
     }
 
     @Test
+    void anInterruptionThatTheEvaluationGivesBackInsteadOfThrowingIsStillATimeout() {
+        // `nothing` never checks for cancellation: it ends normally and the thread is still interrupted, as when the
+        // time limit lands while the pipeline waits for its stages (they are joined without being interrupted)
+        Thread.currentThread().interrupt();
+        PreviewResult result;
+        try {
+            result = run("nothing", 10);
+        } finally {
+            Thread.interrupted();
+        }
+        assertThat(result).isInstanceOf(PreviewResult.TimedOut.class);
+    }
+
+    @Test
     void aLineWithNothingToShowIsAnEmptyResultNotATimeout() {
         assertThat(run("nothing", 10)).isInstanceOfSatisfying(PreviewResult.Values.class, values -> {
             assertThat(values.values()).isEmpty();
