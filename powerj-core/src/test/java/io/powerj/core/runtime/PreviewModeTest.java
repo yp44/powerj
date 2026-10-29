@@ -11,6 +11,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.io.TempDir;
 import io.powerj.core.command.CmdletRegistry;
 import io.powerj.core.error.PjException;
 import io.powerj.core.lang.ParseContext;
+import io.powerj.core.lang.Parser;
 import io.powerj.core.nativeexec.CommandResolver;
 import io.powerj.core.support.PreviewableItems;
 
@@ -31,7 +33,10 @@ class PreviewModeTest {
     Path tmp;
 
     private final List<String> errors = Collections.synchronizedList(new ArrayList<>());
+    private final AtomicReference<PreviewSettings> settings = new AtomicReference<>(PreviewSettings.defaults());
     private PreviewMode preview;
+    private PipelineExecutor executor;
+    private ParseContext parseContext;
     private Session session;
 
     @BeforeEach
@@ -44,13 +49,13 @@ class PreviewModeTest {
         });
         var resolution = new CommandResolution(builtins, CmdletRegistry.of(PreviewableItems.all()),
                 new CommandResolver());
-        ParseContext parseContext = new ParseContext(_ -> false, _ -> false);
+        parseContext = new ParseContext(_ -> false, _ -> false);
         var evaluator = new Evaluator(session, _ -> {
             throw new UnsupportedOperationException("no subexpression in these tests");
         }, () -> parseContext);
-        var executor = new PipelineExecutor(session, io, resolution, new NativeRunner(), evaluator,
+        executor = new PipelineExecutor(session, io, resolution, new NativeRunner(), evaluator,
                 new ErrorReporter(session, io), () -> ExecutionObserver.NONE);
-        preview = new PreviewMode(() -> parseContext, executor);
+        preview = new PreviewMode(() -> parseContext, executor, settings::get);
     }
 
     private PreviewResult run(String line, int limit) {
@@ -117,6 +122,128 @@ class PreviewModeTest {
         assertThat(run("careless", 3)).isInstanceOfSatisfying(PreviewResult.Values.class, values -> {
             assertThat(values.values()).hasSize(3);
             assertThat(values.more()).isTrue();
+        });
+    }
+
+    private void limitStagesTo(int limit) {
+        settings.set(new PreviewSettings(PreviewSettings.DEFAULT_DEADLINE_MILLIS, limit));
+    }
+
+    /** Runs the line like the shell's time limit does: the calling thread is interrupted after {@code millis}. */
+    private PreviewResult runInterruptedAfter(String line, long millis) {
+        Thread caller = Thread.currentThread();
+        Thread watch = Thread.ofVirtual().start(() -> {
+            try {
+                Thread.sleep(millis);
+                caller.interrupt();
+            } catch (InterruptedException _) {
+                // the preview ended first
+            }
+        });
+        try {
+            return run(line, 10);
+        } finally {
+            watch.interrupt();
+            Thread.interrupted();
+        }
+    }
+
+    @Test
+    void aStageSendsOnlyTheLimitToTheNextOneAndTheValuesAreSaidToBePartial() {
+        limitStagesTo(20);
+
+        assertThat(run("items -n 500 | tally", 10)).isInstanceOfSatisfying(PreviewResult.Values.class, values -> {
+            assertThat(values.values()).containsExactly(20); // tally counted what it received: the first 20
+            assertThat(values.partial()).isTrue();
+            assertThat(values.more()).isFalse();
+        });
+    }
+
+    @Test
+    void aStageThatSendsExactlyTheLimitIsNotCut() {
+        limitStagesTo(20);
+
+        assertThat(run("items -n 20 | tally", 10)).isInstanceOfSatisfying(PreviewResult.Values.class, values -> {
+            assertThat(values.values()).containsExactly(20);
+            assertThat(values.partial()).isFalse();
+        });
+    }
+
+    @Test
+    void theLastStageIsNotCutByTheLimitOfTheStages() {
+        limitStagesTo(20);
+
+        assertThat(run("items -n 500", 100)).isInstanceOfSatisfying(PreviewResult.Values.class, values -> {
+            assertThat(values.values()).hasSize(100);
+            assertThat(values.partial()).isFalse();
+        });
+    }
+
+    @Test
+    void everyStageButTheLastIsCut() {
+        limitStagesTo(20);
+
+        assertThat(run("items -n 500 | tally | tally", 10)).isInstanceOfSatisfying(PreviewResult.Values.class,
+                values -> {
+                    assertThat(values.values()).containsExactly(1); // the second tally received one count
+                    assertThat(values.partial()).isTrue();
+                });
+    }
+
+    @Test
+    void theLimitIsReadAtEachPreview() {
+        limitStagesTo(10);
+        assertThat(run("items -n 500 | tally", 10)).isInstanceOfSatisfying(PreviewResult.Values.class,
+                values -> assertThat(values.values()).containsExactly(10));
+
+        limitStagesTo(30);
+        assertThat(run("items -n 500 | tally", 10)).isInstanceOfSatisfying(PreviewResult.Values.class,
+                values -> assertThat(values.values()).containsExactly(30));
+    }
+
+    @Test
+    void theLimitOfTheStagesOnlyCutsAPreview() throws Exception {
+        limitStagesTo(20);
+        List<Object> values = new ArrayList<>();
+
+        var pipeline = Parser.parse("items -n 500 | tally", parseContext).steps().getFirst().statement().pipeline();
+        executor.execute(pipeline, values::add, true, Redirections.NONE);
+
+        assertThat(values).containsExactly(500);
+    }
+
+    @Test
+    void aPreviewThatTheTimeLimitStoppedBeforeAnyValueIsTimedOutNotEmpty() {
+        assertThat(runInterruptedAfter("stall | tally", 300)).isInstanceOf(PreviewResult.TimedOut.class);
+    }
+
+    @Test
+    void aPreviewThatTheTimeLimitStoppedAfterSomeValuesShowsThem() {
+        assertThat(runInterruptedAfter("stall", 300)).isInstanceOfSatisfying(PreviewResult.Values.class, values -> {
+            assertThat(values.values()).hasSize(3);
+            assertThat(values.more()).isTrue();
+        });
+    }
+
+    @Test
+    void anInterruptionThatTheEvaluationGivesBackInsteadOfThrowingIsStillATimeout() {
+        // `nothing` never checks for cancellation: it ends normally and the thread is still interrupted, as when the
+        // time limit lands while the pipeline waits for its stages (they are joined without being interrupted)
+        Thread.currentThread().interrupt();
+        PreviewResult result;
+        try {
+            result = run("nothing", 10);
+        } finally {
+            Thread.interrupted();
+        }
+        assertThat(result).isInstanceOf(PreviewResult.TimedOut.class);
+    }
+
+    @Test
+    void aLineWithNothingToShowIsAnEmptyResultNotATimeout() {
+        assertThat(run("nothing", 10)).isInstanceOfSatisfying(PreviewResult.Values.class, values -> {
+            assertThat(values.values()).isEmpty();
+            assertThat(values.partial()).isFalse();
         });
     }
 }

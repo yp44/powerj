@@ -319,6 +319,32 @@ structures, functions) can be built on it. The work is organised in phases (revi
   quotes it works). Tests: lexer, parser, native commands, `Globs`, `GlobExpander`; acceptance rows 19 to 29 of
   [docs/acceptance/wildcards.md](docs/acceptance/wildcards.md); `ci/smoke/wildcards.sh`.
 
+### Fixed and changed (preview of `sort` and `group`, [#74](https://github.com/yp44/powerj/issues/74))
+- **`ls -r | sort size` and `ls -r | group size` showed `no result` in preview mode** when the walk took longer than the
+  deadline of 400 ms: a stage that emits only when its input has ended had nothing to show when the time limit stopped
+  it, and the empty list was displayed as "no result". Measured on 20 000 files, the same on `b64c4b6` and on `main`: the
+  code had not regressed, the tree the preview ran in had grown. Fixed in two ways (FR-66):
+  - **Each stage but the last sends at most 50 objects to the next one in a preview** (`StageLimit`), so the blocking
+    stage ends its input and emits; `ls -r | group size` answers at once on a tree of any size. The banner says
+    `partial · 50 objects max per stage` as soon as a stage was cut, since a count or a sort made of the first objects is
+    not the real one. The last stage is not limited, and executing the line (Enter) is not limited.
+  - **A preview stopped by the time limit before any value says so** (`PreviewResult.TimedOut`) instead of `no result`,
+    and offers the two settings: `── timed out after 400 ms · [duration 400 ms]  max/stage 50 · Alt+◄► choose, Alt+▲▼
+    change ───`. Alt+◄► choose a setting, Alt+▲▼ change it by a step (200 to 5000 ms, 10 to 5000 objects), and the line is
+    previewed again, without leaving the preview mode. The same menu is available under the banner of values, partial or
+    not: the first Alt+arrow shows it and changes nothing, the next ones change the settings; typing closes it. The keys
+    act while values or a timeout are shown, otherwise they keep the action they had; ▲ and ▼ alone are still the history.
+- **Two settings of the session environment**, read at each evaluation: `POWERJ_PREVIEW_DEADLINE_MS` (400 by default,
+  5000 at most) and `POWERJ_PREVIEW_STAGE_LIMIT` (50 by default). `LatestWinsRunner` asks its deadline at the start of each
+  evaluation.
+- **An interruption that the pipeline hands back instead of throwing** (it joins its stages without letting itself be
+  interrupted) is a timeout too; it used to give an empty result.
+- Tests: `PreviewSettingsTest`, `PreviewModeTest` (the limit, a stage that sends exactly the limit, the last stage, the
+  limit read at each preview, no limit outside a preview, the timeout), `LatestWinsRunnerTest` (a deadline that changes
+  between requests), `PreviewRenderTest`, `PreviewControlTest` and `PreviewControlKeysTest` (keys in a terminal,
+  the history with ▲, the keys that keep their action). Acceptance rows 18 to 26 of
+  [docs/acceptance/preview.md](docs/acceptance/preview.md).
+
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
   whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes

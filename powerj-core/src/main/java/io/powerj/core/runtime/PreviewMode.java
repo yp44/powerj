@@ -31,17 +31,24 @@ final class PreviewMode {
 
     private final Supplier<ParseContext> parseContext;
     private final PipelineExecutor executor;
+    private final Supplier<PreviewSettings> settings;
 
-    PreviewMode(Supplier<ParseContext> parseContext, PipelineExecutor executor) {
+    /** @param settings read at each preview: the limit of the stages is the one of the moment */
+    PreviewMode(Supplier<ParseContext> parseContext, PipelineExecutor executor, Supplier<PreviewSettings> settings) {
         this.parseContext = parseContext;
         this.executor = executor;
+        this.settings = settings;
     }
 
     /**
      * Preview mode (FR-66): evaluates the line as {@link Interpreter#execute} would, but only with what changes nothing — cmdlets
      * declared {@code preview = true}, expressions, Java calls of the preview set — and stops after {@code limit}
      * values. Nothing is displayed, no variable is set, {@code $?} and {@code $errors} are left as they are.
-     * Cancelled by interrupting the calling thread: the values received so far are then returned.
+     * Cancelled by interrupting the calling thread: the values received so far are then returned, or
+     * {@link PreviewResult.TimedOut} if there are none. Each stage but the last sends at most
+     * {@link PreviewSettings#stageLimit()} objects to the next one, so that a stage that emits only when its input
+     * has ended ({@code sort}, {@code group}) has something to show; the result then says it is
+     * {@link PreviewResult.Values#partial() partial}.
      *
      * @param width  width of the formatted lines ({@link PreviewResult.Values#lines()})
      * @param colors {@code true} if the lines may contain ANSI colors
@@ -72,9 +79,10 @@ final class PreviewMode {
         if (!statement.pipeline().redirects().isEmpty()) {
             return new PreviewResult.Off(Messages.get("preview.off.redirection"));
         }
-        var guard = new PreviewGuard();
+        var guard = new PreviewGuard(settings.get().stageLimit());
         List<Object> values = Collections.synchronizedList(new ArrayList<>());
         boolean more = false;
+        boolean interrupted = false;
         try {
             guard.call(() -> executor.execute(statement.pipeline(), value -> previewValue(value, values, limit), true,
                     Redirections.NONE));
@@ -83,6 +91,7 @@ final class PreviewMode {
         } catch (InterruptedException | CancellationException e) {
             if (guard.reason() == null) {
                 more = true; // cancelled by the caller (time limit): what has arrived is shown
+                interrupted = true;
             }
         } catch (PjException e) {
             if (guard.reason() == null) {
@@ -96,10 +105,19 @@ final class PreviewMode {
         if (guard.reason() != null) {
             return new PreviewResult.Off(guard.reason());
         }
+        if (Thread.currentThread().isInterrupted()) {
+            // The pipeline waits for its stages without letting itself be interrupted, then gives the interruption back
+            // instead of throwing: it still is the time limit that stopped the evaluation.
+            more = true;
+            interrupted = true;
+        }
         List<Object> shown;
         synchronized (values) {
             shown = new ArrayList<>(values.subList(0, Math.min(limit, values.size())));
             more |= values.size() > limit;
+        }
+        if (interrupted && shown.isEmpty()) {
+            return new PreviewResult.TimedOut(guard.errors()); // not "no result": the line was cut off, not empty
         }
         var text = new StringWriter();
         try {
@@ -117,7 +135,7 @@ final class PreviewMode {
         }
         String formatted = text.toString().stripTrailing();
         List<String> lines = formatted.isEmpty() ? List.of() : List.of(formatted.split("\\R"));
-        return new PreviewResult.Values(shown, lines, more, guard.errors());
+        return new PreviewResult.Values(shown, lines, more, guard.errors(), guard.wasCut());
     }
 
     /** Adds a value of the preview, unrolled like the display does; stops once there is more than {@code limit}. */

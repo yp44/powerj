@@ -23,8 +23,20 @@ public final class PreviewGuard {
         }
     }
 
+    private final int stageLimit;
     private volatile String reason;
+    private volatile boolean cut;
     private final AtomicInteger errors = new AtomicInteger();
+
+    /** A preview in which no stage is limited. */
+    public PreviewGuard() {
+        this(Integer.MAX_VALUE);
+    }
+
+    /** @param stageLimit objects that each stage but the last may send to the next one */
+    public PreviewGuard(int stageLimit) {
+        this.stageLimit = stageLimit;
+    }
 
     /** Guard of the current thread, or {@code null} outside a preview. */
     public static PreviewGuard current() {
@@ -72,6 +84,21 @@ public final class PreviewGuard {
     /** What stopped the preview, or {@code null}. */
     public String reason() {
         return reason;
+    }
+
+    /** Objects that each stage but the last may send to the next one in this preview. */
+    public int stageLimit() {
+        return stageLimit;
+    }
+
+    /** A stage was stopped at {@link #stageLimit()}: what follows it saw only the beginning of the data. */
+    public void stageCut() {
+        cut = true;
+    }
+
+    /** {@code true} if a stage was stopped at {@link #stageLimit()}. */
+    public boolean wasCut() {
+        return cut;
     }
 
     /** A non-blocking error reported during the preview: counted, never displayed. */

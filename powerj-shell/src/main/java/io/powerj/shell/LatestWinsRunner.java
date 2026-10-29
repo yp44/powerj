@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -40,7 +41,7 @@ final class LatestWinsRunner<Q, R> {
     private final Function<Throwable, R> failure;
     private final BiConsumer<R, Delivery> publish;
     private final Duration debounce;
-    private final Duration deadline;
+    private final Supplier<Duration> deadline;
     private final String threadName;
     private final long stackSize;
 
@@ -59,12 +60,14 @@ final class LatestWinsRunner<Q, R> {
      * @param publish    hands a result over; it runs after the evaluation, outside its deadline, and may throw (the
      *                   result is then dropped)
      * @param debounce   pause after a request before it is evaluated
-     * @param deadline   longest evaluation
+     * @param deadline   longest evaluation, asked for at the start of each one: a setting changed meanwhile applies to
+     *                   the next evaluation
      * @param threadName name of the worker thread
      * @param stackSize  stack of the worker thread
      */
     LatestWinsRunner(Function<Q, R> evaluate, Function<Throwable, R> failure, BiConsumer<R, Delivery> publish,
-                     Duration debounce, Duration deadline, String threadName, long stackSize) {
+                     Duration debounce, Supplier<Duration> deadline, String threadName,
+                     long stackSize) {
         this.evaluate = Objects.requireNonNull(evaluate, "evaluate");
         this.failure = Objects.requireNonNull(failure, "failure");
         this.publish = Objects.requireNonNull(publish, "publish");
@@ -145,9 +148,10 @@ final class LatestWinsRunner<Q, R> {
 
     private R evaluateWithinDeadline(Q request, long generation) {
         Thread self = Thread.currentThread();
+        Duration limit = deadline.get();
         Thread deadlineWatch = Thread.ofVirtual().start(() -> {
             try {
-                Thread.sleep(deadline);
+                Thread.sleep(limit);
                 synchronized (lock) {
                     if (evaluating && requestedGeneration == generation) {
                         self.interrupt();
