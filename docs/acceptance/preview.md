@@ -33,8 +33,15 @@ In a test folder (e.g. `C:\tmp\p`), create with your editor `small.txt` (a few c
 | 15 | Type `ls \| where { f -> f.size > 2kb }` then **Enter** | Executed normally (`big.txt`). |
 | 16 | Type `notepad keep.txt` then **Enter** | `⏸ preview off: native command notepad` while typing; Enter opens Notepad (Enter always executes). Close it. |
 | 17 | Press **Alt+V** | The prompt is `PJ C:\tmp\p> ` again; typing shows no preview any more. |
+| 18 | In a folder with many files (the repository of PowerJ, with its `.git` and `target` folders), press **Alt+V** and type `ls -r \| group size` | A preview at once, not `no result`: a banner `── Group · … · partial · 50 objects max per stage ───`, then a table `key count`. The counts are those of the first 50 files only: the banner says so. |
+| 19 | Type `ls -r \| sort size` | `── FileEntry · 10+ · partial · 50 objects max per stage ───` and the 10 smallest of the first 50 files. |
+| 20 | Type `env --set POWERJ_PREVIEW_STAGE_LIMIT=100000` and **Enter** (it is executed, the preview mode stays), then type the line of row 18 again | On a tree that takes more than 400 ms to walk: `── timed out after 400 ms · [duration 400 ms]  max/stage 100000 · Alt+◄► choose, Alt+▲▼ change ───`, not `no result`. The prompt is still `PJ? …`. |
+| 21 | Press **Alt+▲** | The chosen setting (`[duration 400 ms]`) becomes `[duration 800 ms]` and the line is previewed again with 800 ms; `env POWERJ_PREVIEW_DEADLINE_MS` says `800`. Again: 1600, 3200, then `[duration 3200 ms (max)]` and Alt+▲ no longer changes it. **Alt+▼** goes back down. |
+| 22 | Press **Alt+►**, then **Alt+▼** | `max/stage` is now the chosen one, between brackets; each Alt+▼ takes it down one step (500, 100, 50, 20, 10: a value above 500 goes down to 500) and the preview is evaluated again; with 10 or 20 objects the table appears (`partial`). **Alt+◄** chooses the duration again. |
+| 23 | With a preview that has results (`ls`), press **Alt+▲**, **Alt+◄** | Nothing changes in the settings: the keys act only while the `timed out` banner is shown. **▲** alone, with a line typed, searches the history as before. |
 
 ## Notes
 
 - In Windows Terminal, Alt+V reaches PowerJ as is. Under macOS (Terminal, iTerm2), enable "Use Option as Meta key".
+- If your terminal keeps **Alt+arrows** for itself (a multiplexer, some Linux desktops), change the settings with `env --set POWERJ_PREVIEW_DEADLINE_MS=800` and `env --set POWERJ_PREVIEW_STAGE_LIMIT=20`: they are read at the next key.
 - A Java computation that never checks for cancellation (e.g. `LongStream.range(0, Long.MAX_VALUE).sum()`) keeps the preview busy: it no longer refreshes until the computation ends. Input and Enter remain available.
