@@ -276,7 +276,7 @@ class PreviewTest {
     }
 
     @Test
-    void interruptingThePreviewReturnsWhatHasArrived() throws Exception {
+    void interruptingThePreviewBeforeAnyValueHasArrivedIsATimeoutNotAnEmptyResult() throws Exception {
         var started = new CompletableFuture<Thread>();
         Items.emitting = new java.util.concurrent.CountDownLatch(1);
         var result = CompletableFuture.supplyAsync(() -> {
@@ -286,8 +286,6 @@ class PreviewTest {
         Thread worker = started.get(5, TimeUnit.SECONDS);
         assertThat(Items.emitting.await(10, TimeUnit.SECONDS)).as("the preview is running").isTrue();
         worker.interrupt();
-        var values = (PreviewResult.Values) result.get(10, TimeUnit.SECONDS);
-        assertThat(values.values()).isEmpty();
-        assertThat(values.more()).isTrue();
+        assertThat(result.get(10, TimeUnit.SECONDS)).isInstanceOf(PreviewResult.TimedOut.class);
     }
 }

@@ -244,7 +244,7 @@ final class PipelineExecutor {
         return switch (segment) {
             case ObjectSegment(var stage, _) -> {
                 try {
-                    yield stage.run(input, output != null ? output::putUnrolled : context.sink(), context.errors());
+                    yield stage.run(input, output != null ? StageLimit.into(output) : context.sink(), context.errors());
                 } catch (InterruptedException | RuntimeException e) {
                     throw e;
                 } catch (Exception e) {

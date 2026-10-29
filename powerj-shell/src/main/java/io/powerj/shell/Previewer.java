@@ -16,6 +16,7 @@ import org.jline.utils.AttributedStyle;
 import io.powerj.core.assist.Completions;
 import io.powerj.core.runtime.Interpreter;
 import io.powerj.core.runtime.PreviewResult;
+import io.powerj.core.runtime.PreviewSettings;
 
 /**
  * Preview mode (FR-66): Alt+V switches between the normal mode and the preview mode, shown by the {@code PJ?} prompt.
@@ -52,6 +53,9 @@ final class Previewer {
     private final Object lock = new Object();
     private final LatestWinsRunner<String, PreviewResult> runner;
 
+    /** The settings in force when the last evaluation started: what its banner says it was cut at. */
+    private volatile PreviewSettings evaluatedWith = PreviewSettings.defaults();
+
     /** Text last evaluated (to ignore redisplays that change nothing) and result lines kept when the preview stops. */
     private String lastText;
     private List<AttributedString> lastLines = List.of();
@@ -65,7 +69,10 @@ final class Previewer {
         this.colors = colors;
         this.modes = modes;
         this.runner = new LatestWinsRunner<>(
-                text -> interpreter.preview(text, LIMIT, columns(), colors),
+                text -> {
+                    evaluatedWith = interpreter.previewSettings();
+                    return interpreter.preview(text, LIMIT, columns(), colors);
+                },
                 failure -> new PreviewResult.Failed(String.valueOf(failure)),
                 this::show, Duration.ofMillis(DEBOUNCE_MILLIS), Duration.ofMillis(DEADLINE_MILLIS), "powerj-preview",
                 STACK_SIZE);
@@ -183,7 +190,7 @@ final class Previewer {
                 }
                 return null;
             }
-            case PreviewResult.Values(var values, var formatted, var more, var errors) -> {
+            case PreviewResult.Values(var values, var formatted, var more, var errors, var partial) -> {
                 List<AttributedString> shown = formatted.stream().limit(MAX_LINES)
                         .map(line -> AttributedString.fromAnsi(line).columnSubSequence(0, columns)).toList();
                 synchronized (lock) {
@@ -191,11 +198,24 @@ final class Previewer {
                 }
                 String count = values.isEmpty() ? Messages.get("preview.banner.empty")
                         : Messages.get("preview.banner.count", typeName(values), values.size() + (more ? "+" : ""));
+                if (partial) {
+                    count += " · " + Messages.get("preview.banner.partial", evaluatedWith.stageLimit());
+                }
                 if (errors > 0) {
                     count += " · " + Messages.get("preview.banner.errors", errors);
                 }
                 lines.add(banner(count, columns, BANNER));
                 lines.addAll(shown);
+            }
+            case PreviewResult.TimedOut(var errors) -> {
+                synchronized (lock) {
+                    lastLines = List.of(); // the lines of another text would say the opposite of the banner
+                }
+                String text = Messages.get("preview.banner.timedOut", evaluatedWith.deadlineMillis());
+                if (errors > 0) {
+                    text += " · " + Messages.get("preview.banner.errors", errors);
+                }
+                lines.add(banner(text, columns, BANNER));
             }
             case PreviewResult.Off(var reason) -> {
                 lines.add(banner(Messages.get("preview.banner.off", reason), columns, BANNER));

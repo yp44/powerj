@@ -92,7 +92,7 @@ public final class Interpreter implements CommandCatalog {
         this.resolution = new CommandResolution(builtins, registry, resolver);
         this.executor = new PipelineExecutor(session, io, resolution, nativeRunner, evaluator, reporter,
                 () -> observer);
-        this.preview = new PreviewMode(this::parseContext, executor);
+        this.preview = new PreviewMode(this::parseContext, executor, this::previewSettings);
     }
 
     /** Consent asked before loading a module that uses native code (FR-77); none by default: it is not loaded. */
@@ -269,7 +269,8 @@ public final class Interpreter implements CommandCatalog {
     /**
      * Preview mode (FR-66): evaluates the line as {@link #execute} would, but only with what changes nothing, and stops
      * after {@code limit} values. Nothing is displayed, no variable is set. Cancelled by interrupting the calling thread:
-     * the values received so far are then returned.
+     * the values received so far are then returned, or {@link PreviewResult.TimedOut} if there are none. Each stage but
+     * the last sends at most {@link PreviewSettings#stageLimit()} objects to the next one.
      *
      * @param width  width of the formatted lines ({@link PreviewResult.Values#lines()})
      * @param colors {@code true} if the lines may contain ANSI colors
