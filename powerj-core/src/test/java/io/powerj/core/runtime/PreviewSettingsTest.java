@@ -55,9 +55,9 @@ class PreviewSettingsTest {
 
     @Test
     void aDeadlineThatWouldFreezeTheTypingIsBroughtBackToTheLongestOne() {
-        assertThat(from("60000", null).deadlineMillis()).isEqualTo(3200);
-        assertThat(from("3200", null).deadlineMillis()).isEqualTo(3200);
-        assertThat(from("3201", null).deadlineMillis()).isEqualTo(3200);
+        assertThat(from("60000", null).deadlineMillis()).isEqualTo(5000);
+        assertThat(from("5000", null).deadlineMillis()).isEqualTo(5000);
+        assertThat(from("5001", null).deadlineMillis()).isEqualTo(5000);
         assertThat(from(null, "5000000").stageLimit()).isEqualTo(100_000);
     }
 
@@ -68,7 +68,9 @@ class PreviewSettingsTest {
         assertThat(settings.withDeadlineStep(1).withDeadlineStep(1).deadlineMillis()).isEqualTo(1600);
         assertThat(settings.withDeadlineStep(-1).deadlineMillis()).isEqualTo(200);
         assertThat(settings.withDeadlineStep(-1).withDeadlineStep(-1).deadlineMillis()).isEqualTo(200);
-        assertThat(new PreviewSettings(3200, 50).withDeadlineStep(1).deadlineMillis()).isEqualTo(3200);
+        assertThat(new PreviewSettings(3200, 50).withDeadlineStep(1).deadlineMillis()).isEqualTo(5000);
+        assertThat(new PreviewSettings(5000, 50).withDeadlineStep(1).deadlineMillis()).isEqualTo(5000);
+        assertThat(new PreviewSettings(5000, 50).withDeadlineStep(-1).deadlineMillis()).isEqualTo(3200);
         assertThat(settings.withDeadlineStep(1).stageLimit()).isEqualTo(50);
     }
 
@@ -79,7 +81,10 @@ class PreviewSettingsTest {
         assertThat(settings.withLimitStep(-1).stageLimit()).isEqualTo(20);
         assertThat(settings.withLimitStep(-1).withLimitStep(-1).stageLimit()).isEqualTo(10);
         assertThat(settings.withLimitStep(-1).withLimitStep(-1).withLimitStep(-1).stageLimit()).isEqualTo(10);
-        assertThat(new PreviewSettings(400, 500).withLimitStep(1).stageLimit()).isEqualTo(500);
+        assertThat(new PreviewSettings(400, 500).withLimitStep(1).stageLimit()).isEqualTo(1000);
+        assertThat(new PreviewSettings(400, 1000).withLimitStep(1).stageLimit()).isEqualTo(5000);
+        assertThat(new PreviewSettings(400, 5000).withLimitStep(1).stageLimit()).isEqualTo(5000);
+        assertThat(new PreviewSettings(400, 5000).withLimitStep(-1).stageLimit()).isEqualTo(1000);
         assertThat(settings.withLimitStep(1).deadlineMillis()).isEqualTo(400);
     }
 
@@ -89,17 +94,19 @@ class PreviewSettingsTest {
         assertThat(new PreviewSettings(700, 30).withDeadlineStep(-1).deadlineMillis()).isEqualTo(400);
         assertThat(new PreviewSettings(700, 30).withLimitStep(1).stageLimit()).isEqualTo(50);
         assertThat(new PreviewSettings(700, 30).withLimitStep(-1).stageLimit()).isEqualTo(20);
-        assertThat(new PreviewSettings(700, 5000).withLimitStep(1).stageLimit()).isEqualTo(5000);
-        assertThat(new PreviewSettings(700, 5000).withLimitStep(-1).stageLimit()).isEqualTo(500);
+        assertThat(new PreviewSettings(700, 7000).withLimitStep(1).stageLimit()).isEqualTo(7000);
+        assertThat(new PreviewSettings(700, 7000).withLimitStep(-1).stageLimit()).isEqualTo(5000);
     }
 
     @Test
     void theEndOfTheStepsIsKnown() {
         assertThat(new PreviewSettings(1600, 100).deadlineAtMax()).isFalse();
-        assertThat(new PreviewSettings(3200, 100).deadlineAtMax()).isTrue();
+        assertThat(new PreviewSettings(3200, 100).deadlineAtMax()).isFalse();
+        assertThat(new PreviewSettings(5000, 100).deadlineAtMax()).isTrue();
         assertThat(new PreviewSettings(400, 100).limitAtMax()).isFalse();
-        assertThat(new PreviewSettings(400, 500).limitAtMax()).isTrue();
+        assertThat(new PreviewSettings(400, 1000).limitAtMax()).isFalse();
         assertThat(new PreviewSettings(400, 5000).limitAtMax()).isTrue();
+        assertThat(new PreviewSettings(400, 7000).limitAtMax()).isTrue();
     }
 
     @Test

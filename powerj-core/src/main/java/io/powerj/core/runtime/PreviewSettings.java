@@ -22,8 +22,8 @@ public record PreviewSettings(int deadlineMillis, int stageLimit) {
     public static final int DEFAULT_STAGE_LIMIT = 50;
 
     /** Values that the keys of the preview go through, in increasing order; the last one is the longest deadline. */
-    private static final List<Integer> DEADLINE_STEPS = List.of(200, 400, 800, 1600, 3200);
-    private static final List<Integer> LIMIT_STEPS = List.of(10, 20, 50, 100, 500);
+    private static final List<Integer> DEADLINE_STEPS = List.of(200, 400, 800, 1600, 3200, 5000);
+    private static final List<Integer> LIMIT_STEPS = List.of(10, 20, 50, 100, 500, 1000, 5000);
     /** A deadline beyond this freezes the typing; a larger value is brought back to it. */
     private static final int MAX_DEADLINE_MILLIS = DEADLINE_STEPS.getLast();
     private static final int MAX_STAGE_LIMIT = 100_000;

@@ -330,12 +330,12 @@ structures, functions) can be built on it. The work is organised in phases (revi
     not the real one. The last stage is not limited, and executing the line (Enter) is not limited.
   - **A preview stopped by the time limit before any value says so** (`PreviewResult.TimedOut`) instead of `no result`,
     and offers the two settings: `── timed out after 400 ms · [duration 400 ms]  max/stage 50 · Alt+◄► choose, Alt+▲▼
-    change ───`. Alt+◄► choose a setting, Alt+▲▼ change it by a step (200 to 3200 ms, 10 to 500 objects), and the line is
+    change ───`. Alt+◄► choose a setting, Alt+▲▼ change it by a step (200 to 5000 ms, 10 to 5000 objects), and the line is
     previewed again, without leaving the preview mode. The same menu is available under the banner of values, partial or
     not: the first Alt+arrow shows it and changes nothing, the next ones change the settings; typing closes it. The keys
     act while values or a timeout are shown, otherwise they keep the action they had; ▲ and ▼ alone are still the history.
 - **Two settings of the session environment**, read at each evaluation: `POWERJ_PREVIEW_DEADLINE_MS` (400 by default,
-  3200 at most) and `POWERJ_PREVIEW_STAGE_LIMIT` (50 by default). `LatestWinsRunner` asks its deadline at the start of each
+  5000 at most) and `POWERJ_PREVIEW_STAGE_LIMIT` (50 by default). `LatestWinsRunner` asks its deadline at the start of each
   evaluation.
 - **An interruption that the pipeline hands back instead of throwing** (it joins its stages without letting itself be
   interrupted) is a timeout too; it used to give an empty result.

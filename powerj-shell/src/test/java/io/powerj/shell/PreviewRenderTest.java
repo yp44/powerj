@@ -98,9 +98,9 @@ class PreviewRenderTest {
 
     @Test
     void aSettingThatCannotGoUpAnyMoreSaysSo() {
-        interpreter.previewSettings(new PreviewSettings(3200, 500));
+        interpreter.previewSettings(new PreviewSettings(5000, 5000));
 
-        assertThat(renderWide(new PreviewResult.TimedOut(0))).contains("[duration 3200 ms (max)]  max/stage 500 (max)");
+        assertThat(renderWide(new PreviewResult.TimedOut(0))).contains("[duration 5000 ms (max)]  max/stage 5000 (max)");
     }
 
     @Test

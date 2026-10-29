@@ -52,7 +52,7 @@ class PreviewControlTest {
 
     @Test
     void atTheEndOfTheStepsTheSettingsStayAsTheyAre() {
-        var longest = new PreviewSettings(3200, 500);
+        var longest = new PreviewSettings(5000, 5000);
 
         assertThat(control.press(PreviewControl.Key.UP, longest)).isEqualTo(longest);
         control.press(PreviewControl.Key.RIGHT, longest);
@@ -92,8 +92,8 @@ class PreviewControlTest {
 
     @Test
     void aSettingThatCannotGoUpAnyMoreSaysSo() {
-        assertThat(control.fields(new PreviewSettings(3200, 500), false).toString())
-                .isEqualTo("[duration 3200 ms (max)]  max/stage 500 (max)");
+        assertThat(control.fields(new PreviewSettings(5000, 5000), false).toString())
+                .isEqualTo("[duration 5000 ms (max)]  max/stage 5000 (max)");
         assertThat(control.fields(new PreviewSettings(1600, 100), false).toString())
                 .isEqualTo("[duration 1600 ms]  max/stage 100");
     }
