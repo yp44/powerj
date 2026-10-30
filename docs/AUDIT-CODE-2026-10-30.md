@@ -80,11 +80,11 @@ api ◄── core ◄── shell        fs ◄── core
 | **M1** | Lecture d'un record de sortie : composants, `@Display` (colonnes par défaut, lu 2 fois), `@Bytes` (taille, lu 3 fois), `@Highlight` (spans) | `core.format.OutputFormatter:302-335`, `fx.model.ObjectReader:160-180`, `cmdlets.RecordShape` + `Properties` + `Sizes`, `core.java.RecordShape`, `core.java.Members:144` | **`powerj-api`** : un type `RecordView` (ou `OutputShape`) mis en cache par `ClassValue` | 4 interprétations de `@Display` → 1 ; plus de dérive entre terminal, grille et `to-csv` | moyen : surface d'API à tenir (instantané `ApiSurfaceTest` à régénérer, ligne au CHANGELOG) |
 | **M2** | Mise en forme d'une valeur : `humanBytes`, date `yyyy-MM-dd HH:mm`, durée | `core.format.OutputFormatter:386` et `fx.model.CellFormatter:54` (**copie identique**) ; `Values.duration:22` et `CellFormatter.duration:68` (**divergent**) | **`powerj-api`**, à côté de `@Bytes` : `Bytes.format(long)` ; durée et date dans un `Display`-formatter | supprime la divergence ci-dessous | faible |
 | **M3** | Analyse des unités `kb`/`mb`/`gb`, puissances de 1024 | `core.lang.Units:33-48` et `fx.model.FilterParser:136-165, 216-223` | **`powerj-api`** (`Sizes.parse`) ou `fs` | 2 → 1 ; une grille et un `where size > 2.5mb` acceptent la même syntaxe | faible |
-| **M4** | Détection de la plateforme, du dossier personnel, sensibilité à la casse des noms | `core.nativeexec.Platform`, `cmdlets.HostOs`, `core.runtime.SessionState:24`, `cmdlets.ProtectedPaths:134-146`, `shell.Environment:63` | **`powerj-fs`** : `Host` (`windows()`, `mac()`, `namesIgnoreCase()`, `home(env, fallback)`) | une seule règle ; corrige A-05 | très faible (fs n'a pas de dépendance) |
+| **M4** | Détection de la plateforme, du dossier personnel, sensibilité à la casse des noms | `core.nativeexec.Platform`, `cmdlets.HostOs`, `core.runtime.SessionState:24`, `cmdlets.ProtectedPaths:134-146`, `shell.Environment:63` | **`powerj-fs`** (rouvre, pour une raison nouvelle, le point « dossier personnel en deux endroits » que le CHANGELOG avait laissé : celui-ci jugeait qu'il fallait un type dans l'API ; `fs` suffit) : `Host` (`windows()`, `mac()`, `namesIgnoreCase()`, `home(env, fallback)`) | une seule règle ; corrige A-05 | très faible (fs n'a pas de dépendance) |
 | **M5** | Moteur concurrent de parcours : file bornée, `pending`, `stopped`, `fail/signal/deliver`, `submit` | `fs.FileWalker.ParallelWalk:231-386` et `fs.FileTrees.Work:274-538` | **dans `powerj-fs`**, classe package-private `ParallelEngine<T>` | ≈ 110 lignes en moins ; supprime la dérive A-03 | moyen : code concurrent, mais 69 tests de `fs` et la mutation le couvrent |
 | **M6** | Construction d'un `ProcessBuilder` (ligne de commande, répertoire, environnement vidé puis rempli, `native.startFailed`) | `NativeRunner.run:110`, `runGroup:221`, `startBackground:350` | méthode privée `ProcessSetup` dans `NativeRunner` | 3 → 1 ; une seule garde sur l'environnement | très faible |
 | **M7** | Squelette des cmdlets de fichiers : `FileOps.arguments` → `PipelineFiles` → erreur `fileops.path.expected` → boucle `expand`, puis `process` identique ; options `-n`, `--property` redéfinies avec le même texte | `MakeDirectory`, `Touch`, `Remove`, `Transfer` (`Copy`/`Move`) dans `cmdlets` | classe de base ou assistant dans `cmdlets` (reste dans le module) | ≈ 60 lignes | faible |
-| **M8** | `report(WalkError)` : 4 exemplaires en C-27, **2 aujourd'hui** — `FileArguments.report:84` (utilisé par `ls`, `cat`, `grep`) et `FileOps.report` (`cp`, `mv`, `rm`, `mkdir`, `touch`) — avec **deux jeux de clés de messages identiques** (`files.not.found` / `fileops.not.found`, `files.access.denied` / `fileops.access.denied`, dans les deux langues) | `cmdlets` | `cmdlets` : une seule méthode et un seul jeu de clés | −2 clés × 2 langues, plus de dérive possible entre `ls` et `rm` | très faible |
+| **M8** | `report(WalkError)` en deux exemplaires : `FileArguments.report:84` (`ls`, `cat`, `grep`) et `FileOps.report` (`cp`, `mv`, `rm`, `mkdir`, `touch`) | `cmdlets` | **rien : laissé volontairement** (CHANGELOG, « Examined, not changed » : le premier dit ce qui n'a pas pu être lu, le second ce qui n'a pas pu être modifié, deux libellés — `files.read.failed` ≠ `fileops.failed`). Seuls `not.found` et `access.denied` ont le même texte. | — | — |
 | **M9** | Texte à garde pour regex : `InterruptibleText` (interruption) et `RegexFilter.Budgeted` (budget) | `cmdlets` et `fx` | **`powerj-api`** : `GuardedText(CharSequence, IntPredicate tick)` | 2 → 1 ; une troisième regex (cmdlet tiers) en profite | faible |
 | **M10** | Doubles de test d'un `CmdletContext` : `TestContext` ×2 (126 et 105 lignes), `FakeCmdlets`, pilotes `begin/process/end` répétés dans 16 classes de test | `cmdlets/src/test`, `fx/src/test`, `core/src/test` | module `powerj-testing` (jar de test, dépendance `test`) | 230 lignes + pilotes | faible |
 
@@ -92,7 +92,7 @@ api ◄── core ◄── shell        fs ◄── core
 
 ### 3.2 Ce qu'il ne faut pas mutualiser (et pourquoi)
 
-- **Les sept classes `Messages`** (`api`, `core.i18n`, `core.lang`, `cmdlets`, `shell`, `fx`, `examples/greet`) : la revue précédente concluait « un helper unique suffit » grâce à `ResourceBundle.getBundle(String, Locale, Module)`. **Je l'ai testé sur JDK 21 : cela échoue** (`MissingResourceException`) tant que le module qui porte le bundle n'a pas `opens <package> to io.powerj.api`. Avec le `opens` qualifié, cela fonctionne. Chaque copie fait 19 lignes dont 3 utiles (nom du bundle, `getBundle`, `Language.text`, déjà mutualisé). Le gain est faible et le coût réel : un `opens` dans six `module-info.java` **et** dans celui de tout auteur tiers. **Recommandation : garder les copies**, corriger seulement la Javadoc périmée de `core.i18n.Messages` (« package `io.powerj.core.exec` »).
+- **Les sept classes `Messages`** (`api`, `core.i18n`, `core.lang`, `cmdlets`, `shell`, `fx`, `examples/greet`) : le premier texte de la revue disait « un helper unique suffit » grâce à `ResourceBundle.getBundle(String, Locale, Module)`, mais **le projet l'a déjà essayé et abandonné** (CHANGELOG, « The seven `Messages` classes stay », étape 1.4). J'ai refait l'expérience sur JDK 21 et j'obtiens le même résultat : cela échoue (`MissingResourceException`) tant que le module qui porte le bundle n'a pas `opens <package> to io.powerj.api`. Avec le `opens` qualifié, cela fonctionne. Chaque copie fait 19 lignes dont 3 utiles (nom du bundle, `getBundle`, `Language.text`, déjà mutualisé). Le gain est faible et le coût réel : un `opens` dans six `module-info.java` **et** dans celui de tout auteur tiers. **Recommandation : garder les copies** (c'est la décision du projet), corriger seulement la Javadoc périmée de `core.i18n.Messages` (« package `io.powerj.core.exec` »). Idem pour les deux `report(WalkError)` (M8), l'injection de `Platform` et `Option.min` : tranchés avec leur raison dans le CHANGELOG, je ne les reprends pas.
 - **Les trois `switch (Outcome)`, `Previewer` / `Debouncer` de `fx`** : la Phase 4 les a examinés et écartés pour de bonnes raisons (ils se ressemblent sans être pareils). Je confirme.
 - **Promouvoir `lang` en module** : toujours prématuré tant qu'il n'a pas de second consommateur (ADR 0002).
 
@@ -101,7 +101,7 @@ api ◄── core ◄── shell        fs ◄── core
 - **Option A (recommandée)** : étendre `powerj-api` de deux ou trois petits types (M1, M2, M3, M9) et `powerj-fs` de `Host` (M4) et du moteur (M5). Aucun nouveau module, aucune dépendance nouvelle ; ce sont des éléments qui touchent déjà au *contrat de sortie* (`@Bytes`, `@Display`, `@Highlight`, `Row` y sont déjà). Contrepartie : la surface de l'API grossit, donc à décider avant la première version publiée, tant que « l'API peut encore casser ».
 - **Option B** : un module feuille `powerj-text` (formatage, unités, JSON-quoting) pour ne pas grossir l'API. Plus propre sur le papier, mais c'est un jar de plus à embarquer dans l'image `jlink` *et* à fournir au zip de `powerj-fx` (qui n'embarque pas `api` aujourd'hui). À réserver si M1–M3 dépassent ~500 lignes.
 
-**Ordre conseillé :** M4 → M6 → M8 → M5 → M2/M3 → M1 → M9 → M7 → M10 (du plus sûr au plus structurant).
+**Ordre conseillé :** M4 → M6 → M5 → M2/M3 → M1 → M9 → M7 → M10 (du plus sûr au plus structurant).
 
 ---
 
@@ -146,7 +146,7 @@ Le défaut est donc plus large que « `.` et `..` » : **toute complétion de fi
 
 ### 4.2 Conception à décider
 
-**A-06 `Language` dans l'API** — la politique de langue (`set`, `resolve`, priorités propriété/variable/fichier) est dans le module que les tiers voient : un cmdlet tiers peut appeler `Language.set(Locale.FRENCH)` et changer la langue de tout le shell. Ce qu'un auteur de cmdlet doit lire, c'est `Language.current()` et `Language.text(...)`. Séparer **lecture** (reste dans `api`) et **politique** (`core.i18n`, exportée au shell) supprime aussi la seule violation gelée d'ArchUnit. Reste à choisir comment les tests changent de langue (un `Locale` par `Session`, déjà noté « non planifié » dans la revue).
+**A-06 `Language` dans l'API** — la politique de langue (`set`, `resolve`, priorités propriété/variable/fichier) est dans le module que les tiers voient : un cmdlet tiers peut appeler `Language.set(Locale.FRENCH)` et changer la langue de tout le shell. Ce qu'un auteur de cmdlet doit lire, c'est `Language.current()` et `Language.text(...)`. Séparer **lecture** (reste dans `api`) et **politique** (`core.i18n`, exportée au shell) retire le setter du contrat avant la première version. Cela ne supprime **pas** la violation gelée d'ArchUnit : le champ statique ne disparaît que si l'on passe un `Locale` par `Session` (point déjà ouvert dans l'issue #63, « non planifié » dans la revue).
 
 **A-05 `Platform` ≠ `HostOs`** — `Platform` compare `toLowerCase(ROOT).startsWith("windows")`, `HostOs` compare `startsWith("Windows")` sans normaliser la casse. Plus gênant : `PathCompleter:51` règle `ignoreCase = Platform.isWindows()`, alors que `HostOs.NAMES_IGNORE_CASE` dit que macOS ignore aussi la casse. Sous macOS, la complétion de chemins est donc sensible à la casse et `rm` ne l'est pas. Se règle avec M4.
 
@@ -223,7 +223,7 @@ Points forts (2 271 tests exécutés, JSONTestSuite ; mutation à 87 % sur `lang
 
 | Lot | Contenu | Effort | Risque |
 |---|---|---|---|
-| **1. Correctifs rapides** (½ à 1 j chacun, un test d'abord) | A-02 (`find` + test de complétion — **le plus visible pour l'utilisateur**), **planchers JaCoCo : 80 % minimum dans chaque module, puis cliquet resserré** (détail ci-dessous), A-03 (`DirectoryIteratorException`), A-09 (libellé paresseux), A-10 (regex statiques), A-11 (supprimer la liste de `Task`), M6 (`ProcessSetup`), M8 (un seul `report` et un seul jeu de clés) | ≈ 3,5 j | très faible |
+| **1. Correctifs rapides** (½ à 1 j chacun, un test d'abord) | A-02 (`find` + test de complétion — **le plus visible pour l'utilisateur**), **planchers JaCoCo : 80 % minimum dans chaque module, puis cliquet resserré** (détail ci-dessous), A-03 (`DirectoryIteratorException`), A-09 (libellé paresseux), A-10 (regex statiques), A-11 (supprimer la liste de `Task`), M6 (`ProcessSetup`) | ≈ 3,5 j | très faible |
 | **2. Mutualisation sans API** | M4 (`fs.Host`), M5 (`ParallelEngine`), M7 (squelette fichiers) | ≈ 4 j | faible à moyen (M5 : concurrence) |
 | **3. Mutualisation dans l'API** *(décision à prendre avant la 1ʳᵉ version publiée)* | M2 (`Bytes.format` + durée), M3 (unités), M1 (`RecordView`), M9 (`GuardedText`) ; régénérer l'instantané, ligne au CHANGELOG | ≈ 5 j | moyen (surface publique) |
 | **4. Socle de test** | M10 (`powerj-testing`), `assume*` comptés en CI, attentes de 10–25 ms | ≈ 2 j | faible |
@@ -250,6 +250,27 @@ Aujourd'hui l'exigence de 80 % est globale (§ 4.6) et quatre modules ont un pla
 **Avant de fusionner :** (1) vérifier les valeurs sur le job macOS de la CI, la mesure ci-dessus vient de Linux en `root` (2 tests de `fs` sautés), donc les planchers proposés sont plutôt prudents ; (2) Windows n'est pas concerné, son profil `windows-coverage-floors` désactive déjà le contrôle par module ; (3) le contrôle agrégé de `powerj-coverage` (80 %) ne change pas.
 
 Le lot 1 se règle sans décision. Le lot 3 est le seul qui engage l'API : il vaut mieux le trancher **maintenant**, tant que `ApiSurfaceTest` permet encore de casser.
+
+### Issues créées
+
+Le plan de référence est celui de l'issue **#77** (vagues, dépendances, règles de travail) : il remplace l'ordre des lots ci-dessus si les deux diffèrent. Le dépôt veut que le travail restant vive dans les issues, pas dans un fichier.
+
+| Issue | Constat | Priorité |
+|---|---|---|
+| #82 | A-02 complétion des noms commençant par un point | Haute |
+| #78 | M1, M2, M3, M9 : décision d'étendre `powerj-api` | Haute |
+| #79 | A-06 `Language` | Haute |
+| #83 | A-03 `FileWalker` et `DirectoryIteratorException` | Moyenne |
+| #96 | A-04, M5 moteur concurrent unique dans `fs` | Moyenne |
+| #86 | A-05, M4 plateforme et dossier personnel dans `fs` | Moyenne |
+| #97 | durée affichée différemment (A-01) | Moyenne |
+| #80 | A-12 dépassement entier | Moyenne |
+| #81 | aperçu et lectures de fichiers | Moyenne |
+| #84 | avertissements javac | Moyenne |
+| #85 | planchers JaCoCo | Moyenne |
+| #87, #88, #89, #90, #91, #92, #93, #94, #95, #98 | M6, A-10, A-09, concurrence mineure, journal, `ModuleLoader`, `ConfigFile`, complexité, hygiène des tests, module de test (M10) | Basse |
+
+Non créées, car déjà tranchées par le projet : les classes `Messages`, les deux `report(WalkError)`, `Platform` injectable, `Option.min`. Un commentaire a été ajouté à #63 pour les résidus de documentation.
 
 ---
 
