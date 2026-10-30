@@ -98,6 +98,9 @@ public final class JavaClasses {
             return Optional.of(primitive(name));
         }
         String[] parts = name.split("\\.");
+        if (parts.length == 0) {
+            return Optional.empty(); // "." or "..": split drops every empty piece
+        }
         Optional<Class<?>> type = Optional.empty();
         int next = 0;
         if (simple(parts[0]) instanceof Lookup.Found(var found)) {
@@ -221,8 +224,9 @@ public final class JavaClasses {
 
     private Optional<Class<?>> qualified(String name) {
         return qualifiedNames.computeIfAbsent(name, n -> {
-            if (!Character.isUpperCase(n.charAt(n.lastIndexOf('.') + 1))) {
-                return Optional.empty(); // a package, not a class: avoids useless lookups
+            String last = n.substring(n.lastIndexOf('.') + 1);
+            if (last.isEmpty() || !Character.isUpperCase(last.charAt(0))) {
+                return Optional.empty(); // a package, not a class, or no name at all: avoids useless lookups
             }
             try {
                 Class<?> type = Class.forName(n, false, ClassLoader.getPlatformClassLoader());

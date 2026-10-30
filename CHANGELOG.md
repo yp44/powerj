@@ -345,6 +345,17 @@ structures, functions) can be built on it. The work is organised in phases (revi
   the history with ▲, the keys that keep their action). Acceptance rows 18 to 26 of
   [docs/acceptance/preview.md](docs/acceptance/preview.md).
 
+### Fixed (completion of names that start with a dot, [#82](https://github.com/yp44/powerj/issues/82))
+- **Tab completion offers hidden files and folders when the name is not quoted.** `ls .gi`, `cat .gi`, `ls ./.h` and
+  `ls ~/.h` offered nothing, while the same names inside quotes worked. For a word that follows a dot, completion asks
+  whether the text before the dot names a Java class; for a name that starts with a dot that text is empty (or a dot), and
+  `JavaClasses.find` threw an index out of bounds, which completion swallowed. `find` now answers "no such class" for a text
+  that is empty, made of dots, or has an empty piece (`a..b`, `java.`).
+- Completion still never breaks the input, but what it swallows is now logged at `FINE` with the line, so that "nothing to
+  offer" can be told from "failed".
+- Not changed: `cd ..` and `ls ..` still offer nothing (the completer does not propose `..` as `../`). That is a missing
+  feature, not an error.
+
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
   whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes

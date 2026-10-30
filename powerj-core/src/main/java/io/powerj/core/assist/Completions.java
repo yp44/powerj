@@ -1,6 +1,8 @@
 package io.powerj.core.assist;
 
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -21,6 +23,8 @@ import io.powerj.core.runtime.Session;
  * preview policy knows to be pure.
  */
 public final class Completions {
+
+    private static final Logger LOG = Logger.getLogger(Completions.class.getName());
 
     /**
      * Suggestion.
@@ -95,7 +99,10 @@ public final class Completions {
         try {
             return doComplete(line, Math.min(cursor, line.length()));
         } catch (RuntimeException e) {
-            return Result.none(cursor); // completion must never break the input
+            // Completion must never break the input; but a failure that leaves no trace looks like "nothing to offer"
+            // (a name that starts with a dot was once lost this way, #82).
+            LOG.log(Level.FINE, "Completion failed on: " + line, e);
+            return Result.none(cursor);
         }
     }
 
