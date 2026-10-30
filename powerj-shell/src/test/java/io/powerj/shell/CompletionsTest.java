@@ -192,6 +192,23 @@ class CompletionsTest {
         assertThat(values("ls \"Prog\\ra")).containsExactly("Program Files" + java.io.File.separator);
     }
 
+    /** #82: a name that starts with a dot is completed without quotes too (the receiver before the dot is empty). */
+    @Test
+    void hiddenNamesAreCompletedWithoutQuotes() throws Exception {
+        Files.writeString(tmp.resolve(".hidden"), "x");
+        Files.writeString(tmp.resolve(".gitignore"), "x");
+        Files.createDirectories(tmp.resolve("docs/.cache"));
+        assertThat(values("ls .h")).containsExactly(".hidden");
+        assertThat(values("cat .gi")).containsExactly(".gitignore");
+        assertThat(values("ls ./.h")).containsExactly("./.hidden");
+        assertThat(values("ls ~/.h")).containsExactly("~/.hidden");
+        assertThat(values("ls docs/.c")).containsExactly("docs/.cache" + java.io.File.separator);
+        assertThat(values("ls .")).contains(".hidden", ".gitignore");
+        // The same names with quotes, and a name without a dot, as before.
+        assertThat(values("ls \".h")).containsExactly(".hidden");
+        assertThat(values("ls no")).containsExactly("notes.txt");
+    }
+
     @Test
     void pathsFromHomeHiddenFilesAndMissingFolders() throws Exception {
         Files.writeString(tmp.resolve(".hidden"), "x");
