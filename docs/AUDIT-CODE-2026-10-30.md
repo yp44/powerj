@@ -7,20 +7,21 @@
 
 - **Lecture directe** du code de production des zones à risque : `powerj-fs` (entier), `powerj-api` (entier), `core` (runtime, command, java, assist, une partie de format/lang), `cmdlets` (fichiers, JSON, records), `shell` (config, exécution concurrente), `fx` (formatage, filtres), poms, CI, ADR, docs.
 - **Mesures par script** (dans le scratchpad de la session, non committées) : détection de blocs dupliqués par fenêtres de lignes normalisées sur tout `src/main` et `src/test`, longueur et complexité approchée des 1 812 méthodes de production.
-- **Rien n'a été compilé ni exécuté** : la machine d'audit n'a que le JDK 21 et le réseau vers un JDK 25 est fermé. Les tests, Error Prone et les lints n'ont donc pas été rejoués ; les chiffres de `docs/quality/*.md` sont repris tels quels.
-- **Trois affirmations ont été vérifiées par une petite expérience sur JDK 21** (les instructions concernées n'utilisent rien de spécifique à Java 25) : le comportement de `String.split` sur `"."`, l'exception de `charAt` dans `JavaClasses.qualified`, et la possibilité d'un helper unique pour les `ResourceBundle` (§ 3.2).
-- Chaque constat porte un **niveau de confiance** : *confirmé* (lu et vérifié), *probable* (déduit du code, non exécuté), *à décider* (choix de conception, pas un défaut).
+- **Le projet a été compilé et testé avec OpenJDK 25.0.4** (installé par `apt` ; la première version de ce rapport, écrite avant cette installation, était purement statique). Résultat de `mvn test` sur `api`, `fs`, `core`, `cmdlets`, `shell` : **BUILD SUCCESS, 0 échec, 0 test sauté** sur Linux. Le détail de `mvn verify` (Spotless, enforcer, planchers JaCoCo, ArchUnit, `fx`) est au § 4.7.
+- **Ce qui a été exécuté** : A-02 (sonde jetable, supprimée après usage), la comparaison `humanBytes`/durée n'a *pas* été rejouée (lecture). Une expérience sur JDK 21 a servi au § 3.2 (helper `ResourceBundle`).
+- **Ce qui reste établi par lecture seule** : tous les autres constats. Les chiffres de lint, d'Error Prone et de mutation sont ceux de `docs/quality/*.md`, non rejoués.
+- Chaque constat porte un **niveau de confiance** : *confirmé à l'exécution*, *confirmé par lecture* (code sans ambiguïté, non exécuté), *probable* (déduit), *à décider* (choix de conception, pas un défaut).
 
 ## 1. Synthèse
 
-PowerJ reste, cinq jours après la revue précédente, un projet **nettement au-dessus de la moyenne** : 28 000 lignes de production pour 28 600 de test (ratio 1,02, contre 0,69), 1 850 tests, des règles d'architecture exécutées (ArchUnit, une seule violation gelée), une surface d'API figée par un instantané, une CI épinglée par SHA, des parseurs JSON/CSV validés contre des suites de conformité. Les quatre défauts 🔴 de la revue du 24/10 et la plupart des 🟠 que j'ai relus sont **vraiment corrigés** (§ 2).
+PowerJ reste, cinq jours après la revue précédente, un projet **nettement au-dessus de la moyenne** : 28 000 lignes de production pour 28 600 de test (ratio 1,02, contre 0,69), 2 271 tests exécutés (`mvn verify`, 0 échec), des règles d'architecture exécutées (ArchUnit, une seule violation gelée), une surface d'API figée par un instantané, une CI épinglée par SHA, des parseurs JSON/CSV validés contre des suites de conformité. Les quatre défauts 🔴 de la revue du 24/10 et la plupart des 🟠 que j'ai relus sont **vraiment corrigés** (§ 2).
 
 Ce que cet audit ajoute :
 
 | # | Constat | Gravité | Confiance |
 |---|---|---|---|
 | **A-01** | Le contrat de sortie de l'API est relu en ordre dispersé : `@Display` deux fois (terminal, grille), `@Bytes` trois fois (terminal, grille, `cmdlets`), deux `RecordShape` quasi identiques ; la mise en forme d'une durée **diverge déjà** entre terminal et grille | 🟠 | confirmé |
-| **A-02** | `JavaClasses.find("")` et `find(".")` lèvent une exception ; la complétion l'avale : **`ls .`+Tab et `cd ..`+Tab ne proposent rien** | 🟠 | probable (exception confirmée, atteignabilité déduite) |
+| **A-02** | `JavaClasses.find("")` et `find(".")` lèvent une exception que la complétion avale : **aucun nom commençant par un point (fichier ou dossier caché) n'est complété s'il n'est pas entre guillemets** — `ls .h`, `cat .gi`, `ls ~/.h`, `ls ./.h` | 🟠 | **confirmé à l'exécution** |
 | **A-03** | `FileWalker` n'attrape pas `DirectoryIteratorException` alors que sa Javadoc promet que « the walk goes on » ; `FileTrees` la traite — la dérive est la conséquence de A-04 | 🟠 | confirmé |
 | **A-04** | `FileTrees.Work` recopie `FileWalker.ParallelWalk` (≈ 110 lignes de moteur concurrent) — déjà signalé (C-27), **toujours là** | 🟠 | confirmé |
 | **A-05** | `Platform` (core) et `HostOs` (cmdlets) détectent l'OS séparément et **différemment** (sensibilité à la casse) ; la complétion de chemins traite macOS comme sensible à la casse, `ProtectedPaths` comme insensible | 🟡 | confirmé |
@@ -108,17 +109,26 @@ api ◄── core ◄── shell        fs ◄── core
 
 ### 4.1 Corrections à faire (petites, avec test)
 
-**A-02 🟠 La complétion de `.` et `..` échoue en silence** *(probable — exception confirmée, atteignabilité à confirmer par un test)*
+**A-02 🟠 La complétion d'un nom qui commence par un point échoue en silence** *(confirmé à l'exécution)*
 
-`Completions.doComplete:134` appelle `isExpressionReceiver(receiver)` (l. 167) pour tout mot qui suit un point. Pour `ls .` ou `cd ..`, le « récepteur » calculé par `LineText.receiverText` est `""` ou `"."`. Il atteint `JavaClasses.find(String)` (l. 96) qui :
+`Completions.doComplete:134` appelle `isExpressionReceiver(receiver)` (l. 167) pour tout mot qui suit un point. Quand le point commence le nom d'un fichier (`.gitignore`, `~/.config`, `./.git`), le « récepteur » calculé par `LineText.receiverText` est `""` ou `"."`, et atteint `JavaClasses.find(String)` (l. 96) qui :
 
-- pour `""` : appelle `simple("")`, donc `qualified("java.lang.")`, dont la lambda évalue `n.charAt(n.lastIndexOf('.') + 1)` → `StringIndexOutOfBoundsException` (reproduit sur JDK 21 : `Index 10 out of bounds for length 10`) ;
-- pour `"."` : `".".split("\\.")` renvoie un tableau **vide** (reproduit), puis `parts[0]` → `ArrayIndexOutOfBoundsException`.
+- pour `""` : passe par `qualified("java.lang.")`, dont la lambda évalue `n.charAt(n.lastIndexOf('.') + 1)` → `StringIndexOutOfBoundsException: Index 10 out of bounds for length 10` ;
+- pour `"."` : `".".split("\\.")` renvoie un tableau **vide**, puis `parts[0]` → `ArrayIndexOutOfBoundsException: Index 0 out of bounds for length 0`.
 
-`Completions.complete` attrape `RuntimeException` et renvoie `Result.none` : aucun plantage, mais **aucune complétion** sur `ls .gi<Tab>`, `cd ..<Tab>`. Le seul test existant (`CompletionsTest:200`) complète `ls ".h` *entre guillemets*, qui prend une autre branche.
-*Test à écrire :* `complete("ls .")` et `complete("cd ..")` doivent proposer les fichiers cachés / le parent. *Correctif :* refuser les noms vides ou sans lettre dans `find`/`qualified` (une garde de 2 lignes), et ne pas avaler `RuntimeException` sans la journaliser au niveau `FINE`.
+`Completions.complete` attrape `RuntimeException` et renvoie `Result.none` : aucun plantage, mais aucune complétion. **Mesuré** (sonde jetable, répertoire courant avec `.hidden`, `.gitignore`, `notes.txt`, `sub/`) :
 
-**A-03 🟠 `FileWalker` : une erreur de lecture de répertoire en cours d'itération interrompt tout le parcours** *(confirmé)*
+| Ligne tapée | Candidats |
+|---|---|
+| `ls no`, `ls ~/no`, `ls ./no` (témoins) | `notes.txt`, `~/notes.txt`, `./notes.txt` ✔ |
+| `ls ".h`, `ls "./.h` (entre guillemets) | `.hidden`, `./.hidden` ✔ |
+| `ls .`, `ls .h`, `ls ..`, `cd ..`, `cat .gi`, `ls ./.h`, `ls ~/.h`, `ls sub/../.h` | **aucun** ✘ |
+| `find("")`, `find(".")` appelés directement | lèvent les deux exceptions ci-dessus |
+
+Le défaut est donc plus large que « `.` et `..` » : **toute complétion de fichier ou de dossier caché hors guillemets** est cassée, ce qui est un usage quotidien. Le seul test existant (`CompletionsTest:200`) utilise des guillemets et passe par une autre branche.
+*Correctif :* refuser les noms vides ou sans lettre dans `find`/`qualified` (garde de 2 lignes) ; journaliser au niveau `FINE` ce que `complete` avale, pour que le prochain défaut de ce genre ne soit pas invisible. *Test :* les lignes du tableau ci-dessus, avec un dossier contenant `.hidden`.
+
+**A-03 🟠 `FileWalker` : une erreur de lecture de répertoire en cours d'itération interrompt tout le parcours** *(confirmé par lecture ; aucun test existant ne simule une panne en cours d'itération, ni pour `FileWalker` ni pour `FileTrees`)*
 
 `FileWalker.children:181-203` n'attrape que `IOException`. Or l'itération d'un `DirectoryStream` lève `DirectoryIteratorException` (non contrôlée) quand la lecture échoue au milieu ; `FileTrees.children:484` la traite correctement (« the entries read are kept »). En mode parallèle, l'exception sort de la tâche, `fail()` arrête la marche entière et la relance au thread appelant : `ls -r` sur un répertoire instable (système de fichiers réseau, `/proc`) plante au lieu de signaler l'entrée et de continuer, contrairement au contrat de la Javadoc de `FileWalker`. *Correctif :* copier le `catch (DirectoryIteratorException e)` de `FileTrees` — ou mieux, M5, qui supprime l'écart à la source.
 
@@ -177,17 +187,30 @@ Le modèle est bien posé (ADR 0005, `SECURITY.md`). Restes à connaître, tous 
 
 ### 4.6 Tests
 
-Points forts (1 850 tests, JSONTestSuite ; mutation à 87 % sur `lang`/`runtime` d'après la revue précédente, non rejouée ici) et réserves :
+Points forts (2 271 tests exécutés, JSONTestSuite ; mutation à 87 % sur `lang`/`runtime` d'après la revue précédente, non rejouée ici) et réserves :
 
-- **69 `assumeTrue/False`** : sur la plateforme de développement, ces tests sautent sans bruit. Un décompte « tests exécutés / sautés par plateforme » dans la CI dirait ce que chaque OS joue réellement.
+- **69 `assumeTrue/False`** : sur Linux, `mvn test` rapporte **0 test sauté**, donc ces gardes ne coûtent rien ici ; ils sautent sur Windows (56 tests de `core` d'après le pom racine). Un décompte « exécutés / sautés par plateforme » dans la CI dirait ce que chaque OS joue réellement.
+- **2 tests sautés dans `fs`** : `anEntryThatCannotBeRemovedIsReportedAndTheRestIsRemoved` (×2). C'est un artefact de mon environnement (le conteneur tourne en `root`, qui peut supprimer ce que le test déclare non supprimable) ; sur un poste normal ils tournent. À noter : ce test est précisément celui qui couvre le chemin d'erreur de `FileTrees`, pas celui de A-03.
 - **26 `Thread.sleep`** ; la plupart sont des charges simulées (`Sleeper`, `Duration.ofMinutes(10)` pour bloquer), c'est légitime. Les attentes de 10–25 ms (`ReplTest:120`, `PerfModeTest:153`, `PreviewControlKeysTest:357`, `GridViewUiTest:141`) sont les candidats à un `awaitUntil`.
 - **Duplication dans les tests** (fenêtre de 10 lignes) : `InterpreterCharacterizationTest` se duplique sur 152 lignes (64–298), `PerfTest` (core) sur 26, `CmdletContextTest` sur 36, et `PerfModeTest` / `PreviewControlKeysTest` / `PreviewModeTest` (shell) partagent un même bloc d'installation de 12 lignes. Voir M10.
 - **`KnownDefectsTest`** (core et cmdlets) : la Javadoc parle encore de tests `@Disabled` « rouges aujourd'hui » ; **aucun n'est désactivé**. Les classes ne contiennent plus que des tests de comportements épinglés. Renommer (`PinnedBehaviorsTest`) et corriger la Javadoc.
-- **Couverture** : planchers par module corrects (`fx` 0,99 hors `view`, `cmdlets` 0,93, `core` 0,84/0,76, `api` 0,70 en lignes). Les branches de `core` (0,76) restent le maillon faible, comme dit en Phase 0.
+- **Couverture : le cliquet est desserré.** Les planchers par module (`pom.xml`) sont censés être « mesurés, jamais baissés, relevés quand la couverture monte ». Mesure de cet audit (tests du module seuls, `mvn verify`) :
+
+  | Module | Mesuré lignes / branches | Plancher du pom | Écart |
+  |---|---|---|---|
+  | `core` | 91,5 % / 83,2 % | 84 % / 76 % | +7,5 / +7,2 |
+  | `shell` | 93,9 % / 86,9 % | 83 % / 78 % | +10,9 / +8,9 |
+  | `fs` | 89,1 % / 88,3 % | 85 % / 78 % | +4,1 / +10,3 |
+  | `cmdlets` | 96,0 % / 93,1 % | 93 % / 91 % | +3,0 / +2,1 |
+  | `api` | 78,8 % / 100 % | 70 % / 100 % | +8,8 / 0 |
+
+  Une régression de 7 points sur `core` ou 10 sur `shell` passerait donc inaperçue. Relever les planchers (avec une marge d'un point pour `fs`, dont la couverture varie avec le parallélisme) coûte une ligne par module. Mesuré sur Linux en `root` : les branches propres à Windows n'y sont pas jouées.
 
 ### 4.7 Build, lints, documentation
 
-- **`-Xlint:all` et Error Prone restent en avertissements** (29 et 220 au dernier relevé) : le plancher ne baisse que par discipline. Une étape intermédiaire est possible sans tout corriger : `-Werror` limité à des catégories à zéro aujourd'hui (`[missing-explicit-ctor]`, `[serial]` hors `PjException`…), ou un contrôle « le nombre ne monte pas » dans la CI.
+**Vérifié à l'exécution** (OpenJDK 25.0.4, Maven 3.9, `mvn -B verify`, sans `-Pdist`) : `BUILD SUCCESS` sur les onze modules — enforcer (`dependencyConvergence`, `requirePluginVersions`), Spotless, 2 271 tests, ArchUnit (35 tests, une violation gelée), planchers JaCoCo par module et agrégés, `powerj-fx` compris. Les tests de fumée du lanceur empaqueté (`-Pdist`, `ci/smoke`) n'ont pas été rejoués.
+
+- **`-Xlint:all` et Error Prone restent en avertissements.** Rejoué : **30 avertissements javac** (cmdlets 5 main + 7 test, core 13 main + 5 test) contre 29 dans `docs/quality/lint-baseline.md`, dont le texte dit « le compte ne peut que baisser » : le nouveau est `StageLimit.Full` (`[serial]`, sans `serialVersionUID`), arrivé avec l'aperçu FR-66. Error Prone n'a pas été rejoué (220 dans le baseline). Le plancher ne tient que par discipline. Une étape intermédiaire est possible sans tout corriger : `-Werror` limité à des catégories à zéro aujourd'hui (`[missing-explicit-ctor]`, `[serial]` hors `PjException`…), ou un contrôle « le nombre ne monte pas » dans la CI.
 - **`.mvn/jvm.config` ouvre les paquets internes de `jdk.compiler` pour tous les builds**, alors que seul le profil `quality` en a besoin. Sans effet visible, mais c'est de la configuration de JVM globale qui ne devrait peser que sur un profil.
 - **Pas de japicmp** (il n'y a pas encore de version publiée à comparer) : à brancher au premier tag, comme prévu (#57). `ApiSurfaceTest` couvre l'intervalle.
 - **Résidus de documentation** : `powerj-dist/pom.xml:16-19` est la dernière description de pom **en français** (ADR 0008) ; `SPECIFICATION.md:167` parle de « JLine 3 » (le pom est en 4.4.7) ; `core.i18n.Messages` cite le package `io.powerj.core.exec` (supprimé)  ; `NativeAccessConsent:25` et `OptionBinder:239` codent `oui` / `non` en dur. La spécification fait 2 019 lignes : elle est à la fois cahier des charges et documentation, comme le notait C-35.
@@ -199,7 +222,7 @@ Points forts (1 850 tests, JSONTestSuite ; mutation à 87 % sur `lang`/`runtime`
 
 | Lot | Contenu | Effort | Risque |
 |---|---|---|---|
-| **1. Correctifs rapides** (½ à 1 j chacun, un test d'abord) | A-02 (`find` + test de complétion), A-03 (`DirectoryIteratorException`), A-09 (libellé paresseux), A-10 (regex statiques), A-11 (supprimer la liste de `Task`), M6 (`ProcessSetup`), M8 (un seul `report` et un seul jeu de clés) | ≈ 3 j | très faible |
+| **1. Correctifs rapides** (½ à 1 j chacun, un test d'abord) | A-02 (`find` + test de complétion — **le plus visible pour l'utilisateur**), relever les planchers JaCoCo (§ 4.6), A-03 (`DirectoryIteratorException`), A-09 (libellé paresseux), A-10 (regex statiques), A-11 (supprimer la liste de `Task`), M6 (`ProcessSetup`), M8 (un seul `report` et un seul jeu de clés) | ≈ 3 j | très faible |
 | **2. Mutualisation sans API** | M4 (`fs.Host`), M5 (`ParallelEngine`), M7 (squelette fichiers) | ≈ 4 j | faible à moyen (M5 : concurrence) |
 | **3. Mutualisation dans l'API** *(décision à prendre avant la 1ʳᵉ version publiée)* | M2 (`Bytes.format` + durée), M3 (unités), M1 (`RecordView`), M9 (`GuardedText`) ; régénérer l'instantané, ligne au CHANGELOG | ≈ 5 j | moyen (surface publique) |
 | **4. Socle de test** | M10 (`powerj-testing`), `assume*` comptés en CI, attentes de 10–25 ms | ≈ 2 j | faible |
@@ -218,8 +241,8 @@ Le lot 1 se règle sans décision. Le lot 3 est le seul qui engage l'API : il va
 | Fichiers de production | 30 | 6 | 112 | 63 | 37 | 47 | `bench` 5 |
 | Lignes de production | 1 038 | 1 285 | 13 212 | 5 706 | 2 908 | 3 553 | 236 |
 | Lignes de test | 651 | 841 | 11 618 | 5 801 | 4 513 | 4 490 | `architecture` 682 |
-| Tests (`@Test`/`@ParameterizedTest`) | 36 | 69 | 742 | 375 | 279 | 314 | 35 |
+| Tests exécutés (surefire, `mvn verify`, Linux, JDK 25.0.4) | 36 | 89 (2 sautés) | 820 | 691 | 290 | 310 | `architecture` 35 |
 
-Total : 28 030 lignes de production, 28 596 de test, 300 fichiers de production, 1 850 tests, 229 commits.
+Total : 28 030 lignes de production, 28 596 de test, 300 fichiers de production, 2 271 tests exécutés, 229 commits.
 
 **Détection des doublons** (fenêtre de 6 lignes normalisées, production) : 16 groupes, dont `FileTrees`↔`FileWalker` (40 lignes en fenêtres, ≈ 110 lues), `OutputFormatter`↔`CellFormatter` (9), `JsonWriter`↔`RowExporter` (9), `MakeDirectory`↔`Touch` (17), `Copy`↔`Remove`↔`Move` (13/8/7). Le détecteur par fenêtres **sous-estime** les doublons dont les noms de variables diffèrent (cas de M1) : ceux-là ont été trouvés en cherchant les appels à `getRecordComponents`, `@Display`, `@Bytes` dans les six modules.
