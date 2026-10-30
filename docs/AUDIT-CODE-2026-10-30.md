@@ -223,13 +223,31 @@ Points forts (2 271 tests exécutés, JSONTestSuite ; mutation à 87 % sur `lang
 
 | Lot | Contenu | Effort | Risque |
 |---|---|---|---|
-| **1. Correctifs rapides** (½ à 1 j chacun, un test d'abord) | A-02 (`find` + test de complétion — **le plus visible pour l'utilisateur**), relever les planchers JaCoCo (§ 4.6), A-03 (`DirectoryIteratorException`), A-09 (libellé paresseux), A-10 (regex statiques), A-11 (supprimer la liste de `Task`), M6 (`ProcessSetup`), M8 (un seul `report` et un seul jeu de clés) | ≈ 3 j | très faible |
+| **1. Correctifs rapides** (½ à 1 j chacun, un test d'abord) | A-02 (`find` + test de complétion — **le plus visible pour l'utilisateur**), **planchers JaCoCo : 80 % minimum dans chaque module, puis cliquet resserré** (détail ci-dessous), A-03 (`DirectoryIteratorException`), A-09 (libellé paresseux), A-10 (regex statiques), A-11 (supprimer la liste de `Task`), M6 (`ProcessSetup`), M8 (un seul `report` et un seul jeu de clés) | ≈ 3,5 j | très faible |
 | **2. Mutualisation sans API** | M4 (`fs.Host`), M5 (`ParallelEngine`), M7 (squelette fichiers) | ≈ 4 j | faible à moyen (M5 : concurrence) |
 | **3. Mutualisation dans l'API** *(décision à prendre avant la 1ʳᵉ version publiée)* | M2 (`Bytes.format` + durée), M3 (unités), M1 (`RecordView`), M9 (`GuardedText`) ; régénérer l'instantané, ligne au CHANGELOG | ≈ 5 j | moyen (surface publique) |
 | **4. Socle de test** | M10 (`powerj-testing`), `assume*` comptés en CI, attentes de 10–25 ms | ≈ 2 j | faible |
 | **5. Dette de conception** | A-06 (`Language`), A-12 (dépassement entier), A-05 (via M4) | ≈ 3 j | moyen |
 | **6. Complexité** | `Operators.arithmetic`, `ModuleLoader.define`, `OptionBinder.bind`, `Highlights.of` | ≈ 4 j | faible, couvert par la mutation |
 | **7. Garde-fous de build** | `-Werror` par catégories à zéro, japicmp au premier tag | ≈ 1 j + au tag | faible |
+
+### Détail du lot 1 : planchers JaCoCo par module
+
+Aujourd'hui l'exigence de 80 % est globale (§ 4.6) et quatre modules ont un plancher propre sous 80 % (`api` lignes 70 %, `core` branches 76 %, `fs` et `shell` branches 78 %). Deux niveaux d'ambition, à choisir :
+
+- **Minimum : 80 % partout.** Une ligne par `pom.xml` (`coverage.module.line` / `coverage.module.branch` ≥ `0.80`). Tous les modules le tiennent déjà, **sauf `api` en lignes** (78,8 % mesuré) : il manque environ deux points, soit quelques tests sur `Language`, `Row` ou `Attempt` avant de relever.
+- **Recommandé : plancher = valeur mesurée moins une marge**, c'est ce que la convention du pom demande (« relever quand la couverture monte »). Valeurs proposées, mesurées sur Linux avec JDK 25 :
+
+  | Module | Mesuré (lignes / branches) | Plancher actuel | Plancher proposé |
+  |---|---|---|---|
+  | `api` | 78,8 % / 100 % | 70 % / 100 % | 80 % / 100 % *(après ajout de tests)* |
+  | `fs` | 89,1 % / 88,3 % | 85 % / 78 % | 88 % / 86 % *(le parcours parallèle fait varier les branches d'environ deux points)* |
+  | `core` | 91,5 % / 83,2 % | 84 % / 76 % | 90 % / 82 % |
+  | `cmdlets` | 96,0 % / 93,1 % | 93 % / 91 % | 95 % / 92 % |
+  | `shell` | 93,9 % / 86,9 % | 83 % / 78 % | 93 % / 85 % |
+  | `fx` (hors `view`) | 99,5 % / 97,5 % | 99 % / 97 % | inchangé |
+
+**Avant de fusionner :** (1) vérifier les valeurs sur le job macOS de la CI, la mesure ci-dessus vient de Linux en `root` (2 tests de `fs` sautés), donc les planchers proposés sont plutôt prudents ; (2) Windows n'est pas concerné, son profil `windows-coverage-floors` désactive déjà le contrôle par module ; (3) le contrôle agrégé de `powerj-coverage` (80 %) ne change pas.
 
 Le lot 1 se règle sans décision. Le lot 3 est le seul qui engage l'API : il vaut mieux le trancher **maintenant**, tant que `ApiSurfaceTest` permet encore de casser.
 
