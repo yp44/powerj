@@ -202,7 +202,7 @@ class CompletionsTest {
         assertThat(values("cat .gi")).containsExactly(".gitignore");
         assertThat(values("ls ./.h")).containsExactly("./.hidden");
         assertThat(values("ls ~/.h")).containsExactly("~/.hidden");
-        assertThat(values("ls docs/.c")).containsExactly("docs/.cache" + java.io.File.separator);
+        assertThat(values("ls docs/.c")).containsExactly("docs/.cache/"); // the separator typed is kept, on Windows too
         assertThat(values("ls .")).contains(".hidden", ".gitignore");
         // The same names with quotes, and a name without a dot, as before.
         assertThat(values("ls \".h")).containsExactly(".hidden");
