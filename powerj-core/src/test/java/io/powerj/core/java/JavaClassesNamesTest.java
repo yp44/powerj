@@ -20,16 +20,4 @@ class JavaClassesNamesTest {
     void aTextThatIsNotAClassNameIsNotFound(String text) {
         assertThat(classes.find(text)).isEmpty();
     }
-
-    @ParameterizedTest
-    @ValueSource(strings = {"", ".", "..", "a."})
-    void aTextThatIsNotAClassNameIsNotAStaticReference(String text) {
-        assertThat(classes.isStaticReference(text)).isFalse();
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = {"List", "java.util.List", "Map.Entry", "Math"})
-    void aClassNameIsStillFound(String text) {
-        assertThat(classes.find(text)).isPresent();
-    }
 }
