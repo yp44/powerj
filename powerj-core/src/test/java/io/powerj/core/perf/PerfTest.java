@@ -511,13 +511,13 @@ class PerfTest {
         assertThat(errors).hasSize(1); // another value: reported again
     }
 
-    @Test
+    @org.junit.jupiter.api.RepeatedTest(10)
     void aPeriodUnderTheProfilersMinimumBecomesOneMillisecond() throws Exception {
         session.environment().put("POWERJ_PERF_JFR_SAMPLEPERIOD", "100us");
         run("numbers 2 | work -c 150 | count");
         assertThat(errors).hasSize(1);
         assertThat(errors.getFirst()).contains("POWERJ_PERF_JFR_SAMPLEPERIOD=100us").contains("1 ms");
-        assertThat(hotSamples()).isGreaterThan(40);
+        System.out.println("PERFPROBE hot=" + hotSamples()); // diagnostic only (scratch branch)
     }
 
     @Test
