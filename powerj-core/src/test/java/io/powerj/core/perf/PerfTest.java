@@ -511,13 +511,20 @@ class PerfTest {
         assertThat(errors).hasSize(1); // another value: reported again
     }
 
+    /**
+     * With the real profiler: the user is told that the period was raised, and the profiler still samples. That the
+     * period asked of the profiler is 1 ms is checked where it is decided, with a fake profiler
+     * ({@code PerfModeTest.aPeriodUnderTheMinimumBecomesTheMinimum}). How many samples arrive is not asserted: it
+     * depends on the timer of the system. On the macOS runners the profiler gave one sample every 11 ms (22 to 32 in
+     * 300 ms, 60 at best) and a test that wanted more than 40 failed half of the time (#101).
+     */
     @Test
     void aPeriodUnderTheProfilersMinimumBecomesOneMillisecond() throws Exception {
         session.environment().put("POWERJ_PERF_JFR_SAMPLEPERIOD", "100us");
         run("numbers 2 | work -c 150 | count");
         assertThat(errors).hasSize(1);
         assertThat(errors.getFirst()).contains("POWERJ_PERF_JFR_SAMPLEPERIOD=100us").contains("1 ms");
-        assertThat(hotSamples()).isGreaterThan(40);
+        assertThat(hotSamples()).isPositive(); // the profiler ran with the raised period
     }
 
     @Test
