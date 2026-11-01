@@ -13,6 +13,8 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Pattern;
 
+import io.powerj.fs.Host;
+
 /**
  * Names of the programs found in the session's {@code PATH}, for completion (FR-21). On Windows,
  * the {@code PATHEXT} extensions are removed ({@code notepad}, not {@code notepad.exe}). The result
@@ -28,7 +30,7 @@ public final class NativeCommands {
     private Set<String> cached = Set.of();
 
     public NativeCommands() {
-        this(Platform.isWindows());
+        this(Host.windows());
     }
 
     NativeCommands(boolean windows) {

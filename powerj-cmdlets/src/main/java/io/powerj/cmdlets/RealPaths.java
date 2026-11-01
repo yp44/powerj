@@ -5,6 +5,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
 
+import io.powerj.fs.Host;
+
 /**
  * Paths as the file system sees them, to compare them (review C-21). A path written with {@code ..} after a link, an
  * alias of a protected folder, a link in the middle of the path: {@link Path#normalize()} knows none of that.
@@ -65,6 +67,6 @@ final class RealPaths {
 
     /** The form in which two paths are compared: in lower case where file names ignore case. */
     static Path compared(Path path) {
-        return HostOs.NAMES_IGNORE_CASE ? Path.of(path.toString().toLowerCase(Locale.ROOT)) : path;
+        return Host.namesIgnoreCase() ? Path.of(path.toString().toLowerCase(Locale.ROOT)) : path;
     }
 }

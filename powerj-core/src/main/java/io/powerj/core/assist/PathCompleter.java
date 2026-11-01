@@ -13,8 +13,8 @@ import java.util.Locale;
 import io.powerj.core.assist.Completions.Candidate;
 import io.powerj.core.assist.Completions.Result;
 import io.powerj.core.i18n.Messages;
-import io.powerj.core.nativeexec.Platform;
 import io.powerj.core.runtime.CommandCatalog;
+import io.powerj.fs.Host;
 
 /** Suggestions of file paths (FR-25), for the word starting at a position of the line (possibly quoted). */
 final class PathCompleter {
@@ -22,9 +22,16 @@ final class PathCompleter {
     private static final int MAX_FILES = 500;
 
     private final CommandCatalog catalog;
+    private final boolean namesIgnoreCase;
 
     PathCompleter(CommandCatalog catalog) {
+        this(catalog, Host.namesIgnoreCase());
+    }
+
+    /** @param namesIgnoreCase {@code doc} offers {@code Docs/}: the rule of the host (Windows, macOS), given to a test */
+    PathCompleter(CommandCatalog catalog, boolean namesIgnoreCase) {
         this.catalog = catalog;
+        this.namesIgnoreCase = namesIgnoreCase;
     }
 
     /** File paths for the word starting at {@code start} (possibly quoted). */
@@ -47,8 +54,8 @@ final class PathCompleter {
             return Result.none(cursor);
         }
         char separator = dirPart.contains("/") ? '/' : dirPart.contains("\\") ? '\\'
-                : Platform.isWindows() ? '\\' : '/';
-        boolean ignoreCase = Platform.isWindows();
+                : Host.windows() ? '\\' : '/';
+        boolean ignoreCase = namesIgnoreCase;
         List<Candidate> candidates = new ArrayList<>();
         try (DirectoryStream<Path> entries = Files.newDirectoryStream(base)) {
             for (Path entry : entries) {

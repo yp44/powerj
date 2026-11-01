@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import io.powerj.core.error.PjException;
-import io.powerj.core.nativeexec.Platform;
+import io.powerj.fs.Host;
 
 /** Where the user is: directories, home, environment. */
 class SessionStateTest {
@@ -41,7 +41,7 @@ class SessionStateTest {
         Path b = tmp.resolve("b").toAbsolutePath();
 
         assertThat(state(Map.of("HOME", "  ", "USERPROFILE", b.toString())).home()).isEqualTo(b);
-        assumeFalse(Platform.isWindows(), "a NUL in a path is accepted differently there");
+        assumeFalse(Host.windows(), "a NUL in a path is accepted differently there");
         assertThat(state(Map.of("HOME", "bad\0path", "USERPROFILE", b.toString())).home()).isEqualTo(b);
     }
 
@@ -120,7 +120,7 @@ class SessionStateTest {
     void environmentNamesFollowTheCaseRuleOfThePlatform() {
         var state = state(Map.of("Path", "x"));
 
-        if (Platform.isWindows()) {
+        if (Host.windows()) {
             assertThat(state.environment().get("PATH")).isEqualTo("x");
             assertThat(state.environmentSnapshot().get("pAtH")).isEqualTo("x");
         } else {

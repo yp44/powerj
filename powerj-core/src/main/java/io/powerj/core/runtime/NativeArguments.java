@@ -6,9 +6,9 @@ import java.util.List;
 import io.powerj.core.error.PjException;
 import io.powerj.core.format.Values;
 import io.powerj.core.i18n.Messages;
-import io.powerj.core.nativeexec.Platform;
 import io.powerj.fs.GlobExpander;
 import io.powerj.fs.Globs;
+import io.powerj.fs.Host;
 
 /**
  * The arguments of a native program (specification FR-40): the text of each value, and the wildcards of the words
@@ -34,7 +34,7 @@ final class NativeArguments {
         Boolean ignoreCase = null; // read at the first wildcard: a wrong value is no error for a line without one
         for (Evaluator.Word word : words) {
             String text = Values.text(word.value());
-            if (!Platform.isWindows() && word.pattern() != null && Globs.hasWildcard(word.pattern())) {
+            if (!Host.windows() && word.pattern() != null && Globs.hasWildcard(word.pattern())) {
                 if (ignoreCase == null) {
                     ignoreCase = ignoreCase(session);
                 }

@@ -12,6 +12,8 @@ import java.util.OptionalInt;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import io.powerj.fs.Host;
+
 /**
  * Code page of the Windows console, read through the FFM API ({@code GetConsoleOutputCP}, or failing that
  * {@code GetOEMCP}), without JNI.
@@ -25,7 +27,7 @@ final class WindowsConsole {
 
     /** Output code page of the console, or OEM code page if the process has no console. */
     static OptionalInt outputCodePage() {
-        if (!Platform.isWindows()) {
+        if (!Host.windows()) {
             return OptionalInt.empty();
         }
         try {

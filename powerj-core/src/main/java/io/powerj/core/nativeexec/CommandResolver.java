@@ -10,6 +10,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
+import io.powerj.fs.Host;
+
 
 /**
  * Lookup of a native executable (specification FR-13): explicit path ({@code .\outil.exe},
@@ -23,7 +25,7 @@ public final class CommandResolver {
     private final boolean windows;
 
     public CommandResolver() {
-        this(Platform.isWindows());
+        this(Host.windows());
     }
 
     CommandResolver(boolean windows) {

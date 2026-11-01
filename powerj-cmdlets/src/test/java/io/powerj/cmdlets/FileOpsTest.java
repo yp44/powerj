@@ -20,6 +20,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import io.powerj.api.Cmdlet;
 import io.powerj.api.UsageException;
+import io.powerj.fs.Host;
 
 /** {@code mkdir}, {@code touch}, {@code cp}, {@code mv} and {@code rm} (FR-72), always inside a temporary folder. */
 class FileOpsTest {
@@ -98,7 +99,7 @@ class FileOpsTest {
 
     @Test
     void wildcardsOfTheCommandsThatChangeFilesAreCaseSensitiveOffWindows() throws Exception {
-        assumeFalse(HostOs.WINDOWS, "the file system ignores case here");
+        assumeFalse(Host.windows(), "the file system ignores case here");
         // Names that differ by more than the case: on macOS the file system ignores case and "readme.txt" and
         // "README.txt" would be one file.
         file("README.md", "r");
@@ -114,7 +115,7 @@ class FileOpsTest {
 
     @Test
     void theCaseRuleCanBeChosenWhenExpanding() throws Exception {
-        assumeFalse(HostOs.WINDOWS, "the matcher of Windows ignores case whatever is asked");
+        assumeFalse(Host.windows(), "the matcher of Windows ignores case whatever is asked");
         file("Notes.TXT", "n");
         file("other.md", "o");
 
@@ -125,7 +126,7 @@ class FileOpsTest {
 
     @Test
     void theVariableMakesTheWildcardsOfTheCommandsThatChangeFilesIgnoreCase() throws Exception {
-        assumeFalse(HostOs.WINDOWS, "the matcher of Windows ignores case whatever is asked");
+        assumeFalse(Host.windows(), "the matcher of Windows ignores case whatever is asked");
         file("README.md", "r");
         file("readme.log", "r");
         file("other.txt", "o");

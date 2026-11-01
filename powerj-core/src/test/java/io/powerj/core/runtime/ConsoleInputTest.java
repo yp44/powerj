@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import io.powerj.core.command.CmdletRegistry;
-import io.powerj.core.nativeexec.Platform;
+import io.powerj.fs.Host;
 
 /**
  * The console input is suspended exactly while a native program reads the console itself (vim…), so that
@@ -47,7 +47,7 @@ class ConsoleInputTest {
 
     @BeforeEach
     void unixOnly() {
-        assumeFalse(Platform.isWindows(), "Unix commands");
+        assumeFalse(Host.windows(), "Unix commands");
     }
 
     @Test

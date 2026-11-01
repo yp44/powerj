@@ -18,8 +18,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import io.powerj.core.command.CmdletRegistry;
-import io.powerj.core.nativeexec.Platform;
 import io.powerj.core.support.FakeCmdlets;
+import io.powerj.fs.Host;
 
 /** Wildcards in the unquoted words of a native command are replaced by the file names they match (FR-40). */
 class NativeWildcardsTest {
@@ -34,7 +34,7 @@ class NativeWildcardsTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        assumeFalse(Platform.isWindows(), "on Windows the program expands its own wildcards");
+        assumeFalse(Host.windows(), "on Windows the program expands its own wildcards");
         for (String name : List.of("b.txt", "a.txt", "c.log", "Notes.TXT", ".hidden.txt")) {
             Files.createFile(tmp.resolve(name));
         }

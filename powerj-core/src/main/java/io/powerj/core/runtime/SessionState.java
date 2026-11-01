@@ -1,17 +1,15 @@
 package io.powerj.core.runtime;
 
 import java.nio.file.Files;
-import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
 
 import io.powerj.core.error.PjException;
 import io.powerj.core.i18n.Messages;
-import io.powerj.core.nativeexec.Platform;
+import io.powerj.fs.Host;
 
 /**
  * Where the user is in a session: the current, previous and configuration directories, the home that {@code ~}
@@ -19,9 +17,6 @@ import io.powerj.core.nativeexec.Platform;
  * completion read it, so every field is {@code volatile} or a synchronized map (review C-13).
  */
 final class SessionState {
-
-    /** Environment variables designating the home directory, in order of priority. */
-    private static final List<String> HOME_VARIABLES = List.of("HOME", "USERPROFILE");
 
     private final Path home;
     /** A synchronized map: each operation is atomic; to copy or iterate it, see {@link #environmentSnapshot()}. */
@@ -40,7 +35,7 @@ final class SessionState {
 
     /** Environment variable names are case-insensitive on Windows. */
     private static TreeMap<String, String> newEnvironment() {
-        return Platform.isWindows() ? new TreeMap<>(String.CASE_INSENSITIVE_ORDER) : new TreeMap<>();
+        return Host.windows() ? new TreeMap<>(String.CASE_INSENSITIVE_ORDER) : new TreeMap<>();
     }
 
     /**
@@ -49,17 +44,7 @@ final class SessionState {
      * directory given at startup.
      */
     Path home() {
-        for (String name : HOME_VARIABLES) {
-            String value = environment.get(name);
-            if (value != null && !value.isBlank()) {
-                try {
-                    return Path.of(value.strip()).toAbsolutePath().normalize();
-                } catch (InvalidPathException _) {
-                    // invalid value: try the next source
-                }
-            }
-        }
-        return home;
+        return Host.home(environment, home);
     }
 
     /** The home given at startup, whatever {@code HOME} says since ({@code $home}). */
