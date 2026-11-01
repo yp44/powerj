@@ -28,6 +28,9 @@ import io.powerj.fs.Host;
  */
 class PathCompleterCaseTest {
 
+    /** What follows the name of a folder in a suggestion: the separator of the system when nothing typed has one. */
+    private static final String DIR = Host.windows() ? "Docs\\" : "Docs/";
+
     @TempDir
     Path tmp;
 
@@ -52,9 +55,9 @@ class PathCompleterCaseTest {
     void whereCaseIsIgnoredDocFindsDocsAndDocker() {
         var completer = new PathCompleter(interpreter, true);
 
-        assertThat(offered(completer, "doc")).containsExactly("Docs/", "docker.txt");
+        assertThat(offered(completer, "doc")).containsExactly(DIR, "docker.txt");
         assertThat(offered(completer, "readme")).containsExactly("README.md");
-        assertThat(offered(completer, "DOCS")).containsExactly("Docs/");
+        assertThat(offered(completer, "DOCS")).containsExactly(DIR);
     }
 
     @Test
@@ -62,7 +65,7 @@ class PathCompleterCaseTest {
         var completer = new PathCompleter(interpreter, false);
 
         assertThat(offered(completer, "doc")).containsExactly("docker.txt");
-        assertThat(offered(completer, "Doc")).containsExactly("Docs/");
+        assertThat(offered(completer, "Doc")).containsExactly(DIR);
         assertThat(offered(completer, "readme")).isEmpty();
     }
 
@@ -71,7 +74,7 @@ class PathCompleterCaseTest {
         var completer = new PathCompleter(interpreter);
 
         if (Host.namesIgnoreCase()) { // Windows, macOS
-            assertThat(offered(completer, "doc")).containsExactly("Docs/", "docker.txt");
+            assertThat(offered(completer, "doc")).containsExactly(DIR, "docker.txt");
         } else {
             assertThat(offered(completer, "doc")).containsExactly("docker.txt");
         }
