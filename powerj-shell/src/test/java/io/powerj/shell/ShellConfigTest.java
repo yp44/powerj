@@ -12,7 +12,7 @@ import java.util.Locale;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import io.powerj.api.Language;
+import io.powerj.api.internal.LanguageSetting;
 
 class ShellConfigTest {
 
@@ -51,11 +51,11 @@ class ShellConfigTest {
     @Test
     void nonPositiveHistorySizeIsRejected() {
         assertThatThrownBy(() -> new ShellConfig(0, null)).hasMessage("history.size must be positive: 0");
-        Language.set(Locale.FRENCH);
+        LanguageSetting.set(Locale.FRENCH);
         try {
             assertThatThrownBy(() -> new ShellConfig(-1, null)).hasMessage("history.size doit être positif : -1");
         } finally {
-            Language.set(Locale.ENGLISH);
+            LanguageSetting.set(Locale.ENGLISH);
         }
     }
 

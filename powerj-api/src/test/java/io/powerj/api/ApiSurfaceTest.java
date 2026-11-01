@@ -71,7 +71,9 @@ class ApiSurfaceTest {
         try (Stream<Path> files = Files.walk(CLASSES)) {
             return files.map(CLASSES::relativize).map(Path::toString)
                     .filter(n -> n.endsWith(".class") && !n.endsWith("module-info.class")
-                            && !n.endsWith("package-info.class"))
+                            && !n.endsWith("package-info.class")
+                            // exported to the built-in modules only, so not what a third-party module compiles against
+                            && !n.startsWith("internal" + java.io.File.separator))
                     .map(n -> "io.powerj.api." + n.substring(0, n.length() - ".class".length())
                             .replace(java.io.File.separatorChar, '.'))
                     .sorted()

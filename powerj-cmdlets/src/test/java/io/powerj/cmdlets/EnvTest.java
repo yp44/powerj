@@ -11,7 +11,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import io.powerj.api.Language;
+import io.powerj.api.internal.LanguageSetting;
 
 class EnvTest {
 
@@ -65,19 +65,19 @@ class EnvTest {
 
     @AfterEach
     void restoreLanguage() {
-        Language.set(Locale.ENGLISH);
+        LanguageSetting.set(Locale.ENGLISH);
     }
 
     @Test
     void missingVariableInFrench() {
-        Language.set(Locale.FRENCH);
+        LanguageSetting.set(Locale.FRENCH);
         env("NOPE", null, null, null, null, null);
         assertThat(context.errors).containsExactly("variable absente : NOPE");
     }
 
     @Test
     void invalidSetInFrench() {
-        Language.set(Locale.FRENCH);
+        LanguageSetting.set(Locale.FRENCH);
         assertThatThrownBy(() -> env(null, "NOEQUALS", null, null, null, null))
                 .isInstanceOf(IllegalArgumentException.class).hasMessage("--set attend NOM=valeur");
     }

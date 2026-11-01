@@ -69,8 +69,6 @@ public final class io.powerj.api.Language
   public static final java.lang.String io.powerj.api.Language.PROPERTY
   public static java.lang.String io.powerj.api.Language.text(java.util.ResourceBundle,java.lang.String,java.lang.Object...)
   public static java.util.Locale io.powerj.api.Language.current()
-  public static java.util.Locale io.powerj.api.Language.resolve(java.lang.String,java.lang.String,java.lang.String,java.util.Locale)
-  public static void io.powerj.api.Language.set(java.util.Locale)
 
 public abstract @interface io.powerj.api.Option extends java.lang.annotation.Annotation retention=RUNTIME
   public abstract boolean io.powerj.api.Option.mandatory() default false

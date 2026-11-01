@@ -10,7 +10,7 @@ import java.util.Locale;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
-import io.powerj.api.Language;
+import io.powerj.api.internal.LanguageSetting;
 
 import io.powerj.core.lang.Ast.Binary;
 import io.powerj.core.lang.Ast.Get;
@@ -82,7 +82,7 @@ class ExpressionParserTest {
 
     @AfterEach
     void englishAgain() {
-        Language.set(Locale.ENGLISH);
+        LanguageSetting.set(Locale.ENGLISH);
     }
 
     @Test
@@ -98,7 +98,7 @@ class ExpressionParserTest {
 
     @Test
     void errorsInFrench() {
-        Language.set(Locale.FRENCH);
+        LanguageSetting.set(Locale.FRENCH);
         assertThatThrownBy(() -> ExpressionParser.parse("$_."))
                 .hasMessage("syntaxe : nom attendu après « . » en fin d'expression");
         assertThatThrownBy(() -> ExpressionParser.parse("$_.size = 1"))

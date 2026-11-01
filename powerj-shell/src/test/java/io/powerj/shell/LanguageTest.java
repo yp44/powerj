@@ -11,50 +11,51 @@ import java.util.ResourceBundle;
 import org.junit.jupiter.api.Test;
 
 import io.powerj.api.Language;
+import io.powerj.api.internal.LanguageSetting;
 
 /** Choice of the message language and formatting of the texts (FR-61). */
 class LanguageTest {
 
     @Test
     void resolutionOrderIsPropertyEnvironmentConfigurationSystem() {
-        assertThat(Language.resolve("fr", "en", "en", Locale.ENGLISH)).isEqualTo(Locale.FRENCH);
-        assertThat(Language.resolve("en", "fr", "fr", Locale.FRENCH)).isEqualTo(Locale.ENGLISH);
-        assertThat(Language.resolve(null, "fr", "en", Locale.ENGLISH)).isEqualTo(Locale.FRENCH);
-        assertThat(Language.resolve(null, "en", "fr", Locale.FRENCH)).isEqualTo(Locale.ENGLISH);
-        assertThat(Language.resolve(null, null, "fr", Locale.ENGLISH)).isEqualTo(Locale.FRENCH);
-        assertThat(Language.resolve(null, null, "en", Locale.FRENCH)).isEqualTo(Locale.ENGLISH);
-        assertThat(Language.resolve(null, null, null, Locale.FRENCH)).isEqualTo(Locale.FRENCH);
-        assertThat(Language.resolve(null, null, null, Locale.ENGLISH)).isEqualTo(Locale.ENGLISH);
+        assertThat(LanguageSetting.resolve("fr", "en", "en", Locale.ENGLISH)).isEqualTo(Locale.FRENCH);
+        assertThat(LanguageSetting.resolve("en", "fr", "fr", Locale.FRENCH)).isEqualTo(Locale.ENGLISH);
+        assertThat(LanguageSetting.resolve(null, "fr", "en", Locale.ENGLISH)).isEqualTo(Locale.FRENCH);
+        assertThat(LanguageSetting.resolve(null, "en", "fr", Locale.FRENCH)).isEqualTo(Locale.ENGLISH);
+        assertThat(LanguageSetting.resolve(null, null, "fr", Locale.ENGLISH)).isEqualTo(Locale.FRENCH);
+        assertThat(LanguageSetting.resolve(null, null, "en", Locale.FRENCH)).isEqualTo(Locale.ENGLISH);
+        assertThat(LanguageSetting.resolve(null, null, null, Locale.FRENCH)).isEqualTo(Locale.FRENCH);
+        assertThat(LanguageSetting.resolve(null, null, null, Locale.ENGLISH)).isEqualTo(Locale.ENGLISH);
     }
 
     @Test
     void blankValuesAreIgnored() {
-        assertThat(Language.resolve("", "  ", "fr", Locale.ENGLISH)).isEqualTo(Locale.FRENCH);
-        assertThat(Language.resolve(" ", "", "", Locale.FRENCH)).isEqualTo(Locale.FRENCH);
-        assertThat(Language.resolve(" ", null, "\t", Locale.ENGLISH)).isEqualTo(Locale.ENGLISH);
+        assertThat(LanguageSetting.resolve("", "  ", "fr", Locale.ENGLISH)).isEqualTo(Locale.FRENCH);
+        assertThat(LanguageSetting.resolve(" ", "", "", Locale.FRENCH)).isEqualTo(Locale.FRENCH);
+        assertThat(LanguageSetting.resolve(" ", null, "\t", Locale.ENGLISH)).isEqualTo(Locale.ENGLISH);
     }
 
     @Test
     void valuesAreNormalizedToEnglishOrFrench() {
         for (String french : new String[] {"fr", "fr_FR", "FR", " fr "}) {
-            assertThat(Language.resolve(french, null, null, Locale.ENGLISH)).as(french).isEqualTo(Locale.FRENCH);
+            assertThat(LanguageSetting.resolve(french, null, null, Locale.ENGLISH)).as(french).isEqualTo(Locale.FRENCH);
         }
-        assertThat(Language.resolve("de", null, null, Locale.FRENCH)).isEqualTo(Locale.ENGLISH);
-        assertThat(Language.resolve(null, null, null, null)).isEqualTo(Locale.ENGLISH);
-        assertThat(Language.resolve(null, null, null, Locale.GERMAN)).isEqualTo(Locale.ENGLISH);
-        assertThat(Language.resolve(null, null, null, Locale.FRANCE)).isEqualTo(Locale.FRENCH);
-        assertThat(Language.resolve(null, null, null, Locale.CANADA_FRENCH)).isEqualTo(Locale.FRENCH);
+        assertThat(LanguageSetting.resolve("de", null, null, Locale.FRENCH)).isEqualTo(Locale.ENGLISH);
+        assertThat(LanguageSetting.resolve(null, null, null, null)).isEqualTo(Locale.ENGLISH);
+        assertThat(LanguageSetting.resolve(null, null, null, Locale.GERMAN)).isEqualTo(Locale.ENGLISH);
+        assertThat(LanguageSetting.resolve(null, null, null, Locale.FRANCE)).isEqualTo(Locale.FRENCH);
+        assertThat(LanguageSetting.resolve(null, null, null, Locale.CANADA_FRENCH)).isEqualTo(Locale.FRENCH);
     }
 
     @Test
     void setNormalizesAndCurrentReflectsIt() {
         try {
-            Language.set(Locale.FRANCE);
+            LanguageSetting.set(Locale.FRANCE);
             assertThat(Language.current()).isEqualTo(Locale.FRENCH);
-            Language.set(Locale.GERMAN);
+            LanguageSetting.set(Locale.GERMAN);
             assertThat(Language.current()).isEqualTo(Locale.ENGLISH);
         } finally {
-            Language.set(Locale.ENGLISH);
+            LanguageSetting.set(Locale.ENGLISH);
         }
     }
 
