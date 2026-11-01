@@ -159,6 +159,10 @@ structures, functions) can be built on it. The work is organised in phases (revi
 - `CmdletContext.perfReports()` is removed: `context.service(PerfReports.class)`. `PerfReport`, `StageStat`,
   `BlockStat`, `NativeStat`, `PhaseStat`, `JvmStat`, `HotMethod`, `GcStat`, `AllocStat` and `LineStat` are in
   `io.powerj.api.perf`.
+- `Language.set(Locale)` and `Language.resolve(...)` are removed from `io.powerj.api`: a cmdlet reads the language
+  (`Language.current()`, `Language.text(...)`) and can no longer change it. The language is written by the shell only, once,
+  at startup, through `io.powerj.api.internal.LanguageSetting`, a package exported to the built-in modules and to no other
+  (#79). No built-in cmdlet and no example called them; only the tests of the built-in modules did.
 
 ### Added, changed and fixed (Phase 4, composition root and shell)
 
@@ -425,6 +429,21 @@ structures, functions) can be built on it. The work is organised in phases (revi
   ([#109](https://github.com/yp44/powerj/issues/109), which also removes [#97](https://github.com/yp44/powerj/issues/97)),
   the parser of the units of a size ([#110](https://github.com/yp44/powerj/issues/110)) and `GuardedText`
   ([#111](https://github.com/yp44/powerj/issues/111)).
+
+### Changed (a cmdlet cannot change the language, [#79](https://github.com/yp44/powerj/issues/79))
+- **`Language.set` and `Language.resolve` leave the public API.** Any third-party cmdlet could call
+  `Language.set(Locale.FRENCH)` and change the language of the whole shell. The state and the policy move to
+  `io.powerj.api.internal.LanguageSetting`, in a package that `module-info.java` exports to `io.powerj.core`,
+  `io.powerj.cmdlets`, `io.powerj.fx` and `io.powerj.shell` and to no one else. The order of resolution is unchanged
+  (`-Dpowerj.language`, `POWERJ_LANG`, `language=` of `config.properties`, then the language of the system), and so is
+  `Language.current()`.
+- Tests: `LanguageSurfaceTest` fails if `Language` gets a public `set` or `resolve` again, or if the package of the setter
+  is exported to a module outside that list; the snapshot of `ApiSurfaceTest` loses the two methods, and the internal
+  package is not in it. The tests of the built-in modules that try both languages call `LanguageSetting.set`.
+- The static field `current` is still not `final` (the one frozen entry of the ArchUnit rule): it is now
+  `LanguageSetting.current`, and a `Locale` per `Session` stays an item of [#63](https://github.com/yp44/powerj/issues/63).
+- `io.powerj.fx` is loaded from `~/.powerj/modules` in its own layer: it is named in the list for its tests, which run in
+  one layer with the others. At run time it only reads the language, which needs no export.
 
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
