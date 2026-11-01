@@ -356,6 +356,14 @@ structures, functions) can be built on it. The work is organised in phases (revi
 - Not changed: `cd ..` and `ls ..` still offer nothing (the completer does not propose `..` as `../`). That is a missing
   feature, not an error.
 
+### Fixed (a test that counted profiler samples, [#101](https://github.com/yp44/powerj/issues/101))
+- **The macOS job no longer fails at random on `PerfTest.aPeriodUnderTheProfilersMinimumBecomesOneMillisecond`.** The test
+  asked for more than 40 samples of the profiler in 300 ms of work, which needs one sample per 7.5 ms; on the macOS runners
+  the profiler gave about one every 11 ms (22 to 32 samples, 60 at best), so the test passed or failed by chance, on `main`
+  too. That a period under the profiler's minimum is raised to 1 ms is checked where it is decided, with a fake profiler
+  (`PerfModeTest.aPeriodUnderTheMinimumBecomesTheMinimum`); the test with the real profiler now checks that the user is told
+  and that the profiler still samples. Only a test changed.
+
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
   whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes
