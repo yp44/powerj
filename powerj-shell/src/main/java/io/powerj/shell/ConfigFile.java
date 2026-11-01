@@ -72,15 +72,16 @@ final class ConfigFile {
         } catch (NoSuchFileException _) {
             // new file
         }
+        String line = escape(key, true) + "=" + escape(value, false);
         boolean found = false;
         for (int i = 0; i < lines.size(); i++) {
             if (key.equals(keyOf(lines.get(i)))) {
-                lines.set(i, key + "=" + value);
+                lines.set(i, line);
                 found = true;
             }
         }
         if (!found) {
-            lines.add(key + "=" + value);
+            lines.add(line);
         }
         Path parent = file.toAbsolutePath().getParent();
         Files.createDirectories(parent);
@@ -103,7 +104,23 @@ final class ConfigFile {
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
             if (c == '\\' && i + 1 < text.length()) {
-                key.append(text.charAt(++i));
+                char next = text.charAt(++i);
+                switch (next) {
+                    case 'n' -> key.append('\n');
+                    case 't' -> key.append('\t');
+                    case 'r' -> key.append('\r');
+                    case 'f' -> key.append('\f');
+                    case 'u' -> {
+                        int digits = hexDigits(text, i + 1);
+                        if (digits < 0) {
+                            key.append(next); // not an escape: the letter stays
+                        } else {
+                            key.append((char) digits);
+                            i += 4;
+                        }
+                    }
+                    default -> key.append(next);
+                }
             } else if (c == '=' || c == ':' || Character.isWhitespace(c)) {
                 break;
             } else {
@@ -111,5 +128,55 @@ final class ConfigFile {
             }
         }
         return key.toString();
+    }
+
+    /** The four hexadecimal digits at {@code from} as a number, or -1 if they are not there. */
+    private static int hexDigits(String text, int from) {
+        if (from + 4 > text.length()) {
+            return -1;
+        }
+        int value = 0;
+        for (int i = from; i < from + 4; i++) {
+            int digit = Character.digit(text.charAt(i), 16);
+            if (digit < 0) {
+                return -1;
+            }
+            value = value * 16 + digit;
+        }
+        return value;
+    }
+
+    /**
+     * The text as a properties file spells it, so that {@link Properties#load} gives it back unchanged. A backslash, a line
+     * break and the characters that cannot be written are escaped; a space is escaped in a key, and at the start of a value
+     * (load drops the blanks that follow the separator); {@code =}, {@code :}, {@code #} and {@code !} are escaped in a key. The
+     * file is UTF-8, so letters of any language are written as they are, but a surrogate that is not part of a pair cannot be
+     * encoded and is written as an escape.
+     */
+    static String escape(String text, boolean key) {
+        var out = new StringBuilder(text.length() + 8);
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            switch (c) {
+                case '\\' -> out.append("\\\\");
+                case '\n' -> out.append("\\n");
+                case '\r' -> out.append("\\r");
+                case '\t' -> out.append("\\t");
+                case '\f' -> out.append("\\f");
+                case ' ' -> out.append(key || i == 0 ? "\\ " : " ");
+                case '=', ':', '#', '!' -> out.append(key ? "\\" : "").append(c);
+                default -> {
+                    if (Character.isHighSurrogate(c) && i + 1 < text.length()
+                            && Character.isLowSurrogate(text.charAt(i + 1))) {
+                        out.append(c).append(text.charAt(++i)); // a pair: a character outside the basic plane
+                    } else if (c < 0x20 || c == 0x7f || Character.isSurrogate(c)) {
+                        out.append("\\u%04x".formatted((int) c));
+                    } else {
+                        out.append(c);
+                    }
+                }
+            }
+        }
+        return out.toString();
     }
 }

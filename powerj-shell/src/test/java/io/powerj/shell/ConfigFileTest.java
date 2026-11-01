@@ -10,6 +10,8 @@ import java.nio.file.Path;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class ConfigFileTest {
 
@@ -107,6 +109,83 @@ class ConfigFileTest {
         assertThat(folder).isDirectory();
         assertThatThrownBy(() -> config().set("a", "1")).isInstanceOf(IOException.class);
         assertThatThrownBy(() -> config().get("a")).isInstanceOf(IOException.class);
+    }
+
+    // --- what is written reads back as it was (#93) ---
+
+    /** A value with a backslash used to make the file unreadable ({@code Malformed \\uxxxx}), a line break to split it. */
+    @ParameterizedTest
+    @ValueSource(strings = {"plain", "", "C:\\users\\yves", "ends with a backslash\\", "\\u0041 is not an A",
+            "line one\nline two", "carriage\rreturn", "a=b", "a:b", " leading space", "trailing space ", "\ttab first",
+            "form\ffeed", "#not a comment", "!not a comment", "accents é à ü ñ, 日本語", "emoji \uD83D\uDE00",
+            "lone surrogate \uD800 inside", "control \u0001 character"})
+    void aValueIsReadBackAsItWasWritten(String value) throws IOException {
+        config().set("setting", value);
+
+        assertThat(config().get("setting")).contains(value);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"plain.key", "with space", "equals=sign", "colon:sign", "#hash", "!bang", "back\\slash",
+            "tab\tkey", "é accent", "emoji \uD83D\uDE00", "control \u0001 key"})
+    void aKeyIsReadBackAsItWasWritten(String key) throws IOException {
+        config().set(key, "value");
+
+        assertThat(config().get(key)).contains("value");
+        assertThat(config().read()).containsOnlyKeys(key);
+    }
+
+    @Test
+    void aValueWithLineBreaksStaysOnOneLine() throws IOException {
+        config().set("setting", "one\ntwo\r\nthree");
+
+        assertThat(Files.readAllLines(tmp.resolve("config.properties"))).hasSize(1);
+    }
+
+    @Test
+    void aKeyThatNeedsEscapingIsReplacedNotRepeated() throws IOException {
+        config().set("a key=with:signs", "1");
+        config().set("a key=with:signs", "2");
+        config().set("other", "3");
+
+        assertThat(Files.readAllLines(tmp.resolve("config.properties"))).hasSize(2);
+        assertThat(config().get("a key=with:signs")).contains("2");
+        assertThat(config().get("other")).contains("3");
+    }
+
+    /** The original failure (review finding C-11): one setting with a Windows path made every other one unreadable. */
+    @Test
+    void aWindowsPathDoesNotMakeTheOtherSettingsUnreadable() throws IOException {
+        Files.write(tmp.resolve("config.properties"), java.util.List.of("language=fr", "# mine"), StandardCharsets.UTF_8);
+
+        config().set("modules.path", "C:\\Program Files\\PowerJ\\modules");
+
+        assertThat(config().read()).containsEntry("language", "fr")
+                .containsEntry("modules.path", "C:\\Program Files\\PowerJ\\modules");
+        assertThat(ShellConfig.load(tmp.resolve("config.properties")).language()).isEqualTo("fr");
+    }
+
+    /** What the shell writes today (a consent for a module) is written exactly as before: an existing file keeps its lines. */
+    @Test
+    void theSettingsTheShellWritesAreWrittenAsBefore() throws IOException {
+        String fingerprint = "sha256:0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0";
+
+        config().set("modules.nativeAccess.io.powerj.fx", fingerprint);
+        config().set("modules.nativeAccess.com.example.greet", "false");
+        config().set("language", "fr");
+
+        assertThat(Files.readAllLines(tmp.resolve("config.properties"))).containsExactly(
+                "modules.nativeAccess.io.powerj.fx=" + fingerprint, "modules.nativeAccess.com.example.greet=false",
+                "language=fr");
+    }
+
+    @Test
+    void keyOfReadsTheEscapesOfAKey() {
+        assertThat(ConfigFile.keyOf("a\\tb=1")).isEqualTo("a\tb");
+        assertThat(ConfigFile.keyOf("a\\nb=1")).isEqualTo("a\nb");
+        assertThat(ConfigFile.keyOf("\\u0041\\u00e9=1")).isEqualTo("A\u00e9");
+        assertThat(ConfigFile.keyOf("a\\=b=1")).isEqualTo("a=b");
+        assertThat(ConfigFile.keyOf("a\\u00zz=1")).isEqualTo("au00zz"); // not an escape: as before, the letter stays
     }
 
     @Test
