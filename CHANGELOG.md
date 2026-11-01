@@ -389,6 +389,19 @@ structures, functions) can be built on it. The work is organised in phases (revi
   serializable, so a `PjException` could not be serialized) and rebuilds `error()` from its message and its cause, with
   the same value.
 
+### Fixed (`ConfigFile.set` escapes what it writes, [#93](https://github.com/yp44/powerj/issues/93))
+- **A setting recorded in `config.properties` is read back as it was written.** `ConfigFile.set` wrote `key=value` as it
+  was, but the file is read as a properties file, where a backslash starts an escape and a line break ends the entry.
+  A value with a Windows path (`C:\users\yves`) made the file unreadable (`Malformed \uxxxx encoding`, the failure of
+  review finding C-11), a value with a line break added a line, and a character that cannot be encoded made the write
+  fail. No caller writes such a value today (the consent of a module is `sha256:<hex>` or `false`), so nothing was
+  broken yet; the next setting that holds a path would have been. The value (and the key) is now escaped as
+  `Properties.store` does it: backslash, line breaks, tab, form feed, a leading space, control characters, a surrogate
+  that is not part of a pair; a key also escapes its spaces and `=`, `:`, `#`, `!`. Letters of any language are written
+  as they are (the file is UTF-8). The lines written today are unchanged byte for byte.
+- `ConfigFile.keyOf`, which finds the line of a key to replace it, reads `\n`, `\t`, `\r`, `\f` and `\uXXXX` in a key,
+  as `Properties.load` does, so that a key written escaped is found again and replaced, not repeated.
+
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
   whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes
