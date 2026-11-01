@@ -18,6 +18,9 @@ final class StageLimit implements Consumer<Object> {
 
     /** Stops the stage that has sent its share; a {@link CancellationException}, as a stage is stopped by one. */
     private static final class Full extends CancellationException {
+
+        private static final long serialVersionUID = 1L;
+
         Full() {
             super("preview: the stage has sent as many objects as a preview takes");
         }

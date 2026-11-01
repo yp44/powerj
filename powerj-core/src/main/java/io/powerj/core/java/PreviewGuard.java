@@ -18,6 +18,9 @@ public final class PreviewGuard {
 
     /** Thrown to stop the evaluation; a {@link CancellationException} so that no cmdlet or block swallows it. */
     static final class Denied extends CancellationException {
+
+        private static final long serialVersionUID = 1L;
+
         Denied(String reason) {
             super(reason);
         }

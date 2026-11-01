@@ -1,0 +1,8 @@
+# The javac warnings (-Xlint:all) that each module is allowed in a clean build, by source set (main / test).
+# ci/check-javac-warnings.sh fails the CI when a count goes above its line, and says when one goes below.
+# A number only goes down: lower a line when a warning is fixed, never raise one. How to count: lint-baseline.md.
+# module        source set  allowed
+powerj-core     main        8
+powerj-core     test        5
+powerj-cmdlets  main        3
+powerj-cmdlets  test        7

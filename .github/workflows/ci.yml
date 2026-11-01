@@ -30,7 +30,13 @@ jobs:
           cache: maven
 
       - name: Build, tests and application image
-        run: ./mvnw -B -Pdist verify
+        run: |
+          set -o pipefail
+          ./mvnw -B -Pdist verify 2>&1 | tee build.log
+
+      # The log of a clean build (a fresh checkout compiles everything): the count may go down, never up (#84).
+      - name: javac warnings do not go up
+        run: ci/check-javac-warnings.sh build.log
 
       - name: Test coverage report
         if: always()

@@ -376,6 +376,19 @@ structures, functions) can be built on it. The work is organised in phases (revi
   entries, drives `FileWalkerListingFailureTest` (sequential and parallel, failure before the first entry and in the
   middle) and `FileTreesListingFailureTest`.
 
+### Fixed and changed (javac warnings must not go up, [#84](https://github.com/yp44/powerj/issues/84))
+- **The Linux job of the CI fails when a module has more javac warnings than the repository allows.** `-Xlint:all`
+  reports its warnings without failing the build, and `docs/quality/lint-baseline.md` said that their number could only
+  go down; nothing checked it, and it had gone from 29 to 30 with the preview work (`StageLimit.Full`, no
+  `serialVersionUID`). `ci/check-javac-warnings.sh` now counts the warnings of the log of the clean build by module and
+  by source set (`main`, `test`) and compares them with `docs/quality/javac-warnings.txt`. A count above its line fails,
+  with the warnings listed; a count below it is reported so that the line is lowered; a log without any compilation is
+  refused. You can run it on your machine (see the baseline document).
+- **The seven `[serial]` warnings are gone** (30 to 23): `serialVersionUID` on `PreviewGuard.Denied`, `PreviewMode.PreviewFull`,
+  `StageLimit.Full`, `JsonParser.JsonException` and `Properties.Unreadable`; `PjException` no longer holds a `PjError` (not
+  serializable, so a `PjException` could not be serialized) and rebuilds `error()` from its message and its cause, with
+  the same value.
+
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
   whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes

@@ -328,6 +328,8 @@ final class JsonParser {
     /** Invalid JSON, at a line and a column (from 1). */
     static final class JsonException extends RuntimeException {
 
+        private static final long serialVersionUID = 1L;
+
         private final int line;
         private final int column;
 
