@@ -1,6 +1,7 @@
 package io.powerj.fs;
 
 import java.io.IOException;
+import java.nio.file.DirectoryIteratorException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -177,7 +178,10 @@ public final class FileWalker {
      */
     private record Entry(Path path, BasicFileAttributes attributes, boolean descend) { }
 
-    /** Visible children of a directory; an entry that vanished meanwhile is skipped. */
+    /**
+     * Visible children of a directory; an entry that vanished meanwhile is skipped. A directory that cannot be listed
+     * to the end is reported, and the entries read before the failure are kept.
+     */
     private List<Entry> children(Path dir, ErrorSink errors) throws InterruptedException {
         List<Entry> children = new ArrayList<>();
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
@@ -189,6 +193,8 @@ public final class FileWalker {
                     }
                 }
             }
+        } catch (DirectoryIteratorException e) {
+            errors.report(WalkError.of(dir, e.getCause())); // the failure of the iteration, not of the opening
         } catch (IOException e) {
             errors.report(WalkError.of(dir, e));
         }
