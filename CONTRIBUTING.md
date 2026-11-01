@@ -32,7 +32,7 @@ packaged launcher. `ci/smoke/fx.sh` needs a display (Xvfb is enough).
 | Maven Enforcer | JDK and Maven versions, dependency convergence, pinned plugins | pin the version |
 | ArchUnit (`powerj-architecture`) | dependencies between modules and packages, no cycle, only `Main` ends the JVM, every cmdlet declared and registered | see below |
 | API snapshot (`powerj-api`) | the public surface of the extension API does not change by accident | see below |
-| `-Xlint:all` | warnings are reported but not yet fatal; the count is in [docs/quality/lint-baseline.md](docs/quality/lint-baseline.md) and must not rise | fix the warning |
+| `-Xlint:all` | warnings are reported but not yet fatal; the Linux job of the CI fails when a module has more than [docs/quality/javac-warnings.txt](docs/quality/javac-warnings.txt) allows (`ci/check-javac-warnings.sh`, see [lint-baseline.md](docs/quality/lint-baseline.md)) | fix the warning; lower the line of the file when a count goes down, never raise it |
 
 `./mvnw -Pquality verify` adds Error Prone (warnings only for now, baseline in `docs/quality/`). `./mvnw -Pbench -DskipTests package`
 builds the JMH benchmarks, which are not part of `verify` ([how to run them](docs/quality/performance.md)).
