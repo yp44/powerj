@@ -458,6 +458,19 @@ structures, functions) can be built on it. The work is organised in phases (revi
 - The rule is in FR-33. It is done with `Math.addExact` and its siblings in a helper of `Operators`, which also shortens
   `arithmetic`; the rest of its complexity stays with [#94](https://github.com/yp44/powerj/issues/94).
 
+### Changed (the preview says when a line reads files, [#81](https://github.com/yp44/powerj/issues/81))
+- **The policy of the preview judges `Files.readString`, `readAllBytes`, `readAllLines`, `lines`, `list`, `walk` and `find` by
+  their name, whatever the path.** The line runs while it is typed, so `Files.readAllBytes(Path.of("/dev/zero"))` can exhaust
+  the memory and a FIFO can block until the deadline. A rule on the argument is not made (decision of #81: document the
+  limit, warn); FR-66 ("Reading files") and `SECURITY.md` now state the limit.
+- **The banner warns.** As soon as the line has used one of those seven calls, even from a lambda or a stage in another
+  thread, the banner of values and the banner of the timeout add `⚠ reads files as you type` (`⚠ lit des fichiers pendant la
+  frappe`). `PreviewPolicy.readsFiles` says which calls, `PreviewGuard` remembers it, and `PreviewResult.Values` and
+  `TimedOut` carry it to the shell. A line that only looks at files (`exists`, `size`, attributes) is not warned.
+- Not done on purpose: the warning does not follow `next`, `forEach` and `stream` on iterators and collections, which the
+  policy also allows on any `Iterator` or `Iterable`: `List.of(…).stream()` is everywhere and a warning on it would be read
+  by no one. The limit is written in FR-66. A rule on the argument stays a possible later issue.
+
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
   whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes
