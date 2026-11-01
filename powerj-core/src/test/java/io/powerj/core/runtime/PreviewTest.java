@@ -143,6 +143,31 @@ class PreviewTest {
         return "\"" + file.toString().replace("\\", "\\\\") + "\"";
     }
 
+    private boolean reads(String line) {
+        PreviewResult result = preview(line);
+        assertThat(result).isInstanceOf(PreviewResult.Values.class);
+        return ((PreviewResult.Values) result).readsFiles();
+    }
+
+    /** The policy lets {@code Files.readString} through on its name, whatever the path (#81): the result says so. */
+    @Test
+    void aLineThatReadsAFileSaysSoAndOthersDoNot() throws Exception {
+        Path file = Files.writeString(tmp.resolve("read.txt"), "hello");
+        String path = "java.nio.file.Path.of(" + quoted(file) + ")";
+
+        assertThat(values("java.nio.file.Files.readString(" + path + ")")).containsExactly("hello");
+        assertThat(reads("java.nio.file.Files.readString(" + path + ")")).isTrue();
+        assertThat(reads("java.nio.file.Files.readAllLines(" + path + ").size()")).isTrue();
+        // read from a stage that runs in another thread
+        assertThat(reads("items -n 1 | keep { i -> java.nio.file.Files.readString(" + path + ").length() > 0 }"))
+                .isTrue();
+        // looking at a file, a collection or a value is not reading
+        assertThat(reads("java.nio.file.Files.exists(" + path + ")")).isFalse();
+        assertThat(reads("java.util.List.of(1, 2).stream().count()")).isFalse();
+        assertThat(reads("items")).isFalse();
+        assertThat(reads("\"abc\".length()")).isFalse();
+    }
+
     @Test
     void previewableCmdletsAndBlocksRun() {
         assertThat(values("items")).containsExactly(new Item("item1", 10), new Item("item2", 20), new Item("item3", 30));

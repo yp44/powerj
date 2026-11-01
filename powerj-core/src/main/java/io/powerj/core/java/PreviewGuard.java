@@ -29,6 +29,7 @@ public final class PreviewGuard {
     private final int stageLimit;
     private volatile String reason;
     private volatile boolean cut;
+    private volatile boolean readsFiles;
     private final AtomicInteger errors = new AtomicInteger();
 
     /** A preview in which no stage is limited. */
@@ -72,8 +73,14 @@ public final class PreviewGuard {
     /** Java method or constructor about to be called. */
     static void checkCall(Executable executable) {
         PreviewGuard guard = current();
-        if (guard != null && !PreviewPolicy.allows(executable)) {
+        if (guard == null) {
+            return;
+        }
+        if (!PreviewPolicy.allows(executable)) {
             guard.stop(Messages.get("preview.off.java", PreviewPolicy.describe(executable)));
+        }
+        if (PreviewPolicy.readsFiles(executable)) {
+            guard.readsFiles = true;
         }
     }
 
@@ -102,6 +109,14 @@ public final class PreviewGuard {
     /** {@code true} if a stage was stopped at {@link #stageLimit()}. */
     public boolean wasCut() {
         return cut;
+    }
+
+    /**
+     * {@code true} if the line used a call that reads a file or lists a folder, which the policy lets through on its name
+     * (#81); the preview says so in its banner. Set from whichever thread made the call.
+     */
+    public boolean readsFiles() {
+        return readsFiles;
     }
 
     /** A non-blocking error reported during the preview: counted, never displayed. */

@@ -119,7 +119,7 @@ final class PreviewMode {
             more |= values.size() > limit;
         }
         if (interrupted && shown.isEmpty()) {
-            return new PreviewResult.TimedOut(guard.errors()); // not "no result": the line was cut off, not empty
+            return new PreviewResult.TimedOut(guard.errors(), guard.readsFiles()); // not "no result": the line was cut off, not empty
         }
         var text = new StringWriter();
         try {
@@ -137,7 +137,7 @@ final class PreviewMode {
         }
         String formatted = text.toString().stripTrailing();
         List<String> lines = formatted.isEmpty() ? List.of() : List.of(formatted.split("\\R"));
-        return new PreviewResult.Values(shown, lines, more, guard.errors(), guard.wasCut());
+        return new PreviewResult.Values(shown, lines, more, guard.errors(), guard.wasCut(), guard.readsFiles());
     }
 
     /** Adds a value of the preview, unrolled like the display does; stops once there is more than {@code limit}. */
