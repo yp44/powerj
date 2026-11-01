@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +39,34 @@ class PreviewGuardTest {
 
         assertThat(guard.reason()).isEqualTo("first");
         assertThat(PreviewGuard.active()).isFalse(); // the binding ends with the call
+    }
+
+    @Test
+    void theGuardRemembersThatTheLineReadFilesEvenFromAnotherThread() throws Exception {
+        var guard = new PreviewGuard();
+        assertThat(guard.readsFiles()).isFalse();
+
+        guard.call(() -> {
+            PreviewGuard.checkCall(Files.class.getMethod("exists", Path.class, LinkOption[].class));
+            PreviewGuard.checkCall(String.class.getMethod("length"));
+            return null;
+        });
+        assertThat(guard.readsFiles()).as("looking at a file is not reading it").isFalse();
+
+        guard.call(() -> {
+            Thread other = Thread.ofPlatform().unstarted(PreviewGuard.propagate(() -> {
+                try {
+                    PreviewGuard.checkCall(Files.class.getMethod("readString", Path.class));
+                } catch (NoSuchMethodException e) {
+                    throw new AssertionError(e);
+                }
+            }));
+            other.start();
+            other.join();
+            return null;
+        });
+        assertThat(guard.readsFiles()).as("a stage in another thread reads a file").isTrue();
+        assertThat(guard.reason()).isNull(); // allowed: the line goes on
     }
 
     @Test

@@ -255,7 +255,7 @@ final class Previewer {
                 }
                 return null;
             }
-            case PreviewResult.Values(var values, var formatted, var more, var errors, var partial) -> {
+            case PreviewResult.Values(var values, var formatted, var more, var errors, var partial, var readsFiles) -> {
                 List<AttributedString> shown = formatted.stream().limit(MAX_LINES)
                         .map(line -> AttributedString.fromAnsi(line).columnSubSequence(0, columns)).toList();
                 synchronized (lock) {
@@ -269,17 +269,20 @@ final class Previewer {
                 if (errors > 0) {
                     count += " · " + Messages.get("preview.banner.errors", errors);
                 }
+                if (readsFiles) {
+                    count += " · " + Messages.get("preview.banner.reads");
+                }
                 lines.add(banner(count, columns, BANNER));
                 if (menuOpen) {
                     lines.add(menuLine(columns));
                 }
                 lines.addAll(shown);
             }
-            case PreviewResult.TimedOut(var errors) -> {
+            case PreviewResult.TimedOut(var errors, var readsFiles) -> {
                 synchronized (lock) {
                     lastLines = List.of(); // the lines of another text would say the opposite of the banner
                 }
-                return timedOutBanner(errors, columns);
+                return timedOutBanner(errors, readsFiles, columns);
             }
             case PreviewResult.Off(var reason) -> {
                 lines.add(banner(Messages.get("preview.banner.off", reason), columns, BANNER));
@@ -304,9 +307,10 @@ final class Previewer {
      * the two settings that can be changed (the chosen one between brackets) and the keys. On a narrow terminal the
      * brief form: what has to be cut is the help, not the settings.
      */
-    private AttributedString timedOutBanner(int errors, int columns) {
+    private AttributedString timedOutBanner(int errors, boolean readsFiles, int columns) {
         PreviewSettings settings = interpreter.previewSettings();
-        String skipped = errors > 0 ? " · " + Messages.get("preview.banner.errors", errors) : "";
+        String skipped = (errors > 0 ? " · " + Messages.get("preview.banner.errors", errors) : "")
+                + (readsFiles ? " · " + Messages.get("preview.banner.reads") : "");
         AttributedString full = bannerOf(Messages.get("preview.banner.timedOut", evaluatedWith.deadlineMillis()) + skipped,
                 control.fields(settings, false), PreviewControl.help(false), columns);
         if (full.columnLength() <= columns) {

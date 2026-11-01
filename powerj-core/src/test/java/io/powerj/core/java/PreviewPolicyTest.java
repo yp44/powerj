@@ -61,6 +61,37 @@ class PreviewPolicyTest {
         return PreviewPolicy.allows(executable);
     }
 
+    private static List<Executable> filesMethods(String... names) {
+        List<String> wanted = List.of(names);
+        return Arrays.stream(Files.class.getMethods()).filter(m -> wanted.contains(m.getName()))
+                .<Executable>map(m -> m).toList();
+    }
+
+    /**
+     * {@code Files} reads that the name alone allows, whatever the path (#81): the preview runs them while the user
+     * types, so it warns that the line reads files. A call that only looks at a file, or that is refused, is not one.
+     */
+    @Test
+    void theFileReadsThatTheNameAloneAllowsAreTheOnesThePreviewWarnsAbout() {
+        List<Executable> reads = filesMethods("readString", "readAllBytes", "readAllLines", "lines", "list", "walk",
+                "find");
+        assertThat(reads).hasSizeGreaterThanOrEqualTo(7);
+        for (Executable read : reads) {
+            assertThat(allows(read)).as(read.toString()).isTrue();
+            assertThat(PreviewPolicy.readsFiles(read)).as(read.toString()).isTrue();
+        }
+        for (Executable look : filesMethods("exists", "size", "isDirectory", "getLastModifiedTime", "readAttributes")) {
+            assertThat(allows(look)).as(look.toString()).isTrue();
+            assertThat(PreviewPolicy.readsFiles(look)).as(look.toString()).isFalse();
+        }
+        for (Executable change : filesMethods("delete", "writeString", "createFile")) {
+            assertThat(allows(change)).as(change.toString()).isFalse();
+            assertThat(PreviewPolicy.readsFiles(change)).as(change.toString()).isFalse();
+        }
+        assertThat(PreviewPolicy.readsFiles(method(String.class, "length"))).isFalse();
+        assertThat(PreviewPolicy.readsFiles(method(Collection.class, "stream"))).isFalse();
+    }
+
     @Test
     void methodsOfTypesThatOnlyComputeAreAllowed() {
         assertThat(allows(method(String.class, "length"))).isTrue();

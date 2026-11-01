@@ -29,7 +29,7 @@ only shows that they can be bypassed on purpose is out of scope.
 | `System.exit`, `Runtime.exit`/`halt` typed in a line | ending the shell by accident: the call becomes an exit request, honoured when the line ends | calls through a `MethodHandle` or native code (`CallPolicy` sits on `JavaInvoker`) |
 | `System.setOut`/`setErr`/`setIn` | breaking the display | the same |
 | Protected paths (`rm`, `mv`; the `protected-paths` file of the configuration folder, with platform defaults) | removing a whole system or home folder by typing the wrong path; aliases and links to a protected folder are resolved | removing the *content* of a protected folder (`rm /etc/hosts` is allowed); a path replaced by a link between the check and the removal; Windows 8.3 names, `\\?\` prefixes and junctions are not specifically handled |
-| Preview mode (Alt+V) | running a line with side effects while it is only being typed: only what `PreviewPolicy` allows runs | — |
+| Preview mode (Alt+V) | running a line with side effects while it is only being typed: only what `PreviewPolicy` allows runs | a *read* judged on its name and not on its path: `Files.readAllBytes(Path.of("/dev/zero"))` is allowed and can exhaust the memory, a FIFO can block until the deadline, and `walk` and `find` have no bound. The banner of the preview says `⚠ reads files as you type` when the line uses one (FR-66, #81) |
 | Tab completion | it runs no command and calls no getter on the values it looks at | — |
 
 ### Third-party modules: full trust

@@ -137,4 +137,23 @@ class PreviewRenderTest {
         assertThat(render(new PreviewResult.Values(List.of(1), List.of("1"), false, 0, false)))
                 .doesNotContain("partial");
     }
+
+    @Test
+    void aLineThatReadsFilesIsWarnedInTheBannerAndOthersAreNot() {
+        assertThat(render(new PreviewResult.Values(List.of("x"), List.of("x"), false, 0, false, true)))
+                .startsWith("── String · 1 · ⚠ reads files as you type ─").contains("\nx");
+        assertThat(render(new PreviewResult.Values(List.of("x"), List.of("x"), false, 0, false, false)))
+                .doesNotContain("reads files");
+        var wide = new Previewer(null, null, null, () -> 200, false, new ModeController());
+        assertThat(wide.render(new PreviewResult.Values(List.of(1), List.of("1"), true, 3, true, true)).toString())
+                .startsWith("── Integer · 1+ · partial · 50 objects max per stage · 3 error(s) skipped"
+                        + " · ⚠ reads files as you type ─");
+    }
+
+    @Test
+    void aTimeoutOnALineThatReadsFilesSaysItReadsFiles() {
+        assertThat(renderWide(new PreviewResult.TimedOut(0, true)))
+                .startsWith("── timed out after 400 ms · ⚠ reads files as you type · ");
+        assertThat(renderWide(new PreviewResult.TimedOut(0, false))).doesNotContain("reads files");
+    }
 }

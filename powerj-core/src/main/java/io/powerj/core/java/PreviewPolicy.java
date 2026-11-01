@@ -7,6 +7,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import io.powerj.core.java.PreviewRule.Verdict;
 
@@ -70,11 +72,23 @@ public final class PreviewPolicy {
             "unmodifiableSequencedCollection", "unmodifiableSequencedSet", "unmodifiableSequencedMap", "nCopies",
             "max", "min", "frequency", "disjoint", "reverseOrder");
 
-    /** {@code Files}: reading the file system only. */
-    private static final Set<String> FILES = Set.of("exists", "notExists", "isDirectory", "isRegularFile",
+    /** {@code Files}: looking at the file system, which costs nothing whatever the path. */
+    private static final Set<String> FILE_ATTRIBUTES = Set.of("exists", "notExists", "isDirectory", "isRegularFile",
             "isSymbolicLink", "isReadable", "isWritable", "isExecutable", "isHidden", "isSameFile", "size",
-            "getLastModifiedTime", "getOwner", "readAttributes", "getAttribute", "probeContentType", "readAllLines",
-            "readString", "readAllBytes", "lines", "list", "walk", "find");
+            "getLastModifiedTime", "getOwner", "readAttributes", "getAttribute", "probeContentType");
+
+    /**
+     * {@code Files}: reading the content of a file or listing a folder. Allowed on the name alone, whatever the path,
+     * so what is read, and for how long, depends on what is typed: {@code Files.readAllBytes(Path.of("/dev/zero"))}
+     * can exhaust the memory and a FIFO blocks until the deadline. The preview warns when the line uses one
+     * ({@link #readsFiles}); a rule on the argument is not made (#81, FR-66).
+     */
+    private static final Set<String> FILE_READS = Set.of("readAllLines", "readString", "readAllBytes", "lines", "list",
+            "walk", "find");
+
+    /** {@code Files}: reading the file system only. */
+    private static final Set<String> FILES = Stream.concat(FILE_ATTRIBUTES.stream(), FILE_READS.stream())
+            .collect(Collectors.toUnmodifiableSet());
 
     /** {@code Class}: names and type tests, not reflection. */
     private static final Set<String> CLASS = Set.of("getName", "getSimpleName", "getTypeName", "getPackageName",
@@ -120,6 +134,14 @@ public final class PreviewPolicy {
     /** {@code true} if this method or constructor may run in preview mode. */
     public static boolean allows(Executable executable) {
         return STANDARD.permits(executable);
+    }
+
+    /**
+     * {@code true} for the {@code Files} methods that read a file or list a folder on the name alone (#81). The preview
+     * tells the user when a line it runs while the user types used one.
+     */
+    public static boolean readsFiles(Executable executable) {
+        return executable.getDeclaringClass() == java.nio.file.Files.class && FILE_READS.contains(executable.getName());
     }
 
     /** What the first rule that has an opinion says; a method that no rule allows is refused. */
