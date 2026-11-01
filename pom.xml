@@ -34,8 +34,8 @@
              when a version is released. The zip files of powerj-dist and powerj-fx are made by Ant and are not covered. -->
         <project.build.outputTimestamp>2026-10-25T00:00:00Z</project.build.outputTimestamp>
 
-        <junit.version>5.13.4</junit.version>
-        <assertj.version>3.27.4</assertj.version>
+        <junit.version>6.1.3</junit.version>
+        <assertj.version>3.27.7</assertj.version>
         <jline.version>4.4.7</jline.version>
         <jacoco.version>0.8.15</jacoco.version>
         <archunit.version>1.5.1</archunit.version>
