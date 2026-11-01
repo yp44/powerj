@@ -1,6 +1,8 @@
 # 0003. Built-in cmdlets are independent of the engine
 
-**Status:** accepted (from the first version; enforced since Phase 0)
+**Status:** accepted (from the first version; enforced since Phase 0). Amended by [0010](0010-shared-output-helpers-live-in-powerj-text.md):
+once `powerj-text` exists, `powerj-cmdlets` and `powerj-fx` may depend on it as well as on `powerj-api`; they stay
+independent of `powerj-core`.
 
 ## Context
 A cmdlet is the unit of extension. If the built-in ones could reach into the engine, third-party authors would find the

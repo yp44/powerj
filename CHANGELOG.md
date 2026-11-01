@@ -413,6 +413,19 @@ structures, functions) can be built on it. The work is organised in phases (revi
   The limit is written in `SECURITY.md`: a word typed alone is a name whatever it is.
 - FR-60, the README and `SECURITY.md` say what the log and the history hold.
 
+### Decided (the shared output helpers go to a new module, `powerj-text`, [#78](https://github.com/yp44/powerj/issues/78))
+- **A decision, no code yet.** The output contract (`@Display`, `@Bytes`, `@Highlight`) is read again in `core`, `cmdlets` and
+  `fx`, a size and a duration are formatted in several places that already give different texts, the units of a size are
+  parsed twice and two wrappers guard a regular expression. The helpers go to a **new module `powerj-text`**
+  (`io.powerj.text`, depends on `powerj-api` and the JDK only), not to `powerj-api`: the public surface of the API does not
+  grow, so this is not tied to the first release. The reasons and what is not retained are in
+  [ADR 0010](docs/adr/0010-shared-output-helpers-live-in-powerj-text.md), which amends ADR 0003.
+- The work is split in five issues: the module itself ([#107](https://github.com/yp44/powerj/issues/107)), then `RecordView`
+  ([#108](https://github.com/yp44/powerj/issues/108)), the formatting of sizes, dates and durations
+  ([#109](https://github.com/yp44/powerj/issues/109), which also removes [#97](https://github.com/yp44/powerj/issues/97)),
+  the parser of the units of a size ([#110](https://github.com/yp44/powerj/issues/110)) and `GuardedText`
+  ([#111](https://github.com/yp44/powerj/issues/111)).
+
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
   whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes

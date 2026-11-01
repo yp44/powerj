@@ -19,5 +19,6 @@ evidence.
 | [0007](0007-a-composition-root-without-a-framework.md) | A composition root, without a dependency-injection framework | accepted |
 | [0008](0008-english-repository-bilingual-interface.md) | An English repository, a bilingual interface | accepted |
 | [0009](0009-json-and-csv-are-written-in-house.md) | JSON and CSV are written in-house, and checked against the standard suites | accepted |
+| [0010](0010-shared-output-helpers-live-in-powerj-text.md) | The shared output helpers live in a new module, `powerj-text` | accepted (amends 0003) |
 
 To add one: copy the shape of the last, number it, add a row here.
