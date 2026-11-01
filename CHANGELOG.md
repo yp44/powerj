@@ -364,6 +364,18 @@ structures, functions) can be built on it. The work is organised in phases (revi
   (`PerfModeTest.aPeriodUnderTheMinimumBecomesTheMinimum`); the test with the real profiler now checks that the user is told
   and that the profiler still samples. Only a test changed.
 
+### Fixed (a walk that meets a folder it cannot list to the end, [#83](https://github.com/yp44/powerj/issues/83))
+- **`FileWalker` no longer stops the whole walk when the listing of a folder fails in the middle.** Reading a folder can
+  fail after some entries were read (a network file system that drops, an entry that goes bad); the Java API then throws
+  the unchecked `DirectoryIteratorException`, which `FileWalker` did not catch, although its Javadoc says that errors
+  go to the error consumer and the walk goes on. A sequential walk threw it to the caller, a parallel walk stopped
+  everything and threw it back, so `ls -r` and the other tree walks (`cat`, `grep`) failed outright. The folder is now
+  reported as a non-blocking error (`WalkError`, kind `IO`), the entries read before the failure are kept, and the
+  rest of the tree is walked. `FileTrees` (`rm -r`, `cp -r`) already behaved so.
+- Tests: `FaultyFileSystem`, a wrapper of the file system of the machine whose listing of chosen folders fails after N
+  entries, drives `FileWalkerListingFailureTest` (sequential and parallel, failure before the first entry and in the
+  middle) and `FileTreesListingFailureTest`.
+
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
   whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes
