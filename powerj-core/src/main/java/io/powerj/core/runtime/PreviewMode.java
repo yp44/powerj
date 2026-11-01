@@ -27,7 +27,9 @@ import io.powerj.core.lang.SyntaxException;
 final class PreviewMode {
 
     /** Stops a preview that has received enough values. */
-    private static final class PreviewFull extends CancellationException { }
+    private static final class PreviewFull extends CancellationException {
+        private static final long serialVersionUID = 1L;
+    }
 
     private final Supplier<ParseContext> parseContext;
     private final PipelineExecutor executor;

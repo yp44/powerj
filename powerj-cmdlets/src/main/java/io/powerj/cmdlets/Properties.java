@@ -23,6 +23,8 @@ final class Properties {
      */
     static final class Unreadable extends IllegalStateException {
 
+        private static final long serialVersionUID = 1L;
+
         Unreadable(String message, Throwable cause) {
             super(message, cause);
         }
