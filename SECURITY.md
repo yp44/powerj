@@ -47,6 +47,17 @@ again. A no holds whatever the content ([ADR 0006](docs/adr/0006-consent-to-nati
 PowerJ does not verify the origin of a module (there is no signature), only that the content it loads is the content the
 user agreed to when native access is at stake. Only put in `~/.powerj/modules` jars you would run.
 
+### What PowerJ keeps of what you type
+
+- The **history** (`~/.powerj/history`) keeps every line you run, arguments included, so a password typed as an argument is
+  in it. A line that **starts with a space** is not kept: that is how to run a command with a secret without leaving it
+  there.
+- The **diagnostic log** (`~/.powerj/logs/`) is meant to be attached to a bug report, so it never holds a line you typed,
+  at any level: a record that concerns a line names the command and stops (`curl [truncated...]`). A line you keep out of
+  the history is therefore in neither file. The limit: a word typed alone is the name of a command, whatever it is, so a
+  password typed at the prompt by mistake is logged as the name of an unknown command.
+- Neither file is given a restricted mode by PowerJ: who can read them is decided by the `umask` of your session.
+
 ### Native programs and files
 
 Native programs are started with an argument list, never through another shell, and with an explicit environment.

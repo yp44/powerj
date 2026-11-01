@@ -6,6 +6,7 @@ import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import io.powerj.core.error.LoggedLine;
 import io.powerj.core.java.JavaClasses;
 import io.powerj.core.java.JavaIndex;
 import io.powerj.core.java.PropertyAccess;
@@ -100,8 +101,9 @@ public final class Completions {
             return doComplete(line, Math.min(cursor, line.length()));
         } catch (RuntimeException e) {
             // Completion must never break the input; but a failure that leaves no trace looks like "nothing to offer"
-            // (a name that starts with a dot was once lost this way, #82).
-            LOG.log(Level.FINE, "Completion failed on: " + line, e);
+            // (a name that starts with a dot was once lost this way, #82). The line being typed may hold a secret: the log
+            // keeps the name of the command only (#91).
+            LOG.log(Level.FINE, "Completion failed on: " + LoggedLine.of(line), e);
             return Result.none(cursor);
         }
     }
