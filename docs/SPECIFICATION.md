@@ -298,7 +298,7 @@ Option names are case-insensitive; a long option can be abbreviated as long as i
 The menu displays the signature (`of(E...) : List<E>`). Imported classes (§FR-47) are offered by their simple name.
 - CA: `java.util.Li<Tab>` offers `List LinkedList …`; `List.<Tab>` offers `of copyOf`; `$l = List.of(1); $l.<Tab>` offers `size() get(int) stream() …`.
 
-**FR-25 — Native command arguments.** Tab completes file paths.
+**FR-25 — Native command arguments.** Tab completes file paths. The names are matched without regard to case on **Windows and macOS**, whose file systems do not tell `docs` from `Docs` (`doc` + Tab offers `Docs/`), and in the case they are written on Linux. It is the same rule as the one that compares the protected paths of `rm` and `mv` with the paths typed; the wildcards keep their own (FR-40).
 
 **FR-26 — Ergonomics.** First Tab: completes the common prefix; next Tab: menu of candidates, Tab/Shift+Tab to move through it; each candidate displays a short description (cmdlet synopsis, option type). Response time < 50 ms.
 

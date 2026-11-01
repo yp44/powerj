@@ -27,7 +27,7 @@ import io.powerj.core.i18n.Messages;
 import io.powerj.core.nativeexec.ExecutableKind;
 import io.powerj.core.nativeexec.NativeEncoding;
 import io.powerj.core.nativeexec.NativeRun;
-import io.powerj.core.nativeexec.Platform;
+import io.powerj.fs.Host;
 
 /**
  * Runs a native command (specification §3.10). Streams remain streams: stdout and stderr are
@@ -48,7 +48,7 @@ public final class NativeRunner {
     private static final long GRACE_SECONDS = 2;
 
     /** Standard input of a background command: nothing to read. */
-    private static final File NULL_DEVICE = new File(Platform.isWindows() ? "NUL" : "/dev/null");
+    private static final File NULL_DEVICE = new File(Host.windows() ? "NUL" : "/dev/null");
 
     /** Target file of a redirection. */
     public record FileTarget(Path file, boolean append) {
@@ -112,7 +112,7 @@ public final class NativeRunner {
         Charset charset = encoding.forProgram(executable, session.environment());
 
         boolean detached = !capture && stdout.isEmpty() && stderr.isEmpty()
-                && Platform.isWindows() && ExecutableKind.isWindowsGui(executable);
+                && Host.windows() && ExecutableKind.isWindowsGui(executable);
         boolean inheritOut = io.interactive() && !capture && stdout.isEmpty() && !detached;
         boolean inheritErr = io.interactive() && !capture && stderr.isEmpty() && !detached;
 
@@ -341,7 +341,7 @@ public final class NativeRunner {
         for (int i = 0; i < commands.size(); i++) {
             Command command = commands.get(i);
             List<String> line = new ArrayList<>(command.args().size() + 4);
-            if (!Platform.isWindows()) {
+            if (!Host.windows()) {
                 line.addAll(List.of("/bin/sh", "-c", "trap '' INT QUIT; exec \"$0\" \"$@\""));
             }
             line.add(command.executable().toString());

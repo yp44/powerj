@@ -11,7 +11,7 @@ import io.powerj.core.command.ModuleLoader;
 import io.powerj.core.error.PjException;
 import io.powerj.core.format.Values;
 import io.powerj.core.i18n.Messages;
-import io.powerj.core.nativeexec.Platform;
+import io.powerj.fs.Host;
 
 /**
  * Built-in commands: {@code cd}, {@code pwd}, {@code exit} (specification FR-04, FR-04b), {@code which} (FR-13, FR-15),
@@ -35,7 +35,7 @@ public final class Builtins {
         Path path = switch (target) {
             case "-" -> session.previousDirectory()
                     .orElseThrow(() -> new PjException(Messages.get("cd.noPrevious")));
-            case String t when Platform.isWindows() && t.matches("[A-Za-z]:") -> Path.of(t + "\\");
+            case String t when Host.windows() && t.matches("[A-Za-z]:") -> Path.of(t + "\\");
             case String t -> parse(t);
         };
         session.changeDirectory(path);

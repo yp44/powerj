@@ -23,9 +23,9 @@ import org.junit.jupiter.api.io.TempDir;
 
 import io.powerj.core.command.CmdletRegistry;
 import io.powerj.core.nativeexec.NativeRun;
-import io.powerj.core.nativeexec.Platform;
 import io.powerj.core.support.FakeCmdlets;
 import io.powerj.core.support.Waits;
+import io.powerj.fs.Host;
 
 /** Pipeline {@code |}, blocks {@code { }} and native commands in the pipeline (step 4). */
 class PipelineTest {
@@ -264,7 +264,7 @@ class PipelineTest {
 
     @Test
     void nativeLinesFeedCmdlets() throws Exception {
-        assumeFalse(Platform.isWindows());
+        assumeFalse(Host.windows());
         assertThat(run("printf \"un\\ndeux\\ntrois\\n\" | filter { $_.startsWith(\"d\") || $_.length() == 5 }"))
                 .isEqualTo("deux\ntrois\n");
         assertThat(session.lastNative()).get().extracting(NativeRun::exitCode).isEqualTo(0);
@@ -272,7 +272,7 @@ class PipelineTest {
 
     @Test
     void nativeToNativeKeepsBytes() throws Exception {
-        assumeFalse(Platform.isWindows());
+        assumeFalse(Host.windows());
         assertThat(run("printf \"b\\na\\nc\\n\" | sort -r")).isEqualTo("c\nb\na\n");
         assertThat(run("printf \"b\\na\\n\" | sort | filter { $_ == \"a\" }")).isEqualTo("a\n");
         run("$l = printf \"x\\ny\\n\" | tr a-z A-Z");
@@ -281,7 +281,7 @@ class PipelineTest {
 
     @Test
     void objectsAreWrittenToNativeStdin() throws Exception {
-        assumeFalse(Platform.isWindows());
+        assumeFalse(Host.windows());
         assertThat(run("items -n 2 | cat")).isEqualTo("""
                 name   size
                 ----   ----
@@ -294,7 +294,7 @@ class PipelineTest {
     @Test
     @Timeout(20)
     void nativeThatStopsReadingStopsTheUpstreamStage() throws Exception {
-        assumeFalse(Platform.isWindows());
+        assumeFalse(Host.windows());
         assertThat(run("infinite | head -n 3")).isEqualTo("0\n1\n2\n");
         assertThat(errors).isEmpty();
     }
@@ -312,7 +312,7 @@ class PipelineTest {
     @Test
     @Timeout(20)
     void aCmdletThatStopsItsInputStopsANativeProducer() throws Exception {
-        assumeFalse(Platform.isWindows());
+        assumeFalse(Host.windows());
         assertThat(run("yes | take 2 && \"ok\"")).isEqualTo("y\ny\ndone\nok\n");
         assertThat(errors).isEmpty();
         run("sh -c \"exit 0\"");
@@ -322,7 +322,7 @@ class PipelineTest {
 
     @Test
     void errorsToOutput() throws Exception {
-        assumeFalse(Platform.isWindows());
+        assumeFalse(Host.windows());
         assertThat(run("sh -c \"echo dehors; echo erreur >&2\" 2>&1 | filter { $_ == \"erreur\" }")).isEqualTo("erreur\n");
         assertThat(errors).isEmpty();
         run("$x = sh -c \"echo erreur >&2\" 2>&1");
@@ -333,7 +333,7 @@ class PipelineTest {
 
     @Test
     void errorRedirectionAppliesToAllStages() throws Exception {
-        assumeFalse(Platform.isWindows());
+        assumeFalse(Host.windows());
         run("sh -c \"echo e1 >&2; echo a\" | sh -c \"cat; echo e2 >&2\" | filter { $_.nope } 2> err.txt");
         assertThat(Files.readAllLines(tmp.resolve("err.txt")))
                 .contains("e1", "e2").anyMatch(line -> line.contains("String has no property 'nope'"));
@@ -342,7 +342,7 @@ class PipelineTest {
 
     @Test
     void outputRedirectionOfAPipeline() throws Exception {
-        assumeFalse(Platform.isWindows());
+        assumeFalse(Host.windows());
         run("items | filter { $_.size > 10 } > out.txt");
         assertThat(Files.readString(tmp.resolve("out.txt"))).contains("item2", "item3").doesNotContain("item1");
         run("printf \"z\\ny\\n\" | sort > sorted.txt");
@@ -351,7 +351,7 @@ class PipelineTest {
 
     @Test
     void exitStatusOfAPipeline() throws Exception {
-        assumeFalse(Platform.isWindows());
+        assumeFalse(Host.windows());
         run("printf \"a\\n\" | sh -c \"cat; exit 4\"");
         assertThat(session.lastSucceeded()).isFalse();
         assertThat(session.variable("exit")).isEqualTo(4);

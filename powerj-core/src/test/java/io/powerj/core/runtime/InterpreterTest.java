@@ -19,8 +19,8 @@ import org.junit.jupiter.api.io.TempDir;
 import io.powerj.core.command.CmdletRegistry;
 import io.powerj.core.error.PjException;
 import io.powerj.core.nativeexec.NativeRun;
-import io.powerj.core.nativeexec.Platform;
 import io.powerj.core.support.Waits;
+import io.powerj.fs.Host;
 
 /** Runs real native commands ({@code sh}, {@code printf}…): tests limited to Linux/macOS. */
 class InterpreterTest {
@@ -35,7 +35,7 @@ class InterpreterTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        assumeFalse(Platform.isWindows(), "commandes Unix");
+        assumeFalse(Host.windows(), "commandes Unix");
         Files.createDirectories(tmp.resolve("home"));
         Map<String, String> environment = new java.util.HashMap<>(System.getenv());
         environment.put("HOME", tmp.resolve("home").toString()); // ~ follows HOME (FR-62)

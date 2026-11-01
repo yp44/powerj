@@ -25,7 +25,7 @@ import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
 import io.powerj.api.ScriptBlock;
 import io.powerj.core.command.CmdletRegistry;
-import io.powerj.core.nativeexec.Platform;
+import io.powerj.fs.Host;
 
 /** Preview mode (FR-66): what runs, what stops the preview, and that nothing changes. */
 @Timeout(30)
@@ -214,7 +214,7 @@ class PreviewTest {
 
     @Test
     void nativeCommandsStopThePreview() {
-        assumeFalse(Platform.isWindows(), "sh");
+        assumeFalse(Host.windows(), "sh");
         assertThat(off("sh -c \"touch native.txt\"")).contains("sh");
         assertThat(off("items | sh -c \"touch native.txt\"")).contains("sh");
         assertThat(tmp.resolve("native.txt")).doesNotExist();

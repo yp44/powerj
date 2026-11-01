@@ -18,8 +18,8 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import io.powerj.core.command.CmdletRegistry;
-import io.powerj.core.nativeexec.Platform;
 import io.powerj.core.support.FakeCmdlets;
+import io.powerj.fs.Host;
 
 /**
  * Characterization of {@link Interpreter#execute}: what a line displays, which errors it reports, whether it succeeds
@@ -309,7 +309,7 @@ class InterpreterCharacterizationTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("natives")
     void nativeLines(Case expected) throws Exception {
-        assumeFalse(Platform.isWindows(), "Unix commands");
+        assumeFalse(Host.windows(), "Unix commands");
         verify(expected, System.getenv());
     }
 

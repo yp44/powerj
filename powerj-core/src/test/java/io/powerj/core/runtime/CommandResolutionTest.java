@@ -20,8 +20,8 @@ import io.powerj.api.CmdletInfo;
 import io.powerj.core.command.CmdletRegistry;
 import io.powerj.core.command.Help;
 import io.powerj.core.nativeexec.CommandResolver;
-import io.powerj.core.nativeexec.Platform;
 import io.powerj.core.support.FakeCmdlets;
+import io.powerj.fs.Host;
 
 /** The one rule that gives a command name its meaning (FR-13), and everything that now reads its answer. */
 class CommandResolutionTest {
@@ -43,7 +43,7 @@ class CommandResolutionTest {
 
     @BeforeEach
     void setUp() throws IOException {
-        org.junit.jupiter.api.Assumptions.assumeFalse(Platform.isWindows(), "programs are found through PATHEXT there");
+        org.junit.jupiter.api.Assumptions.assumeFalse(Host.windows(), "programs are found through PATHEXT there");
         Path bin = Files.createDirectory(tmp.resolve("bin"));
         Path program = Files.createFile(bin.resolve("tool"));
         Files.setPosixFilePermissions(program, java.nio.file.attribute.PosixFilePermissions.fromString("rwxr-xr-x"));

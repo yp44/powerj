@@ -9,7 +9,8 @@ import java.lang.foreign.ValueLayout;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import io.powerj.core.nativeexec.Platform;
+import io.powerj.fs.Host;
+
 
 /** Nature of the process's standard input, read through the FFM API ({@code isatty}, {@code GetConsoleMode}). */
 public final class StandardInput {
@@ -25,7 +26,7 @@ public final class StandardInput {
     /** {@code true} if standard input is a terminal (keyboard), {@code false} if it is a file or a pipe. */
     public static boolean isTerminal() {
         try {
-            return Platform.isWindows() ? windowsConsole() : posixTty();
+            return Host.windows() ? windowsConsole() : posixTty();
         } catch (Throwable t) {
             LOG.log(Level.FINE, "Unknown kind of standard input", t);
             return System.console() != null && System.console().isTerminal();

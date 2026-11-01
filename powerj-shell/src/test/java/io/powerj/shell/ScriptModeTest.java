@@ -1,7 +1,6 @@
 package io.powerj.shell;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -13,11 +12,12 @@ import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 import io.powerj.api.internal.LanguageSetting;
 import io.powerj.core.command.CmdletRegistry;
-import io.powerj.core.nativeexec.Platform;
 import io.powerj.core.runtime.Session;
 
 /** Non-interactive mode: {@code powerj -c}, {@code .pj} file, standard input (FR-04d). */
@@ -83,8 +83,8 @@ class ScriptModeTest {
     }
 
     @Test
+    @DisabledOnOs(OS.WINDOWS) // runs sh
     void failedNativeGivesItsExitCode() {
-        assumeFalse(Platform.isWindows());
         assertThat(run(Optional.empty(), "sh -c \"exit 3\"")).isEqualTo(3);
         assertThat(run(Optional.empty(), "sh -c \"exit 3\"", "\"apres\"")).isZero();
     }

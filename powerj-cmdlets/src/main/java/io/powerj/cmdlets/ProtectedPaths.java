@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import io.powerj.fs.Host;
+
 /**
  * Paths that {@code rm} and {@code mv} refuse to remove (specification FR-72): those of the {@value #FILE_NAME} file
  * of the configuration folder, any folder that contains one of them, and the current folder with its parents. The
@@ -67,13 +69,13 @@ public final class ProtectedPaths {
         FileSystems.getDefault().getRootDirectories().forEach(root -> entries.add(root.toString()));
         entries.add("~");
         entries.add(configDirectory == null ? "~/.powerj" : configDirectory.toAbsolutePath().normalize().toString());
-        if (HostOs.WINDOWS) {
+        if (Host.windows()) {
             entries.addAll(List.of("C:\\Windows", "C:\\Program Files", "C:\\Program Files (x86)", "C:\\ProgramData",
                     "C:\\Users"));
         } else {
             entries.addAll(List.of("/bin", "/boot", "/dev", "/etc", "/home", "/lib", "/opt", "/proc", "/root", "/sbin",
                     "/sys", "/usr", "/var"));
-            if (HostOs.MAC) {
+            if (Host.mac()) {
                 entries.addAll(List.of("/Applications", "/Library", "/System", "/Users"));
             }
         }
@@ -133,17 +135,7 @@ public final class ProtectedPaths {
 
     /** Home folder of the session: {@code HOME}, then {@code USERPROFILE}, then {@code user.home}. */
     private static Path home(Map<String, String> environment) {
-        for (String name : List.of("HOME", "USERPROFILE")) {
-            String value = environment.get(name);
-            if (value != null && !value.isBlank()) {
-                try {
-                    return Path.of(value.strip()).toAbsolutePath().normalize();
-                } catch (InvalidPathException _) {
-                    // try the next one
-                }
-            }
-        }
-        return Path.of(System.getProperty("user.home")).toAbsolutePath().normalize();
+        return Host.home(environment, Path.of(System.getProperty("user.home")));
     }
 
     /**

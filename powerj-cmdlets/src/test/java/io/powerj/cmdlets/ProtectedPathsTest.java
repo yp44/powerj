@@ -12,6 +12,8 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import io.powerj.fs.Host;
+
 class ProtectedPathsTest {
 
     @TempDir
@@ -86,7 +88,7 @@ class ProtectedPathsTest {
 
     @Test
     void dotDotAfterALinkIsTheParentOfWhatTheLinkPointsTo() throws IOException {
-        org.junit.jupiter.api.Assumptions.assumeFalse(HostOs.WINDOWS, "Windows collapses the .. as text, before the file system");
+        org.junit.jupiter.api.Assumptions.assumeFalse(Host.windows(), "Windows collapses the .. as text, before the file system");
         Path protectedFolder = Files.createDirectories(tmp.resolve("area/p"));
         Files.createDirectories(protectedFolder.resolve("sub"));
         Files.createDirectories(tmp.resolve("area/q"));

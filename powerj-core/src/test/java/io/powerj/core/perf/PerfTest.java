@@ -24,12 +24,12 @@ import io.powerj.api.perf.PerfReport;
 import io.powerj.api.perf.StageStat;
 import io.powerj.core.command.CmdletRegistry;
 import io.powerj.core.format.Values;
-import io.powerj.core.nativeexec.Platform;
 import io.powerj.core.runtime.Interpreter;
 import io.powerj.core.runtime.Session;
 import io.powerj.core.runtime.ShellIo;
 import io.powerj.core.runtime.ShellStatistics;
 import io.powerj.core.support.FakeCmdlets;
+import io.powerj.fs.Host;
 
 /** Perf mode (FR-76): per-stage counters, waits, blocks, phases, native processes, and the summary. */
 class PerfTest {
@@ -232,7 +232,7 @@ class PerfTest {
 
     @Test
     void nativeCommandsAreReported() throws Exception {
-        assumeFalse(Platform.isWindows(), "Unix commands");
+        assumeFalse(Host.windows(), "Unix commands");
         run("printf \"a\\nb\\n\" | count");
         var report = last();
         assertThat(report.stages()).hasSize(2);
@@ -292,7 +292,7 @@ class PerfTest {
         run("");
         run("   ");
         assertThat(session.perfReports()).isEmpty();
-        assumeFalse(Platform.isWindows(), "Unix commands");
+        assumeFalse(Host.windows(), "Unix commands");
         run("sleep 0 &");
         assertThat(session.perfReports()).isEmpty();
         run("items -n 1");

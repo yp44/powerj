@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import io.powerj.core.runtime.Session;
+import io.powerj.fs.Host;
 
 class CommandResolverTest {
 
@@ -20,7 +21,7 @@ class CommandResolverTest {
 
     @Test
     void unixSearchesPathForExecutableFiles() throws Exception {
-        assumeFalse(Platform.isWindows(), "permissions POSIX indisponibles sous Windows");
+        assumeFalse(Host.windows(), "permissions POSIX indisponibles sous Windows");
         var bin = Files.createDirectories(tmp.resolve("bin"));
         var tool = Files.createFile(bin.resolve("outil"),
                 PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwxr-xr-x")));
