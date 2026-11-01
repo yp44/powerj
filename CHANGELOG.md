@@ -471,6 +471,21 @@ structures, functions) can be built on it. The work is organised in phases (revi
   policy also allows on any `Iterator` or `Iterable`: `List.of(…).stream()` is everywhere and a warning on it would be read
   by no one. The limit is written in FR-66. A rule on the argument stays a possible later issue.
 
+### Changed and fixed (the operating system is read in one place, [#86](https://github.com/yp44/powerj/issues/86))
+- **`io.powerj.fs.Host` is the one class that looks at `os.name`.** `core.nativeexec.Platform` (lower-cased name,
+  `startsWith("windows")`) and `cmdlets.HostOs` (`startsWith("Windows")`) said the same thing twice and disagreed about
+  macOS; both are gone. `Host.windows()`, `Host.mac()`, `Host.namesIgnoreCase()` (Windows and macOS: yes, Linux: no) and
+  `Host.home(environment, fallback)`, which `SessionState.home()` and `ProtectedPaths` now share instead of each reading
+  `HOME`, then `USERPROFILE`, then the fallback. The name of the system is a parameter of package-private variants, so a test
+  tries Windows, macOS, Linux and others whatever the machine. This reopens, for new reasons, a point of "Examined, not
+  changed" (the home folder in two places); the other decision there, no injectable `Platform`, is kept.
+- **Fixed: Tab completion of a path ignores case on macOS.** `doc` + Tab offers `Docs/` on Windows and macOS (it did on Windows
+  only), as the protected paths of `rm` and `mv` were already compared without regard to case on both: the file systems
+  of those two systems do not tell the two names apart. On Linux case counts, as before. FR-25 states it.
+- Not changed: the wildcards (`*.TXT`, FR-40) keep their own rule (case counts unless `POWERJ_GLOB_IGNORE_CASE` says
+  otherwise). The folder of `~/.powerj` is still found from the JVM's `user.home` (`shell.Environment`), not from `HOME`:
+  taking `HOME` there would move the configuration of whoever sets it to something else.
+
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
   whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes
