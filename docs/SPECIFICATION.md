@@ -1312,7 +1312,7 @@ Java code that writes to `System.out` / `System.err` (`System.out.println("x")`)
 
 **FR-59 — Terminal and history always restored.** History is written after each command (FR-09), so an abrupt stop loses nothing. On exit, including on a fatal JVM error or when the window is closed, a shutdown hook restores the terminal to its initial state (raw mode disabled, colors reset).
 
-**FR-60 — Diagnostic log.** Internal errors and warnings are logged to `~/.powerj/logs/powerj.<n>.log` (rotation, 5 files maximum), in English whatever the language of the messages (FR-61). `--debug` also displays these details on screen.
+**FR-60 — Diagnostic log.** Internal errors and warnings are logged to `~/.powerj/logs/powerj.<n>.log` (rotation, 5 files maximum), in English whatever the language of the messages (FR-61). `--debug` also displays these details on screen. The log is made to be shared in a bug report, so it **never holds a line the user typed**: where a record concerns a line (a command abandoned, an internal error while running it, a completion that failed), it names the command and nothing else, followed by `[truncated...]` when something came after it (`curl -u user:password https://example.org` is logged `curl [truncated...]`); a line that does not start with a command name (an assignment, a string, a Java expression) is logged `[truncated...]`. This is so at every level, `--debug` included. The history (FR-09, FR-10) keeps the lines, except those that start with a space, which the user types to keep a line out of it: the log must not keep what the history does not.
 
 ### 3.15 Language (internationalization)
 

@@ -7,6 +7,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import io.powerj.core.error.LoggedLine;
 import io.powerj.core.error.PjError;
 import io.powerj.core.error.PjException;
 import io.powerj.core.i18n.Messages;
@@ -78,7 +79,7 @@ public final class Supervisor {
         if (current.cancels().incrementAndGet() == 1) {
             current.worker().interrupt();
         } else {
-            LOG.warning(() -> "Command abandoned: " + current.commandLine());
+            LOG.warning(() -> "Command abandoned: " + LoggedLine.of(current.commandLine()));
             current.outcome().complete(new Outcome.Abandoned(current.commandLine()));
         }
     }
@@ -94,7 +95,7 @@ public final class Supervisor {
             case StackOverflowError e -> new Outcome.Failure(PjError.of(Messages.get("error.stackOverflow"), e));
             case LinkageError e -> new Outcome.Failure(PjError.of(Messages.get("error.linkage", e.getMessage()), e));
             default -> {
-                LOG.log(Level.SEVERE, "Internal error while running: " + commandLine, t);
+                LOG.log(Level.SEVERE, "Internal error while running: " + LoggedLine.of(commandLine), t);
                 yield new Outcome.Failure(PjError.of(Messages.get("error.internal", t), t));
             }
         };

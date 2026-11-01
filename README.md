@@ -246,13 +246,13 @@ PowerJ keeps its files in `~/.powerj/` (`%USERPROFILE%\.powerj\` on Windows, or 
 
 | File / folder | Role |
 |---|---|
-| `history` | Command history (UTF-8), reloaded at startup |
+| `history` | Command history (UTF-8), reloaded at startup. A line that starts with a space is not kept: type ` curl -u me:secret …` to keep a line with a secret out of it |
 | `config.properties` | `history.size=10000`, `language=en` (or `fr`), `modules.nativeAccess.<module>=sha256:<fingerprint>` or `=false` (consent to load a module that uses native code, asked once per version of the module). Java properties syntax: a backslash in a value is written twice. A file that cannot be read is reported at startup and the defaults apply |
 | `profile.pj` | Commands run when the interactive shell starts: `$proj = Path.of("/home/me/dev")`, `import java.time.*`, `env --set MAVEN_OPTS=-Xmx2g` — errors show their line and never prevent startup ([profile](docs/acceptance/profile.md)) |
 | `protected-paths` | Paths that `rm` and `mv` refuse to remove (one per line, `~` for the home folder); written with the defaults of the platform on first launch, then yours to edit ([fileops](docs/acceptance/fileops.md)) |
 | `modules/` | Third-party module jars, or folders (a module and its dependencies), loaded at startup |
 | `fx-grid.properties` | Position and size of the window of `grid`, written when it is closed |
-| `logs/` | Diagnostic log, always in English |
+| `logs/` | Diagnostic log, always in English, made to be shared in a bug report: it never holds the lines you type, only the name of a command (`curl [truncated...]`) |
 
 | Environment variable | Role |
 |---|---|

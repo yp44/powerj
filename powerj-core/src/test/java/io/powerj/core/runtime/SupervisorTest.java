@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 import io.powerj.core.error.PjException;
+import io.powerj.core.support.LogCapture;
 
 class SupervisorTest {
 
@@ -101,6 +102,49 @@ class SupervisorTest {
 
         assertThat(result.get()).isEqualTo(new Outcome.Abandoned("boucle"));
         stop.set(true);
+    }
+
+    // --- what the log says about the line (#91) ---
+
+    /** A line that starts with a space is kept out of the history on purpose: it must not reach the log either. */
+    @Test
+    void anInternalErrorIsLoggedWithTheNameOfTheCommandNotItsLine() {
+        try (var log = new LogCapture(Supervisor.class)) {
+            supervisor.run(" curl -u user:s3cret https://example.org", () -> {
+                throw new IllegalStateException("boom");
+            });
+
+            assertThat(log.records()).hasSize(1);
+            assertThat(log.records().getFirst().getLevel()).isEqualTo(java.util.logging.Level.SEVERE);
+            assertThat(log.text()).contains("Internal error while running: curl [truncated...]", "boom")
+                    .doesNotContain("s3cret", "user:", "example.org");
+        }
+    }
+
+    @Test
+    void anAbandonedCommandIsLoggedWithTheNameOfTheCommandNotItsLine() throws Exception {
+        try (var log = new LogCapture(Supervisor.class)) {
+            var started = new CountDownLatch(1);
+            var stop = new java.util.concurrent.atomic.AtomicBoolean();
+            var result = new AtomicReference<Outcome>();
+            var caller = Thread.ofVirtual().start(() -> result.set(supervisor.run(" curl -u user:s3cret", () -> {
+                started.countDown();
+                while (!stop.get()) {
+                    Thread.onSpinWait();
+                }
+                return List.of();
+            })));
+            started.await();
+            supervisor.cancel();
+            caller.join(300);
+            supervisor.cancel();
+            caller.join(TimeUnit.SECONDS.toMillis(10));
+            stop.set(true);
+
+            // the terminal is told which line was abandoned (the user typed it); the log is not
+            assertThat(result.get()).isEqualTo(new Outcome.Abandoned(" curl -u user:s3cret"));
+            assertThat(log.text()).contains("Command abandoned: curl [truncated...]").doesNotContain("s3cret", "user:");
+        }
     }
 
     @Test

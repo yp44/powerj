@@ -402,6 +402,17 @@ structures, functions) can be built on it. The work is organised in phases (revi
 - `ConfigFile.keyOf`, which finds the line of a key to replace it, reads `\n`, `\t`, `\r`, `\f` and `\uXXXX` in a key,
   as `Properties.load` does, so that a key written escaped is found again and replaced, not repeated.
 
+### Fixed (the log no longer holds the lines you type, [#91](https://github.com/yp44/powerj/issues/91))
+- **The diagnostic log keeps the name of a command, never its line.** `Supervisor` wrote the whole line when a command was
+  abandoned (second Ctrl+C, WARNING) or failed with an internal error (SEVERE), and `Completions` the line being typed when
+  completion failed (`FINE`, added with #82). A secret typed as an argument (`curl -u user:password …`) ended up in a file
+  that is meant to be attached to bug reports, and a line that starts with a space, which the history does not keep on
+  purpose (FR-10), was then in the log and nowhere else. The log now says `curl [truncated...]`, and `[truncated...]` alone
+  for a line that does not start with a command name (an assignment, a string, a Java expression, a number, a path), at
+  every level. `LoggedLine` decides; the message shown on the terminal when a command is abandoned is unchanged.
+  The limit is written in `SECURITY.md`: a word typed alone is a name whatever it is.
+- FR-60, the README and `SECURITY.md` say what the log and the history hold.
+
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
   whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes
