@@ -118,7 +118,10 @@ public final class Operators {
         }
     }
 
-    /** Java arithmetic with numeric promotion: int, long, double, or BigInteger / BigDecimal. */
+    /**
+     * Java arithmetic with numeric promotion: int, long, double, or BigInteger / BigDecimal. A result that does not fit
+     * in an {@code int} or a {@code long} is an error, not the wrong number Java gives (FR-33).
+     */
     private static Object arithmetic(Operator op, Object left, Object right) {
         if (!isNumeric(left) || !isNumeric(right)) {
             throw unsupported(op, left, right);
@@ -160,30 +163,47 @@ public final class Operators {
                     default -> x % y;
                 };
             }
-            if (a instanceof Long || b instanceof Long) {
+            return integer(op, a, b);
+        } catch (ArithmeticException e) {
+            // Once the division is compiled, the JVM may throw a preallocated exception without message.
+            String reason = e.getMessage() == null ? "/ by zero" : e.getMessage();
+            throw new PjException(PjError.of(Messages.get("operator.arithmeticFailed", reason), e));
+        }
+    }
+
+    /**
+     * {@code int} or {@code long} arithmetic ({@code long} as soon as one operand is), exact: Java wraps around
+     * ({@code 100000 * 100000} is {@code 1410065408}), this raises an error that names the operation and the way out.
+     */
+    private static Object integer(Operator op, Number a, Number b) {
+        boolean wide = a instanceof Long || b instanceof Long;
+        try {
+            if (wide) {
                 long x = a.longValue();
                 long y = b.longValue();
                 return switch (op) {
-                    case ADD -> x + y;
-                    case SUB -> x - y;
-                    case MUL -> x * y;
-                    case DIV -> x / y;
+                    case ADD -> Math.addExact(x, y);
+                    case SUB -> Math.subtractExact(x, y);
+                    case MUL -> Math.multiplyExact(x, y);
+                    case DIV -> Math.divideExact(x, y);
                     default -> x % y;
                 };
             }
             int x = a.intValue();
             int y = b.intValue();
             return switch (op) {
-                case ADD -> x + y;
-                case SUB -> x - y;
-                case MUL -> x * y;
-                case DIV -> x / y;
+                case ADD -> Math.addExact(x, y);
+                case SUB -> Math.subtractExact(x, y);
+                case MUL -> Math.multiplyExact(x, y);
+                case DIV -> Math.divideExact(x, y);
                 default -> x % y;
             };
         } catch (ArithmeticException e) {
-            // Once the division is compiled, the JVM may throw a preallocated exception without message.
-            String reason = e.getMessage() == null ? "/ by zero" : e.getMessage();
-            throw new PjException(PjError.of(Messages.get("operator.arithmeticFailed", reason), e));
+            if (b.longValue() == 0) {
+                throw e; // a division by zero, named by the caller
+            }
+            throw new PjException(PjError.of(Messages.get(wide ? "operator.overflow.long" : "operator.overflow.int",
+                    a, op.symbol(), b), e));
         }
     }
 

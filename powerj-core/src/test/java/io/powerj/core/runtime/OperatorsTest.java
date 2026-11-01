@@ -9,9 +9,11 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Locale;
 
 import org.junit.jupiter.api.Test;
 
+import io.powerj.api.internal.LanguageSetting;
 import io.powerj.core.error.PjException;
 import io.powerj.core.lang.Ast.Operator;
 
@@ -84,12 +86,100 @@ class OperatorsTest {
     }
 
     @Test
-    void integerArithmeticFollowsJava() {
+    void integerArithmeticGivesTheResultOfJavaWhenItFits() {
         assertThat(binary(Operator.ADD, 2, 3)).isEqualTo(5);
         assertThat(binary(Operator.MUL, 4, 3)).isEqualTo(12);
         assertThat(binary(Operator.DIV, 7, 2)).isEqualTo(3);
         assertThat(binary(Operator.REM, 7, 2)).isEqualTo(1);
         assertThat(binary(Operator.ADD, 'a', 1)).isEqualTo(98);
+    }
+
+    // --- overflow is an error, not a wrong number (#80) ---
+
+    @Test
+    void anIntResultThatDoesNotFitIsAnErrorNotAWrongNumber() {
+        // Java gives 1410065408 for 100000 * 100000 and a negative number for Integer.MAX_VALUE + 1.
+        assertThatThrownBy(() -> binary(Operator.MUL, 100_000, 100_000))
+                .isInstanceOf(PjException.class)
+                .hasMessage("calculation failed: 100000 * 100000 does not fit in an int"
+                        + " (write 100000L * 100000 to compute with long)");
+        assertThatThrownBy(() -> binary(Operator.ADD, Integer.MAX_VALUE, 1))
+                .hasMessage("calculation failed: 2147483647 + 1 does not fit in an int"
+                        + " (write 2147483647L + 1 to compute with long)");
+        assertThatThrownBy(() -> binary(Operator.SUB, Integer.MIN_VALUE, 1))
+                .hasMessageContaining("-2147483648 - 1 does not fit in an int");
+        assertThatThrownBy(() -> binary(Operator.DIV, Integer.MIN_VALUE, -1))
+                .hasMessageContaining("-2147483648 / -1 does not fit in an int");
+        assertThatThrownBy(() -> binary(Operator.ADD, 'a', Integer.MAX_VALUE))
+                .hasMessageContaining("does not fit in an int");
+    }
+
+    @Test
+    void aLongResultThatDoesNotFitIsAnError() {
+        assertThatThrownBy(() -> binary(Operator.ADD, Long.MAX_VALUE, 1))
+                .isInstanceOf(PjException.class)
+                .hasMessage("calculation failed: 9223372036854775807 + 1 does not fit in a long");
+        assertThatThrownBy(() -> binary(Operator.SUB, Long.MIN_VALUE, 1L))
+                .hasMessageContaining("does not fit in a long");
+        assertThatThrownBy(() -> binary(Operator.MUL, 4_000_000_000L, 4_000_000_000L))
+                .hasMessageContaining("4000000000 * 4000000000 does not fit in a long");
+        assertThatThrownBy(() -> binary(Operator.DIV, Long.MIN_VALUE, -1L))
+                .hasMessageContaining("does not fit in a long");
+    }
+
+    @Test
+    void negatingTheSmallestNumberIsAnError() {
+        assertThatThrownBy(() -> Operators.unary(Operator.NEG, Integer.MIN_VALUE))
+                .isInstanceOf(PjException.class).hasMessageContaining("does not fit in an int");
+        assertThatThrownBy(() -> Operators.unary(Operator.NEG, Long.MIN_VALUE))
+                .isInstanceOf(PjException.class).hasMessageContaining("does not fit in a long");
+    }
+
+    @Test
+    void resultsAtTheLimitsOfTheRangeAreStillCalculated() {
+        assertThat(binary(Operator.ADD, Integer.MAX_VALUE, 0)).isEqualTo(Integer.MAX_VALUE);
+        assertThat(binary(Operator.SUB, Integer.MIN_VALUE, 0)).isEqualTo(Integer.MIN_VALUE);
+        assertThat(binary(Operator.MUL, 46_340, 46_340)).isEqualTo(2_147_395_600);
+        assertThat(binary(Operator.ADD, Integer.MAX_VALUE, -1)).isEqualTo(Integer.MAX_VALUE - 1);
+        assertThat(binary(Operator.DIV, Integer.MIN_VALUE, 1)).isEqualTo(Integer.MIN_VALUE);
+        assertThat(binary(Operator.REM, Integer.MIN_VALUE, -1)).isEqualTo(0);
+        // the same product, computed with a long operand as the message suggests
+        assertThat(binary(Operator.MUL, 100_000L, 100_000)).isEqualTo(10_000_000_000L);
+        // 1gb * 4: the unit literals are long
+        assertThat(binary(Operator.MUL, 1024L * 1024 * 1024, 4)).isEqualTo(4L * 1024 * 1024 * 1024);
+        assertThat(binary(Operator.ADD, Long.MAX_VALUE, 0L)).isEqualTo(Long.MAX_VALUE);
+        assertThat(binary(Operator.SUB, Long.MIN_VALUE, 0L)).isEqualTo(Long.MIN_VALUE);
+        assertThat(binary(Operator.REM, Long.MIN_VALUE, -1L)).isEqualTo(0L);
+        assertThat(Operators.unary(Operator.NEG, Integer.MAX_VALUE)).isEqualTo(-Integer.MAX_VALUE);
+    }
+
+    @Test
+    void theOverflowIsSaidInFrenchToo() {
+        LanguageSetting.set(Locale.FRENCH);
+        try {
+            assertThatThrownBy(() -> binary(Operator.MUL, 100_000, 100_000))
+                    .hasMessage("calcul impossible : 100000 * 100000 ne tient pas dans un int"
+                            + " (écrivez 100000L * 100000 pour calculer en long)");
+            assertThatThrownBy(() -> binary(Operator.ADD, Long.MAX_VALUE, 1))
+                    .hasMessage("calcul impossible : 9223372036854775807 + 1 ne tient pas dans un long");
+        } finally {
+            LanguageSetting.set(Locale.ENGLISH);
+        }
+    }
+
+    @Test
+    void anOverflowDoesNotHideADivisionByZero() {
+        assertThatThrownBy(() -> binary(Operator.DIV, Integer.MIN_VALUE, 0))
+                .hasMessage("calculation failed: / by zero");
+        assertThatThrownBy(() -> binary(Operator.REM, Long.MAX_VALUE, 0L))
+                .hasMessage("calculation failed: / by zero");
+    }
+
+    @Test
+    void bigNumbersAndDecimalsDoNotOverflow() {
+        assertThat(binary(Operator.MUL, BigInteger.valueOf(Long.MAX_VALUE), 2))
+                .isEqualTo(BigInteger.valueOf(Long.MAX_VALUE).shiftLeft(1));
+        assertThat(binary(Operator.MUL, Long.MAX_VALUE, 2.0)).isEqualTo(Long.MAX_VALUE * 2.0);
     }
 
     @Test

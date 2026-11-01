@@ -445,6 +445,19 @@ structures, functions) can be built on it. The work is organised in phases (revi
 - `io.powerj.fx` is loaded from `~/.powerj/modules` in its own layer: it is named in the list for its tests, which run in
   one layer with the others. At run time it only reads the language, which needs no export.
 
+### Changed (an integer that overflows is an error, [#80](https://github.com/yp44/powerj/issues/80))
+- **`100000 * 100000` no longer prints `1410065408`.** The operators of a block (`+ - * / %`) followed Java, which keeps the
+  low 32 bits when an `int` does not hold the result (and the low 64 for a `long`): `2147483647 + 1` was negative, silently,
+  in a shell that is used as a calculator for sizes and counts. A result that does not fit is now an error that names the
+  operation and the way out: `calculation failed: 100000 * 100000 does not fit in an int (write 100000L * 100000 to compute
+  with long)`, and `… does not fit in a long` for a `long`. It covers `+`, `-`, `*`, the one division that can overflow
+  (`Integer.MIN_VALUE / -1`) and the unary minus of the smallest number; a division by zero keeps its own message.
+- **Behavior change**, so a line that relied on the wrap now fails. What does not change: a result that fits, a `long`
+  operand (`100000L * 100000`, a literal too big for an `int`, the unit literals `1gb * 4`), decimals, `BigInteger` and
+  `BigDecimal`. `measure` already summed exactly (`BigDecimal`); no other cmdlet adds numbers by itself.
+- The rule is in FR-33. It is done with `Math.addExact` and its siblings in a helper of `Operators`, which also shortens
+  `arithmetic`; the rest of its complexity stays with [#94](https://github.com/yp44/powerj/issues/94).
+
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
   whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes
