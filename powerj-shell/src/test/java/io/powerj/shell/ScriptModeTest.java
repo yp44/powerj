@@ -15,7 +15,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import io.powerj.api.Language;
+import io.powerj.api.internal.LanguageSetting;
 import io.powerj.core.command.CmdletRegistry;
 import io.powerj.core.nativeexec.Platform;
 import io.powerj.core.runtime.Session;
@@ -61,12 +61,12 @@ class ScriptModeTest {
 
     @Test
     void errorsInFrench() {
-        Language.set(Locale.FRENCH);
+        LanguageSetting.set(Locale.FRENCH);
         try {
             assertThat(run(Optional.empty(), "commandeinconnue")).isEqualTo(1);
             assertThat(errors).containsExactly("commande inconnue : commandeinconnue");
         } finally {
-            Language.set(Locale.ENGLISH);
+            LanguageSetting.set(Locale.ENGLISH);
         }
     }
 

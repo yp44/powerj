@@ -11,13 +11,13 @@ import java.util.Locale;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
-import io.powerj.api.Language;
+import io.powerj.api.internal.LanguageSetting;
 
 class CellFormatterTest {
 
     @AfterEach
     void restoreLanguage() {
-        Language.set(Locale.ENGLISH);
+        LanguageSetting.set(Locale.ENGLISH);
     }
 
     private static String text(Object value) {
@@ -58,7 +58,7 @@ class CellFormatterTest {
 
     @Test
     void theDecimalSeparatorFollowsTheLanguage() {
-        Language.set(Locale.FRENCH);
+        LanguageSetting.set(Locale.FRENCH);
         assertThat(size(14_520L)).isEqualTo("14,2 KB");
     }
 

@@ -21,7 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
-import io.powerj.api.Language;
+import io.powerj.api.internal.LanguageSetting;
 import io.powerj.core.BuildInfo;
 import io.powerj.core.command.CmdletRegistry;
 import io.powerj.core.runtime.Session;
@@ -198,11 +198,11 @@ class ReplTest {
 
     @Test
     void historyMessagesInFrench() throws Exception {
-        Language.set(Locale.FRENCH);
+        LanguageSetting.set(Locale.FRENCH);
         try {
             session("alpha" + ENTER + "!zzz" + ENTER + "history -x" + ENTER);
         } finally {
-            Language.set(Locale.ENGLISH);
+            LanguageSetting.set(Locale.ENGLISH);
         }
 
         assertThat(screen).contains("historique : aucune commande ne correspond à !zzz",

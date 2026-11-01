@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import io.powerj.api.Language;
+import io.powerj.api.internal.LanguageSetting;
 import io.powerj.core.command.CmdletRegistry;
 import io.powerj.core.support.FakeCmdlets;
 
@@ -40,7 +40,7 @@ class CmdletInterpreterTest {
 
     @AfterEach
     void englishAgain() {
-        Language.set(Locale.ENGLISH);
+        LanguageSetting.set(Locale.ENGLISH);
     }
 
     private String run(String line) throws Exception {
@@ -79,7 +79,7 @@ class CmdletInterpreterTest {
 
     @Test
     void messagesInFrench() throws Exception {
-        Language.set(Locale.FRENCH);
+        LanguageSetting.set(Locale.FRENCH);
         run("items --cont 2");
         assertThat(errors).containsExactly("items : option inconnue --cont, vouliez-vous dire --count ?");
         assertThat(run("which cd")).isEqualTo("cd → commande interne\n");

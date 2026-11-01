@@ -9,6 +9,7 @@ import java.util.function.Consumer;
 import org.jline.terminal.Terminal;
 
 import io.powerj.api.Language;
+import io.powerj.api.internal.LanguageSetting;
 import io.powerj.core.BuildInfo;
 import io.powerj.core.runtime.Session;
 
@@ -98,7 +99,7 @@ final class ShellBootstrap {
         logs.install(home.logsDir(), options.debug(), environment.messages()::println);
         ShellConfig config = ShellConfig.load(home.configFile(), environment.messages()::println);
         // Language of the messages (FR-61): -Dpowerj.language, POWERJ_LANG, config.properties, then the system.
-        Language.set(Language.resolve(environment.properties().get(Language.PROPERTY),
+        LanguageSetting.set(LanguageSetting.resolve(environment.properties().get(Language.PROPERTY),
                 environment.variables().get(Language.ENVIRONMENT_VARIABLE), config.language(),
                 environment.systemLocale()));
         var session = new Session(environment.userHome(), environment.workingDirectory(), environment.variables());

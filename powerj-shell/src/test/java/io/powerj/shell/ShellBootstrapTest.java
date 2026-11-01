@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
-import io.powerj.api.Language;
+import io.powerj.api.internal.LanguageSetting;
 
 /**
  * The start of the shell, without the process: a folder, a few streams and a fake terminal are all it needs. What was
@@ -45,7 +45,7 @@ class ShellBootstrapTest {
 
     @AfterEach
     void restoreLanguage() {
-        Language.set(Locale.ENGLISH);
+        LanguageSetting.set(Locale.ENGLISH);
     }
 
     private Environment environment() {

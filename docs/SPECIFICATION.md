@@ -1327,7 +1327,7 @@ The language is resolved once at startup, in this order (the first non-blank val
 | 3 | Key `language` of `config.properties` (§8) | `language=en` in `~/.powerj/config.properties` (or `$POWERJ_HOME/config.properties`) |
 | 4 | Display language of the system (`Locale.Category.DISPLAY`) | French system → `fr`; anything else → `en` |
 
-A value is matched on its prefix: `fr`, `fr_FR`, `FR` give French; `en`, `de`… give English. The API class `io.powerj.api.Language` performs this resolution (`Language.current()`).
+A value is matched on its prefix: `fr`, `fr_FR`, `FR` give French; `en`, `de`… give English. The shell performs this resolution once, at startup. A cmdlet reads the result with `Language.current()` (or translates with `Language.text(...)`) and cannot change it: the setter is not part of the API (`io.powerj.api.internal` is exported to the built-in modules only).
 
 **Message files.** Texts are not in the code but in `ResourceBundle` files, one pair per package, in UTF-8, with positional placeholders `{0}`, `{1}`… (no `MessageFormat` escaping: apostrophes are written as is):
 

@@ -1,5 +1,7 @@
 package io.powerj.api;
 
+import io.powerj.api.internal.LanguageSetting;
+
 import java.util.Locale;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
@@ -9,8 +11,9 @@ import java.util.ResourceBundle;
  * <p>
  * Resolution order: system property {@value #PROPERTY}, environment variable {@code POWERJ_LANG}, key
  * {@code language} of {@code config.properties}, then the language of the system. Any language other than
- * French gives English. The shell resolves it at startup ({@link #set}); otherwise (tests, embedding) it is
- * resolved on first use from the system property and the system locale.
+ * French gives English. The shell resolves it once, at startup; otherwise (tests, embedding) it is resolved on first
+ * use from the system property and the system locale. A cmdlet reads the language and cannot change it: the language
+ * is written by the shell only.
  * <p>
  * A module translates its texts with its own {@link ResourceBundle} files {@code messages_en.properties}
  * and {@code messages_fr.properties}, loaded from its own module with {@code ResourceBundle.getBundle(name,
@@ -24,41 +27,12 @@ public final class Language {
     /** Environment variable that chooses the language ({@code en} or {@code fr}). */
     public static final String ENVIRONMENT_VARIABLE = "POWERJ_LANG";
 
-    private static volatile Locale current;
-
     private Language() {
     }
 
     /** {@link Locale#ENGLISH} or {@link Locale#FRENCH}. */
     public static Locale current() {
-        Locale locale = current;
-        if (locale == null) {
-            locale = resolve(System.getProperty(PROPERTY), null, null, Locale.getDefault(Locale.Category.DISPLAY));
-            current = locale;
-        }
-        return locale;
-    }
-
-    /** Sets the language (normalized to English or French). */
-    public static void set(Locale locale) {
-        current = normalize(locale == null ? null : locale.getLanguage());
-    }
-
-    /**
-     * Language chosen from, in order of priority, the system property, the environment variable, the
-     * configuration file and the system locale; blank values are ignored.
-     */
-    public static Locale resolve(String property, String environment, String configuration, Locale system) {
-        for (String value : new String[] {property, environment, configuration}) {
-            if (value != null && !value.isBlank()) {
-                return normalize(value.strip());
-            }
-        }
-        return normalize(system == null ? null : system.getLanguage());
-    }
-
-    private static Locale normalize(String language) {
-        return language != null && language.toLowerCase(Locale.ROOT).startsWith("fr") ? Locale.FRENCH : Locale.ENGLISH;
+        return LanguageSetting.current();
     }
 
     /**

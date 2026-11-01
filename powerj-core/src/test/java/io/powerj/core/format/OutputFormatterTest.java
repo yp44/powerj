@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 import io.powerj.api.Bytes;
 import io.powerj.api.Display;
 import io.powerj.api.Highlight;
-import io.powerj.api.Language;
+import io.powerj.api.internal.LanguageSetting;
 import io.powerj.api.Span;
 
 class OutputFormatterTest {
@@ -162,12 +162,12 @@ class OutputFormatterTest {
 
     @Test
     void frenchUsesItsDecimalSeparatorAndHeaders() {
-        Language.set(Locale.FRENCH);
+        LanguageSetting.set(Locale.FRENCH);
         try {
             assertThat(OutputFormatter.humanBytes(5L * 1024 * 1024 * 1024)).isEqualTo("5,0 GB");
             assertThat(render(80, Map.of("k", "v"))).contains("clé  valeur", "---  ------", "k    v");
         } finally {
-            Language.set(Locale.ENGLISH);
+            LanguageSetting.set(Locale.ENGLISH);
         }
     }
 
