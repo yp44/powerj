@@ -375,7 +375,7 @@ Sizes and durations in readable format (`14.2 KB`, `2 h 05 min`; the decimal sep
 | Equality | `==  !=` | **Value** equality (`Objects.equals`), not reference; numbers compared by value (`1 == 1L`). |
 | Ordering | `<  <=  >  >=` | Numbers by value; other types via `Comparable.compareTo` (dates, `Duration`, strings…). |
 | Logical | `&&  \|\|  !` | Short-circuit, as in Java. |
-| Arithmetic | `+  -  *  /  %` | Java rules; `+` concatenates if either operand is a `String`; `Instant - Duration`, `Instant + Duration` supported. |
+| Arithmetic | `+  -  *  /  %` | Java rules, with one difference: a result that does not fit in an `int` or a `long` is an **error**, not the wrong number Java gives (`100000 * 100000` is `calculation failed: 100000 * 100000 does not fit in an int`, not `1410065408`; `100000L * 100000` is `10000000000`; unit literals such as `1gb` are `long`). `BigInteger` and `BigDecimal` do not overflow. `+` concatenates if either operand is a `String`; `Instant - Duration`, `Instant + Duration` supported. |
 | Ternary | `cond ? a : b` | As in Java. |
 
 String comparisons are **case-sensitive**, as in Java (`equalsIgnoreCase`, `toLowerCase()` for the opposite).

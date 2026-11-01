@@ -128,6 +128,19 @@ class PipelineTest {
     }
 
     @Test
+    void anIntegerOverflowIsAnErrorAndTheWayOutThatTheMessageGivesWorks() throws Exception {
+        // Java would print 1410065408
+        run("$r = eval { 100000 * 100000 }");
+        assertThat(errors).hasSize(1);
+        assertThat(errors.getFirst()).contains("100000 * 100000 does not fit in an int");
+        assertThat(session.lastSucceeded()).isFalse();
+        assertThat(eval("100000L * 100000")).isEqualTo(10_000_000_000L);
+        assertThat(eval("2147483647 + 1L")).isEqualTo(2_147_483_648L);
+        assertThat(eval("1gb * 4")).isEqualTo(4L * 1024 * 1024 * 1024); // the unit literals are long
+        assertThat(eval("3000000000 * 2")).isEqualTo(6_000_000_000L); // a literal too big for an int is a long
+    }
+
+    @Test
     void shortCircuit() throws Exception {
         assertThat(eval("false && $_.nope")).isEqualTo(false);
         assertThat(eval("true || $_.nope")).isEqualTo(true);
