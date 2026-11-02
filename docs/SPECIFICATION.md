@@ -298,7 +298,7 @@ Option names are case-insensitive; a long option can be abbreviated as long as i
 The menu displays the signature (`of(E...) : List<E>`). Imported classes (§FR-47) are offered by their simple name.
 - CA: `java.util.Li<Tab>` offers `List LinkedList …`; `List.<Tab>` offers `of copyOf`; `$l = List.of(1); $l.<Tab>` offers `size() get(int) stream() …`.
 
-**FR-25 — Native command arguments.** Tab completes file paths. The names are matched without regard to case on **Windows and macOS**, whose file systems do not tell `docs` from `Docs` (`doc` + Tab offers `Docs/`), and in the case they are written on Linux. It is the same rule as the one that compares the protected paths of `rm` and `mv` with the paths typed; the wildcards keep their own (FR-40).
+**FR-25 — Native command arguments.** Tab completes file paths, for the native commands and for the cmdlets whose positional argument is a path: typed `Path` or `String`, a `List` of them, or marked `@Option(path = true)` when it is typed `Object` because it also takes a block (`rm`, `cp`, `mv`, `mkdir`, `touch`: `rm f` + Tab offers `files/` and `fichier.txt`). A cmdlet whose positional argument is a key, a column or a condition (`sort`, `select`, `where`) offers no file. The names are matched without regard to case on **Windows and macOS**, whose file systems do not tell `docs` from `Docs` (`doc` + Tab offers `Docs/`), and in the case they are written on Linux. It is the same rule as the one that compares the protected paths of `rm` and `mv` with the paths typed; the wildcards keep their own (FR-40).
 
 **FR-26 — Ergonomics.** First Tab: completes the common prefix; next Tab: menu of candidates, Tab/Shift+Tab to move through it; each candidate displays a short description (cmdlet synopsis, option type). Response time < 50 ms.
 
@@ -1432,6 +1432,7 @@ public @interface Option {
     String longName() default "";      // default: component name
     boolean mandatory() default false;
     int position() default -1;          // >= 0: positional parameter
+    boolean path() default false;       // Tab completes file paths here, for an Object that also takes a block (FR-25)
     String description() default "";
 }
 

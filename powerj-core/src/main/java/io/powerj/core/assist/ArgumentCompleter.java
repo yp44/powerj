@@ -50,10 +50,12 @@ final class ArgumentCompleter {
             if (expecting.isPresent()) {
                 return optionValues(expecting.get(), line, wordStart, cursor);
             }
-            // Textual positional parameter (often a path: ls docs); not for a block (where, map).
+            // Textual positional parameter (often a path: ls docs), or one that says it takes paths (rm: a path or a
+            // block); not for a block alone (where, map) or keys (sort, select).
             boolean pathPositional = specs.stream().anyMatch(s -> s.isPositional()
                     && (s.component().getType() == Path.class || s.component().getType() == String.class
-                        || isPathList(s) || s.isList() && s.component().getGenericType().getTypeName().contains("String")));
+                        || isPathList(s) || s.isList() && s.component().getGenericType().getTypeName().contains("String")
+                        || s.isPath()));
             return pathPositional ? paths.paths(line, wordStart, cursor) : Result.none(cursor);
         }
         if (catalog.builtinNames().contains(name) && !name.equals("cd")) {

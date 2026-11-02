@@ -21,7 +21,7 @@ public final class MakeDirectory implements Cmdlet<MakeDirectory.Params, Object,
 
     /** Parameters of {@code mkdir}. */
     public record Params(
-            @Option(position = 0, description = "Folders to create, or a block { … } that gives the folder of each pipeline object")
+            @Option(position = 0, path = true, description = "Folders to create, or a block { … } that gives the folder of each pipeline object")
             List<Object> paths,
             @Option(shortName = 'p', description = "Creates the missing parent folders; an existing folder is not an error")
             boolean parents,

@@ -26,7 +26,7 @@ public final class Touch implements Cmdlet<Touch.Params, Object, Object> {
 
     /** Parameters of {@code touch}. */
     public record Params(
-            @Option(position = 0, description = "Files to create or update, or a block { … } that gives the file of each pipeline object")
+            @Option(position = 0, path = true, description = "Files to create or update, or a block { … } that gives the file of each pipeline object")
             List<Object> paths,
             @Option(shortName = 'n', description = "Changes nothing: shows what would be done")
             boolean dryRun,

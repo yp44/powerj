@@ -46,6 +46,12 @@ public final class OptionBinder {
             return position >= 0;
         }
 
+        /** Does the cmdlet say that Tab completion offers file paths here? ({@code @Option(path = true)}) */
+        public boolean isPath() {
+            Option option = component.getAnnotation(Option.class);
+            return option != null && option.path();
+        }
+
         /** Displayed form: {@code -r, --recurse}. */
         public String display() {
             return (shortName != '\0' ? "-" + shortName + ", " : "    ") + "--" + longName;

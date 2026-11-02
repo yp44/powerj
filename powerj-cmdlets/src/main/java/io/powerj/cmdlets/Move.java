@@ -17,7 +17,7 @@ public final class Move implements Cmdlet<Move.Params, Object, Object> {
 
     /** Parameters of {@code mv}. */
     public record Params(
-            @Option(position = 0, description = "Sources (wildcards accepted), then the destination, or a block { … } that gives the destination of each source")
+            @Option(position = 0, path = true, description = "Sources (wildcards accepted), then the destination, or a block { … } that gives the destination of each source")
             List<Object> paths,
             @Option(shortName = 'f', description = "Overwrites existing targets")
             boolean force,
