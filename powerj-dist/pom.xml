@@ -38,6 +38,12 @@
             <groupId>io.powerj</groupId>
             <artifactId>powerj-shell</artifactId>
         </dependency>
+        <!-- Nothing in the shell requires it yet: it is here so that the image holds it (see the add-modules option of jpackage below), for the
+             modules loaded from ~/.powerj/modules, such as powerj-fx, which find it in the boot layer like powerj-api. -->
+        <dependency>
+            <groupId>io.powerj</groupId>
+            <artifactId>powerj-text</artifactId>
+        </dependency>
     </dependencies>
 
     <profiles>
@@ -184,8 +190,10 @@
                                             <!-- The whole Java SE library can be called from the shell (spec FR-52). -->
                                             <arg value="--add-modules"/>
                                             <!-- jdk.unsupported: Ctrl+C interception by JLine (sun.misc.Signal).
-                                                 jdk.jfr, jdk.management: the profiler of the perf mode (FR-76). -->
-                                            <arg value="java.se,jdk.unsupported,jdk.jfr,jdk.management,io.powerj.cmdlets"/>
+                                                 jdk.jfr, jdk.management: the profiler of the perf mode (FR-76).
+                                                 io.powerj.cmdlets: found by ServiceLoader, nothing requires it.
+                                                 io.powerj.text: required by the modules loaded later (powerj-fx), ADR 0010. -->
+                                            <arg value="java.se,jdk.unsupported,jdk.jfr,jdk.management,io.powerj.cmdlets,io.powerj.text"/>
                                             <!-- JLine accesses the native console (FFM / native library). -->
                                             <arg value="--java-options"/>
                                             <arg value="--enable-native-access=org.jline.terminal.ffm,org.jline.nativ,io.powerj.core"/>

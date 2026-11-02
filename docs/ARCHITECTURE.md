@@ -29,7 +29,8 @@ Every module is a JPMS module (`module-info.java`); the only runtime dependency 
 ```mermaid
 flowchart BT
     api[powerj-api<br/>extension API]
-    fs[powerj-fs<br/>file tree walks]
+    fs[powerj-fs<br/>file tree walks, host]
+    text[powerj-text<br/>shared output helpers]
     core[powerj-core<br/>language, engine]
     cmdlets[powerj-cmdlets<br/>built-in cmdlets]
     fx[powerj-fx<br/>grid, optional]
@@ -37,6 +38,10 @@ flowchart BT
     core --> api
     cmdlets --> api
     cmdlets --> fs
+    text --> api
+    core -.-> text
+    cmdlets -.-> text
+    fx -.-> text
     fx --> api
     shell --> core
     shell --> jline[(JLine)]
@@ -46,7 +51,8 @@ flowchart BT
 | Module | Depends on | Is |
 |---|---|---|
 | `powerj-api` | the JDK | The contract of a cmdlet (`Cmdlet`, `CmdletContext`, `@CmdletInfo`, `@Option`, `CmdletProvider`), the values it exchanges (`Row`, `Collected`, `Span`…), the capability interfaces (`Previewable`, `ColumnProvider`) and `io.powerj.api.perf`. The only module a third party compiles against. |
-| `powerj-fs` | the JDK | `FileWalker` and `FileTrees`: sequential or parallel walks, copy and delete of trees. |
+| `powerj-fs` | the JDK | `FileWalker` and `FileTrees`: sequential or parallel walks, copy and delete of trees; `Host`, the one place that reads the operating system. |
+| `powerj-text` | `api` | What `core`, `cmdlets` and `fx` share about the output contract (reading a record, showing and parsing values), so that the terminal, the grid and the exports cannot disagree ([ADR 0010](adr/0010-shared-output-helpers-live-in-powerj-text.md)). Not API. The dotted arrows of the diagram are what the issues #108 to #111 add: the module is empty until they move the helpers in. In the image, so that `powerj-fx` finds it in the boot layer like `api`. |
 | `powerj-core` | `api` | The language (`lang`), the engine (`runtime`, `command`, `java`, `nativeexec`, `format`), the completion (`assist`), the profiler (`perf`). Exported to the shell only. |
 | `powerj-cmdlets` | `api`, `fs` | The built-in cmdlets, published through `provides CmdletProvider with BuiltinCmdlets`. **Never depends on `core`**, so a built-in cmdlet behaves exactly like a third-party one. |
 | `powerj-fx` | `api`, JavaFX | `grid`. A real third-party module that happens to live in the repository; not in the distribution, and left out of the build with `-DskipFx`. |
