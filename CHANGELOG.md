@@ -486,6 +486,21 @@ structures, functions) can be built on it. The work is organised in phases (revi
   otherwise). The folder of `~/.powerj` is still found from the JVM's `user.home` (`shell.Environment`), not from `HOME`:
   taking `HOME` there would move the configuration of whoever sets it to something else.
 
+### Added (the module `powerj-text`, [#107](https://github.com/yp44/powerj/issues/107))
+- **A new module, `powerj-text` (`io.powerj.text`), empty on purpose.** It depends on `powerj-api` and the JDK only, and is
+  where `core`, `cmdlets` and `fx` will share what they each wrote a copy of (decision of #78, ADR 0010):
+  [#108](https://github.com/yp44/powerj/issues/108) the reading of a record,
+  [#109](https://github.com/yp44/powerj/issues/109) the formatting of sizes, dates and durations,
+  [#110](https://github.com/yp44/powerj/issues/110) the units of a size,
+  [#111](https://github.com/yp44/powerj/issues/111) the guard of a regular expression. Each moves in its own pull request.
+  It has its own message bundle (English and French) and a module-local `Messages`, ready for the texts of #109.
+- **Wired everywhere before it has content:** in the build and in the coverage report (a floor from the start); in the
+  runtime image of `powerj-dist`, which a new smoke test (`ci/smoke/modules.sh`, and a step of the Windows job) checks on
+  the three systems, so that `powerj-fx` and any module loaded later find it in the boot layer; in the architecture tests
+  (`textDependsOnlyOnTheJdkAndTheApi`, and `fxDependsOnlyOnTheApi` becomes `fxDependsOnlyOnTheApiAndText`).
+- **Not API.** Its package is exported to every module, since `powerj-fx` is loaded in a layer where a qualified export
+  would not reach it, so a third-party module can read it; nothing in it is promised to stay. ADR 0010 says so.
+
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
   whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes
