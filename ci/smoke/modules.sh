@@ -4,7 +4,10 @@
 # image would make such a module fail to load, whatever the machine.
 . "$(dirname "$0")/common.sh"
 
-java="$(find "$APP" -path '*runtime/bin/java' | head -1)"
+# The runtime is at lib/runtime/bin/java in the image of Linux, and at Contents/runtime/Contents/Home/bin/java in the
+# application bundle of macOS.
+java="$(find "$APP" -path '*runtime*bin/java' | head -1)"
+[ -n "$java" ] || { echo "no Java runtime found in $APP" >&2; exit 2; }
 modules="$("$java" --list-modules)"
 for module in io.powerj.api io.powerj.fs io.powerj.text io.powerj.core io.powerj.cmdlets io.powerj.shell; do
     echo "$modules" | grep -q "^$module@" || { echo "$module is not in the image" >&2; exit 1; }
