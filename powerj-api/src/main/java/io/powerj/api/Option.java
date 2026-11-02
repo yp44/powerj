@@ -28,6 +28,13 @@ public @interface Option {
     /** Position ({@code >= 0}) if the argument can be given without an option name. */
     int position() default -1;
 
+    /**
+     * Tab completion offers file paths for this argument. A component typed {@code Path}, {@code String} or a
+     * {@code List} of them is completed as a path anyway; this is for one typed {@code Object}, because it also takes a
+     * block ({@code rm { f -> … }}), where the type does not say that a path is expected.
+     */
+    boolean path() default false;
+
     /** Description displayed by the help. */
     String description() default "";
 }

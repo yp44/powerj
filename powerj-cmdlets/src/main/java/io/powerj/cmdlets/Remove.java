@@ -21,7 +21,7 @@ public final class Remove implements Cmdlet<Remove.Params, Object, Object> {
 
     /** Parameters of {@code rm}. */
     public record Params(
-            @Option(position = 0, description = "Files and folders to remove (wildcards accepted), or a block { … } that gives the path of each pipeline object")
+            @Option(position = 0, path = true, description = "Files and folders to remove (wildcards accepted), or a block { … } that gives the path of each pipeline object")
             List<Object> paths,
             @Option(shortName = 'r', description = "Removes folders with their content")
             boolean recurse,

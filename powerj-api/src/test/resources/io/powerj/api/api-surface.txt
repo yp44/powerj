@@ -72,6 +72,7 @@ public final class io.powerj.api.Language
 
 public abstract @interface io.powerj.api.Option extends java.lang.annotation.Annotation retention=RUNTIME
   public abstract boolean io.powerj.api.Option.mandatory() default false
+  public abstract boolean io.powerj.api.Option.path() default false
   public abstract char io.powerj.api.Option.shortName() default '\u0000'
   public abstract int io.powerj.api.Option.position() default -1
   public abstract java.lang.String io.powerj.api.Option.description() default ""
