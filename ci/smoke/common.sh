@@ -3,6 +3,7 @@
 #
 #   ci/smoke/launcher.sh                 the session of a user: cmdlets, Java, native commands, exit code
 #   ci/smoke/profiler.sh                 the runtime of the image holds the profiler of the perf mode
+#   ci/smoke/modules.sh                  the runtime of the image holds the modules that a module loaded later needs
 #   ci/smoke/non-interactive.sh          -c, a script file, standard input
 #   ci/smoke/third-party-modules.sh      greet.jar loaded from ~/.powerj/modules
 #   ci/smoke/languages.sh                English and French messages

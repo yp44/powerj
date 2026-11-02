@@ -65,6 +65,15 @@ class ArchitectureTest {
     }
 
     @Test
+    void textDependsOnlyOnTheJdkAndTheApi() {
+        check(classes().that().resideInAPackage("io.powerj.text..")
+                .should().onlyDependOnClassesThat()
+                .resideInAnyPackage("io.powerj.text..", "io.powerj.api..", "java..", "javax..")
+                .because("powerj-text holds what core, cmdlets and fx share about the output contract (ADR 0010): "
+                        + "it must not know the engine or the modules that use it"));
+    }
+
+    @Test
     void cmdletsAreIndependentOfTheEngine() {
         check(noClasses().that().resideInAPackage("io.powerj.cmdlets..")
                 .should().dependOnClassesThat()
@@ -73,10 +82,11 @@ class ArchitectureTest {
     }
 
     @Test
-    void fxDependsOnlyOnTheApi() {
+    void fxDependsOnlyOnTheApiAndText() {
         check(classes().that().resideInAPackage("io.powerj.fx..")
                 .should().onlyDependOnClassesThat()
-                .resideInAnyPackage("io.powerj.fx..", "io.powerj.api..", "java..", "javax..", "javafx..")
+                .resideInAnyPackage("io.powerj.fx..", "io.powerj.api..", "io.powerj.text..", "java..", "javax..",
+                        "javafx..")
                 .because("powerj-fx is a model of a real third-party module, shipped apart from the distribution")
                 .allowEmptyShould(true)); // the module is not there with -DskipFx
     }

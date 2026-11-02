@@ -53,6 +53,9 @@ jobs:
       - name: Profiler of the perf mode in the launcher
         run: ci/smoke/profiler.sh
 
+      - name: Modules of PowerJ in the image
+        run: ci/smoke/modules.sh
+
       - name: Smoke test of the non-interactive mode
         run: ci/smoke/non-interactive.sh
 
@@ -157,6 +160,7 @@ jobs:
         run: |
           export PJ="$PWD/powerj-dist/target/jpackage/powerj.app/Contents/MacOS/powerj"
           ci/smoke/launcher.sh
+          ci/smoke/modules.sh
           ci/smoke/non-interactive.sh
           ci/smoke/third-party-modules.sh
           ci/smoke/languages.sh
@@ -241,6 +245,16 @@ jobs:
           # The profiler is only resolved when asked: without this option the perf mode has no recording.
           $cfg = Get-ChildItem $app -Recurse -Filter powerj.cfg | Select-Object -First 1
           if (-not (Select-String -Path $cfg.FullName -SimpleMatch '--add-modules=jdk.jfr' -Quiet)) { throw "option --add-modules=jdk.jfr is not in powerj.cfg" }
+
+      - name: Modules of PowerJ in the image
+        shell: pwsh
+        run: |
+          $app = "powerj-dist\target\jpackage\powerj"
+          $java = Get-ChildItem $app -Recurse -Filter java.exe | Where-Object { $_.FullName -like '*runtime*bin*' } | Select-Object -First 1
+          $modules = & $java.FullName --list-modules
+          foreach ($module in 'io.powerj.api', 'io.powerj.fs', 'io.powerj.text', 'io.powerj.core', 'io.powerj.cmdlets', 'io.powerj.shell') {
+            if (-not ($modules -match ('^' + [regex]::Escape($module) + '@'))) { throw "$module is not in the image" }
+          }
 
       - name: Smoke test of the non-interactive mode
         shell: pwsh

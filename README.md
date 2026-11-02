@@ -280,7 +280,8 @@ All modules are JPMS modules (`module-info.java`); the only runtime dependency i
 | Module | Role |
 |---|---|
 | `powerj-api` | Public API for writing cmdlets (`Cmdlet`, `@CmdletInfo`, `@Option`, `CmdletProvider`); no dependencies |
-| `powerj-fs` | File tree walk, sequential or parallel in virtual threads (`FileWalker`), reusable by any cmdlet |
+| `powerj-fs` | File tree walk, sequential or parallel in virtual threads (`FileWalker`), reusable by any cmdlet; the operating system and its rules about file names (`Host`) |
+| `powerj-text` | What `core`, `cmdlets` and `fx` share about the output contract: how a value is read, shown and parsed ([ADR 0010](docs/adr/0010-shared-output-helpers-live-in-powerj-text.md)). Not API; the helpers move in one by one |
 | `powerj-core` | Lexer, parser, interpreter, pipeline, option binding, Java interoperability, completion engine, output formatting, native execution |
 | `powerj-cmdlets` | Built-in cmdlets (`ls`, `grep`, `cat`, `where`, `map`, `sort`, `first`, `last`, `range`, `select`, `count`, `measure`, `group`, `join`, `mkdir`, `touch`, `cp`, `mv`, `rm`, `collect`, `env`) |
 | `powerj-shell` | Entry point (`Main`), JLine REPL, profile, script mode, history expansion |

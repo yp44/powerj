@@ -1562,7 +1562,8 @@ Yves   Hello Yves!   2026-10-07 10:12:03
 ```text
 powerj/                         (parent POM, packaging pom)
 ├── powerj-api/                 Public API for cmdlets (no dependencies)
-├── powerj-fs/                  File tree walk, sequential or parallel in virtual threads (FR-64)
+├── powerj-fs/                  File tree walk, sequential or parallel in virtual threads (FR-64); the host (OS rules)
+├── powerj-text/                What core, cmdlets and fx share about the output contract (ADR 0010); not API
 ├── powerj-core/                Lexer, parser, AST, resolution, evaluator, pipeline, Java interop,
 │                               completion, formatting, native execution, perf mode (by layers, §5.6)
 ├── powerj-cmdlets/             The 28 built-in cmdlets (§3.9)

@@ -1,7 +1,7 @@
 # 0010. The shared output helpers live in a new module, `powerj-text`
 
 **Status:** accepted (decision of [#78](https://github.com/yp44/powerj/issues/78), from the audit of 2026-10-30; the module is
-created by [#107](https://github.com/yp44/powerj/issues/107)). It amends [0003](0003-built-in-cmdlets-are-independent-of-the-engine.md)
+created by [#107](https://github.com/yp44/powerj/issues/107), empty until the helpers move in). It amends [0003](0003-built-in-cmdlets-are-independent-of-the-engine.md)
 once the module exists: `powerj-cmdlets` and `powerj-fx` may then depend on `powerj-text` as well as on `powerj-api`.
 
 ## Context
@@ -38,6 +38,17 @@ a module can be added afterwards. The cost is one more jar: in the jlink image, 
 formatters need (the durations) come with their own bundle in the module, like the seven `Messages` classes, which stay
 (CHANGELOG, "Examined, not changed").
 
-The ArchUnit rules that say what the built-in modules may depend on are updated when the module is created, and a rule says
-what `powerj-text` may depend on. Whether a third-party module may use `powerj-text` (it is in the image, so any module can
-`require` it) is settled in [#107](https://github.com/yp44/powerj/issues/107) and written here.
+The ArchUnit rules say what the module may depend on (`textDependsOnlyOnTheJdkAndTheApi`) and that `powerj-fx` may depend
+on it (`fxDependsOnlyOnTheApiAndText`); `powerj-cmdlets` was already only forbidden to reach the engine.
+
+Settled when the module was created ([#107](https://github.com/yp44/powerj/issues/107)):
+- **It is in the image, not in the zip of `powerj-fx`.** `powerj-dist` adds `io.powerj.text` to the modules of the runtime
+  (nothing in the shell requires it, as for `io.powerj.cmdlets`). The zip of `powerj-fx` already leaves out every artifact
+  of the group `io.powerj` (`excludeGroupIds`), so it will not carry `powerj-text` when `powerj-fx` starts to use it. A
+  module loaded from `~/.powerj/modules` finds it in the boot layer, as it finds `powerj-api`. `ci/smoke/modules.sh`
+  fails if the image does not hold it, on Linux, macOS and Windows.
+- **Its package is exported to every module, and it is not API.** A qualified export to the built-in modules, as for
+  `io.powerj.api.internal` ([#79](https://github.com/yp44/powerj/issues/79)), would not reach `powerj-fx`, which is loaded in
+  a layer of its own (a module of a child layer cannot even load a class from a package that its parent layer exports to
+  it alone). So a third-party module can read it; the module descriptor and the package documentation say that nothing
+  in it is promised to stay and that it changes without deprecation. What an author needs is in `powerj-api`.

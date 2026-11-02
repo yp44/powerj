@@ -35,6 +35,10 @@
         </dependency>
         <dependency>
             <groupId>io.powerj</groupId>
+            <artifactId>powerj-text</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.powerj</groupId>
             <artifactId>powerj-core</artifactId>
         </dependency>
         <dependency>
