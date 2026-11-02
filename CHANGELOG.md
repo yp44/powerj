@@ -501,6 +501,17 @@ structures, functions) can be built on it. The work is organised in phases (revi
 - **Not API.** Its package is exported to every module, since `powerj-fx` is loaded in a layer where a qualified export
   would not reach it, so a third-party module can read it; nothing in it is promised to stay. ADR 0010 says so.
 
+### Fixed (Tab completes the paths of `rm`, `cp`, `mv`, `mkdir` and `touch`, [#118](https://github.com/yp44/powerj/issues/118))
+- **`rm f` + Tab offered nothing, where `ls f` offered `files/` and `fichier.txt`.** The five cmdlets declare their argument
+  as `List<Object>`, because it takes a path or a block `{ … }`, and the completer only knew `Path`, `String` and lists of
+  them. It cannot take every `Object`: `sort`, `select`, `kill`, `group`, `where`, `map` and `measure` also have one, and
+  it is a key, a column or a condition.
+- **`@Option` gets a member, `path`** (`false` by default): "Tab completes file paths for this argument". The five cmdlets set
+  it on their first positional argument, and `ArgumentCompleter` reads it. A third-party cmdlet can use it too. This adds a
+  member to the public API, compatible: the snapshot of `ApiSurfaceTest` has one line more.
+- Not changed: `cd f` + Tab still offers files as well as folders (another cause: `cd` is a built-in command that gets the
+  generic completion of paths).
+
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
   whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes
