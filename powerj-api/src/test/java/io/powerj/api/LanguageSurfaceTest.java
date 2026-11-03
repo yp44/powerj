@@ -24,7 +24,7 @@ class LanguageSurfaceTest {
 
     /** The modules of PowerJ itself, the only ones that may write the language (tests included). */
     private static final Set<String> BUILT_IN = Set.of("io.powerj.core", "io.powerj.cmdlets", "io.powerj.fx",
-            "io.powerj.shell");
+            "io.powerj.shell", "io.powerj.text");
 
     /** Read from the compiled descriptor: these tests run on the class path, where the module is not named. */
     private static final Path DESCRIPTOR = Path.of("target/classes/module-info.class");

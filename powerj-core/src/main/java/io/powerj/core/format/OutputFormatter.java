@@ -6,8 +6,6 @@ import java.lang.reflect.RecordComponent;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -22,6 +20,7 @@ import io.powerj.api.Highlight;
 import io.powerj.api.Language;
 import io.powerj.api.Span;
 import io.powerj.core.i18n.Messages;
+import io.powerj.text.Formats;
 
 /**
  * Display of values (specification FR-30):
@@ -44,7 +43,6 @@ public final class OutputFormatter implements AutoCloseable {
     private static final int WIDTH_SAMPLE = 50;
     private static final int MIN_COLUMN = 4;
     private static final String GAP = "  ";
-    private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     private static final String HIGHLIGHT_ON = "\u001b[1;31m";
     private static final String HIGHLIGHT_OFF = "\u001b[0m";
@@ -375,7 +373,7 @@ public final class OutputFormatter implements AutoCloseable {
         return switch (value) {
             case null -> "";
             case Number n when bytes -> humanBytes(n.longValue());
-            case Instant instant -> DATE_TIME.format(instant.atZone(ZoneId.systemDefault()));
+            case Instant instant -> Formats.dateTime(instant);
             case Duration d -> Values.text(d);
             case String s -> s;
             default -> Values.text(value);
@@ -384,16 +382,6 @@ public final class OutputFormatter implements AutoCloseable {
 
     /** {@code 14 520} → {@code 14.2 KB} (multiples of 1024, decimal separator of the current {@link Language}). */
     public static String humanBytes(long bytes) {
-        if (bytes < 1024) {
-            return bytes + " B";
-        }
-        String[] units = {"KB", "MB", "GB", "TB", "PB"};
-        double value = bytes;
-        int unit = -1;
-        while (value >= 1024 && unit < units.length - 1) {
-            value /= 1024;
-            unit++;
-        }
-        return String.format(Language.current(), "%.1f %s", value, units[unit]);
+        return Formats.bytes(bytes);
     }
 }

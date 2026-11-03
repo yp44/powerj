@@ -82,11 +82,25 @@ class CellFormatterTest {
     }
 
     @Test
-    void durationsAreSecondsThenMinutes() {
+    void durationsAreTheTextOfTheTerminal() {
+        // the same table as FormatsTest (powerj-text) and ValuesTest (core): the grid shows what the terminal shows (#97)
+        assertThat(text(Duration.ZERO)).isEqualTo("0 ns");
+        assertThat(text(Duration.ofNanos(1_400))).isEqualTo("1.4 µs");
+        assertThat(text(Duration.ofNanos(2_000))).isEqualTo("2.0 µs");
         assertThat(text(Duration.ofMillis(10))).isEqualTo("0.010 s");
+        assertThat(text(Duration.ofMillis(1_500))).isEqualTo("1.500 s");
         assertThat(text(Duration.ofSeconds(59))).isEqualTo("59.000 s");
-        assertThat(text(Duration.ofSeconds(65))).isEqualTo("1:05");
-        assertThat(text(Duration.ofMinutes(90))).isEqualTo("90:00");
+        assertThat(text(Duration.ofSeconds(65))).isEqualTo("1 min 05 s");
+        assertThat(text(Duration.ofSeconds(90))).isEqualTo("1 min 30 s");
+        assertThat(text(Duration.ofMinutes(90))).isEqualTo("90 min 00 s");
+    }
+
+    @Test
+    void aDurationKeepsTheDecimalPointInFrench() {
+        LanguageSetting.set(Locale.FRENCH);
+        assertThat(text(Duration.ofMillis(1_500))).isEqualTo("1.500 s");
+        assertThat(text(Duration.ofSeconds(90))).isEqualTo("1 min 30 s");
+        assertThat(text(Duration.ofNanos(2_000))).isEqualTo("2.0 µs");
     }
 
     @Test

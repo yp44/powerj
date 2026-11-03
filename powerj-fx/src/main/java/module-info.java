@@ -4,6 +4,7 @@
  */
 module io.powerj.fx {
     requires io.powerj.api;
+    requires io.powerj.text;
     requires javafx.controls;
 
     provides io.powerj.api.CmdletProvider with io.powerj.fx.FxProvider;

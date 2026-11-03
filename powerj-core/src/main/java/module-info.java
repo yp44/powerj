@@ -8,6 +8,7 @@
 module io.powerj.core {
     requires transitive io.powerj.api;
     requires io.powerj.fs;
+    requires io.powerj.text;
     requires java.logging;
     requires java.management;
     requires static jdk.jfr;

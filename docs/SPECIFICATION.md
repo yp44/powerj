@@ -331,6 +331,8 @@ The menu displays the signature (`of(E...) : List<E>`). Imported classes (§FR-4
 - **scalars** (`String`, numbers, booleans, dates, `Path`, enums): readable form; the line breaks of a text are kept, also in a table cell or a redirected file (`cat a.txt -t`, `cat a.txt -c | map { $_.content } > copie.txt`), and a text that already ends with a line break gets no other one (the copy is identical to the file);
 - **other objects**: `toString()`; `help members` lets you explore their properties.
 
+**The text of a size, a date and a duration** is the same in the terminal, in the grid (FR-77) and in the exports; it is written by one class, `io.powerj.text.Formats`. A **size** (`@Bytes`) is in multiples of 1024 with one decimal and the decimal separator of the language (`14.2 KB`, `14,2 KB`). A **date** is `yyyy-MM-dd HH:mm`, local time. A **duration** is `1 min 30 s` from a minute on, `1.500 s` to the millisecond, `2.0 µs` under a millisecond and `150 ns` under a microsecond: the words follow the language, the **decimal point never does**, because the same text is what `"$d"` interpolates and what an argument receives.
+
 Successive objects of the same record type are grouped in the same table.
 
 **FR-30b — Unrolling collections.** When a pipeline stage produces an `Iterable` (`List`, `Set`…), an array, a stream (`Stream`, `IntStream`, `LongStream`, `DoubleStream`: boxed elements), an `Iterator` or an `Optional` (and `OptionalInt`, `OptionalLong`, `OptionalDouble`), its elements are **emitted one by one** into the stream (empty `Optional` → nothing). A stream displayed directly (`IntStream.range(0, 3)`) likewise shows its elements. `String` and `Map` are **never** unrolled, nor is the list produced by `collect` (FR-36d).
