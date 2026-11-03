@@ -3,10 +3,8 @@ package io.powerj.fx.model;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 
-import io.powerj.api.Language;
+import io.powerj.text.Formats;
 
 /** The text of a cell, as the terminal shows it (FR-30): readable sizes, local dates, one line. */
 public final class CellFormatter {
@@ -15,8 +13,6 @@ public final class CellFormatter {
     static final int MAX_LENGTH = 300;
     /** Shown in place of a line break. */
     static final String LINE_BREAK = "↵";
-
-    private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     private CellFormatter() {
     }
@@ -42,33 +38,11 @@ public final class CellFormatter {
     private static String full(Object value, ColumnKind kind) {
         return switch (value) {
             case null -> "";
-            case Number n when kind == ColumnKind.SIZE -> humanBytes(n.longValue());
-            case Instant instant -> DATE_TIME.format(instant.atZone(ZoneId.systemDefault()));
-            case Duration d -> duration(d);
+            case Number n when kind == ColumnKind.SIZE -> Formats.bytes(n.longValue());
+            case Instant instant -> Formats.dateTime(instant);
+            case Duration d -> Formats.duration(d);
             case BigDecimal d -> d.toPlainString();
             default -> String.valueOf(value);
         };
-    }
-
-    /** {@code 14 520} → {@code 14.2 KB} (multiples of 1024, decimal separator of the current language). */
-    static String humanBytes(long bytes) {
-        if (bytes < 1024) {
-            return bytes + " B";
-        }
-        String[] units = {"KB", "MB", "GB", "TB", "PB"};
-        double value = bytes;
-        int unit = -1;
-        while (value >= 1024 && unit < units.length - 1) {
-            value /= 1024;
-            unit++;
-        }
-        return String.format(Language.current(), "%.1f %s", value, units[unit]);
-    }
-
-    private static String duration(Duration d) {
-        if (d.toMinutes() > 0) {
-            return "%d:%02d".formatted(d.toMinutes(), d.toSecondsPart());
-        }
-        return String.format(Language.current(), "%.3f s", d.toNanos() / 1e9);
     }
 }
