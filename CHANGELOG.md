@@ -512,6 +512,19 @@ structures, functions) can be built on it. The work is organised in phases (revi
 - Not changed: `cd f` + Tab still offers files as well as folders (another cause: `cd` is a built-in command that gets the
   generic completion of paths).
 
+### Fixed (one text for a size, a date and a duration, [#109](https://github.com/yp44/powerj/issues/109), [#97](https://github.com/yp44/powerj/issues/97))
+- **The grid shows a `Duration` as the terminal does.** `fx.model.CellFormatter` said `1:30` and `0.000 s` for 2 µs where the
+  terminal said `1 min 30 s` and `2.0 µs`, and it wrote `1,500 s` in French where the terminal wrote `1.500 s`. The sizes
+  (`humanBytes`) and the dates were copied word for word in `core` and in `fx`.
+- **One class, `io.powerj.text.Formats`** (`bytes`, `duration`, `dateTime`), the first helper to move into `powerj-text`. `core`
+  (`Values`, `OutputFormatter`) and `fx` (`CellFormatter`) call it and lose their copies; the `duration.*` texts move to the bundle of
+  the module. `core` and `fx` now require `io.powerj.text`; in the image `powerj-fx` finds it in the boot layer.
+- **Behavior change, in the grid only:** `1:30` → `1 min 30 s`, `0.000 s` → `2.0 µs` for a micro-duration, `1,500 s` → `1.500 s` in
+  French. The terminal is unchanged. A duration keeps its decimal point in every language, on purpose: its text is also what a script
+  interpolates or passes as an argument. A size keeps the separator of the language, as before.
+- Tests: the same table of durations is checked in `powerj-text` (`FormatsTest`, both languages), in `core` (`ValuesTest`) and in `fx`
+  (`CellFormatterTest`): three modules, one text.
+
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
   whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes
