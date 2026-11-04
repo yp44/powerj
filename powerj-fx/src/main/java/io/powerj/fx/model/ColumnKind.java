@@ -6,6 +6,7 @@ import java.time.temporal.Temporal;
 import java.util.Date;
 
 import io.powerj.api.Bytes;
+import io.powerj.text.RecordView;
 
 /** What a column holds: it decides the alignment, the text of the cells and (later) how they are sorted and filtered. */
 public enum ColumnKind {
@@ -34,8 +35,13 @@ public enum ColumnKind {
 
     /** Kind of a record component: {@link Bytes} makes a size. */
     public static ColumnKind of(RecordComponent component) {
-        return component.isAnnotationPresent(Bytes.class) && ofType(component.getType()) == NUMBER
-                ? SIZE : ofType(component.getType());
+        return of(RecordView.of(component.getDeclaringRecord()).component(component.getName()));
+    }
+
+    /** Kind of a component read through {@link RecordView}: {@link Bytes} makes a size. */
+    public static ColumnKind of(RecordView.Component component) {
+        Class<?> type = component.recordComponent().getType();
+        return component.bytes() && ofType(type) == NUMBER ? SIZE : ofType(type);
     }
 
     /** Kind of the value of a column, {@link #UNKNOWN} for {@code null}. */

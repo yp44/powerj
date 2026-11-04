@@ -2,7 +2,6 @@ package io.powerj.core.format;
 
 import java.io.PrintWriter;
 import java.lang.reflect.Method;
-import java.lang.reflect.RecordComponent;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
@@ -21,6 +20,7 @@ import io.powerj.api.Language;
 import io.powerj.api.Span;
 import io.powerj.core.i18n.Messages;
 import io.powerj.text.Formats;
+import io.powerj.text.RecordView;
 
 /**
  * Display of values (specification FR-30):
@@ -274,13 +274,14 @@ public final class OutputFormatter implements AutoCloseable {
     }
 
     private void listRecord(Record record) {
-        RecordComponent[] components = record.getClass().getRecordComponents();
-        int nameWidth = Arrays.stream(components).mapToInt(c -> c.getName().length()).max().orElse(0);
-        for (RecordComponent c : components) {
-            Object value = read(c.getAccessor(), record);
-            String text = cell(value, c.isAnnotationPresent(Bytes.class));
-            text = highlight(text, highlights(value, column(c).highlight(), record), text.length());
-            out.println(("%-" + nameWidth + "s : %s").formatted(c.getName(), text));
+        List<RecordView.Component> components = RecordView.of(record.getClass()).components();
+        int nameWidth = components.stream().mapToInt(c -> c.name().length()).max().orElse(0);
+        for (RecordView.Component c : components) {
+            Column column = column(c);
+            Object value = column.reader().apply(record);
+            String text = cell(value, c.bytes());
+            text = highlight(text, highlights(value, column.highlight(), record), text.length());
+            out.println(("%-" + nameWidth + "s : %s").formatted(c.name(), text));
         }
         out.println();
     }
@@ -298,37 +299,28 @@ public final class OutputFormatter implements AutoCloseable {
 
     /** Table columns for this type, or {@code null} if it is displayed as a list. */
     private static List<Column> tableColumns(Class<?> type) {
-        RecordComponent[] components = type.getRecordComponents();
-        Display display = type.getAnnotation(Display.class);
-        List<Column> result = new ArrayList<>();
-        if (display != null) {
-            for (String name : display.columns()) {
-                Arrays.stream(components).filter(c -> c.getName().equals(name)).findFirst()
-                        .ifPresent(c -> result.add(column(c)));
-            }
-            return result.isEmpty() ? null : result;
+        RecordView view = RecordView.of(type);
+        List<RecordView.Component> chosen = view.displayed();
+        if (view.declaresDisplay()) {
+            return chosen.isEmpty() ? null : chosen.stream().map(OutputFormatter::column).toList();
         }
-        if (components.length == 0 || components.length > MAX_TABLE_COLUMNS) {
+        List<RecordView.Component> all = view.components();
+        if (all.isEmpty() || all.size() > MAX_TABLE_COLUMNS) {
             return null;
         }
-        for (RecordComponent c : components) {
-            result.add(column(c));
-        }
-        return result;
+        return all.stream().map(OutputFormatter::column).toList();
     }
 
-    private static Column column(RecordComponent c) {
-        Method accessor = c.getAccessor();
+    /** The column of a component; its value is read with an accessor that this module made accessible. */
+    private static Column column(RecordView.Component component) {
+        Method accessor = component.recordComponent().getAccessor();
         accessor.trySetAccessible();
         Method highlight = null;
-        Highlight annotation = c.getAnnotation(Highlight.class);
-        if (annotation != null) {
-            highlight = Arrays.stream(c.getDeclaringRecord().getRecordComponents())
-                    .filter(other -> other.getName().equals(annotation.value()) && other.getType() == List.class)
-                    .map(RecordComponent::getAccessor).findFirst().orElse(null);
+        if (component.highlight() != null) {
+            highlight = component.highlight().getAccessor();
         }
-        return new Column(c.getName(), value -> read(accessor, (Record) value), accessor.getReturnType(),
-                c.isAnnotationPresent(Bytes.class), highlight);
+        return new Column(component.name(), value -> read(accessor, (Record) value), accessor.getReturnType(),
+                component.bytes(), highlight);
     }
 
     /** Parts to highlight in the text of {@code value}, or {@code null} if none (or no colors). */

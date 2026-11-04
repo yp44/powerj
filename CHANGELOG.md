@@ -525,6 +525,19 @@ structures, functions) can be built on it. The work is organised in phases (revi
 - Tests: the same table of durations is checked in `powerj-text` (`FormatsTest`, both languages), in `core` (`ValuesTest`) and in `fx`
   (`CellFormatterTest`): three modules, one text.
 
+### Changed (one reading of `@Display`, `@Bytes` and `@Highlight`, [#108](https://github.com/yp44/powerj/issues/108))
+- **`io.powerj.text.RecordView` reads the output contract of a record once per class** (cached by `ClassValue`): the components, the
+  columns that `@Display` names (`displayed()`, `declaresDisplay()`), the sizes that `@Bytes` marks and the `List<Span>` component
+  that `@Highlight` points at. The terminal (`OutputFormatter`), the grid (`ObjectReader`, `ColumnKind`) and the exports and
+  properties of the cmdlets (`cmdlets.RecordShape`) used to interpret the annotations each on their own; they now ask the view.
+  What each does with it stays its own: the terminal shows a table of at most five components or a list, the grid adds the
+  other components after the ones of `@Display`.
+- **The view holds structure, not accessors.** Making an accessor accessible is allowed to the module that asks, and a record of a
+  third-party module is opened to `io.powerj.core` only (`ModuleLoader`): a view that made the accessors accessible from
+  `powerj-text` would read none of them. So `core`, `cmdlets` and `fx` keep their own accessors. That is why `core.java.RecordShape`
+  (case-insensitive access by name, for properties) stays as it is: it holds accessors only, and reads no annotation.
+- No visible change. `cmdlets` now requires `io.powerj.text`.
+
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
   whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes

@@ -1,19 +1,17 @@
 package io.powerj.cmdlets;
 
 import java.lang.reflect.Method;
-import java.lang.reflect.RecordComponent;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
-import io.powerj.api.Bytes;
+import io.powerj.text.RecordView;
 
 /**
- * The components of a record class, read once per class and not at every use (review C-26):
- * {@code Class.getRecordComponents()} builds new objects at each call, about 7 µs, and {@code to-csv}, {@code to-json}
- * and {@code join} ask for every column of every object.
+ * The accessors of a record class, made accessible by this module and read once per class and not at every use
+ * (review C-26): {@code Class.getRecordComponents()} builds new objects at each call, about 7 µs, and {@code to-csv},
+ * {@code to-json} and {@code join} ask for every column of every object. The names and the sizes ({@code @Bytes}) are
+ * those of {@link RecordView}; the accessors stay here because a module can make accessible only what is open or
+ * exported to it (a record of a third-party module is opened to {@code io.powerj.core} only), so the one that reads
+ * must be the one that makes them accessible, and {@code powerj-text} cannot do it for the others.
  */
 final class RecordShape {
 
@@ -24,25 +22,16 @@ final class RecordShape {
         }
     };
 
-    private final List<String> names;
+    private final RecordView view;
     private final Method[] accessors;
-    private final Map<String, Integer> indexes = new HashMap<>();
-    private final Set<String> bytes = new HashSet<>();
 
     private RecordShape(Class<?> type) {
-        RecordComponent[] components = type.getRecordComponents();
-        String[] names = new String[components.length];
-        accessors = new Method[components.length];
-        for (int i = 0; i < components.length; i++) {
-            names[i] = components[i].getName();
-            accessors[i] = components[i].getAccessor();
+        view = RecordView.of(type);
+        accessors = new Method[view.components().size()];
+        for (int i = 0; i < accessors.length; i++) {
+            accessors[i] = view.components().get(i).recordComponent().getAccessor();
             accessors[i].trySetAccessible();
-            indexes.put(names[i], i); // the names of the components of a record are all different
-            if (components[i].isAnnotationPresent(Bytes.class)) {
-                bytes.add(names[i]);
-            }
         }
-        this.names = List.of(names);
     }
 
     /** The shape of a record class; the same one every time. */
@@ -52,12 +41,12 @@ final class RecordShape {
 
     /** Names of the components, in declaration order (unmodifiable). */
     List<String> names() {
-        return names;
+        return view.names();
     }
 
     /** Position of the component called {@code name}, or -1. */
     int indexOf(String name) {
-        return indexes.getOrDefault(name, -1);
+        return view.indexOf(name);
     }
 
     /** Accessor of the component at {@code index}, already made accessible when it can be. */
@@ -65,8 +54,8 @@ final class RecordShape {
         return accessors[index];
     }
 
-    /** {@code true} if the component called {@code name} is a size ({@link Bytes}). */
+    /** {@code true} if the component called {@code name} is a size ({@code @Bytes}). */
     boolean isBytes(String name) {
-        return bytes.contains(name);
+        return view.isBytes(name);
     }
 }
