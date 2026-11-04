@@ -3,7 +3,6 @@ package io.powerj.fx.model;
 import java.io.File;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.lang.reflect.RecordComponent;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.net.URL;
@@ -12,7 +11,6 @@ import java.time.Duration;
 import java.time.temporal.Temporal;
 import java.time.temporal.TemporalAmount;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.LinkedHashMap;
@@ -27,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import io.powerj.api.Display;
 import io.powerj.api.Row;
+import io.powerj.text.RecordView;
 
 /**
  * Turns a received object into a {@link Reading}, with the same idea of columns as the table of the terminal (FR-30):
@@ -161,26 +160,23 @@ public final class ObjectReader {
      * component, so that the table has all the properties of the object (the terminal shows only the first ones).
      */
     private List<ColumnSpec> recordColumns(Class<?> type) {
-        RecordComponent[] components = type.getRecordComponents();
+        RecordView view = RecordView.of(type);
         List<ColumnSpec> columns = new ArrayList<>();
-        Display display = type.getAnnotation(Display.class);
-        if (display != null) {
-            for (String name : display.columns()) {
-                Arrays.stream(components).filter(c -> c.getName().equals(name)).findFirst()
-                        .ifPresent(c -> columns.add(new ColumnSpec(c.getName(), kind(c))));
-            }
+        for (RecordView.Component component : view.displayed()) {
+            columns.add(new ColumnSpec(component.name(), kind(component)));
         }
-        for (RecordComponent component : components) {
-            if (columns.stream().noneMatch(c -> c.name().equals(component.getName()))) {
-                columns.add(new ColumnSpec(component.getName(), kind(component)));
+        for (RecordView.Component component : view.components()) {
+            if (columns.stream().noneMatch(c -> c.name().equals(component.name()))) {
+                columns.add(new ColumnSpec(component.name(), kind(component)));
             }
         }
         return columns;
     }
 
     /** The kind of a record component, a number if it is shown raw. */
-    private ColumnKind kind(RecordComponent component) {
-        return raw ? rawKind(ColumnKind.of(component), component.getType()) : ColumnKind.of(component);
+    private ColumnKind kind(RecordView.Component component) {
+        Class<?> type = component.recordComponent().getType();
+        return raw ? rawKind(ColumnKind.of(component), type) : ColumnKind.of(component);
     }
 
     private ColumnKind kind(Method getter) {
