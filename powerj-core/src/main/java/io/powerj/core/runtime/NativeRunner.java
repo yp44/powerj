@@ -95,7 +95,6 @@ public final class NativeRunner {
      */
     public Result run(Command command, ExecutionContext context) throws InterruptedException {
         Path executable = command.executable();
-        List<String> args = command.args();
         Session session = context.session();
         ShellIo io = context.io();
         boolean capture = context.capture();
@@ -103,12 +102,7 @@ public final class NativeRunner {
         Optional<FileTarget> stderr = context.redirections().err();
         boolean errorsToOutput = command.errorsToOutput();
         boolean inheritInput = context.inheritInput();
-        List<String> line = new ArrayList<>(args.size() + 1);
-        line.add(executable.toString());
-        line.addAll(args);
-        var builder = new ProcessBuilder(line).directory(session.currentDirectory().toFile());
-        builder.environment().clear();
-        builder.environment().putAll(session.environmentSnapshot());
+        var builder = newBuilder(command, session);
         Charset charset = encoding.forProgram(executable, session.environment());
 
         boolean detached = !capture && stdout.isEmpty() && stderr.isEmpty()
@@ -214,12 +208,7 @@ public final class NativeRunner {
         List<ProcessBuilder> builders = new ArrayList<>(commands.size());
         for (int i = 0; i < commands.size(); i++) {
             Command command = commands.get(i);
-            List<String> line = new ArrayList<>(command.args().size() + 1);
-            line.add(command.executable().toString());
-            line.addAll(command.args());
-            var builder = new ProcessBuilder(line).directory(session.currentDirectory().toFile());
-            builder.environment().clear();
-            builder.environment().putAll(session.environmentSnapshot());
+            var builder = newBuilder(command, session);
             if (i == 0) {
                 builder.redirectInput(input == null && inheritInput
                         ? ProcessBuilder.Redirect.INHERIT : ProcessBuilder.Redirect.PIPE);
@@ -263,8 +252,7 @@ public final class NativeRunner {
         try {
             processes = ProcessBuilder.startPipeline(builders);
         } catch (IOException e) {
-            throw new PjException(PjError.of(Messages.get("native.startFailed", commands.stream()
-                    .map(c -> c.executable().getFileName().toString()).toList(), e.getMessage()), e));
+            throw startFailed(commands, e);
         }
         Runnable stop = () -> processes.forEach(NativeRunner::destroyTree);
         if (output != null) {
@@ -340,15 +328,7 @@ public final class NativeRunner {
         List<ProcessBuilder> builders = new ArrayList<>(commands.size());
         for (int i = 0; i < commands.size(); i++) {
             Command command = commands.get(i);
-            List<String> line = new ArrayList<>(command.args().size() + 4);
-            if (!Host.windows()) {
-                line.addAll(List.of("/bin/sh", "-c", "trap '' INT QUIT; exec \"$0\" \"$@\""));
-            }
-            line.add(command.executable().toString());
-            line.addAll(command.args());
-            var builder = new ProcessBuilder(line).directory(session.currentDirectory().toFile());
-            builder.environment().clear();
-            builder.environment().putAll(session.environmentSnapshot());
+            var builder = newBuilder(Host.windows() ? command : shielded(command), session);
             if (i == 0) {
                 builder.redirectInput(ProcessBuilder.Redirect.from(NULL_DEVICE));
             }
@@ -367,9 +347,41 @@ public final class NativeRunner {
         try {
             return ProcessBuilder.startPipeline(builders);
         } catch (IOException e) {
-            throw new PjException(PjError.of(Messages.get("native.startFailed", commands.stream()
-                    .map(c -> c.executable().getFileName().toString()).toList(), e.getMessage()), e));
+            throw startFailed(commands, e);
         }
+    }
+
+    /**
+     * The one place where a child process is set up: the command line, the directory of the session and its
+     * environment. <b>A child process never inherits the environment of PowerJ</b>: the builder starts from the
+     * environment of the JVM, which is cleared and replaced by the snapshot of the session. The redirections differ
+     * from one way of starting to another, on purpose, and stay where they are.
+     */
+    private static ProcessBuilder newBuilder(Command command, Session session) {
+        List<String> line = new ArrayList<>(command.args().size() + 1);
+        line.add(command.executable().toString());
+        line.addAll(command.args());
+        var builder = new ProcessBuilder(line).directory(session.currentDirectory().toFile());
+        builder.environment().clear();
+        builder.environment().putAll(session.environmentSnapshot());
+        return builder;
+    }
+
+    /**
+     * The command run by {@code sh}, which ignores {@code SIGINT} and {@code SIGQUIT} and replaces itself with the program
+     * ({@code exec}): the command line of a background process on Unix.
+     */
+    private static Command shielded(Command command) {
+        List<String> args = new ArrayList<>(command.args().size() + 4);
+        args.addAll(List.of("-c", "trap '' INT QUIT; exec \"$0\" \"$@\"", command.executable().toString()));
+        args.addAll(command.args());
+        return new Command(Path.of("/bin/sh"), args, command.errorsToOutput());
+    }
+
+    /** The error of a group of processes that could not be started: the names of the programs, then the cause. */
+    private static PjException startFailed(List<Command> commands, IOException e) {
+        return new PjException(PjError.of(Messages.get("native.startFailed", commands.stream()
+                .map(c -> c.executable().getFileName().toString()).toList(), e.getMessage()), e));
     }
 
     /** Writes the objects received to the process's stdin, in their displayed form (FR-37). */
