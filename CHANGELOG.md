@@ -550,6 +550,17 @@ structures, functions) can be built on it. The work is organised in phases (revi
 - No visible change. The same table of factors (`b` 1 … `tb` 1099511627776, any case, `pb` and `kib` refused) is checked in
   `powerj-text` (`SizeUnitsTest`), in `core` (`UnitsTest`) and in `fx` (`FilterParserTest`).
 
+### Changed (one guarded text for regular expressions, [#111](https://github.com/yp44/powerj/issues/111))
+- **`io.powerj.text.GuardedText` is the one `CharSequence` that lets a regular expression be stopped.** The matcher reads its input
+  through `charAt`; the text asks a guard (`LongPredicate`, given the number of reads so far) whether to go on, and throws
+  `GuardedText.Stopped` when it says no. `cmdlets.InterruptibleText` (the interrupt flag, looked at every 1,024 reads) and
+  `fx.model.RegexFilter.Budgeted` (a budget of reads) were two copies of it; they are now `GuardedText.interruptible(text)` and
+  `GuardedText.withBudget(text, steps)`, and a third-party cmdlet that runs a user's regular expression can use the same two.
+- `Stopped` is a `CancellationException` without a stack trace. `grep` and `range` still end with a cancellation on Ctrl+C (the
+  tests pass unchanged); the filter `/regex/` of the grid still gives up on a cell that spends its budget and tells the status bar.
+- No visible change. The same pattern, `(.*a){30}`, is stopped by the interrupt flag and by the budget in `powerj-text`
+  (`GuardedTextTest`), and still stops `grep` and `range` (`CtrlCStopsRegexTest`, formerly `InterruptibleTextTest`).
+
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
   whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes

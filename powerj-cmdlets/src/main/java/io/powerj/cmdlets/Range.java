@@ -10,6 +10,7 @@ import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
 import io.powerj.api.ScriptBlock;
 import io.powerj.api.UsageException;
+import io.powerj.text.GuardedText;
 
 /**
  * {@code range}: the objects between two bounds (specification FR-68). A bound is a position (from 1) without
@@ -156,7 +157,7 @@ public final class Range implements Cmdlet<Range.Params, Object, Object> {
         return switch (bound) {
             case Position(long n) -> Attempt.succeeded(index == n);
             case Match(ScriptBlock property, Pattern regex) -> property.tryInvoke(input).map(value ->
-                    value != null && regex.matcher(new InterruptibleText(String.valueOf(value))).find());
+                    value != null && regex.matcher(GuardedText.interruptible(String.valueOf(value))).find());
             case Condition(ScriptBlock block) -> block.tryTest(input);
         };
     }
