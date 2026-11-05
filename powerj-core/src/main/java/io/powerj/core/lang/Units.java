@@ -8,13 +8,15 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import io.powerj.text.SizeUnits;
+
 /**
  * Unit literals (specification FR-19): sizes {@code 512b 2kb 500mb 1gb 1tb} (multiples of 1024,
  * {@code Long} value in bytes) and durations {@code 250ms 30s 5m 2h 7d} ({@link Duration}).
  */
 public final class Units {
 
-    private static final Pattern LITERAL = Pattern.compile("(\\d+(?:\\.\\d+)?)(b|kb|mb|gb|tb|ms|s|m|h|d)",
+    private static final Pattern LITERAL = Pattern.compile("(\\d+(?:\\.\\d+)?)(" + SizeUnits.PATTERN + "|ms|s|m|h|d)",
             Pattern.CASE_INSENSITIVE);
 
     private Units() {
@@ -28,12 +30,10 @@ public final class Units {
         }
         var number = new BigDecimal(m.group(1));
         String unit = m.group(2).toLowerCase(Locale.ROOT);
+        if (SizeUnits.isUnit(unit)) {
+            return Optional.of(bytes(number, unit));
+        }
         return Optional.of(switch (unit) {
-            case "b" -> bytes(number, 0);
-            case "kb" -> bytes(number, 1);
-            case "mb" -> bytes(number, 2);
-            case "gb" -> bytes(number, 3);
-            case "tb" -> bytes(number, 4);
             case "ms" -> Duration.ofNanos(nanos(number, 1_000_000L));
             case "s" -> Duration.ofNanos(nanos(number, 1_000_000_000L));
             case "m" -> Duration.ofNanos(nanos(number, 60_000_000_000L));
@@ -43,9 +43,8 @@ public final class Units {
         });
     }
 
-    private static Long bytes(BigDecimal number, int power) {
-        return number.multiply(BigDecimal.valueOf(1024).pow(power)).setScale(0, RoundingMode.HALF_UP)
-                .longValueExact();
+    private static Long bytes(BigDecimal number, String unit) {
+        return SizeUnits.bytes(number, unit).setScale(0, RoundingMode.HALF_UP).longValueExact();
     }
 
     private static long nanos(BigDecimal number, long factor) {

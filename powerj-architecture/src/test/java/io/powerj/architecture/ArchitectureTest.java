@@ -112,14 +112,15 @@ class ArchitectureTest {
     // --- Target architecture: violations frozen (finding in brackets) ---
 
     /**
-     * [C-05] {@code lang} is the language: it needs nothing of the rest of the product, only the JDK and the
-     * localization of the API ({@code io.powerj.api.Language}, for its error messages) (review §5.1).
+     * [C-05] {@code lang} is the language: it needs nothing of the rest of the engine, only the JDK, the localization of
+     * the API ({@code io.powerj.api.Language}, for its error messages) and {@code powerj-text}, a leaf that depends on
+     * the API and the JDK only, for what the units of a size are worth (review §5.1, #110).
      */
     @Test
-    void langDependsOnlyOnTheJdkAndTheApi() {
+    void langDependsOnlyOnTheJdkTheApiAndText() {
         check(classes().that().resideInAPackage("io.powerj.core.lang..")
                 .should().onlyDependOnClassesThat().resideInAnyPackage("io.powerj.core.lang..", "io.powerj.api..",
-                        "java..", "javax.."));
+                        "io.powerj.text..", "java..", "javax.."));
     }
 
     /**
