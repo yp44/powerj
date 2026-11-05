@@ -561,6 +561,20 @@ structures, functions) can be built on it. The work is organised in phases (revi
 - No visible change. The same pattern, `(.*a){30}`, is stopped by the interrupt flag and by the budget in `powerj-text`
   (`GuardedTextTest`), and still stops `grep` and `range` (`CtrlCStopsRegexTest`, formerly `InterruptibleTextTest`).
 
+### Changed (one test context and one driver for the tests of the cmdlets, [#98](https://github.com/yp44/powerj/issues/98))
+- **New module `powerj-testing`, for tests only.** `io.powerj.testing.TestContext` is the in-memory `CmdletContext` (emitted objects,
+  errors, environment, current directory, state, input, perf reports, compilation), and `CmdletDriver.run(cmdlet, params, context,
+  inputs…)` calls `begin`, `process` for each object and `end`, then closes the state, as the shell does: it sends no more objects once
+  the cmdlet has stopped its input (`TestContext.objectsSent` says how many were sent). It depends on `powerj-api` only, is used with
+  `test` scope, and is neither installed, deployed, shipped in the image nor counted in the coverage (as `powerj-architecture`).
+- **The two copies of `TestContext` (`powerj-cmdlets`, `powerj-fx`) and sixteen local drivers are gone**: `Measure`, `Cancellation`,
+  `PsKill`, `Range`, `FirstLast`, `Grep` (two), `KnownDefects`, `Join`, `Select`, `Sort`, `FileOps`, `Group`, `Cat`, `WhereMapCollect`,
+  `JsonCsvCmdlets` and `GridCmdlet` each wrote the same loop. The grid test only keeps what is its own: a context with input and a
+  `$_.name` read by reflection. The tests are the same (2,565 before, 2,579 after: the 14 of the new module).
+- Left alone, on purpose: `FakeCmdlets` in `powerj-core` (test cmdlets, not a context) and the long duplicated blocks inside
+  `InterpreterCharacterizationTest`, `PerfTest` of the core, `CmdletContextTest` and `PerfModeTest` / `PreviewControlKeysTest` /
+  `PreviewModeTest`: they are not drivers of a cmdlet.
+
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
   whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes

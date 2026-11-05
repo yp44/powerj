@@ -1573,6 +1573,7 @@ powerj/                         (parent POM, packaging pom)
 ├── powerj-shell/               Entry point and composition root, JLine REPL, scripts, profile,
 │                               adapters of completion and highlighting
 ├── powerj-fx/                  Optional module, not in the distribution: JavaFX cmdlets (`grid`, FR-77)
+├── powerj-testing/             Test code shared by the modules (in-memory CmdletContext, driver); never shipped
 ├── powerj-architecture/        Architecture rules (ArchUnit): tests only
 ├── powerj-coverage/            Test coverage of all the modules (JaCoCo report and threshold, NFR-05)
 ├── powerj-dist/                jlink + jpackage → powerj.exe

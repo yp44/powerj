@@ -10,6 +10,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
+import io.powerj.testing.TestContext;
+
 /**
  * Ctrl+C stops a regular expression that backtracks for ever (review C-18), in {@code grep} and {@code range}. The text
  * that does it is {@code io.powerj.text.GuardedText}, tested in {@code powerj-text} (#111).

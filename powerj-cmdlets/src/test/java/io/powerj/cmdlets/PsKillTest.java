@@ -13,6 +13,8 @@ import org.junit.jupiter.api.Test;
 
 import io.powerj.api.Cmdlet;
 import io.powerj.fs.Globs;
+import io.powerj.testing.CmdletDriver;
+import io.powerj.testing.TestContext;
 
 /** The cmdlets {@code ps} and {@code kill} (specification FR-74). */
 class PsKillTest {
@@ -40,12 +42,7 @@ class PsKillTest {
                                                       Object... inputs) {
         context.hasInput = inputs.length > 0;
         try {
-            cmdlet.begin(params, context);
-            for (Object input : inputs) {
-                cmdlet.process(params, input, context);
-            }
-            cmdlet.end(params, context);
-            context.closeStates();
+            CmdletDriver.run(cmdlet, params, context, inputs);
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {

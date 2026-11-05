@@ -14,6 +14,8 @@ import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 
 import io.powerj.api.ScriptBlock;
+import io.powerj.testing.CmdletDriver;
+import io.powerj.testing.TestContext;
 
 class SortTest {
 
@@ -51,13 +53,7 @@ class SortTest {
 
     private List<Object> sort(Sort.Params params, Object... inputs) throws Exception {
         var sort = new Sort();
-        sort.begin(params, context);
-        for (Object input : inputs) {
-            sort.process(params, input, context);
-        }
-        sort.end(params, context);
-        context.closeStates();
-        return context.emitted;
+        return CmdletDriver.run(sort, params, context, inputs);
     }
 
     private static Sort.Params params(boolean desc, boolean ignoreCase, Object... keys) {

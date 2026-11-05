@@ -14,6 +14,8 @@ import org.junit.jupiter.api.Test;
 
 import io.powerj.api.Collected;
 import io.powerj.api.ScriptBlock;
+import io.powerj.testing.CmdletDriver;
+import io.powerj.testing.TestContext;
 
 /** {@code where}, {@code map} and {@code collect} driven directly (specification FR-36 to FR-36d). */
 class WhereMapCollectTest {
@@ -46,13 +48,7 @@ class WhereMapCollectTest {
     private List<Object> where(List<Object> condition, Object... inputs) throws Exception {
         var where = new Where();
         var params = new Where.Params(condition);
-        where.begin(params, context);
-        for (Object input : inputs) {
-            where.process(params, input, context);
-        }
-        where.end(params, context);
-        context.closeStates();
-        return context.emitted;
+        return CmdletDriver.run(where, params, context, inputs);
     }
 
     @Test

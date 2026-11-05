@@ -10,6 +10,8 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import io.powerj.api.Cmdlet;
+import io.powerj.testing.CmdletDriver;
+import io.powerj.testing.TestContext;
 
 class FirstLastTest {
 
@@ -21,18 +23,8 @@ class FirstLastTest {
 
     /** Runs the cmdlet as the shell does: no more objects once the input is stopped; returns how many were read. */
     private <P extends Record> int run(Cmdlet<P, Object, Object> cmdlet, P params, Object... inputs) throws Exception {
-        cmdlet.begin(params, context);
-        int read = 0;
-        for (Object input : inputs) {
-            if (context.stopInputCalls > 0) {
-                break;
-            }
-            read++;
-            cmdlet.process(params, input, context);
-        }
-        cmdlet.end(params, context);
-        context.closeStates();
-        return read;
+        CmdletDriver.run(cmdlet, params, context, inputs);
+        return context.objectsSent;
     }
 
     @Test

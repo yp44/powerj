@@ -12,6 +12,8 @@ import org.junit.jupiter.api.Test;
 
 import io.powerj.api.Row;
 import io.powerj.api.ScriptBlock;
+import io.powerj.testing.CmdletDriver;
+import io.powerj.testing.TestContext;
 
 class MeasureTest {
 
@@ -43,12 +45,7 @@ class MeasureTest {
     private Row measure(Object key, Object... inputs) throws Exception {
         var measure = new Measure();
         var params = new Measure.Params(key);
-        measure.begin(params, context);
-        for (Object input : inputs) {
-            measure.process(params, input, context);
-        }
-        measure.end(params, context);
-        context.closeStates();
+        CmdletDriver.run(measure, params, context, inputs);
         assertThat(context.emitted).hasSize(1);
         return context.emitted.getFirst();
     }
@@ -162,15 +159,11 @@ class MeasureTest {
         var count = new Count();
         var params = new Count.Params();
         var counted = new TestContext<Long>(Path.of("."));
-        count.begin(params, counted);
-        count.process(params, "a", counted);
-        count.process(params, null, counted);
-        count.end(params, counted);
+        CmdletDriver.run(count, params, counted, "a", null);
         assertThat(counted.emitted).containsExactly(2L);
 
         var empty = new TestContext<Long>(Path.of("."));
-        count.begin(params, empty);
-        count.end(params, empty);
+        CmdletDriver.run(count, params, empty);
         assertThat(empty.emitted).containsExactly(0L);
     }
 

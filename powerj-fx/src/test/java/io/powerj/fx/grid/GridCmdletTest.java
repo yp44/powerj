@@ -12,12 +12,16 @@ import org.junit.jupiter.api.Test;
 import io.powerj.fx.Threads;
 
 import io.powerj.api.CmdletInfo;
+import io.powerj.api.ScriptBlock;
 import io.powerj.fx.model.ColumnKind;
 import io.powerj.fx.model.ColumnSpec;
 import io.powerj.fx.model.GridRow;
 import io.powerj.fx.model.GridTable;
 import io.powerj.fx.model.LiveTable;
+import io.powerj.fx.model.Reflect;
 import io.powerj.fx.runtime.FxUnavailableException;
+import io.powerj.testing.CmdletDriver;
+import io.powerj.testing.TestContext;
 
 class GridCmdletTest {
 
@@ -59,16 +63,31 @@ class GridCmdletTest {
 
     private static final GridParams NO_OPTIONS = new GridParams(null);
 
-    private static void run(GridCmdlet grid, GridParams params, TestContext<Object> context, Object... inputs)
-            throws Exception {
-        grid.begin(params, context);
-        for (Object input : inputs) {
-            if (context.stopInputCalls > 0) {
-                break; // the runner reads no more once the cmdlet stopped its input
+    /**
+     * A context as the shell gives one to a cmdlet placed after a {@code |}: there is input, and {@code $_.name} is read
+     * by reflection, which is what the shell does for a property.
+     */
+    private static TestContext<Object> piped() {
+        var context = new TestContext<Object>();
+        context.hasInput = true;
+        context.compiler = expression -> {
+            if (!expression.startsWith("$_.")) {
+                throw new IllegalArgumentException(expression);
             }
-            grid.process(params, input, context);
-        }
-        grid.end(params, context);
+            String name = expression.substring(3);
+            return new ScriptBlock() {
+                @Override
+                public Object invoke(Object current) {
+                    return Reflect.read(current, name);
+                }
+
+                @Override
+                public String source() {
+                    return expression;
+                }
+            };
+        };
+        return context;
     }
 
     private static List<Object> names(GridTable table) {
@@ -79,7 +98,7 @@ class GridCmdletTest {
     void theWindowOpensAtTheFirstObjectWhichIsAlreadyInIt() throws Exception {
         RecordingOpener opener = new RecordingOpener();
         GridCmdlet grid = new GridCmdlet(opener);
-        TestContext<Object> context = new TestContext<>();
+        TestContext<Object> context = piped();
         grid.begin(NO_OPTIONS, context);
         assertThat(opener.lives).isEmpty();                       // nothing yet: no object has arrived
         grid.process(NO_OPTIONS, new Person("Ada", 36), context);
@@ -99,13 +118,13 @@ class GridCmdletTest {
     @Test
     void theObjectsAreKeptOnlyWhenTheyWillBeGivenBack() throws Exception {
         RecordingOpener plain = new RecordingOpener();
-        run(new GridCmdlet(plain), NO_OPTIONS, new TestContext<>(), new Person("Ada", 36));
+        CmdletDriver.run(new GridCmdlet(plain), NO_OPTIONS, piped(), new Person("Ada", 36));
         assertThat(plain.show().rows().stream().map(GridRow::source)).containsExactly((Object) null);
 
         // with --pass-thru the source of a row is what OK gives back: PassThru below checks it end to end
         RecordingOpener kept = new RecordingOpener();
         GridCmdlet grid = new GridCmdlet(kept);
-        TestContext<Object> context = new TestContext<>();
+        TestContext<Object> context = piped();
         grid.begin(PASS_THRU, context);
         grid.process(PASS_THRU, new Person("Ada", 36), context);
         GridTable table = new GridTable();
@@ -117,7 +136,7 @@ class GridCmdletTest {
     void theWindowOfACommandThatDidNotFinishIsClosedWithIt() throws Exception {
         RecordingOpener opener = new RecordingOpener();
         GridCmdlet grid = new GridCmdlet(opener);
-        TestContext<Object> context = new TestContext<>();
+        TestContext<Object> context = piped();
         grid.begin(NO_OPTIONS, context);
         grid.process(NO_OPTIONS, new Person("Ada", 36), context);
         assertThat(opener.live().isClosed()).isFalse();
@@ -130,8 +149,8 @@ class GridCmdletTest {
     @Test
     void theWindowOfAFinishedCommandOutlivesIt() throws Exception {
         RecordingOpener opener = new RecordingOpener();
-        TestContext<Object> context = new TestContext<>();
-        run(new GridCmdlet(opener), NO_OPTIONS, context, new Person("Ada", 36));
+        TestContext<Object> context = piped();
+        CmdletDriver.run(new GridCmdlet(opener), NO_OPTIONS, context, new Person("Ada", 36));
 
         context.closeStates(); // what the shell does when the command is over
 
@@ -140,7 +159,7 @@ class GridCmdletTest {
 
     @Test
     void aCommandThatNeverOpenedAWindowHasNothingToClose() throws Exception {
-        TestContext<Object> context = new TestContext<>();
+        TestContext<Object> context = piped();
         new GridCmdlet(new RecordingOpener()).begin(NO_OPTIONS, context);
 
         context.closeStates();
@@ -148,14 +167,14 @@ class GridCmdletTest {
 
     @Test
     void processNeedsBegin() {
-        assertThatThrownBy(() -> new GridCmdlet(new RecordingOpener()).process(NO_OPTIONS, "x", new TestContext<>()))
+        assertThatThrownBy(() -> new GridCmdlet(new RecordingOpener()).process(NO_OPTIONS, "x", piped()))
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("begin was not called");
     }
 
     @Test
     void objectsOfSeveralTypesShareTheTable() throws Exception {
         RecordingOpener opener = new RecordingOpener();
-        run(new GridCmdlet(opener), NO_OPTIONS, new TestContext<>(), new Person("Ada", 36), "text", Map.of("k", 1));
+        CmdletDriver.run(new GridCmdlet(opener), NO_OPTIONS, piped(), new Person("Ada", 36), "text", Map.of("k", 1));
         GridTable table = opener.show();
         assertThat(table.columns().stream().map(ColumnSpec::name)).containsExactly("name", "age", "value", "k");
         assertThat(table.total()).isEqualTo(3);
@@ -164,7 +183,7 @@ class GridCmdletTest {
     @Test
     void emptyInputOpensTheWindowAtTheEnd() throws Exception {
         RecordingOpener opener = new RecordingOpener();
-        run(new GridCmdlet(opener), NO_OPTIONS, new TestContext<>());
+        CmdletDriver.run(new GridCmdlet(opener), NO_OPTIONS, piped());
         assertThat(opener.lives).hasSize(1);
         assertThat(opener.live().state()).isEqualTo(LiveTable.State.COMPLETE);
         assertThat(opener.show().total()).isZero();
@@ -172,8 +191,8 @@ class GridCmdletTest {
 
     @Test
     void emitsNothing() throws Exception {
-        TestContext<Object> context = new TestContext<>();
-        run(new GridCmdlet(new RecordingOpener()), NO_OPTIONS, context, new Person("Ada", 36));
+        TestContext<Object> context = piped();
+        CmdletDriver.run(new GridCmdlet(new RecordingOpener()), NO_OPTIONS, context, new Person("Ada", 36));
         assertThat(context.emitted).isEmpty();
         assertThat(context.errors).isEmpty();
         assertThat(context.stopInputCalls).isZero();
@@ -184,8 +203,8 @@ class GridCmdletTest {
     @Test
     void readingStopsAtTheLimitAndTheTableIsTruncated() throws Exception {
         RecordingOpener opener = new RecordingOpener();
-        TestContext<Object> context = new TestContext<>();
-        run(new GridCmdlet(opener), new GridParams(3), context, "a", "b", "c", "d", "e", "f");
+        TestContext<Object> context = piped();
+        CmdletDriver.run(new GridCmdlet(opener), new GridParams(3), context, "a", "b", "c", "d", "e", "f");
         assertThat(opener.show().total()).isEqualTo(3);
         assertThat(context.stopInputCalls).isEqualTo(1);
         assertThat(opener.live().state()).isEqualTo(LiveTable.State.TRUNCATED);
@@ -194,8 +213,8 @@ class GridCmdletTest {
     @Test
     void exactlyTheLimitIsNotTruncated() throws Exception {
         RecordingOpener opener = new RecordingOpener();
-        TestContext<Object> context = new TestContext<>();
-        run(new GridCmdlet(opener), new GridParams(3), context, "a", "b", "c");
+        TestContext<Object> context = piped();
+        CmdletDriver.run(new GridCmdlet(opener), new GridParams(3), context, "a", "b", "c");
         assertThat(opener.show().total()).isEqualTo(3);
         assertThat(context.stopInputCalls).isZero();
         assertThat(opener.live().state()).isEqualTo(LiveTable.State.COMPLETE);
@@ -211,7 +230,7 @@ class GridCmdletTest {
     @Test
     void aLimitBelowOneIsRefused() {
         for (int bad : new int[] {0, -5}) {
-            assertThatThrownBy(() -> new GridCmdlet(new RecordingOpener()).begin(new GridParams(bad), new TestContext<>()))
+            assertThatThrownBy(() -> new GridCmdlet(new RecordingOpener()).begin(new GridParams(bad), piped()))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessage("--max-rows must be at least 1: " + bad);
         }
@@ -220,7 +239,7 @@ class GridCmdletTest {
     @Test
     void aProcessAfterTheStopIsIgnored() throws Exception {
         RecordingOpener opener = new RecordingOpener();
-        TestContext<Object> context = new TestContext<>();
+        TestContext<Object> context = piped();
         GridCmdlet grid = new GridCmdlet(opener);
         GridParams params = new GridParams(1);
         grid.begin(params, context);
@@ -237,7 +256,7 @@ class GridCmdletTest {
     @Test
     void whenTheWindowIsClosedTheCmdletStopsReading() throws Exception {
         RecordingOpener opener = new RecordingOpener();
-        TestContext<Object> context = new TestContext<>();
+        TestContext<Object> context = piped();
         GridCmdlet grid = new GridCmdlet(opener);
         grid.begin(NO_OPTIONS, context);
         grid.process(NO_OPTIONS, "a", context);
@@ -254,7 +273,7 @@ class GridCmdletTest {
     void aCancelledPipelineLeavesTheWindowInterrupted() throws Exception {
         RecordingOpener opener = new RecordingOpener();
         GridCmdlet grid = new GridCmdlet(opener);
-        TestContext<Object> context = new TestContext<>();
+        TestContext<Object> context = piped();
         Thread stage = Thread.ofVirtual().start(() -> {
             try {
                 grid.begin(NO_OPTIONS, context);
@@ -274,11 +293,11 @@ class GridCmdletTest {
         WindowOpener failing = (options, live) -> {
             throw new FxUnavailableException("no display", new RuntimeException("x"));
         };
-        assertThatThrownBy(() -> run(new GridCmdlet(failing), NO_OPTIONS, new TestContext<>(), "a"))
+        assertThatThrownBy(() -> CmdletDriver.run(new GridCmdlet(failing), NO_OPTIONS, piped(), "a"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("no display")
                 .hasCauseInstanceOf(FxUnavailableException.class);
-        assertThatThrownBy(() -> run(new GridCmdlet(failing), NO_OPTIONS, new TestContext<>()))
+        assertThatThrownBy(() -> CmdletDriver.run(new GridCmdlet(failing), NO_OPTIONS, piped()))
                 .isInstanceOf(IllegalArgumentException.class); // an empty input opens it at the end
     }
 
@@ -295,11 +314,11 @@ class GridCmdletTest {
     void rawShowsTheRealValuesWithoutUnits() throws Exception {
         RecordingOpener opener = new RecordingOpener();
         GridParams raw = new GridParams(null, null, null, false, false, false, true);
-        run(new GridCmdlet(opener), raw, new TestContext<>(), new Process("a", 14_520),
+        CmdletDriver.run(new GridCmdlet(opener), raw, piped(), new Process("a", 14_520),
                 java.time.Duration.ofMillis(1310));
         GridTable table = opener.show();
         assertThat(table.columns()).extracting(ColumnSpec::kind).contains(ColumnKind.NUMBER).doesNotContain(ColumnKind.SIZE);
-        run(new GridCmdlet(opener), NO_OPTIONS, new TestContext<>(), new Process("a", 14_520));
+        CmdletDriver.run(new GridCmdlet(opener), NO_OPTIONS, piped(), new Process("a", 14_520));
         assertThat(opener.lives.get(1)).isNotNull();
         GridTable plain = new GridTable();
         opener.lives.get(1).drain(plain, Integer.MAX_VALUE);
@@ -309,18 +328,18 @@ class GridCmdletTest {
     @Test
     void theWindowHasATitleOfItsOwnOrTheDefaultOne() throws Exception {
         RecordingOpener opener = new RecordingOpener();
-        run(new GridCmdlet(opener), params("Files", null, false), new TestContext<>(), "a");
-        run(new GridCmdlet(opener), params(null, null, false), new TestContext<>(), "a");
-        run(new GridCmdlet(opener), params("  ", null, false), new TestContext<>(), "a");
+        CmdletDriver.run(new GridCmdlet(opener), params("Files", null, false), piped(), "a");
+        CmdletDriver.run(new GridCmdlet(opener), params(null, null, false), piped(), "a");
+        CmdletDriver.run(new GridCmdlet(opener), params("  ", null, false), piped(), "a");
         assertThat(opener.titles).containsExactly("Files", "PowerJ grid", "PowerJ grid");
     }
 
     @Test
     void theColumnsAskedForAreGivenToTheWindow() throws Exception {
         RecordingOpener opener = new RecordingOpener();
-        run(new GridCmdlet(opener), params(null, "age, name", false), new TestContext<>(), new Person("Ada", 36));
+        CmdletDriver.run(new GridCmdlet(opener), params(null, "age, name", false), piped(), new Person("Ada", 36));
         assertThat(opener.optionsSeen.getFirst().columns().names()).containsExactly("age", "name");
-        run(new GridCmdlet(opener), NO_OPTIONS, new TestContext<>(), new Person("Ada", 36));
+        CmdletDriver.run(new GridCmdlet(opener), NO_OPTIONS, piped(), new Person("Ada", 36));
         assertThat(opener.optionsSeen.get(1).columns().isAll()).isTrue();
     }
 
@@ -328,23 +347,23 @@ class GridCmdletTest {
     void aListWithoutColumnNameIsRefused() {
         for (String bad : new String[] {"", " ", ",", " , ,"}) {
             assertThatThrownBy(() -> new GridCmdlet(new RecordingOpener()).begin(params(null, bad, false),
-                    new TestContext<>())).isInstanceOf(IllegalArgumentException.class)
+                    piped())).isInstanceOf(IllegalArgumentException.class)
                     .hasMessage("--columns needs at least one column name: " + bad);
         }
     }
 
     @Test
     void aColumnAskedForThatNeverArrivedIsReportedAtTheEnd() throws Exception {
-        TestContext<Object> context = new TestContext<>();
-        run(new GridCmdlet(new RecordingOpener()), params(null, "name,Nothing,AGE,other", false), context,
+        TestContext<Object> context = piped();
+        CmdletDriver.run(new GridCmdlet(new RecordingOpener()), params(null, "name,Nothing,AGE,other", false), context,
                 new Person("Ada", 36));
         assertThat(context.errors).containsExactly("no such column: Nothing, other");
     }
 
     @Test
     void aColumnThatArrivesLaterIsNotReported() throws Exception {
-        TestContext<Object> context = new TestContext<>();
-        run(new GridCmdlet(new RecordingOpener()), params(null, "name,extra", false), context, new Person("Ada", 36),
+        TestContext<Object> context = piped();
+        CmdletDriver.run(new GridCmdlet(new RecordingOpener()), params(null, "name,extra", false), context, new Person("Ada", 36),
                 Map.of("extra", 1));
         assertThat(context.errors).isEmpty();
     }
@@ -352,11 +371,11 @@ class GridCmdletTest {
     @Test
     void theWindowSettingsAreInTheConfigurationFolder() throws Exception {
         RecordingOpener opener = new RecordingOpener();
-        TestContext<Object> context = new TestContext<>();
+        TestContext<Object> context = piped();
         context.configDirectory = java.nio.file.Path.of("home");
-        run(new GridCmdlet(opener), NO_OPTIONS, context, "a");
+        CmdletDriver.run(new GridCmdlet(opener), NO_OPTIONS, context, "a");
         assertThat(opener.optionsSeen.getFirst().settings()).isEqualTo(java.nio.file.Path.of("home", "fx-grid.properties"));
-        run(new GridCmdlet(opener), NO_OPTIONS, new TestContext<>(), "a");
+        CmdletDriver.run(new GridCmdlet(opener), NO_OPTIONS, piped(), "a");
         assertThat(opener.optionsSeen.get(1).settings()).isNull();
     }
 
@@ -364,11 +383,11 @@ class GridCmdletTest {
     void waitBlocksUntilTheWindowIsClosed() throws Exception {
         RecordingOpener opener = new RecordingOpener();
         GridCmdlet grid = new GridCmdlet(opener);
-        TestContext<Object> context = new TestContext<>();
+        TestContext<Object> context = piped();
         var done = new java.util.concurrent.CompletableFuture<Void>();
         Thread stage = Thread.ofVirtual().start(() -> {
             try {
-                run(grid, params(null, null, true), context, "a", "b");
+                CmdletDriver.run(grid, params(null, null, true), context, "a", "b");
                 done.complete(null);
             } catch (Exception e) {
                 done.completeExceptionally(e);
@@ -385,7 +404,7 @@ class GridCmdletTest {
     @Test
     void withoutWaitThePromptIsGivenBackAtOnce() throws Exception {
         RecordingOpener opener = new RecordingOpener();
-        run(new GridCmdlet(opener), params(null, null, false), new TestContext<>(), "a");
+        CmdletDriver.run(new GridCmdlet(opener), params(null, null, false), piped(), "a");
         assertThat(opener.live().isClosed()).isFalse();
     }
 
@@ -395,7 +414,7 @@ class GridCmdletTest {
         var failure = new java.util.concurrent.atomic.AtomicReference<Throwable>();
         Thread stage = new Thread(() -> {
             try {
-                run(new GridCmdlet(opener), params(null, null, true), new TestContext<>(), "a");
+                CmdletDriver.run(new GridCmdlet(opener), params(null, null, true), piped(), "a");
             } catch (Exception e) {
                 failure.set(e);
             }
@@ -415,14 +434,14 @@ class GridCmdletTest {
     /** Runs {@code grid --pass-thru} on a thread; the test plays the user with the {@link LiveTable} of the window. */
     private static final class PassThru {
         final RecordingOpener opener = new RecordingOpener();
-        final TestContext<Object> context = new TestContext<>();
+        final TestContext<Object> context = piped();
         final java.util.concurrent.CompletableFuture<Void> done = new java.util.concurrent.CompletableFuture<>();
         Thread stage;
 
         PassThru(GridParams params, Object... inputs) {
             stage = Thread.ofVirtual().start(() -> {
                 try {
-                    run(new GridCmdlet(opener), params, context, inputs);
+                    CmdletDriver.run(new GridCmdlet(opener), params, context, inputs);
                     done.complete(null);
                 } catch (Exception e) {
                     done.completeExceptionally(e);
@@ -510,14 +529,14 @@ class GridCmdletTest {
         single.ok();
         assertThat(single.opener.optionsSeen.getFirst().single()).isTrue();
         RecordingOpener without = new RecordingOpener();
-        run(new GridCmdlet(without), NO_OPTIONS, new TestContext<>(), "a");
+        CmdletDriver.run(new GridCmdlet(without), NO_OPTIONS, piped(), "a");
         assertThat(without.optionsSeen.getFirst().passThru()).isFalse();
     }
 
     @Test
     void singleNeedsPassThru() {
         assertThatThrownBy(() -> new GridCmdlet(new RecordingOpener()).begin(
-                new GridParams(null, null, null, false, false, true, false), new TestContext<>()))
+                new GridParams(null, null, null, false, false, true, false), piped()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("--single only goes with --pass-thru");
     }
@@ -525,8 +544,8 @@ class GridCmdletTest {
     @Test
     void withoutPassThruNothingIsEmittedWhateverIsDone() throws Exception {
         RecordingOpener opener = new RecordingOpener();
-        TestContext<Object> context = new TestContext<>();
-        run(new GridCmdlet(opener), NO_OPTIONS, context, "a", "b");
+        TestContext<Object> context = piped();
+        CmdletDriver.run(new GridCmdlet(opener), NO_OPTIONS, context, "a", "b");
         opener.live().accept(List.of(opener.show().rows().get(0)));
         assertThat(context.emitted).isEmpty();
     }
@@ -548,9 +567,9 @@ class GridCmdletTest {
 
     @Test
     void aPropertyThatCannotBeReadIsReportedOncePerColumn() throws Exception {
-        TestContext<Object> context = new TestContext<>();
+        TestContext<Object> context = piped();
         RecordingOpener opener = new RecordingOpener();
-        run(new GridCmdlet(opener), NO_OPTIONS, context, new Fragile("a", 1), new Fragile("b", 2), new Fragile("c", 3));
+        CmdletDriver.run(new GridCmdlet(opener), NO_OPTIONS, context, new Fragile("a", 1), new Fragile("b", 2), new Fragile("c", 3));
         assertThat(context.errors).containsExactly("cannot read the property broken: cannot read broken");
         GridTable table = opener.show();
         assertThat(table.total()).isEqualTo(3);
@@ -560,18 +579,18 @@ class GridCmdletTest {
 
     @Test
     void theErrorOfAnExecutionIsReportedAgainInTheNext() throws Exception {
-        TestContext<Object> first = new TestContext<>();
-        TestContext<Object> second = new TestContext<>();
+        TestContext<Object> first = piped();
+        TestContext<Object> second = piped();
         GridCmdlet grid = new GridCmdlet(new RecordingOpener());
-        run(grid, NO_OPTIONS, first, new Fragile("a", 1));
-        run(grid, NO_OPTIONS, second, new Fragile("a", 1));
+        CmdletDriver.run(grid, NO_OPTIONS, first, new Fragile("a", 1));
+        CmdletDriver.run(grid, NO_OPTIONS, second, new Fragile("a", 1));
         assertThat(first.errors).hasSize(1);
         assertThat(second.errors).hasSize(1);
     }
 
     @Test
     void refusesToRunAtTheHeadOfAPipeline() {
-        TestContext<Object> context = new TestContext<>();
+        TestContext<Object> context = piped();
         context.hasInput = false;
         assertThatThrownBy(() -> new GridCmdlet(new RecordingOpener()).begin(NO_OPTIONS, context))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -582,8 +601,8 @@ class GridCmdletTest {
     void executionsDoNotShareTheirRows() throws Exception {
         RecordingOpener opener = new RecordingOpener();
         GridCmdlet grid = new GridCmdlet(opener);
-        TestContext<Object> first = new TestContext<>();
-        TestContext<Object> second = new TestContext<>();
+        TestContext<Object> first = piped();
+        TestContext<Object> second = piped();
         grid.begin(NO_OPTIONS, first);
         grid.begin(NO_OPTIONS, second);
         grid.process(NO_OPTIONS, "a", first);

@@ -281,11 +281,12 @@ All modules are JPMS modules (`module-info.java`); the only runtime dependency i
 |---|---|
 | `powerj-api` | Public API for writing cmdlets (`Cmdlet`, `@CmdletInfo`, `@Option`, `CmdletProvider`); no dependencies |
 | `powerj-fs` | File tree walk, sequential or parallel in virtual threads (`FileWalker`), reusable by any cmdlet; the operating system and its rules about file names (`Host`) |
-| `powerj-text` | What `core`, `cmdlets` and `fx` share about the output contract: how a value is read, shown and parsed ([ADR 0010](docs/adr/0010-shared-output-helpers-live-in-powerj-text.md)). Not API; the helpers move in one by one |
+| `powerj-text` | What `core`, `cmdlets` and `fx` share about the output contract: how a value is read, shown and parsed ([ADR 0010](docs/adr/0010-shared-output-helpers-live-in-powerj-text.md)). Not API |
 | `powerj-core` | Lexer, parser, interpreter, pipeline, option binding, Java interoperability, completion engine, output formatting, native execution |
 | `powerj-cmdlets` | Built-in cmdlets (`ls`, `grep`, `cat`, `where`, `map`, `sort`, `first`, `last`, `range`, `select`, `count`, `measure`, `group`, `join`, `mkdir`, `touch`, `cp`, `mv`, `rm`, `collect`, `env`) |
 | `powerj-shell` | Entry point (`Main`), JLine REPL, profile, script mode, history expansion |
 | `powerj-fx` | Optional module, not in the distribution: the JavaFX cmdlets (`grid`); a template for a real third-party module (dependencies, messages, settings) |
+| `powerj-testing` | Test code that the modules share: the in-memory `CmdletContext` (`TestContext`) and the driver that runs a cmdlet as the shell does (`CmdletDriver`). Test scope only, never shipped |
 | `powerj-coverage` | Test coverage of all the modules: JaCoCo report and 80% threshold |
 | `powerj-bench` | JMH benchmarks, outside the default build (`-Pbench`, [numbers](docs/quality/performance.md)) |
 | `powerj-dist` | Distribution: jlink runtime + jpackage launcher / installer |

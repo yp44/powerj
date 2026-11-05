@@ -9,6 +9,8 @@ import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 
 import io.powerj.api.ScriptBlock;
+import io.powerj.testing.CmdletDriver;
+import io.powerj.testing.TestContext;
 
 class RangeTest {
 
@@ -52,18 +54,8 @@ class RangeTest {
     /** Runs as the shell does (no more objects after stopInput); returns the number of objects read. */
     private int run(Range.Params params, Object... inputs) throws Exception {
         var range = new Range();
-        range.begin(params, context);
-        int read = 0;
-        for (Object input : inputs) {
-            if (context.stopInputCalls > 0) {
-                break;
-            }
-            read++;
-            range.process(params, input, context);
-        }
-        range.end(params, context);
-        context.closeStates();
-        return read;
+        CmdletDriver.run(range, params, context, inputs);
+        return context.objectsSent;
     }
 
     private static Object[] letters() {

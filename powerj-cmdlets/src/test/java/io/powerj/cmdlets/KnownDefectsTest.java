@@ -12,6 +12,8 @@ import java.util.concurrent.CancellationException;
 import org.junit.jupiter.api.Test;
 
 import io.powerj.api.ScriptBlock;
+import io.powerj.testing.CmdletDriver;
+import io.powerj.testing.TestContext;
 
 /**
  * Defects of the architecture review that a test demonstrates (docs/REVUE-ARCHITECTURE.md, §4). A test marked
@@ -60,12 +62,7 @@ class KnownDefectsTest {
             inputs.add(random.nextBoolean() ? (Object) n : String.valueOf(n));
         }
 
-        sort.begin(params, context);
-        for (Object input : inputs) {
-            sort.process(params, input, context);
-        }
-        sort.end(params, context);
-        context.closeStates();
+        CmdletDriver.run(sort, params, context, inputs.toArray());
 
         assertThat(context.emitted).hasSize(400);
     }

@@ -17,6 +17,8 @@ import org.junit.jupiter.api.Test;
 
 import io.powerj.api.Row;
 import io.powerj.api.ScriptBlock;
+import io.powerj.testing.CmdletDriver;
+import io.powerj.testing.TestContext;
 
 class SelectTest {
 
@@ -63,13 +65,7 @@ class SelectTest {
     private List<Row> select(List<Object> columns, Object... inputs) throws Exception {
         var select = new Select();
         var params = new Select.Params(columns);
-        select.begin(params, context);
-        for (Object input : inputs) {
-            select.process(params, input, context);
-        }
-        select.end(params, context);
-        context.closeStates();
-        return context.emitted;
+        return CmdletDriver.run(select, params, context, inputs);
     }
 
     private static List<Object> columns(Object... columns) {
