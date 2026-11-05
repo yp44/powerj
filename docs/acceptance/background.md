@@ -48,10 +48,10 @@ process and `tpgid` the foreground group of the terminal.
 | E1 | `sleep 300 &` then `^ps -o pid,pgid,tpgid,stat,args -C sleep` | **Before** (variable not set): `pgid` equals `tpgid`, the shell's own group. |
 | E2 | `env --set POWERJ_BACKGROUND=group`, then `sleep 301 &` and the same `^ps` | **After**: for `sleep 301`, `pgid` equals its `pid` and differs from `tpgid`. |
 | E3 | `sleep 100`, then Ctrl+C | Only this `sleep` stops. `jobs` shows both background `sleep` running (in both modes). |
-| E4 | `jobs \| kill`, then Enter | `[n] done sleep 30x (exit 143)` for each job, in both modes. |
-| E5 | `sleep 302 \| sleep 303 &` (group mode) | One job; both processes have the same `pgid`, the pid of the first. |
-| E6 | `printf "b\na\n" \| sort > tri.txt &`, `cat tri.txt` (group mode) | `a`, `b`. |
-| E7 | `stty tostop`, then `sh -c "sleep 1; echo hi" &` and wait (group mode) | The job is **stopped** by `SIGTTOU` (`T` in `ps`) and `hi` is not printed, as in bash. Before, it printed. `stty -tostop` and `kill -f` clean up. |
+| E4 | `jobs`, then `jobs \| kill`, then Enter | `[n] done sleep 30x (exit 143)` for each job, in both modes. Show `jobs` first: in the packaged shell `jobs \| kill` alone currently fails with `kill: not a process: Job[…]` until `jobs` has been displayed once (a defect of `main`, seen with the variable unset; `kill $last.pid` works). |
+| E5 | `sleep 302 \| sleep 303 &` (group mode) | One job; both processes have the same `pgid`, the pid of the first. `kill` stops the last process of the job only, as before: `sleep 302` stays. |
+| E6 | `printf "b\na\n" \| ^sort > tri.txt &`, `cat tri.txt` (group mode) | `a`, `b` (`^sort`: in the real shell `sort` is the cmdlet, which `&` refuses). |
+| E7 | `stty tostop`, then `sh -c "sleep 1; echo hi" &` and wait (group mode) | The job is **stopped** by `SIGTTOU` (`T` in `ps`) and `hi` is not printed, as in bash. Before, it printed. `stty -tostop`, then `kill -f <pid>` clean up. |
 | E8 | `env --unset POWERJ_BACKGROUND`, then `sleep 304 &` and `^ps` | Back to the `sh` path: `pgid` equals `tpgid` again. |
 
 Known differences of the group mode (the same as a shell with job control): a job that reads the terminal (`/dev/tty`) or, with

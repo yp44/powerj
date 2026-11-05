@@ -160,3 +160,34 @@ shipped. The 14 tests pass, the whole `powerj-core` suite passes (940 tests), an
    `docs/quality/lint-baseline.md`.
 5. **Phase 3 gate, Linux side: go.** Checks 1-10 and 12 pass, no lost status, no leak, faster than the `sh` wrapper. The decision
    waits for macOS and Windows.
+
+## Results — in a real PowerJ shell (group mode, Linux)
+
+`POWERJ_BACKGROUND=group` in the session starts a background job through `GroupLauncher` (`NativeRunner.startBackground`); unset, nothing
+changes. Checked on the packaged image (`./mvnw -Pdist -DskipFx -DskipTests package`, 16 s) driven on a pseudo-terminal by a script
+that types the lines of `docs/acceptance/background.md` (E1 to E8) and a real Ctrl+C. `ps -o pid,pgid,tpgid,stat,args`:
+
+| Step | Result |
+|---|---|
+| E1, variable unset: `sleep 300 &` | `pgid 22281 = tpgid 22281`, state `S+`: in the foreground group of the terminal (protected only by `sh`). |
+| E2, `env --set POWERJ_BACKGROUND=group`, `sleep 301 &` | `pid 22333 = pgid 22333`, `tpgid 22281`, state `S`: own group, background. |
+| E5, `sleep 302 \| sleep 303 &` | both processes in `pgid 22340`, the pid of the first stage. |
+| E3, `sleep 100` then Ctrl+C (`\x03`) | `^C`, only this `sleep` stops; `jobs` still lists the three jobs as running. |
+| E6, `printf ... \| ^sort > f &` | `a`, `b` in both modes (the first stage ends at once: see the fix below). |
+| E7, `stty tostop` then `sh -c "sleep 1; echo hi" &` | group mode: job `T` (stopped by `SIGTTOU`), nothing printed. `sh` path: `hi-from-job` printed, job ends with exit 0. |
+| E8, `env --unset POWERJ_BACKGROUND`, `sleep 304 &` | `pgid = tpgid` again. |
+
+Found on the way:
+
+1. **A pipeline whose first stage ends at once failed** (`cannot start [printf, sort]: error=1, Operation not permitted`): the
+   second stage joins the group of the first with `setpgid`, which fails once the first has been reaped and its group is gone.
+   `GroupLauncher` now starts every stage first and only then starts the `waitpid` threads (a zombie keeps its group). Covered by
+   `BackgroundGroupTest.redirectionsAndPipelinesWorkAsWithoutTheExperiment`.
+2. **A defect of `main`, unrelated to the experiment**: in the packaged shell `jobs | kill` fails with `kill: not a process: Job[...]`
+   until `jobs` has been displayed once (with the variable unset too); `kill $last.pid` works. `Kill.pidOf` returns `null` for a `Job`,
+   probably because `io.powerj.core.runtime` is exported to `io.powerj.shell` only and `RecordShape` of the cmdlets module cannot read the
+   record until another path has cached its shape. To file as its own issue.
+3. `kill` on a pipeline job stops its last process only (the pid of the job); the other stages stay. True of the `sh` path too. A job being
+   a process group, the whole job could be stopped (`kill(-pgid)`) in Phase 4.
+4. In the real shell `sort` and `cat` are cmdlets: a pipeline with `&` needs `^sort` (the acceptance row 7 of the existing checklist
+   says `sort`; it only works in the unit test, whose registry is empty).
