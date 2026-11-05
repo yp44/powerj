@@ -25,8 +25,6 @@ public final class GroupLauncher {
     /** The value of {@link #VARIABLE} that selects this launcher. */
     public static final String GROUP = "group";
 
-    private static volatile Boolean available;
-
     private GroupLauncher() {
     }
 
@@ -65,12 +63,15 @@ public final class GroupLauncher {
      * (glibc 2.34 or later). Anywhere else the caller keeps its usual way of starting a background command.
      */
     public static boolean available() {
-        Boolean known = available;
-        if (known == null) {
-            known = probe();
-            available = known;
+        return Probe.AVAILABLE;
+    }
+
+    /** Asked once, the first time it is needed: loading {@link PosixSpawn} binds the functions of the libc. */
+    private static final class Probe {
+        static final boolean AVAILABLE = probe();
+
+        private Probe() {
         }
-        return known;
     }
 
     private static boolean probe() {
