@@ -575,6 +575,17 @@ structures, functions) can be built on it. The work is organised in phases (revi
   `InterpreterCharacterizationTest`, `PerfTest` of the core, `CmdletContextTest` and `PerfModeTest` / `PreviewControlKeysTest` /
   `PreviewModeTest`: they are not drivers of a cmdlet.
 
+### Changed (`NativeRunner` sets a process up in one place, [#87](https://github.com/yp44/powerj/issues/87))
+- **`NativeRunner.newBuilder(Command, Session)` is the one place where a child process gets its command line, the directory of
+  the session and its environment.** `run`, `runGroup` and `startBackground` each wrote the three lines; the rule that must not
+  drift, *a child process never inherits the environment of PowerJ* (`environment().clear()` then the snapshot of the session),
+  is now written once. The background command is the same `Command` run by `sh` (`shielded`), not a longer command line built
+  apart. The error `native.startFailed` of a group is built by one `startFailed(commands, e)` (it was written in `startGroup`
+  and in `startBackground`).
+- No visible change. The redirections stay where they are: they differ on purpose between the three ways to start. A new test
+  of `InterpreterTest` checks the environment rule for a group of natives and for a background command, where only a single
+  command was checked; removing the `clear()` makes it fail.
+
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
   whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes

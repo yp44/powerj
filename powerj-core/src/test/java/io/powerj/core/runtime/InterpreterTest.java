@@ -146,6 +146,31 @@ class InterpreterTest {
         assertThat(run("printenv " + inherited)).isEmpty();
     }
 
+    /** The rule holds on the three ways to start a process: alone, in a group of natives, and in the background (#87). */
+    @Test
+    void everyStageOfAGroupAndEveryBackgroundCommandSeesOnlyTheSessionEnvironment() throws Exception {
+        String inherited = System.getenv().keySet().stream()
+                .filter(name -> name.matches("[A-Z][A-Z_]*") && !name.equals("PATH") && !name.equals("HOME"))
+                .findFirst().orElse(null);
+        assumeTrue(inherited != null, "the JVM has an environment variable to leave out");
+        session.environment().remove(inherited);
+        session.environment().put("POWERJ_PROBE", "from-the-session");
+
+        // A group: the two stages are natives, started together.
+        assertThat(run("printenv POWERJ_PROBE | tr a-z A-Z")).isEqualTo("FROM-THE-SESSION" + System.lineSeparator());
+        assertThat(run("printenv " + inherited + " | tr a-z A-Z")).isEmpty();
+        assertThat(run("printenv HOME | tr a-z A-Z"))
+                .isEqualTo(tmp.resolve("home").toString().toUpperCase() + System.lineSeparator());
+
+        // The background: started apart, by sh on Unix.
+        run("printenv POWERJ_PROBE > probe.txt &");
+        awaitEnd();
+        run("printenv " + inherited + " > inherited.txt &");
+        awaitEnd();
+        assertThat(Files.readString(tmp.resolve("probe.txt"))).isEqualTo("from-the-session\n");
+        assertThat(Files.readString(tmp.resolve("inherited.txt"))).isEmpty();
+    }
+
     @Test
     void redirections() throws Exception {
         run("printf \"a\\n\" > out.txt");
