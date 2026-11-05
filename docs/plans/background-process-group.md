@@ -104,3 +104,59 @@ Commits: one step per commit, each builds and passes the tests; `type(scope): su
 
 - JDK 25 may not be downloadable in the sandbox (network policy): then the Linux prototype also runs in the CI.
 - `waitpid` may race with the JDK's own reaper (check 3): if it does, fall back to polling `ProcessHandle.onExit()` and give up the exit code of Unix jobs (a regression: `[1] done … (exit 0)`), which would push the decision toward (a).
+
+## Results — Linux prototype (Phase 1)
+
+Run on Linux x86_64 (Ubuntu 24.04, glibc 2.39), OpenJDK 25.0.4. Code: `powerj-core/src/test/java/io/powerj/core/nativeexec/prototype/`
+(`PosixSpawn`, `PosixSpawnPrototypeTest`, `PtyProbe`) and `powerj-core/src/test/prototype/pty-check.py`; test code only, nothing
+shipped. The 14 tests pass, the whole `powerj-core` suite passes (940 tests), and the javac warnings stay at 8 (main) and 5 (test).
+**Not run: macOS, glibc older than 2.34, musl, aarch64.**
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Own process group | `pgid(child) == child`, not the JVM's. A `ProcessBuilder` child and the `sh` + `trap` child are both in the JVM's group. |
+| 2 | Survives the foreground group's SIGINT | `kill(-leader, SIGINT)`: leader and member exit 130, the background process (own group) is alive 300 ms later. |
+| 2b | **`kill -INT <pid>` straight to the process** | exit 130: it dies. The `sh` + `trap` child survives it. The existing test `backgroundCommandGivesControlBackAtOnce` must change, as announced. |
+| 3 | Exit code | `exit 7` gives 7, SIGTERM 143, SIGKILL 137 (128 + signal, as `Process`). **1000 runs on 4 threads with 239-268 `ProcessBuilder` runs at the same time and 470 children also followed by `ProcessHandle.onExit()`: 0 wrong code, 0 lost status.** `ProcessHandle` (`isAlive`, `parent`, `children`, `onExit`) works on a `posix_spawn` child. |
+| 4 | Kill | `ProcessHandle.destroy()` gives 143, `destroyForcibly()` 137: `Kill` and `jobs \| kill` need no change. |
+| 5 | Descriptors | With `addclosefrom_np(3)` the child has exactly 0, 1, 2. Without it (control) it inherits every descriptor of the JVM that is not close-on-exec (27 to 44 descriptors, including a pipe of the JVM). |
+| 6 | Redirections | `>` truncates, `2>>` appends, `2>&1` joins, stdin on `/dev/null` ends `cat` at once. |
+| 7 | Pipeline | `printf \| sort > f`: 50 rounds, EOF reaches `sort`, the JVM has the same 3 pipes before and after. |
+| 8 | Directory, environment | `addchdir_np` gives the session directory; `env` prints exactly the variables given, none of the JVM's 175. |
+| 9 | Start errors | `posix_spawn` returns the errno (2 for a missing file, 13 for a file that is not executable or a directory), the same numbers and texts as `ProcessBuilder` (JDK 25: `Exec failed, error: 2 (No such file or directory)`). No test depends on the exact text of `native.startFailed`. |
+| 10 | Latency | Median of 200 starts of `true`: `posix_spawn` 1.0-1.2 ms, `ProcessBuilder` 1.8-2.1 ms, `ProcessBuilder` through `sh` + `trap` 2.6-3.0 ms. |
+| 11 | Terminal, on a real pseudo-terminal | See below. |
+| 12 | Signal state of the child | With `SETSIGDEF` (all signals) and `SETSIGMASK` (empty): `SigIgn = 0`, `SigBlk = 0`, same as a `ProcessBuilder` child. The `sh` + `trap` child has `SigIgn = 6` (INT, QUIT). |
+
+**Check 11** (`pty-check.py`): a pty whose session leader plays the shell, starts the probe in its own foreground group, then Ctrl+C
+(`\x03`) is written to the master. B is the background command, C a companion `sleep` in the foreground group.
+
+| Scenario | B started as | B | C |
+|---|---|---|---|
+| Ctrl+C | `ProcessBuilder` (what a Windows console program is today) | **dead** | dead |
+| Ctrl+C | `sh` + `trap` (Unix today) | alive | dead |
+| Ctrl+C | **`posix_spawn`, own group** | **alive** | dead |
+| B writes to the terminal, `tostop` off | `sh` + `trap` / own group | alive, line printed / alive, line printed | |
+| B writes to the terminal, `stty tostop` | `sh` + `trap` | alive, line printed | |
+| B writes to the terminal, `stty tostop` | own group | **STOPPED** (`SIGTTOU`), line not printed | |
+| B reads the terminal | `sh` + `trap` | alive (reads) | alive |
+| B reads the terminal | own group | **STOPPED** (`SIGTTIN`) | alive |
+
+### What the results change in the plan
+
+1. **Behaviour changes on Unix**, the same as an interactive bash with job control, to write into FR-75 and the acceptance file:
+   with `stty tostop`, a background command that writes to the terminal is stopped; one that reads the terminal (`/dev/tty`: `ssh`,
+   `sudo`, `gpg`) is stopped. Today they are not, because they stay in the foreground group.
+2. **A stopped job ignores `SIGTERM`** (measured: the signal stays pending until `SIGCONT`; `SIGKILL` works). `jobs | kill`
+   without `-f` would leave such a job alone. Phase 4 must either send `SIGCONT` after `SIGTERM` (in `Kill`, or for the jobs
+   only) or document `kill -f`.
+3. **The pty harness must not make the probe the session leader**: when the leader dies, the kernel sends `SIGHUP` to its
+   foreground group, which killed the `sh` + `trap` child in a first version of the script. A real terminal's leader is the
+   user's shell; `pty-check.py` now plays it.
+4. **Production code needs, beyond the prototype**: the arguments in the charset of `sun.jnu.encoding` (the prototype uses UTF-8);
+   `addclosefrom_np` only exists from glibc 2.34 (macOS: `POSIX_SPAWN_CLOEXEC_DEFAULT` and `addinherit_np`, to verify on the macOS job;
+   musl: explicit `addclose` of the descriptors found in `/proc/self/fd`, or fall back to `sh`); the same `native.startFailed` message
+   built from the errno; the restricted-method warnings (`downcallHandle` x2, `reinterpret` x1 here) added to the count in
+   `docs/quality/lint-baseline.md`.
+5. **Phase 3 gate, Linux side: go.** Checks 1-10 and 12 pass, no lost status, no leak, faster than the `sh` wrapper. The decision
+   waits for macOS and Windows.
