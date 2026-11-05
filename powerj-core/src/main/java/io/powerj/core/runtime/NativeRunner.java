@@ -25,6 +25,7 @@ import io.powerj.core.error.PjException;
 import io.powerj.core.format.OutputFormatter;
 import io.powerj.core.i18n.Messages;
 import io.powerj.core.nativeexec.ExecutableKind;
+import io.powerj.core.nativeexec.GroupLauncher;
 import io.powerj.core.nativeexec.NativeEncoding;
 import io.powerj.core.nativeexec.NativeRun;
 import io.powerj.fs.Host;
@@ -317,6 +318,12 @@ public final class NativeRunner {
      * Java cannot start a process in another group, so the program is started by {@code sh}, which ignores the
      * signals and replaces itself with the program ({@code exec}: the pid is the program's).
      *
+     * <p>
+     * <b>Experiment (issue #128).</b> On Linux, when the session variable {@code POWERJ_BACKGROUND} is {@code group}
+     * ({@code env --set POWERJ_BACKGROUND=group}), the job is started by {@link GroupLauncher} in a process group of its
+     * own instead: no {@code sh}, and the Ctrl+C of the terminal does not reach it because it is not in the foreground
+     * group. Without the variable nothing changes.
+     *
      * @param context the surroundings; the file of {@code 2>} is in append mode, shared by all stages
      * @return the processes, in order
      */
@@ -325,6 +332,10 @@ public final class NativeRunner {
         ShellIo io = context.io();
         Optional<FileTarget> stdout = context.redirections().out();
         Optional<FileTarget> stderrFile = context.redirections().err();
+        if (GroupLauncher.GROUP.equals(session.environmentSnapshot().get(GroupLauncher.VARIABLE))
+                && GroupLauncher.available()) {
+            return startInGroup(commands, session, io, stdout, stderrFile);
+        }
         List<ProcessBuilder> builders = new ArrayList<>(commands.size());
         for (int i = 0; i < commands.size(); i++) {
             Command command = commands.get(i);
@@ -346,6 +357,25 @@ public final class NativeRunner {
         }
         try {
             return ProcessBuilder.startPipeline(builders);
+        } catch (IOException e) {
+            throw startFailed(commands, e);
+        }
+    }
+
+    /**
+     * The experiment: the same job as the {@link ProcessBuilder} branch of {@link #startBackground} (null device in, then
+     * the file of the redirection, else the terminal when there is one, else nothing; {@code 2>&1}), started in a group
+     * of its own. The environment is the snapshot of the session, never the JVM's.
+     */
+    private static List<Process> startInGroup(List<Command> commands, Session session, ShellIo io,
+                                              Optional<FileTarget> stdout, Optional<FileTarget> stderrFile) {
+        GroupLauncher.Output terminal = io.interactive() ? GroupLauncher.Output.inherit() : GroupLauncher.Output.discard();
+        GroupLauncher.Output out = stdout.map(f -> GroupLauncher.Output.file(f.file(), f.append())).orElse(terminal);
+        GroupLauncher.Output err = stderrFile.map(f -> GroupLauncher.Output.file(f.file(), true)).orElse(terminal);
+        List<GroupLauncher.Stage> stages = commands.stream()
+                .map(c -> new GroupLauncher.Stage(c.executable(), c.args(), c.errorsToOutput())).toList();
+        try {
+            return GroupLauncher.start(stages, session.currentDirectory(), session.environmentSnapshot(), out, err);
         } catch (IOException e) {
             throw startFailed(commands, e);
         }
