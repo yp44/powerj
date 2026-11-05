@@ -3,6 +3,8 @@ package io.powerj.fx.model;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
+import io.powerj.text.GuardedText;
+
 /**
  * The filter {@code /regex/}: the cell as shown contains a match. A regular expression can take a time that grows with the
  * square, the cube or the exponential of the text ({@code (a+)+$} on a run of a's), and the filter runs on the toolkit
@@ -20,49 +22,6 @@ final class RegexFilter implements ColumnFilter {
     /** Cells that may exhaust their budget before the regex is not tried on the others. */
     static final int GIVE_UP_AFTER = 10;
 
-    /** Thrown by the text when its budget is spent; it carries no stack trace, it is control flow. */
-    private static final class OutOfSteps extends RuntimeException {
-        private static final long serialVersionUID = 1L;
-
-        OutOfSteps() {
-            super(null, null, false, false);
-        }
-    }
-
-    /** A text that counts the characters the regex reads. */
-    private static final class Budgeted implements CharSequence {
-        private final String text;
-        private long left;
-
-        Budgeted(String text) {
-            this.text = text;
-            this.left = BASE_STEPS + (long) STEPS_PER_CHAR * text.length();
-        }
-
-        @Override
-        public int length() {
-            return text.length();
-        }
-
-        @Override
-        public char charAt(int index) {
-            if (--left < 0) {
-                throw new OutOfSteps();
-            }
-            return text.charAt(index);
-        }
-
-        @Override
-        public CharSequence subSequence(int start, int end) {
-            return text.subSequence(start, end);
-        }
-
-        @Override
-        public String toString() {
-            return text;
-        }
-    }
-
     private final Pattern pattern;
     private final ColumnKind display;
     private final AtomicInteger abandoned = new AtomicInteger();
@@ -78,9 +37,11 @@ final class RegexFilter implements ColumnFilter {
             abandoned.incrementAndGet();
             return false;
         }
+        String text = CellFormatter.fullText(value, display);
         try {
-            return pattern.matcher(new Budgeted(CellFormatter.fullText(value, display))).find();
-        } catch (OutOfSteps e) {
+            return pattern.matcher(GuardedText.withBudget(text, BASE_STEPS + (long) STEPS_PER_CHAR * text.length()))
+                    .find();
+        } catch (GuardedText.Stopped e) {
             abandoned.incrementAndGet();
             return false;
         }

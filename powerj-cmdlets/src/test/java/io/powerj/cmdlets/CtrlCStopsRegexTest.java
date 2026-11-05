@@ -1,19 +1,20 @@
 package io.powerj.cmdlets;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
-/** Ctrl+C stops a regular expression that backtracks for ever (review C-18). */
-class InterruptibleTextTest {
+/**
+ * Ctrl+C stops a regular expression that backtracks for ever (review C-18), in {@code grep} and {@code range}. The text
+ * that does it is {@code io.powerj.text.GuardedText}, tested in {@code powerj-text} (#111).
+ */
+class CtrlCStopsRegexTest {
 
     /**
      * Takes time exponential in the length of the line: thirty groups that can each match any number of characters.
@@ -21,38 +22,6 @@ class InterruptibleTextTest {
      */
     private static final String CATASTROPHIC = "(.*a){30}";
     private static final String LINE = "a".repeat(40) + "!";
-
-    @Test
-    void itReadsLikeTheTextItWraps() {
-        CharSequence text = new InterruptibleText("hello");
-
-        assertThat(text.length()).isEqualTo(5);
-        assertThat(text.charAt(1)).isEqualTo('e');
-        assertThat(text.subSequence(1, 3).toString()).isEqualTo("el");
-        assertThat(text.toString()).isEqualTo("hello");
-        assertThat(Pattern.compile("l+").matcher(text).find()).isTrue();
-    }
-
-    @Test
-    void itDoesNotGetInTheWayOfAnOrdinaryMatch() {
-        var matcher = Pattern.compile("(?<word>[a-z]+)-(\\d+)").matcher(new InterruptibleText("zz abc-123 yy"));
-
-        assertThat(matcher.find()).isTrue();
-        assertThat(matcher.group("word")).isEqualTo("abc");
-        assertThat(matcher.group(2)).isEqualTo("123");
-        assertThat(matcher.start()).isEqualTo(3);
-    }
-
-    @Test
-    void aThreadThatIsInterruptedStopsTheMatcher() {
-        Thread.currentThread().interrupt();
-        try {
-            assertThatThrownBy(() -> Pattern.compile(CATASTROPHIC).matcher(new InterruptibleText(LINE)).find())
-                    .isInstanceOf(CancellationException.class);
-        } finally {
-            Thread.interrupted();
-        }
-    }
 
     /** Runs {@code work} on another thread, interrupts it after a moment and tells how it ended. */
     private static Throwable interrupted(Runnable work) throws InterruptedException {

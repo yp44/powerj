@@ -41,11 +41,12 @@ formatters need (the durations) come with their own bundle in the module, like t
 The ArchUnit rules say what the module may depend on (`textDependsOnlyOnTheJdkAndTheApi`) and that `powerj-fx` may depend
 on it (`fxDependsOnlyOnTheApiAndText`); `powerj-cmdlets` was already only forbidden to reach the engine.
 
-First helpers moved in: the formatting of sizes, dates and durations, `io.powerj.text.Formats`
+The helpers moved in: the formatting of sizes, dates and durations, `io.powerj.text.Formats`
 ([#109](https://github.com/yp44/powerj/issues/109)), the reading of the output contract of a record,
 `io.powerj.text.RecordView` ([#108](https://github.com/yp44/powerj/issues/108)), and the units of a size,
-`io.powerj.text.SizeUnits` ([#110](https://github.com/yp44/powerj/issues/110)); `core`, `cmdlets` and `fx` now `require
-io.powerj.text`. `RecordView` holds structure (components, `@Display`, `@Bytes`, `@Highlight`), not accessors: making an
+`io.powerj.text.SizeUnits` ([#110](https://github.com/yp44/powerj/issues/110)), and the text that lets a regular expression be
+stopped, `io.powerj.text.GuardedText` ([#111](https://github.com/yp44/powerj/issues/111): `cmdlets` stops it on the interrupt flag,
+`fx` on a budget of reads, one class for both); `core`, `cmdlets` and `fx` now `require io.powerj.text`. `RecordView` holds structure (components, `@Display`, `@Bytes`, `@Highlight`), not accessors: making an
 accessor accessible is allowed to the module that asks, and a record of a third-party module is opened to `io.powerj.core`
 only, so each module keeps its own accessors.
 
