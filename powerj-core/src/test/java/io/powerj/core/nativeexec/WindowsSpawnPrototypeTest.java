@@ -81,7 +81,14 @@ class WindowsSpawnPrototypeTest {
         // ... and that it is the flag, not our way of starting: the same start without it dies of Ctrl+C.
         assertThat(r.get("C_ended")).as("the control C, started by CreateProcessW without the flag, must die: " + report)
                 .isEqualTo("true");
-        // A, A2 and A3 (ProcessBuilder) are measures, not conditions: they say what PowerJ does today.
+        // The premise of issue #128: a console program started by ProcessBuilder, as PowerJ starts a background command at
+        // a terminal (A2), receives the Ctrl+C of the console. TEMPORARY, and expected to fail if the premise is wrong: the
+        // report in the message is how the measure comes back from the CI, whose log is read from its end.
+        assertThat(r.get("A_ended")).as("A (ProcessBuilder, everything redirected) dies of Ctrl+C: " + report)
+                .isEqualTo("true");
+        assertThat(r.get("A2_ended")).as("A2 (ProcessBuilder, as PowerJ at a terminal) dies of Ctrl+C: " + report)
+                .isEqualTo("true");
+        assertThat(r.get("A3_ended")).as("A3 (ProcessBuilder, inheritIO) dies of Ctrl+C: " + report).isEqualTo("true");
     }
 
     // --- 2. exit code ---
