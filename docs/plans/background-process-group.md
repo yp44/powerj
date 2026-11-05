@@ -191,3 +191,54 @@ Found on the way:
    a process group, the whole job could be stopped (`kill(-pgid)`) in Phase 4.
 4. In the real shell `sort` and `cat` are cmdlets: a pipeline with `&` needs `^sort` (the acceptance row 7 of the existing checklist
    says `sort`; it only works in the unit test, whose registry is empty).
+
+## Results — Windows prototype (Phase 2)
+
+Run on the `windows-latest` job of the CI (run 259, then run 260 for the Ctrl+C report), JDK 25. Code: `WindowsSpawn`,
+`WindowsCommandLine`, `WindowsConsoleProbe`, `ArgvEcho`, `StdioEcho` and `WindowsSpawnPrototypeTest` in
+`powerj-core/src/test/java/io/powerj/core/nativeexec/`, test code only. The 12 checks pass; `WindowsCommandLineTest` (the pure
+quoting and environment block, 8 tests) also runs on Linux and macOS.
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Ctrl+C | See the table below. |
+| 2 | Exit code | `cmd /c exit 7` gives 7; `ProcessHandle.isAlive`/`onExit` work on a `CreateProcessW` child. |
+| 2b | Lost status, leaked handle | 200 runs on 4 threads: 0 wrong code, 670 ms; handles of the JVM 446 before, 441 after. |
+| 3 | Kill | `TerminateProcess`, `ProcessHandle.destroy()` and `destroyForcibly()` all give exit code 1 (what the JDK does). |
+| 4 | Redirections | `>` truncates, `>>` appends (`FILE_APPEND_DATA`), `2>&1` shares one handle, stdin on `NUL` ends at once. |
+| 4b | Pipeline | `type f \| sort > g`: sort sees the end of its input, so nobody else holds the write end. |
+| 4c | Handle list | With `PROC_THREAD_ATTRIBUTE_HANDLE_LIST` a read on a pipe ends at once (`ERROR_BROKEN_PIPE`) once the parent closed its write end; without it (control) the child holds the write end and the read blocks until the child is killed. |
+| 5 | Command line | `CreateProcessW` with `WindowsCommandLine`: 12 of 12 tricky arguments come back exactly (spaces, `"`, trailing `\`, tab…). **`ProcessBuilder` gets 8 of the 12 wrong** (an embedded quote splits the argument). An empty argument is the same for both. |
+| 6 | Directory, environment | The child sees the Unicode variable of the session, not `USERPROFILE` of the JVM, and the directory given. |
+| 7 | `.bat` / `.cmd` | Refused by the prototype; `ProcessBuilder` runs them (`hello x`). The launcher must hand them to `ProcessBuilder`. |
+| 8 | Start errors | Same Win32 numbers as `ProcessBuilder`: 2 (missing), 193 (not an executable), 5 (a folder). |
+| 9 | Latency | Median of 100 starts of `cmd /c exit 0`: `CreateProcessW` 7 ms, `ProcessBuilder` 16 ms. |
+
+**Check 1** (run 260): a probe in a console of its own (`CREATE_NEW_CONSOLE`, with the standard handles of that console) starts
+seven `ping -t`, lists the processes of its console (`GetConsoleProcessList`), then sends `GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0)`.
+
+| Child | Started as | On the console | After Ctrl+C |
+|---|---|---|---|
+| A | `ProcessBuilder`, stdin `NUL`, output and errors discarded | **no** | alive |
+| A2 | `ProcessBuilder`, stdin `NUL`, output and errors inherited (**PowerJ at a terminal**) | yes | **dead, `0xC000013A`** |
+| A3 | `ProcessBuilder`, `inheritIO()` | yes | **dead, `0xC000013A`** |
+| B | `CreateProcessW`, `CREATE_NEW_PROCESS_GROUP`, `NUL` | yes | **alive** |
+| B2 | `CreateProcessW`, `CREATE_NEW_PROCESS_GROUP`, the handles of the console | yes | **alive** |
+| C | `CreateProcessW`, no flag, `NUL` (control) | yes | dead, `0xC000013A` |
+| C2 | `CreateProcessW`, no flag, the handles of the console (control) | yes | dead, `0xC000013A` |
+
+### What the results change in the plan
+
+1. **The premise of the issue holds** for what PowerJ does at a terminal (A2): a console program started with `&` is on the console
+   and dies of its Ctrl+C. The new process group removes it, with the same inherited handles (B2). Option (c) is not justified on Windows.
+2. **A nuance the issue did not have**: when *all three* streams are redirected (`cmd > f 2> g &`, `2>&1`, or a script without a terminal), the JDK
+   starts the child **off the console of its parent** (A is not in the console's process list), so it does not receive Ctrl+C. The defect is
+   therefore limited to a job whose output or errors go to the terminal, the usual case of `ping -t localhost &`. The mechanism is the JDK's, not measured here.
+3. **The Windows implementation is smaller than feared and quicker than `ProcessBuilder`** (7 ms against 16 ms), with no handle leak.
+   It brings two differences with the foreground path to decide: the arguments are quoted correctly (so an argument with a `"` differs from
+   what `ProcessBuilder` sends), and `.bat`/`.cmd` stay on `ProcessBuilder`.
+4. **Not measured**: macOS; a Windows GUI program (FR-39 already starts those detached); `Ctrl+Break` (it still reaches a process of a
+   new group, by design); PowerJ started by a parent without a console; the `.exe` launcher of the image.
+5. **Phase 3 gate, Windows side: go.** With the Linux side (all checks pass, one behaviour change to accept: a job that reads the terminal or,
+   with `stty tostop`, writes to it, is stopped), the data supports both (a) and (b). (a) changes nothing on Unix, where `sh` is proven;
+   (b) unifies the two platforms at the price of the Unix behaviour changes and of an unverified macOS.

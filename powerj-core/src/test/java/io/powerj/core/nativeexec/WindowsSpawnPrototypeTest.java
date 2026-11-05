@@ -81,14 +81,16 @@ class WindowsSpawnPrototypeTest {
         // ... and that it is the flag, not our way of starting: the same start without it dies of Ctrl+C.
         assertThat(r.get("C_ended")).as("the control C, started by CreateProcessW without the flag, must die: " + report)
                 .isEqualTo("true");
-        // The premise of issue #128: a console program started by ProcessBuilder, as PowerJ starts a background command at
-        // a terminal (A2), receives the Ctrl+C of the console. TEMPORARY, and expected to fail if the premise is wrong: the
-        // report in the message is how the measure comes back from the CI, whose log is read from its end.
-        assertThat(r.get("A_ended")).as("A (ProcessBuilder, everything redirected) dies of Ctrl+C: " + report)
-                .isEqualTo("true");
+        // The premise of issue #128, measured on the Windows job: a console program started by ProcessBuilder as PowerJ
+        // starts a background command at a terminal (A2: input from the null device, output and errors inherited) or with
+        // everything inherited (A3) is on the console of its parent and dies of Ctrl+C, so it is the defect that the new
+        // process group removes (B2 has the same handles and survives).
+        assertThat(r.get("A2_attached")).as(report).isEqualTo("true");
         assertThat(r.get("A2_ended")).as("A2 (ProcessBuilder, as PowerJ at a terminal) dies of Ctrl+C: " + report)
                 .isEqualTo("true");
         assertThat(r.get("A3_ended")).as("A3 (ProcessBuilder, inheritIO) dies of Ctrl+C: " + report).isEqualTo("true");
+        // A (ProcessBuilder, all three streams redirected) is not on the console of its parent, so Ctrl+C does not reach
+        // it: the JDK detaches it. Recorded in the report, not asserted (the mechanism is the JDK's to change).
     }
 
     // --- 2. exit code ---
