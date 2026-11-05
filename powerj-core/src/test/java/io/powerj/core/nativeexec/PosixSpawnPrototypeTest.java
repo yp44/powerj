@@ -1,4 +1,4 @@
-package io.powerj.core.nativeexec.prototype;
+package io.powerj.core.nativeexec;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -23,9 +23,10 @@ import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
-import io.powerj.core.nativeexec.prototype.PosixSpawn.Spawned;
-import io.powerj.core.nativeexec.prototype.PosixSpawn.Spec;
-import io.powerj.core.nativeexec.prototype.PosixSpawn.Stdio;
+import io.powerj.core.nativeexec.PosixSpawn.Spawned;
+import io.powerj.core.nativeexec.PosixSpawn.Spec;
+import io.powerj.core.nativeexec.PosixSpawn.Stdio;
+
 
 /**
  * PROTOTYPE of issue #128 (Linux): start a background process in its own process group with {@code posix_spawn}
@@ -294,7 +295,15 @@ class PosixSpawnPrototypeTest {
         snapshot.put("B", "deux é");
         assertThat(start(Spec.of(exe("env")).env(snapshot).out(Stdio.file(env))).exit().get(10, TimeUnit.SECONDS))
                 .isZero();
-        assertThat(Files.readString(env)).isEqualTo("A=1\nB=deux é\n");
+        // The names are encoded as ProcessBuilder does it (sun.jnu.encoding): compare with the JDK's own result.
+        ProcessBuilder jdk = new ProcessBuilder(exe("env").toString()).redirectOutput(tmp.resolve("jdk-env.txt").toFile());
+        jdk.environment().clear();
+        jdk.environment().putAll(snapshot);
+        assertThat(jdk.start().waitFor()).isZero();
+        assertThat(Files.readAllLines(env, java.nio.charset.StandardCharsets.ISO_8859_1))
+                .containsExactlyInAnyOrderElementsOf(
+                        Files.readAllLines(tmp.resolve("jdk-env.txt"), java.nio.charset.StandardCharsets.ISO_8859_1));
+        assertThat(Files.readAllLines(env, java.nio.charset.StandardCharsets.ISO_8859_1)).hasSize(2).contains("A=1");
         assertThat(System.getenv()).isNotEmpty(); // the JVM has an environment of its own; none of it reaches the child
         log("08 chdir (addchdir_np) gives %s; the child's environment is exactly the %d variables given, none of the "
                 + "JVM's %d", tmp.toRealPath(), snapshot.size(), System.getenv().size());

@@ -1,11 +1,14 @@
-package io.powerj.core.nativeexec.prototype;
+package io.powerj.core.nativeexec;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
 
-import io.powerj.core.nativeexec.prototype.PosixSpawn.Spec;
-import io.powerj.core.nativeexec.prototype.PosixSpawn.Stdio;
+import io.powerj.core.nativeexec.PosixSpawn.Spec;
+import io.powerj.core.nativeexec.PosixSpawn.Stdio;
+
 
 /**
  * PROTOTYPE of issue #128, not shipped: the process that {@code powerj-core/src/test/prototype/pty-check.py} runs on a
@@ -13,11 +16,12 @@ import io.powerj.core.nativeexec.prototype.PosixSpawn.Stdio;
  * companion C (a plain {@code sleep}, in the group of the JVM, so in the foreground group): the script then sends
  * Ctrl+C to the terminal and looks at which of B and C are still alive.
  * <pre>
- *   PtyProbe plain|shield|group null|inherit &lt;sh script of B&gt;
+ *   PtyProbe plain|shield|group|launcher null|inherit &lt;sh script of B&gt;
  * </pre>
  * {@code plain}: {@link ProcessBuilder}, as a Windows console program is started today; {@code shield}: through
  * {@code sh}, ignoring SIGINT and SIGQUIT, as a Unix background command is started today; {@code group}:
- * {@link PosixSpawn} with its own process group.
+ * {@link PosixSpawn} with its own process group; {@code launcher}: {@link GroupLauncher}, what the shell runs in group
+ * mode (its standard input is always the null device).
  */
 public final class PtyProbe {
 
@@ -36,6 +40,11 @@ public final class PtyProbe {
             case "group" -> PosixSpawn.spawn(Spec.of(Path.of("/bin/sh"), "-c", script).group(PosixSpawn.OWN_GROUP)
                     .in(inherit ? Stdio.INHERIT : Stdio.NULL).out(inherit ? Stdio.INHERIT : Stdio.NULL)
                     .err(inherit ? Stdio.INHERIT : Stdio.NULL).closeFds(true)).pid();
+            case "launcher" -> {
+                GroupLauncher.Output output = inherit ? GroupLauncher.Output.inherit() : GroupLauncher.Output.discard();
+                yield GroupLauncher.start(List.of(new GroupLauncher.Stage(Path.of("/bin/sh"), List.of("-c", script), false)),
+                        Path.of("").toAbsolutePath(), Map.of("PATH", "/usr/bin:/bin"), output, output).getFirst().pid();
+            }
             default -> throw new IllegalArgumentException(mode);
         };
         long companion = java(new ProcessBuilder("/usr/bin/sleep", "60"), false);

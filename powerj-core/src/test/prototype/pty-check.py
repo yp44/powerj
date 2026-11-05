@@ -11,7 +11,8 @@ from the terminal: SIGTTOU when it writes with `stty tostop`, SIGTTIN when it re
     JAVA=<jdk 25>/bin/java python3 powerj-core/src/test/prototype/pty-check.py
 
 Reads: B started as `plain` (ProcessBuilder, as a console program on Windows today), `shield` (sh + trap '' INT QUIT, as
-on Unix today) or `group` (posix_spawn with its own process group, the prototype).
+on Unix today), `group` (posix_spawn with its own process group, the prototype, standard input inherited) or `launcher`
+(GroupLauncher, what the shell runs with POWERJ_BACKGROUND=group; standard input is the null device).
 """
 import os
 import pty
@@ -24,7 +25,7 @@ import time
 
 JAVA = os.environ.get("JAVA", "java")
 CLASSES = os.environ.get("CLASSES", "powerj-core/target/test-classes")
-PROBE = "io.powerj.core.nativeexec.prototype.PtyProbe"
+PROBE = "io.powerj.core.nativeexec.PtyProbe"
 
 
 def state(pid):
@@ -102,13 +103,13 @@ def scenario(mode, stdio, script, tostop=False, ctrl_c=True, settle=1.5):
 
 def main():
     rows = []
-    for mode in ("plain", "shield", "group"):
+    for mode in ("plain", "shield", "group", "launcher"):
         b, c, _ = scenario(mode, "null", "exec sleep 60")
         rows.append(("Ctrl+C, then who is alive", mode, b, c))
     for mode in ("shield", "group"):
         b, c, saw = scenario(mode, "inherit", "sleep 1; echo hi-from-B; exec sleep 60", ctrl_c=False, settle=3)
         rows.append(("B writes to the terminal (tostop off)", mode, b, f"B's line printed: {saw}"))
-    for mode in ("shield", "group"):
+    for mode in ("shield", "group", "launcher"):
         b, c, saw = scenario(mode, "inherit", "sleep 1; echo hi-from-B; exec sleep 60", tostop=True, ctrl_c=False,
                              settle=3)
         rows.append(("B writes to the terminal (stty tostop)", mode, b, f"B's line printed: {saw}"))

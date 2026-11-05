@@ -1,4 +1,4 @@
-package io.powerj.core.nativeexec.prototype;
+package io.powerj.core.nativeexec;
 
 import static java.lang.foreign.ValueLayout.ADDRESS;
 import static java.lang.foreign.ValueLayout.JAVA_INT;
@@ -13,6 +13,8 @@ import java.lang.foreign.MemorySegment;
 import java.lang.foreign.StructLayout;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.VarHandle;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -22,10 +24,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
- * PROTOTYPE of issue #128, not shipped (test code): starts a process with {@code posix_spawn} through the FFM API, in
- * the process group of our choice, with file actions for the redirections, and reads its exit status with
- * {@code waitpid} on a thread of its own. Linux (glibc 2.34 or later) only: the flags, the {@code O_*} values and
- * {@code addclosefrom_np} differ on macOS.
+ * EXPERIMENT of issue #128, used only when the session variable {@code POWERJ_BACKGROUND} is {@code group}
+ * ({@link GroupLauncher}): starts a process with {@code posix_spawn} through the FFM API, in the process group of our
+ * choice, with file actions for the redirections, and reads its exit status with {@code waitpid} on a thread of its own.
+ * Linux (glibc 2.34 or later) only: the flags, the {@code O_*} values and {@code addclosefrom_np} differ on macOS.
+ * <p>
+ * The restricted-method warnings of the FFM calls are not counted in {@code docs/quality/javac-warnings.txt}: the
+ * experiment is off by default, and the baseline may not go up.
  */
 @SuppressWarnings("restricted")
 final class PosixSpawn {
@@ -53,6 +58,9 @@ final class PosixSpawn {
     private static final Linker LINKER = Linker.nativeLinker();
     private static final ReentrantLock SPAWN_LOCK = new ReentrantLock();
     private static final AtomicInteger LOST_STATUSES = new AtomicInteger();
+
+    /** The charset in which the system names files and arguments, as {@link ProcessBuilder} uses it. */
+    private static final Charset NAMES = names();
 
     private static final StructLayout CAPTURE = Linker.Option.captureStateLayout();
     private static final VarHandle ERRNO = CAPTURE.varHandle(PathElement.groupElement("errno"));
@@ -166,7 +174,19 @@ final class PosixSpawn {
         return LOST_STATUSES.get();
     }
 
+    /** Starts a process and the thread that reaps it. */
     static Spawned spawn(Spec spec) throws IOException {
+        Spawned spawned = spawnUnreaped(spec);
+        reap(spawned);
+        return spawned;
+    }
+
+    /**
+     * Starts a process but does not reap it yet: until {@link #reap} is called, a child that has ended stays a zombie
+     * and its process group exists. The stages of a pipeline need that: a stage that joins the group of the first one
+     * fails with {@code EPERM} if the first has already ended and been reaped.
+     */
+    static Spawned spawnUnreaped(Spec spec) throws IOException {
         int pid;
         SPAWN_LOCK.lock();
         try (Arena arena = Arena.ofConfined()) {
@@ -189,7 +209,7 @@ final class PosixSpawn {
                 ok("file_actions_init", (int) FA_INIT.invokeExact(actions));
                 try {
                     fileActions(actions, spec, arena);
-                    MemorySegment path = arena.allocateFrom(spec.executable().toString());
+                    MemorySegment path = arena.allocateFrom(spec.executable().toString(), NAMES);
                     MemorySegment argv = strings(arena, prepend(spec.executable().toString(), spec.args()));
                     List<String> environment = new ArrayList<>();
                     spec.env().forEach((name, value) -> environment.add(name + "=" + value));
@@ -213,14 +233,18 @@ final class PosixSpawn {
         } finally {
             SPAWN_LOCK.unlock();
         }
-        var exit = new CompletableFuture<Integer>();
-        Thread.ofPlatform().daemon().name("proto-waitpid-" + pid).start(() -> waitFor(pid, exit));
-        return new Spawned(pid, exit);
+        return new Spawned(pid, new CompletableFuture<>());
+    }
+
+    /** Starts the thread that waits for the child, completes its exit code and so frees its pid. */
+    static void reap(Spawned spawned) {
+        Thread.ofPlatform().daemon().name("powerj-waitpid-" + spawned.pid())
+                .start(() -> waitFor(spawned.pid(), spawned.exit()));
     }
 
     private static void fileActions(MemorySegment actions, Spec spec, Arena arena) throws Throwable {
         if (spec.directory() != null) {
-            ok("addchdir_np", (int) FA_CHDIR.invokeExact(actions, arena.allocateFrom(spec.directory().toString())));
+            ok("addchdir_np", (int) FA_CHDIR.invokeExact(actions, arena.allocateFrom(spec.directory().toString(), NAMES)));
         }
         stdio(actions, arena, 0, spec.in());
         stdio(actions, arena, 1, spec.out());
@@ -243,7 +267,7 @@ final class PosixSpawn {
     }
 
     private static void open(MemorySegment actions, Arena arena, int fd, String path, int flags) throws Throwable {
-        ok("addopen", (int) FA_OPEN.invokeExact(actions, fd, arena.allocateFrom(path), flags, 0666));
+        ok("addopen", (int) FA_OPEN.invokeExact(actions, fd, arena.allocateFrom(path, NAMES), flags, 0666));
     }
 
     private static List<String> prepend(String first, List<String> rest) {
@@ -256,7 +280,7 @@ final class PosixSpawn {
     private static MemorySegment strings(Arena arena, List<String> values) {
         MemorySegment array = arena.allocate(8L * (values.size() + 1), 8);
         for (int i = 0; i < values.size(); i++) {
-            array.setAtIndex(ADDRESS, i, arena.allocateFrom(values.get(i)));
+            array.setAtIndex(ADDRESS, i, arena.allocateFrom(values.get(i), NAMES));
         }
         array.setAtIndex(ADDRESS, values.size(), MemorySegment.NULL);
         return array;
@@ -291,7 +315,23 @@ final class PosixSpawn {
         return signal == 0 ? (status >> 8) & 0xff : 128 + signal;
     }
 
-    // --- small calls the tests need ---
+    /**
+     * {@code true} if this system can start processes this way: Linux, and a libc that has every function used here
+     * (glibc 2.34 or later). Loading this class fails otherwise, which the caller reads as "not available".
+     */
+    static boolean ready() {
+        return true;
+    }
+
+    private static Charset names() {
+        try {
+            return Charset.forName(System.getProperty("sun.jnu.encoding", "UTF-8"));
+        } catch (RuntimeException _) {
+            return StandardCharsets.UTF_8;
+        }
+    }
+
+    // --- small calls ---
 
     static int[] pipe() throws IOException {
         try (Arena arena = Arena.ofConfined()) {
