@@ -117,6 +117,8 @@ final class WindowsSpawn {
     private static final MethodHandle GENERATE_CTRL_EVENT = call("GenerateConsoleCtrlEvent",
             FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT));
     private static final MethodHandle CONSOLE_WINDOW = call("GetConsoleWindow", FunctionDescriptor.of(ADDRESS));
+    private static final MethodHandle CONSOLE_PROCESSES = call("GetConsoleProcessList",
+            FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT));
 
     private WindowsSpawn() {
     }
@@ -150,38 +152,46 @@ final class WindowsSpawn {
      * three standard handles; {@code false} inherits every inheritable handle (the control of the leak test).
      */
     record Spec(Path executable, List<String> args, Map<String, String> env, Path directory, Stdio in, Stdio out,
-                Stdio err, int flags, boolean handleList) {
+                Stdio err, int flags, boolean handleList, boolean redirect) {
 
         static Spec of(Path executable, String... args) {
-            return new Spec(executable, List.of(args), System.getenv(), null, Stdio.NULL, Stdio.NULL, Stdio.NULL, 0, true);
+            return new Spec(executable, List.of(args), System.getenv(), null, Stdio.NULL, Stdio.NULL, Stdio.NULL, 0, true, true);
         }
 
         Spec env(Map<String, String> env) {
-            return new Spec(executable, args, env, directory, in, out, err, flags, handleList);
+            return new Spec(executable, args, env, directory, in, out, err, flags, handleList, redirect);
         }
 
         Spec directory(Path directory) {
-            return new Spec(executable, args, env, directory, in, out, err, flags, handleList);
+            return new Spec(executable, args, env, directory, in, out, err, flags, handleList, redirect);
         }
 
         Spec in(Stdio in) {
-            return new Spec(executable, args, env, directory, in, out, err, flags, handleList);
+            return new Spec(executable, args, env, directory, in, out, err, flags, handleList, redirect);
         }
 
         Spec out(Stdio out) {
-            return new Spec(executable, args, env, directory, in, out, err, flags, handleList);
+            return new Spec(executable, args, env, directory, in, out, err, flags, handleList, redirect);
         }
 
         Spec err(Stdio err) {
-            return new Spec(executable, args, env, directory, in, out, err, flags, handleList);
+            return new Spec(executable, args, env, directory, in, out, err, flags, handleList, redirect);
         }
 
         Spec flags(int flags) {
-            return new Spec(executable, args, env, directory, in, out, err, this.flags | flags, handleList);
+            return new Spec(executable, args, env, directory, in, out, err, this.flags | flags, handleList, redirect);
         }
 
         Spec handleList(boolean handleList) {
-            return new Spec(executable, args, env, directory, in, out, err, flags, handleList);
+            return new Spec(executable, args, env, directory, in, out, err, flags, handleList, redirect);
+        }
+
+        /**
+         * {@code false}: no standard handle is given and nothing is inherited, so that the child gets those of its
+         * console (a new one with {@code CREATE_NEW_CONSOLE}), as a program started by a user in a terminal does.
+         */
+        Spec standardHandles(boolean redirect) {
+            return new Spec(executable, args, env, directory, in, out, err, flags, handleList, redirect);
         }
     }
 
@@ -252,19 +262,27 @@ final class WindowsSpawn {
                 MemorySegment security = arena.allocate(SECURITY_ATTRIBUTES_SIZE, 8);
                 security.set(JAVA_INT, 0, SECURITY_ATTRIBUTES_SIZE);
                 security.set(JAVA_INT, SA_INHERIT, 1);
-                MemorySegment in = standard(spec.in(), true, STD_INPUT, security, arena, owned);
-                MemorySegment out = standard(spec.out(), false, STD_OUTPUT, security, arena, owned);
-                MemorySegment err = spec.err().kind() == Stdio.Kind.STDOUT ? out
-                        : standard(spec.err(), false, STD_ERROR, security, arena, owned);
+                boolean redirect = spec.redirect();
+                MemorySegment in = MemorySegment.NULL;
+                MemorySegment out = MemorySegment.NULL;
+                MemorySegment err = MemorySegment.NULL;
+                if (redirect) {
+                    in = standard(spec.in(), true, STD_INPUT, security, arena, owned);
+                    out = standard(spec.out(), false, STD_OUTPUT, security, arena, owned);
+                    err = spec.err().kind() == Stdio.Kind.STDOUT ? out
+                            : standard(spec.err(), false, STD_ERROR, security, arena, owned);
+                }
 
                 MemorySegment startup = arena.allocate(STARTUPINFOEX_SIZE, 8);
-                startup.set(JAVA_INT, 0, spec.handleList() ? STARTUPINFOEX_SIZE : STARTUPINFO_SIZE);
-                startup.set(JAVA_INT, SI_FLAGS, STARTF_USESTDHANDLES);
-                startup.set(ADDRESS, SI_STDIN, in);
-                startup.set(ADDRESS, SI_STDOUT, out);
-                startup.set(ADDRESS, SI_STDERR, err);
+                startup.set(JAVA_INT, 0, redirect && spec.handleList() ? STARTUPINFOEX_SIZE : STARTUPINFO_SIZE);
+                if (redirect) {
+                    startup.set(JAVA_INT, SI_FLAGS, STARTF_USESTDHANDLES);
+                    startup.set(ADDRESS, SI_STDIN, in);
+                    startup.set(ADDRESS, SI_STDOUT, out);
+                    startup.set(ADDRESS, SI_STDERR, err);
+                }
                 int flags = CREATE_UNICODE_ENVIRONMENT | spec.flags();
-                if (spec.handleList()) {
+                if (redirect && spec.handleList()) {
                     // The same handle twice in the list is an error (2>&1 shares one).
                     Set<Long> inherited = new LinkedHashSet<>();
                     for (MemorySegment handle : List.of(in, out, err)) {
@@ -300,7 +318,7 @@ final class WindowsSpawn {
                 MemorySegment info = arena.allocate(PROCESS_INFORMATION_SIZE, 8);
                 MemorySegment capture = arena.allocate(CAPTURE);
                 int created = (int) CREATE_PROCESS.invoke(capture, application, commandLine, MemorySegment.NULL,
-                        MemorySegment.NULL, 1, flags, environment, directory, startup, info);
+                        MemorySegment.NULL, redirect ? 1 : 0, flags, environment, directory, startup, info);
                 if (created == 0) {
                     throw new IOException("CreateProcess error=" + lastError(capture));
                 }
@@ -438,6 +456,22 @@ final class WindowsSpawn {
     static long consoleWindow() {
         try {
             return ((MemorySegment) CONSOLE_WINDOW.invoke()).address();
+        } catch (Throwable t) {
+            throw new IllegalStateException(t);
+        }
+    }
+
+    /** The ids of the processes attached to the console of this process (this one included). */
+    static int[] consoleProcessIds() {
+        try (Arena arena = Arena.ofConfined()) {
+            int room = 256;
+            MemorySegment ids = arena.allocate(4L * room, 4);
+            int count = (int) CONSOLE_PROCESSES.invoke(ids, room);
+            int[] result = new int[Math.min(count, room)];
+            for (int i = 0; i < result.length; i++) {
+                result[i] = ids.getAtIndex(JAVA_INT, i);
+            }
+            return result;
         } catch (Throwable t) {
             throw new IllegalStateException(t);
         }

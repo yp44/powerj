@@ -60,25 +60,28 @@ class WindowsSpawnPrototypeTest {
 
     @Test
     void check01_ctrlCDoesNotReachAProcessStartedInANewProcessGroup() throws Exception {
-        // The Ctrl+C goes to every process of the console of the sender: the probe has a console of its own, so that it
-        // reaches nothing of the build.
+        // The Ctrl+C goes to every process of the console of the sender: the probe has a console of its own, with the
+        // standard handles of that console as a program in a terminal has them, so that it reaches nothing of the build.
         Path result = tmp.resolve("console.txt");
-        Path output = tmp.resolve("console.log");
         Spawned probe = start(java(WindowsConsoleProbe.class, result.toString()).flags(WindowsSpawn.CREATE_NEW_CONSOLE)
-                .out(Stdio.file(output)).err(Stdio.STDOUT));
+                .standardHandles(false));
         Integer code = probe.exit().get(45, TimeUnit.SECONDS);
 
-        String report = Files.exists(result) ? Files.readString(result) : "(no result file) " + readOrEmpty(output);
+        String report = Files.exists(result) ? Files.readString(result).replace("\r\n", "\n") : "(no result file)";
         Map<String, String> r = keyValues(result);
-        log("01 Ctrl+C on a console of its own, probe exit=%d: %s", code, report.replace("\r\n", " ").replace("\n", " "));
+        log("01 Ctrl+C on a console of its own, probe exit=%d:%n%s", code, report.stripTrailing());
         assertThat(r).as(report).doesNotContainKey("error");
-        assertThat(r.get("A_alive_before")).as("A (ProcessBuilder) was running: " + report).isEqualTo("true");
-        assertThat(r.get("A_ended")).as("the control A, started by ProcessBuilder, must die of Ctrl+C: " + report)
+        assertThat(r.get("ctrl_c_sent")).as(report).isEqualTo("true");
+        // What the prototype has to prove: the flag spares the process, whatever its standard handles are...
+        assertThat(r.get("B_alive_before")).as(report).isEqualTo("true");
+        assertThat(r.get("B_ended")).as("B, started in a new process group, must survive Ctrl+C: " + report)
+                .isEqualTo("false");
+        assertThat(r.get("B2_ended")).as("B2, in a new process group with the handles of the console, must survive: "
+                + report).isEqualTo("false");
+        // ... and that it is the flag, not our way of starting: the same start without it dies of Ctrl+C.
+        assertThat(r.get("C_ended")).as("the control C, started by CreateProcessW without the flag, must die: " + report)
                 .isEqualTo("true");
-        assertThat(r.get("C_ended")).as("the control C, started by CreateProcessW without the flag, must die of Ctrl+C: "
-                + report).isEqualTo("true");
-        assertThat(r.get("B_alive_after")).as("B, started in a new process group, must survive Ctrl+C: " + report)
-                .isEqualTo("true");
+        // A, A2 and A3 (ProcessBuilder) are measures, not conditions: they say what PowerJ does today.
     }
 
     // --- 2. exit code ---
