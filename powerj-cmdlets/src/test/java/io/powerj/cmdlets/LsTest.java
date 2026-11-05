@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import io.powerj.api.UsageException;
+import io.powerj.testing.TestContext;
 
 class LsTest {
 

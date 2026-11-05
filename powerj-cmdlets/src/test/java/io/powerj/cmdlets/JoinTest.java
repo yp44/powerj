@@ -16,6 +16,8 @@ import org.junit.jupiter.api.Test;
 
 import io.powerj.api.Row;
 import io.powerj.api.ScriptBlock;
+import io.powerj.testing.CmdletDriver;
+import io.powerj.testing.TestContext;
 
 class JoinTest {
 
@@ -57,13 +59,7 @@ class JoinTest {
 
     private List<Row> join(Join.Params params, Object... inputs) throws Exception {
         var join = new Join();
-        join.begin(params, context);
-        for (Object input : inputs) {
-            join.process(params, input, context);
-        }
-        join.end(params, context);
-        context.closeStates();
-        return context.emitted;
+        return CmdletDriver.run(join, params, context, inputs);
     }
 
     private static Join.Params byKey(Object right, Object key) {

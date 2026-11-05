@@ -14,6 +14,7 @@
 
     <modules>
         <module>powerj-api</module>
+        <module>powerj-testing</module>
         <module>powerj-fs</module>
         <module>powerj-text</module>
         <module>powerj-core</module>
@@ -64,6 +65,11 @@
             <dependency>
                 <groupId>io.powerj</groupId>
                 <artifactId>powerj-text</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.powerj</groupId>
+                <artifactId>powerj-testing</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -247,7 +253,7 @@
                             <includeSystemScope>false</includeSystemScope>
                             <includeTestScope>false</includeTestScope>
                             <!-- What ships is the shell and the libraries it needs; powerj-fx is shipped apart and stays. -->
-                            <excludeArtifactId>powerj-coverage,powerj-dist,powerj-architecture,powerj-example-greet</excludeArtifactId>
+                            <excludeArtifactId>powerj-coverage,powerj-dist,powerj-architecture,powerj-testing,powerj-example-greet</excludeArtifactId>
                         </configuration>
                     </plugin>
                 </plugins>

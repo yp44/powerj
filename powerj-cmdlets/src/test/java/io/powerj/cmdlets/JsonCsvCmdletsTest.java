@@ -15,6 +15,8 @@ import org.junit.jupiter.api.Test;
 import io.powerj.api.Cmdlet;
 import io.powerj.api.Row;
 import io.powerj.api.ScriptBlock;
+import io.powerj.testing.CmdletDriver;
+import io.powerj.testing.TestContext;
 
 /** The cmdlets {@code to-json}, {@code from-json}, {@code to-csv} and {@code from-csv} (specification FR-73). */
 class JsonCsvCmdletsTest {
@@ -23,12 +25,7 @@ class JsonCsvCmdletsTest {
                                                      Object... inputs) {
         context.hasInput = true;
         try {
-            cmdlet.begin(params, context);
-            for (Object input : inputs) {
-                cmdlet.process(params, input, context);
-            }
-            cmdlet.end(params, context);
-            context.closeStates();
+            CmdletDriver.run(cmdlet, params, context, inputs);
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {

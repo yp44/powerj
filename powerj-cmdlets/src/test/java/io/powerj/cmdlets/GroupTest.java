@@ -13,6 +13,8 @@ import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 
 import io.powerj.api.ScriptBlock;
+import io.powerj.testing.CmdletDriver;
+import io.powerj.testing.TestContext;
 
 class GroupTest {
 
@@ -48,13 +50,7 @@ class GroupTest {
     private List<Group> group(boolean noItems, List<Object> keys, Object... inputs) throws Exception {
         var group = new GroupCmdlet();
         var params = new GroupCmdlet.Params(keys, noItems);
-        group.begin(params, context);
-        for (Object input : inputs) {
-            group.process(params, input, context);
-        }
-        group.end(params, context);
-        context.closeStates();
-        return context.emitted;
+        return CmdletDriver.run(group, params, context, inputs);
     }
 
     private static List<Object> keys(Object... keys) {

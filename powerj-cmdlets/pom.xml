@@ -33,6 +33,11 @@
             <artifactId>powerj-text</artifactId>
         </dependency>
         <dependency>
+            <groupId>io.powerj</groupId>
+            <artifactId>powerj-testing</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>

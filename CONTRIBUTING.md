@@ -134,7 +134,7 @@ and its refactoring plan, kept in the language in which it was commissioned.
 6. **Texts:** `<name>.summary`, `<name>.option.<longName>` and the error keys, in both bundles.
 7. `preview = true` only if the cmdlet has no side effect; otherwise implement `Previewable` and refuse the options that
    change something.
-8. Tests in `powerj-cmdlets/src/test/java/…/<Name>Test.java` with `TestContext` and `@TempDir`.
+8. Tests in `powerj-cmdlets/src/test/java/…/<Name>Test.java` with `TestContext` and `CmdletDriver.run(cmdlet, params, context, inputs…)` (module `powerj-testing`: begin, process for each object, end, as the shell does) and `@TempDir`.
 9. Docs: the cmdlets table of the README, the acceptance sheet `docs/acceptance/<name>.md` (format of `grep.md`), the
    specification, [CHANGELOG.md](CHANGELOG.md).
 

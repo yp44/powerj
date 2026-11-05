@@ -12,6 +12,8 @@ import org.junit.jupiter.api.Test;
 
 import io.powerj.api.Cmdlet;
 import io.powerj.api.ScriptBlock;
+import io.powerj.testing.CmdletDriver;
+import io.powerj.testing.TestContext;
 
 /**
  * Ctrl+C is not an error of the object (review C-15): when the block of a cmdlet is cancelled, the cmdlet stops with the
@@ -45,12 +47,7 @@ class CancellationPropagationTest {
                                         Object... inputs) throws Exception {
         @SuppressWarnings({"unchecked", "rawtypes"})
         Cmdlet<P, Object, Object> typed = (Cmdlet) cmdlet;
-        typed.begin(params, context);
-        for (Object input : inputs) {
-            typed.process(params, input, context);
-        }
-        typed.end(params, context);
-        context.closeStates();
+        CmdletDriver.run(typed, params, context, inputs);
     }
 
     /** A cmdlet with the parameters that put {@code block} where it is evaluated for each object. */

@@ -20,6 +20,7 @@ import io.powerj.api.perf.NativeStat;
 import io.powerj.api.perf.PerfReport;
 import io.powerj.api.perf.PhaseStat;
 import io.powerj.api.perf.StageStat;
+import io.powerj.testing.TestContext;
 
 class PerfTest {
 

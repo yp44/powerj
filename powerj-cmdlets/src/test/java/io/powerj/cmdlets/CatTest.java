@@ -16,6 +16,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import io.powerj.api.ScriptBlock;
+import io.powerj.testing.CmdletDriver;
+import io.powerj.testing.TestContext;
 
 class CatTest {
 
@@ -50,13 +52,7 @@ class CatTest {
     private List<Object> run(Cat.Params params, Object... inputs) throws Exception {
         var cat = new Cat();
         context.hasInput = inputs.length > 0;
-        cat.begin(params, context);
-        for (Object input : inputs) {
-            cat.process(params, input, context);
-        }
-        cat.end(params, context);
-        context.closeStates();
-        return context.emitted;
+        return CmdletDriver.run(cat, params, context, inputs);
     }
 
     private List<CatLine> numbered(Cat.Params params, Object... inputs) throws Exception {

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.powerj</groupId>
+        <artifactId>powerj-parent</artifactId>
+        <version>0.2.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>powerj-testing</artifactId>
+    <name>PowerJ Testing</name>
+    <description>
+        What the tests of the modules share: the in-memory CmdletContext and the driver that calls begin, process and
+        end (#98). Used with test scope and never shipped. It has no module descriptor: the tests that use it run on the
+        class path, where its package is open to them.
+    </description>
+
+    <properties>
+        <!-- Not an artifact of PowerJ: neither installed nor deployed, as powerj-architecture. -->
+        <maven.install.skip>true</maven.install.skip>
+        <maven.deploy.skip>true</maven.deploy.skip>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.powerj</groupId>
+            <artifactId>powerj-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- It is test code that the other modules run, not code that ships: no coverage floor of its own. -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <configuration>
+                    <skip>true</skip>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

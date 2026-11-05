@@ -21,6 +21,8 @@ import org.junit.jupiter.api.io.TempDir;
 import io.powerj.api.Cmdlet;
 import io.powerj.api.UsageException;
 import io.powerj.fs.Host;
+import io.powerj.testing.CmdletDriver;
+import io.powerj.testing.TestContext;
 
 /** {@code mkdir}, {@code touch}, {@code cp}, {@code mv} and {@code rm} (FR-72), always inside a temporary folder. */
 class FileOpsTest {
@@ -53,13 +55,7 @@ class FileOpsTest {
     private <P extends Record> List<Object> run(Cmdlet<P, Object, Object> cmdlet, P params, Object... inputs)
             throws Exception {
         context.hasInput = inputs.length > 0;
-        cmdlet.begin(params, context);
-        for (Object input : inputs) {
-            cmdlet.process(params, input, context);
-        }
-        cmdlet.end(params, context);
-        context.closeStates();
-        return context.emitted;
+        return CmdletDriver.run(cmdlet, params, context, inputs);
     }
 
     private Path file(String name, String content) throws IOException {

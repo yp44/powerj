@@ -19,6 +19,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import io.powerj.api.ScriptBlock;
 import io.powerj.api.Span;
+import io.powerj.testing.CmdletDriver;
+import io.powerj.testing.TestContext;
 
 class GrepTest {
 
@@ -51,9 +53,7 @@ class GrepTest {
 
     private List<GrepMatch> run(Grep.Params params) throws Exception {
         var grep = new Grep();
-        grep.begin(params, context);
-        grep.end(params, context);
-        context.closeStates();
+        CmdletDriver.run(grep, params, context);
         return context.emitted.stream().map(GrepMatch.class::cast).toList();
     }
 
@@ -254,12 +254,7 @@ class GrepTest {
         context.hasInput = true;
         var grep = new Grep();
         var params = new Grep.Params("fix", List.of(), false, null, null, true, false, false, null, null, false, false);
-        grep.begin(params, context);
-        for (String line : List.of("a1 Fix crash", "b2 add feature", "c3 fix typo")) {
-            grep.process(params, line, context);
-        }
-        grep.end(params, context);
-        context.closeStates();
+        CmdletDriver.run(grep, params, context, "a1 Fix crash", "b2 add feature", "c3 fix typo");
         assertThat(context.emitted).containsExactly("a1 Fix crash", "c3 fix typo");
     }
 
