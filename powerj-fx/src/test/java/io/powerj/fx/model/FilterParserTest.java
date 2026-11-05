@@ -12,6 +12,9 @@ import java.util.Date;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class FilterParserTest {
 
@@ -334,6 +337,32 @@ class FilterParserTest {
         assertThat(size(">100").keeps(101L)).isTrue();
         assertThat(size(">100b").keeps(100L)).isFalse();
         assertThat(size("=1kb").keeps(1_024L)).isTrue();
+    }
+
+    @ParameterizedTest(name = "{0} = {1} bytes")
+    @CsvSource({
+            "b,  1",
+            "kb, 1024",
+            "mb, 1048576",
+            "gb, 1073741824",
+            "tb, 1099511627776",
+            "KB, 1024",
+            "Mb, 1048576",
+            "gB, 1073741824",
+            "TB, 1099511627776",
+    })
+    void theUnitsOfAFilterAreThoseOfTheLanguage(String unit, long bytes) {
+        // the same table as UnitsTest (core) and SizeUnitsTest (powerj-text)
+        assertThat(size(">=2" + unit).keeps(2 * bytes)).isTrue();
+        assertThat(size(">=2" + unit).keeps(2 * bytes - 1)).isFalse();
+        assertThat(size("<2" + unit).keeps(2 * bytes - 1)).isTrue();
+        assertThat(size("<2" + unit).keeps(2 * bytes)).isFalse();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {">1pb", ">1kib", ">1 pb", ">kb", ">1kbb"})
+    void aUnitThatIsNotOneIsAnErrorInAFilter(String expression) {
+        assertThat(size(expression).error()).isNotNull();
     }
 
     @Test

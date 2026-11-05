@@ -150,7 +150,7 @@ options, the window opener). What touches the toolkit is behind ports (`FxPlatfo
 | `fx` uses only the API; its model does not use the toolkit's UI | `fxDependsOnlyOnTheApi`, `fxModelDoesNotUseTheToolkitUi` |
 | the core does not know its clients; the shell does not know `fx` | `coreDoesNotKnowItsClients`, `shellDoesNotKnowTheOptionalModule` |
 | no cycle between modules, none between core packages | `modulesHaveNoCycle`, `corePackagesHaveNoCycle` |
-| the layers of the core | `corePackagesRespectTheLayers`, `langDependsOnlyOnTheJdkAndTheApi` |
+| the layers of the core | `corePackagesRespectTheLayers`, `langDependsOnlyOnTheJdkTheApiAndText` |
 | completion does not use the concrete interpreter | `assistDoesNotUseTheConcreteInterpreter` |
 | the process is read in three places; the read loop does not know the editor; the shell does not use the built-in cmdlets | `shellReadsTheProcessInThreePlacesOnly`, `theReadLoopDoesNotKnowTheConcreteLineEditor`, `shellDoesNotUseTheBuiltInCmdlets` |
 | no mutable static field (one exception frozen: `Language.current`); only `Main` ends the JVM | `staticFieldsAreFinal`, `onlyMainEndsTheJvm` |

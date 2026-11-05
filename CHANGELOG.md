@@ -538,6 +538,18 @@ structures, functions) can be built on it. The work is organised in phases (revi
   (case-insensitive access by name, for properties) stays as it is: it holds accessors only, and reads no annotation.
 - No visible change. `cmdlets` now requires `io.powerj.text`.
 
+### Changed (one definition of the units of a size, [#110](https://github.com/yp44/powerj/issues/110))
+- **`io.powerj.text.SizeUnits` says what `b kb mb gb tb` are worth** (multiples of 1024, any case): `power`, `factor`, `bytes` and the
+  alternation `PATTERN` to build a regular expression. The unit literals of the language (`core.lang.Units`: `2.5mb`) and the filter of
+  a column of the grid (`fx.model.FilterParser`: `>2,5 mb`) used to know the list of units and the powers of 1024 each on their own.
+- **What stays different on purpose:** the syntax. A literal is `digits[.digits]unit`, with the unit required, and is rounded to the byte
+  as a `long`; a filter also takes a sign, a comma, a space before the unit and no unit at all, and compares the exact value. Only the
+  value of a unit is shared.
+- The architecture rule on `core.lang` (the language needs nothing of the engine) now also allows `powerj-text`, a leaf that depends
+  on the API and the JDK only: `langDependsOnlyOnTheJdkTheApiAndText`.
+- No visible change. The same table of factors (`b` 1 … `tb` 1099511627776, any case, `pb` and `kib` refused) is checked in
+  `powerj-text` (`SizeUnitsTest`), in `core` (`UnitsTest`) and in `fx` (`FilterParserTest`).
+
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
   whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes

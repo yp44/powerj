@@ -17,6 +17,7 @@ import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 import io.powerj.fx.Messages;
+import io.powerj.text.SizeUnits;
 
 /**
  * The expression typed in the filter of a column (specification FR-77). A column of numbers, sizes or dates is
@@ -40,7 +41,7 @@ public final class FilterParser {
 
     private static final Pattern DATE = Pattern.compile(
             "(\\d{4})(?:-(\\d{2})(?:-(\\d{2})(?:[T ](\\d{2}):(\\d{2})(?::(\\d{2}))?)?)?)?");
-    private static final Pattern SIZE = Pattern.compile("([+-]?\\d+(?:[.,]\\d+)?)\\s*(b|kb|mb|gb|tb)?",
+    private static final Pattern SIZE = Pattern.compile("([+-]?\\d+(?:[.,]\\d+)?)\\s*(" + SizeUnits.PATTERN + ")?",
             Pattern.CASE_INSENSITIVE);
     private static final Pattern NUMBER = Pattern.compile("[+-]?\\d+(?:[.,]\\d+)?(?:[eE][+-]?\\d+)?");
 
@@ -140,9 +141,8 @@ public final class FilterParser {
         BigDecimal exact = number(text, semantics);
         if (semantics == ColumnKind.SIZE) {
             Matcher m = SIZE.matcher(text);
-            if (m.matches() && m.group(2) != null && power(m.group(2)) > 0 && decimals(m.group(1)) <= 1) {
-                BigDecimal half = new BigDecimal("0.05")
-                        .multiply(new BigDecimal(BigInteger.valueOf(1024).pow(power(m.group(2)))));
+            if (m.matches() && m.group(2) != null && SizeUnits.power(m.group(2)) > 0 && decimals(m.group(1)) <= 1) {
+                BigDecimal half = new BigDecimal("0.05").multiply(SizeUnits.factor(m.group(2)));
                 return new Interval<>(exact.subtract(half), true, exact.add(half), false);
             }
         }
@@ -152,16 +152,6 @@ public final class FilterParser {
     private static int decimals(String number) {
         int separator = Math.max(number.indexOf('.'), number.indexOf(','));
         return separator < 0 ? 0 : number.length() - separator - 1;
-    }
-
-    private static int power(String unit) {
-        return switch (lower(unit)) {
-            case "kb" -> 1;
-            case "mb" -> 2;
-            case "gb" -> 3;
-            case "tb" -> 4;
-            default -> 0;
-        };
     }
 
     /** Operators and ranges of the numbers, the sizes and the dates. */
@@ -218,8 +208,7 @@ public final class FilterParser {
                 throw new Invalid(Messages.get("grid.filter.size.invalid", text));
             }
             BigDecimal value = new BigDecimal(m.group(1).replace(',', '.'));
-            int power = m.group(2) == null ? 0 : power(m.group(2));
-            return value.multiply(new BigDecimal(BigInteger.valueOf(1024).pow(power)));
+            return SizeUnits.bytes(value, m.group(2) == null ? "b" : m.group(2));
         }
         if (!NUMBER.matcher(text).matches()) {
             throw new Invalid(Messages.get("grid.filter.number.invalid", text));
