@@ -599,7 +599,9 @@ structures, functions) can be built on it. The work is organised in phases (revi
   is still started by `ProcessBuilder`, without protection: `cmd.exe` reads its command line by other rules.
 - **Behaviour that changes on Unix, as in a shell with job control**: a background command that reads the terminal (`/dev/tty`:
   `ssh`, `sudo`) or, after `stty tostop`, writes to it, is stopped by the terminal and ignores `SIGTERM` until it is continued
-  (`kill -f` ends it); and `kill -INT <pid>` sent straight to a job now kills it, where the `sh` wrapper ignored it. The test
+  (`kill -f` ends it); `kill -INT <pid>` sent straight to a job now kills it, where the `sh` wrapper ignored it; and a signal
+  sent to the process group of the shell no longer reaches the jobs (the `SIGHUP` of a closed terminal, the signal by which a CI
+  job or `timeout` aborts a script by its group): a job outlives the terminal or the script that started it, as with `nohup`. The test
   `InterpreterTest.backgroundCommandGivesControlBackAtOnce` checks the group, no longer the ignored signal.
 - **On Windows the arguments of a background command are quoted correctly**: an argument that holds a `"` reaches the program
   as written, where `ProcessBuilder` splits it. Measured on the CI: 12 tricky arguments out of 12 against 4. A start is also

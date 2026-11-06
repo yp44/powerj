@@ -275,7 +275,9 @@ Choices, and why:
    nothing: it is out of the reach of the terminal's signal. The test now checks that the job leads a group of its own, and
    `PosixSpawnTest.check02` that a `SIGINT` sent to the foreground group does not reach it.
 4. **Behaviour that changes on Unix** (a shell with job control does the same): a job that reads the terminal, or writes to it after
-   `stty tostop`, is stopped; a stopped job ignores `SIGTERM`; `kill -INT <pid>` kills a job.
+   `stty tostop`, is stopped; a stopped job ignores `SIGTERM`; `kill -INT <pid>` kills a job; and **a signal sent to the process group of the
+   shell no longer reaches the jobs**: a closed terminal (`SIGHUP`) or a CI harness that aborts a script by its group leaves them running,
+   as with `nohup` (found by the review of #129, point 1; documented in FR-75).
 5. **Windows arguments are quoted correctly** for a background command: they differ from what `ProcessBuilder` sends for an argument that holds a `"`.
 
 Not measured, to look at on a real machine: macOS (the CI runs the Unix tests there), a Windows GUI program in the background, `Ctrl+Break`,

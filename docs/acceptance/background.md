@@ -55,13 +55,14 @@ Build and run (any system with a JDK 25): `./mvnw -B -Pdist -DskipFx -DskipTests
 | G9 | Windows: a batch file in the background (`hello.cmd x &`) | It runs and its output appears, but it is not protected: Ctrl+C reaches it (known limitation). |
 | G10 | A Unix system without a usable `posix_spawn` (glibc older than 2.34, Alpine): `sleep 5 &` | Refused: `cannot start a background command on this system (no usable posix_spawn); set POWERJ_BACKGROUND_SH_FALLBACK=true to start it through sh`. With `env --set POWERJ_BACKGROUND_SH_FALLBACK=true` it starts through `sh`, which ignores `SIGINT` and `SIGQUIT` (no process group of its own). |
 
-The same comparison on a pseudo-terminal, with a real Ctrl+C, is the script `powerj-core/src/test/prototype/pty-check.py`.
+The same comparison on a pseudo-terminal, with a real Ctrl+C, is the script `powerj-core/src/test/tools/pty-check.py`.
 
 ## Known limitations
 
 - Windows 11: `notepad`, `calc`, `mspaint` (and other Store applications) are launchers: `notepad.exe` starts the real application through Windows, then ends at once with code 0. The job is therefore `done` right away, and its pid no longer exists; the window that opened is another process, which is not a child of PowerJ. Stop it with `ps notepad | kill`.
 
 - Windows: a **batch file** (`.bat`, `.cmd`) in the background still receives the console's Ctrl+C: it is started by `ProcessBuilder`, because `cmd.exe` reads its command line by rules that `CreateProcessW` cannot apply safely. Console programs and graphical programs are protected.
+- Unix: a job is not in the process group of the shell, so a signal sent to that group does not reach it: closing the terminal (`SIGHUP`), or a harness that aborts a script by its group, leaves the jobs running (as with `nohup`). Stop them with `jobs | kill` before leaving.
 - Unix: a job that reads the terminal (`/dev/tty`) or, after `stty tostop`, writes to it, is stopped, as in a shell with job control; `kill` (`SIGTERM`) does not end it until it is continued, `kill -f` does.
 - The output of a background command is not captured: it goes to the terminal, where it may mix with the prompt, unless redirected.
 - No `fg`, `bg` or `wait`: follow a job with `jobs`, stop it with `jobs | kill`.
