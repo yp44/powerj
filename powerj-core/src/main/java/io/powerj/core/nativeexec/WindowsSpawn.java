@@ -56,7 +56,6 @@ final class WindowsSpawn {
     private static final int GENERIC_READ = 0x80000000;
     private static final int GENERIC_WRITE = 0x40000000;
     private static final int FILE_APPEND_DATA = 0x4;
-    private static final int FILE_SHARE_READ = 0x1;
     private static final int FILE_SHARE_READ_WRITE = 0x3;
     private static final int CREATE_ALWAYS = 2;
     private static final int OPEN_EXISTING = 3;
@@ -366,7 +365,9 @@ final class WindowsSpawn {
                         arena, owned);
             }
             case FILE -> {
-                return open(stdio.file().toString(), GENERIC_WRITE, FILE_SHARE_READ, CREATE_ALWAYS, security, arena, owned);
+                // Read and write shared, as FileOutputStream does and as a file is on Linux: another job may write the same file.
+                return open(stdio.file().toString(), GENERIC_WRITE, FILE_SHARE_READ_WRITE, CREATE_ALWAYS, security, arena,
+                        owned);
             }
             case APPEND -> {
                 return open(stdio.file().toString(), FILE_APPEND_DATA, FILE_SHARE_READ_WRITE, OPEN_ALWAYS, security, arena,

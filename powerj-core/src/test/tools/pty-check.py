@@ -8,10 +8,10 @@ command) and C (a companion in the foreground group) are alive. It also looks at
 from the terminal: SIGTTOU when it writes with `stty tostop`, SIGTTIN when it reads.
 
     ./mvnw -pl powerj-core -am test-compile          # compiles PtyProbe
-    JAVA=<jdk 25>/bin/java python3 powerj-core/src/test/prototype/pty-check.py
+    JAVA=<jdk 25>/bin/java python3 powerj-core/src/test/tools/pty-check.py
 
 Reads: B started as `plain` (ProcessBuilder, as a console program on Windows today), `shield` (sh + trap '' INT QUIT, as
-on Unix today), `group` (posix_spawn with its own process group, the prototype, standard input inherited) or `launcher`
+on Unix today), `group` (PosixSpawn directly, with its own process group and standard input inherited) or `launcher`
 (BackgroundLauncher, what the shell runs for a background command; standard input is the null device).
 """
 import os

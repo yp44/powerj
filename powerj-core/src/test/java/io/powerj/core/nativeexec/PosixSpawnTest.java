@@ -26,17 +26,18 @@ import org.junit.jupiter.api.io.TempDir;
 import io.powerj.core.nativeexec.PosixSpawn.Spawned;
 import io.powerj.core.nativeexec.PosixSpawn.Spec;
 import io.powerj.core.nativeexec.PosixSpawn.Stdio;
+import io.powerj.core.support.ProcessGroups;
 
 
 /**
  * Issue #128 (Linux and macOS): start a background process in its own process group with {@code posix_spawn} through the
- * FFM API (the checks of the plan, {@code docs/plans/background-process-group.md}, Phase 1). Each test is one check of the plan ({@code docs/plans/background-process-group.md}, Phase 1);
- * the numbers are printed and appended to {@code target/prototype/posix-spawn-results.txt}. Not shipped.
+ * FFM API. Each test is one check of the plan ({@code docs/plans/background-process-group.md}, Phase 1); the numbers are
+ * printed and appended to {@code target/background/posix-spawn-results.txt}.
  */
 @EnabledOnOs({OS.LINUX, OS.MAC})
 class PosixSpawnTest {
 
-    private static final Path RESULTS = Path.of("target", "prototype", "posix-spawn-results.txt");
+    private static final Path RESULTS = Path.of("target", "background", "posix-spawn-results.txt");
     private static final String SH_SHIELD = "trap '' INT QUIT; exec \"$0\" \"$@\"";
 
     @TempDir
@@ -64,7 +65,7 @@ class PosixSpawnTest {
         int jvmGroup = PosixSpawn.getpgrp();
 
         assertThat(PosixSpawn.getpgid(own.pid())).isEqualTo(own.pid()).isNotEqualTo(jvmGroup);
-        assertThat(psGroup(own.pid())).isEqualTo(own.pid());
+        assertThat(ProcessGroups.of(own.pid())).isEqualTo(own.pid());
         assertThat(PosixSpawn.getpgid(shared.pid())).isEqualTo(jvmGroup);
         // The `sh` wrapper of today: same group as the JVM, so the terminal's SIGINT reaches it (and is ignored there).
         assertThat(PosixSpawn.getpgid((int) shielded.pid())).isEqualTo(jvmGroup);
@@ -421,14 +422,6 @@ class PosixSpawnTest {
         throw new IllegalStateException("no " + name);
     }
 
-    /** The process group of a process, from {@code ps}, which Linux and macOS both have. */
-    private static int psGroup(int pid) throws IOException, InterruptedException {
-        Process ps = new ProcessBuilder("ps", "-o", "pgid=", "-p", String.valueOf(pid)).redirectErrorStream(true).start();
-        String text = new String(ps.getInputStream().readAllBytes()).strip();
-        ps.waitFor();
-        return Integer.parseInt(text);
-    }
-
     private static String signals(int pid) throws IOException {
         Map<String, String> wanted = new java.util.LinkedHashMap<>();
         for (String line : Files.readAllLines(Path.of("/proc", String.valueOf(pid), "status"))) {
@@ -476,7 +469,7 @@ class PosixSpawnTest {
 
     private static void log(String format, Object... args) {
         String line = String.format(format, args);
-        System.out.println("[prototype] " + line);
+        System.out.println("[posix-spawn] " + line);
         try {
             Files.createDirectories(RESULTS.getParent());
             Files.writeString(RESULTS, line + System.lineSeparator(), java.nio.file.StandardOpenOption.CREATE,

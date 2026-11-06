@@ -20,6 +20,7 @@ import io.powerj.core.command.CmdletRegistry;
 import io.powerj.core.error.PjException;
 import io.powerj.core.nativeexec.NativeRun;
 import io.powerj.fs.Host;
+import io.powerj.core.support.ProcessGroups;
 
 /** Runs real native commands ({@code sh}, {@code printf}…): tests limited to Linux/macOS. */
 class InterpreterTest {
@@ -261,9 +262,9 @@ class InterpreterTest {
             });
             // Ctrl+C in the terminal goes to the foreground process group. The background command is not in it: it leads a
             // group of its own (started with posix_spawn, issue #128), so the signal never reaches it. What a real Ctrl+C
-            // does is checked on a pseudo-terminal (powerj-core/src/test/prototype/pty-check.py).
-            assertThat(processGroup(last.pid())).isEqualTo(last.pid())
-                    .isNotEqualTo(processGroup(ProcessHandle.current().pid()));
+            // does is checked on a pseudo-terminal (powerj-core/src/test/tools/pty-check.py).
+            assertThat(ProcessGroups.of(last.pid())).isEqualTo(last.pid())
+                    .isNotEqualTo(ProcessGroups.of(ProcessHandle.current().pid()));
         } finally {
             sleep.destroyForcibly();
         }
@@ -298,14 +299,6 @@ class InterpreterTest {
         run("\"x\" &");
         assertThat(errors).containsExactly(message);
         assertThat(session.jobs().list()).isEmpty();
-    }
-
-    /** The process group of a process, from {@code ps}, which Linux and macOS both have. */
-    private static long processGroup(long pid) throws Exception {
-        Process ps = new ProcessBuilder("ps", "-o", "pgid=", "-p", Long.toString(pid)).redirectErrorStream(true).start();
-        String text = new String(ps.getInputStream().readAllBytes()).strip();
-        ps.waitFor();
-        return Long.parseLong(text);
     }
 
     /** Waits for the end of the background jobs. */

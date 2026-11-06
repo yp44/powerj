@@ -9,7 +9,7 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
-/** The prototype's command line and environment block (issue #128): pure strings, checked on every system. */
+/** The command line and the environment block of {@link WindowsCommandLine} (issue #128): pure strings, checked on every system. */
 class WindowsCommandLineTest {
 
     @Test

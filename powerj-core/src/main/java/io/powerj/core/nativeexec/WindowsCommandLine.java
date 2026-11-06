@@ -4,8 +4,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * PROTOTYPE of issue #128 (Windows), test code: the two strings that {@code CreateProcessW} wants and that
- * {@code ProcessBuilder} builds for us today, the command line and the environment block. Pure, so that it is tested on
+ * The two strings that {@code CreateProcessW} wants and that {@code ProcessBuilder} builds for us otherwise, the
+ * command line and the environment block (issue #128). Pure, so that it is tested on
  * every system.
  * <p>
  * The command line follows the rules that {@code CommandLineToArgvW} and the C runtime read back (2n backslashes before a

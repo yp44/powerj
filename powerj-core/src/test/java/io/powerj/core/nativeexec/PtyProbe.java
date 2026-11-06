@@ -11,8 +11,8 @@ import io.powerj.core.nativeexec.PosixSpawn.Stdio;
 
 
 /**
- * PROTOTYPE of issue #128, not shipped: the process that {@code powerj-core/src/test/prototype/pty-check.py} runs on a
- * pseudo-terminal, as PowerJ runs on a real one. It starts a background command B in one of three ways, and a
+ * Issue #128: the process that {@code powerj-core/src/test/tools/pty-check.py} runs on a pseudo-terminal, as PowerJ runs on a
+ * real one. Test tooling, run by hand. It starts a background command B in one of three ways, and a
  * companion C (a plain {@code sleep}, in the group of the JVM, so in the foreground group): the script then sends
  * Ctrl+C to the terminal and looks at which of B and C are still alive.
  * <pre>

@@ -25,12 +25,13 @@ import io.powerj.core.nativeexec.CommandResolver;
 import io.powerj.core.nativeexec.NativeEncoding;
 import io.powerj.core.nativeexec.NativeRun;
 import io.powerj.fs.Host;
+import io.powerj.core.support.ProcessGroups;
 
 /**
  * Background jobs on Linux and macOS (issue #128, FR-75): a job is started by {@link BackgroundLauncher} in a process group
  * of its own, not by {@code sh}, so that the Ctrl+C of the terminal does not reach it; the {@code sh} fallback exists only for
  * a system that cannot, and only when the session allows it. Real programs ({@code sleep}, {@code sh}): Unix only.
- * What happens to a real Ctrl+C is checked on a pseudo-terminal ({@code powerj-core/src/test/prototype/pty-check.py}).
+ * What happens to a real Ctrl+C is checked on a pseudo-terminal ({@code powerj-core/src/test/tools/pty-check.py}).
  */
 class BackgroundJobsTest {
 
@@ -86,7 +87,7 @@ class BackgroundJobsTest {
         NativeRun last = session.lastNative().orElseThrow();
         assertThat(last.exitCode()).isNull();
         assertThat(session.lastSucceeded()).isTrue();
-        assertThat(processGroup(last.pid())).isEqualTo(last.pid()).isNotEqualTo(processGroup(ProcessHandle.current().pid()));
+        assertThat(ProcessGroups.of(last.pid())).isEqualTo(last.pid()).isNotEqualTo(ProcessGroups.of(ProcessHandle.current().pid()));
         assertThat(session.jobs().list()).singleElement().satisfies(job -> {
             assertThat(job.id()).isEqualTo(1);
             assertThat(job.pid()).isEqualTo(last.pid());
@@ -117,8 +118,8 @@ class BackgroundJobsTest {
         run("sleep 30 | sleep 31 &");
 
         long last = session.lastNative().orElseThrow().pid();
-        long group = processGroup(last);
-        assertThat(group).isNotEqualTo(last).isNotEqualTo(processGroup(ProcessHandle.current().pid()));
+        long group = ProcessGroups.of(last);
+        assertThat(group).isNotEqualTo(last).isNotEqualTo(ProcessGroups.of(ProcessHandle.current().pid()));
         ProcessHandle first = ProcessHandle.of(group).orElseThrow();
         assertThat(first.isAlive()).isTrue();
         assertThat(first.parent()).contains(ProcessHandle.current());
@@ -196,7 +197,7 @@ class BackgroundJobsTest {
 
         assertThat(errors).isEmpty();
         long pid = session.lastNative().orElseThrow().pid();
-        assertThat(processGroup(pid)).isEqualTo(processGroup(ProcessHandle.current().pid()));
+        assertThat(ProcessGroups.of(pid)).isEqualTo(ProcessGroups.of(ProcessHandle.current().pid()));
         ProcessHandle sleep = ProcessHandle.of(pid).orElseThrow();
         // The shell that starts it ignores SIGINT, then becomes sleep: signalled before that it would die, which no user
         // can do within a millisecond of pressing Enter.
@@ -210,14 +211,6 @@ class BackgroundJobsTest {
     }
 
     // --- helpers ---
-
-    /** The process group of a process, from {@code ps}, which Linux and macOS both have. */
-    private static long processGroup(long pid) throws IOException, InterruptedException {
-        Process ps = new ProcessBuilder("ps", "-o", "pgid=", "-p", Long.toString(pid)).redirectErrorStream(true).start();
-        String text = new String(ps.getInputStream().readAllBytes()).strip();
-        ps.waitFor();
-        return Long.parseLong(text);
-    }
 
     /** Waits for the end of the background jobs. */
     private void awaitEnd() throws InterruptedException {

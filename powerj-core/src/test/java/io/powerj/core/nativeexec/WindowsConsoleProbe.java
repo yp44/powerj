@@ -22,7 +22,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * PROTOTYPE of issue #128 (Windows), test code: the process that {@code WindowsSpawnTest} starts <b>in a console of
+ * Issue #128 (Windows), a helper program of {@code WindowsSpawnTest}: the process that it starts <b>in a console of
  * its own</b> (so that the Ctrl+C sent here reaches nothing of the build), with the standard handles of that console as a
  * program started in a terminal has them. It starts several {@code ping -t} and sends
  * {@code GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0)}, which goes to every process of the console:

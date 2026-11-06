@@ -33,15 +33,14 @@ import io.powerj.core.nativeexec.WindowsSpawn.Spec;
 import io.powerj.core.nativeexec.WindowsSpawn.Stdio;
 
 /**
- * PROTOTYPE of issue #128 (Windows): start a background process in a new process group with {@code CreateProcessW}
- * through the FFM API. Each test is one check of the plan ({@code docs/plans/background-process-group.md}, Phase 2); the
- * numbers are printed and appended to {@code target/prototype/windows-spawn-results.txt}. It was written without a Windows
- * machine: the Windows job of the CI is the first place where it runs. Not shipped.
+ * Issue #128 (Windows): start a background process in a new process group with {@code CreateProcessW} through the FFM
+ * API. Each test is one check of the plan ({@code docs/plans/background-process-group.md}, Phase 2); the numbers are
+ * printed and appended to {@code target/background/windows-spawn-results.txt}.
  */
 @EnabledOnOs(OS.WINDOWS)
 class WindowsSpawnTest {
 
-    private static final Path RESULTS = Path.of("target", "prototype", "windows-spawn-results.txt");
+    private static final Path RESULTS = Path.of("target", "background", "windows-spawn-results.txt");
     private static final Pattern ERROR_NUMBER = Pattern.compile("error=(\\d+)");
 
     @TempDir
@@ -72,7 +71,7 @@ class WindowsSpawnTest {
         log("01 Ctrl+C on a console of its own, probe exit=%d:%n%s", code, report.stripTrailing());
         assertThat(r).as(report).doesNotContainKey("error");
         assertThat(r.get("ctrl_c_sent")).as(report).isEqualTo("true");
-        // What the prototype has to prove: the flag spares the process, whatever its standard handles are...
+        // What the process group has to prove: the flag spares the process, whatever its standard handles are...
         assertThat(r.get("B_alive_before")).as(report).isEqualTo("true");
         assertThat(r.get("B_ended")).as("B, started in a new process group, must survive Ctrl+C: " + report)
                 .isEqualTo("false");
@@ -181,6 +180,20 @@ class WindowsSpawnTest {
         assertThat(start(echo.out(Stdio.file(both)).err(Stdio.STDOUT)).exit().get(60, TimeUnit.SECONDS)).isZero();
         assertThat(lines(both)).containsExactly("out", "err", "stdin=0"); // 2>&1: one handle for both
         log("04 redirections: > truncates, >> appends (FILE_APPEND_DATA), 2>&1 shares one handle, stdin on NUL ends at once");
+    }
+
+    @Test
+    void check04a_twoJobsCanWriteTheSameFile() throws Exception {
+        // On Linux and with FileOutputStream a file can be opened for writing by two processes; a handle opened with
+        // FILE_SHARE_READ only made the second open fail with error 32 (sharing violation).
+        Path shared = tmp.resolve("shared.txt");
+        Spawned first = start(Spec.of(ping(), "-n", "3", "127.0.0.1").out(Stdio.file(shared)));
+        Spawned second = start(Spec.of(cmd(), "/c", "echo", "second").out(Stdio.append(shared)));
+        Spawned third = start(Spec.of(cmd(), "/c", "echo", "third").out(Stdio.file(shared)));
+        assertThat(second.exit().get(30, TimeUnit.SECONDS)).isZero();
+        assertThat(third.exit().get(30, TimeUnit.SECONDS)).isZero();
+        assertThat(first.exit().get(30, TimeUnit.SECONDS)).isZero();
+        log("04a three processes wrote the same file with > and >> without a sharing violation");
     }
 
     @Test
@@ -311,7 +324,7 @@ class WindowsSpawnTest {
         Path out = tmp.resolve("hello.txt");
         runByJava(new ProcessBuilder(script.toString(), "x").redirectOutput(out.toFile()));
         assertThat(lines(out)).containsExactly("hello x");
-        log("07 .cmd/.bat: refused by the prototype (the launcher hands them to ProcessBuilder, which runs this one: %s)",
+        log("07 .cmd/.bat: refused by WindowsSpawn (the launcher hands them to ProcessBuilder, which runs this one: %s)",
                 lines(out));
     }
 
@@ -488,7 +501,7 @@ class WindowsSpawnTest {
 
     private static void log(String format, Object... args) {
         String line = String.format(format, args);
-        System.out.println("[prototype] " + line);
+        System.out.println("[windows-spawn] " + line);
         try {
             Files.createDirectories(RESULTS.getParent());
             Files.writeString(RESULTS, line + System.lineSeparator(), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
