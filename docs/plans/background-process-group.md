@@ -149,7 +149,7 @@ shipped. The 14 tests pass, the whole `powerj-core` suite passes (940 tests), an
    `sudo`, `gpg`) is stopped. Today they are not, because they stay in the foreground group.
 2. **A stopped job ignores `SIGTERM`** (measured: the signal stays pending until `SIGCONT`; `SIGKILL` works). `jobs | kill`
    without `-f` would leave such a job alone. **Done** (review of #129, point 2): `Kill` sends `SIGCONT` after a normal `SIGTERM`
-   on Unix, through the native `kill -CONT`; `PsKillTest.killEndsAProcessThatTheTerminalHasStopped` fails without it.
+   on Unix, through `kill(2)` called by FFM (`io.powerj.fs.ProcessSignals`, no program started); `PsKillTest.killEndsAProcessThatTheTerminalHasStopped` fails without it.
 3. **The pty harness must not make the probe the session leader**: when the leader dies, the kernel sends `SIGHUP` to its
    foreground group, which killed the `sh` + `trap` child in a first version of the script. A real terminal's leader is the
    user's shell; `pty-check.py` now plays it.

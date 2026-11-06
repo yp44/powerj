@@ -603,6 +603,8 @@ structures, functions) can be built on it. The work is organised in phases (revi
   sent to the process group of the shell no longer reaches the jobs (the `SIGHUP` of a closed terminal, the signal by which a CI
   job or `timeout` aborts a script by its group): a job outlives the terminal or the script that started it, as with `nohup`. The test
   `InterpreterTest.backgroundCommandGivesControlBackAtOnce` checks the group, no longer the ignored signal.
+- **An executable text file without a `#!` line no longer starts in the background**: the former `sh` wrapper ran it as a shell
+  script, `posix_spawn` does not (`Exec format error`). Give it to its interpreter: `sh script &`. (Decided in the review of #129.)
 - **On Windows the arguments of a background command are quoted correctly**: an argument that holds a `"` reaches the program
   as written, where `ProcessBuilder` splits it. Measured on the CI: 12 tricky arguments out of 12 against 4. A start is also
   faster (7 ms against 16 ms for `cmd /c exit 0`).

@@ -39,6 +39,7 @@ class PosixSpawnTest {
 
     private static final Path RESULTS = Path.of("target", "background", "posix-spawn-results.txt");
     private static final String SH_SHIELD = "trap '' INT QUIT; exec \"$0\" \"$@\"";
+    private static final int SIGINT = 2;
 
     @TempDir
     Path tmp;
@@ -62,16 +63,16 @@ class PosixSpawnTest {
         Spawned own = start(sleep().group(PosixSpawn.OWN_GROUP));
         Spawned shared = start(sleep());
         Process shielded = startByJava(new ProcessBuilder("/bin/sh", "-c", SH_SHIELD, exe("sleep").toString(), "30"));
-        int jvmGroup = PosixSpawn.getpgrp();
+        long jvmGroup = ProcessGroups.of(ProcessHandle.current().pid());
 
-        assertThat(PosixSpawn.getpgid(own.pid())).isEqualTo(own.pid()).isNotEqualTo(jvmGroup);
+        assertThat(ProcessGroups.of(own.pid())).isEqualTo(own.pid()).isNotEqualTo(jvmGroup);
         assertThat(ProcessGroups.of(own.pid())).isEqualTo(own.pid());
-        assertThat(PosixSpawn.getpgid(shared.pid())).isEqualTo(jvmGroup);
+        assertThat(ProcessGroups.of(shared.pid())).isEqualTo(jvmGroup);
         // The `sh` wrapper of today: same group as the JVM, so the terminal's SIGINT reaches it (and is ignored there).
-        assertThat(PosixSpawn.getpgid((int) shielded.pid())).isEqualTo(jvmGroup);
+        assertThat(ProcessGroups.of(shielded.pid())).isEqualTo(jvmGroup);
         log("01 pgid: jvm=%d, posix_spawn(setpgroup 0)=%d (own pid %d), posix_spawn(no group)=%d, sh+trap=%d",
-                jvmGroup, PosixSpawn.getpgid(own.pid()), own.pid(), PosixSpawn.getpgid(shared.pid()),
-                PosixSpawn.getpgid((int) shielded.pid()));
+                jvmGroup, ProcessGroups.of(own.pid()), own.pid(), ProcessGroups.of(shared.pid()),
+                ProcessGroups.of(shielded.pid()));
     }
 
     // --- 2. SIGINT of the foreground group ---
@@ -82,10 +83,10 @@ class PosixSpawnTest {
         Spawned leader = start(sleep().group(PosixSpawn.OWN_GROUP));
         Spawned member = start(sleep().group(leader.pid()));
         Spawned background = start(sleep().group(PosixSpawn.OWN_GROUP));
-        assertThat(PosixSpawn.getpgid(member.pid())).isEqualTo(leader.pid());
-        assertThat(PosixSpawn.getpgid(background.pid())).isEqualTo(background.pid());
+        assertThat(ProcessGroups.of(member.pid())).isEqualTo(leader.pid());
+        assertThat(ProcessGroups.of(background.pid())).isEqualTo(background.pid());
 
-        assertThat(PosixSpawn.kill(-leader.pid(), PosixSpawn.SIGINT)).isZero();
+        assertThat(PosixSpawn.kill(-leader.pid(), SIGINT)).isZero();
 
         assertThat(leader.exit().get(10, TimeUnit.SECONDS)).isEqualTo(130);
         assertThat(member.exit().get(10, TimeUnit.SECONDS)).isEqualTo(130);
@@ -102,7 +103,7 @@ class PosixSpawnTest {
         // What the unit test of today does (`kill -INT <pid>`): with a process group the program does not ignore
         // SIGINT, it only is out of the reach of the terminal. That test has to change.
         Spawned background = start(sleep().group(PosixSpawn.OWN_GROUP));
-        assertThat(PosixSpawn.kill(background.pid(), PosixSpawn.SIGINT)).isZero();
+        assertThat(PosixSpawn.kill(background.pid(), SIGINT)).isZero();
         assertThat(background.exit().get(10, TimeUnit.SECONDS)).isEqualTo(130);
         log("02b kill -INT <pid> of a process in its own group: exit=%d (the sh+trap child survives it)",
                 background.exit().get());
@@ -125,7 +126,6 @@ class PosixSpawnTest {
 
     @Test
     void check03b_noStatusIsLostInAThousandRunsEvenWithTheJdkStartingProcessesToo() throws Exception {
-        int before = PosixSpawn.lostStatuses();
         Path trueExe = exe("true");
         var noise = new AtomicBoolean(true);
         int[] noiseRuns = new int[1];
@@ -151,7 +151,7 @@ class PosixSpawnTest {
                     long bad = 0;
                     long viaHandle = 0;
                     for (int i = 0; i < perThread; i++) {
-                        Spawned child = PosixSpawn.spawn(sh("exit 5"));
+                        Spawned child = PosixSpawnSupport.spawn(sh("exit 5"));
                         // Half of the children are also followed by the JDK, as `jobs` or `ps` would.
                         if (i % 2 == 0) {
                             var handle = ProcessHandle.of(child.pid());
@@ -178,10 +178,10 @@ class PosixSpawnTest {
         }
         long millis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - begin);
         assertThat(wrong).isZero();
-        assertThat(PosixSpawn.lostStatuses() - before).isZero();
-        log("03b %d runs on %d threads, %d ProcessBuilder runs at the same time: %d wrong codes, %d lost statuses "
+        // A status that waitpid could not give would complete the future with an exception and fail the get() above.
+        log("03b %d runs on %d threads, %d ProcessBuilder runs at the same time: %d wrong codes or lost statuses "
                         + "(%d ms, %d children also followed through ProcessHandle)", threads * perThread, threads,
-                noiseRuns[0], wrong, PosixSpawn.lostStatuses() - before, millis, handleCompleted);
+                noiseRuns[0], wrong, millis, handleCompleted);
     }
 
     @Test
@@ -318,7 +318,7 @@ class PosixSpawnTest {
         Path notExecutable = Files.writeString(tmp.resolve("data.txt"), "x");
         List<String> lines = new ArrayList<>();
         for (Path path : List.of(missing, notExecutable, tmp)) {
-            String ours = failure(() -> PosixSpawn.spawn(Spec.of(path)));
+            String ours = failure(() -> PosixSpawnSupport.spawn(Spec.of(path)));
             String theirs = failure(() -> new ProcessBuilder(path.toString()).start());
             // ours: "error=2, No such file or directory"; the JDK 25: "Exec failed, error: 2 (No such file or directory) ".
             String number = ours.substring(ours.indexOf('=') + 1, ours.indexOf(','));
@@ -357,7 +357,7 @@ class PosixSpawnTest {
         long[] shield = new long[200];
         for (int i = -50; i < 200; i++) { // the first 50 warm up
             long t0 = System.nanoTime();
-            assertThat(PosixSpawn.spawn(Spec.of(trueExe)).exit().get(10, TimeUnit.SECONDS)).isZero();
+            assertThat(PosixSpawnSupport.spawn(Spec.of(trueExe)).exit().get(10, TimeUnit.SECONDS)).isZero();
             long t1 = System.nanoTime();
             new ProcessBuilder(trueExe.toString()).redirectInput(ProcessBuilder.Redirect.from(new java.io.File("/dev/null")))
                     .redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD)
@@ -392,7 +392,7 @@ class PosixSpawnTest {
     }
 
     private Spawned start(Spec spec) throws IOException {
-        Spawned spawned = PosixSpawn.spawn(spec);
+        Spawned spawned = PosixSpawnSupport.spawn(spec);
         started.add(spawned);
         return spawned;
     }

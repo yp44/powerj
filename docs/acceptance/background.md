@@ -62,6 +62,7 @@ The same comparison on a pseudo-terminal, with a real Ctrl+C, is the script `pow
 - Windows 11: `notepad`, `calc`, `mspaint` (and other Store applications) are launchers: `notepad.exe` starts the real application through Windows, then ends at once with code 0. The job is therefore `done` right away, and its pid no longer exists; the window that opened is another process, which is not a child of PowerJ. Stop it with `ps notepad | kill`.
 
 - Windows: a **batch file** (`.bat`, `.cmd`) in the background still receives the console's Ctrl+C: it is started by `ProcessBuilder`, because `cmd.exe` reads its command line by rules that `CreateProcessW` cannot apply safely. Console programs and graphical programs are protected.
+- Unix: a text file without a `#!` line cannot be a background command (`Exec format error`): give it to its interpreter, `sh script &`.
 - Unix: a job is not in the process group of the shell, so a signal sent to that group does not reach it: closing the terminal (`SIGHUP`), or a harness that aborts a script by its group, leaves the jobs running (as with `nohup`). Stop them with `jobs | kill` before leaving.
 - Unix: a job that reads the terminal (`/dev/tty`) or, after `stty tostop`, writes to it, is stopped, as in a shell with job control; `kill` continues it after `SIGTERM` (`SIGCONT`), so that it ends.
 - The output of a background command is not captured: it goes to the terminal, where it may mix with the prompt, unless redirected.

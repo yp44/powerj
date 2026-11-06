@@ -1,5 +1,6 @@
 package io.powerj.core.nativeexec;
 
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
@@ -113,6 +114,18 @@ public final class BackgroundLauncher {
     }
 
     /**
+     * Opens, and closes at once, the file of a redirection, so that a target that cannot be opened (a folder that does not
+     * exist, no right to write) fails <b>before</b> anything starts, with the name of the file and the reason, as
+     * {@link ProcessBuilder} did. Inside {@code posix_spawn} or {@code CreateProcessW} the same failure would be reported as
+     * a program that cannot be started. A file to truncate is truncated here, and again by the first stage: no harm.
+     */
+    private static void open(Output output) throws IOException {
+        if (output.kind() == Output.Kind.FILE || output.kind() == Output.Kind.APPEND) {
+            new FileOutputStream(output.file().toFile(), output.kind() == Output.Kind.APPEND).close();
+        }
+    }
+
+    /**
      * Starts the stages of one job, connected by pipes, without waiting for them. Standard input is the null device.
      *
      * @param directory   the current directory of the session
@@ -124,6 +137,8 @@ public final class BackgroundLauncher {
      */
     public static List<Process> start(List<Stage> stages, Path directory, Map<String, String> environment, Output out,
                                       Output err) throws IOException {
+        open(out);
+        open(err);
         return Host.windows() ? WindowsJobs.start(stages, directory, environment, out, err)
                 : PosixJobs.start(stages, directory, environment, out, err);
     }

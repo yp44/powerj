@@ -62,7 +62,7 @@ class WindowsSpawnTest {
         // The Ctrl+C goes to every process of the console of the sender: the probe has a console of its own, with the
         // standard handles of that console as a program in a terminal has them, so that it reaches nothing of the build.
         Path result = tmp.resolve("console.txt");
-        Spawned probe = start(javaProgram(WindowsConsoleProbe.class, result.toString()).flags(WindowsSpawn.CREATE_NEW_CONSOLE)
+        Spawned probe = start(javaProgram(WindowsConsoleProbe.class, result.toString()).flags(WindowsTestSupport.CREATE_NEW_CONSOLE)
                 .standardHandles(false));
         Integer code = probe.exit().get(45, TimeUnit.SECONDS);
 
@@ -115,7 +115,7 @@ class WindowsSpawnTest {
 
     @Test
     void check02b_noStatusLostAndNoHandleLeakInTwoHundredRuns() throws Exception {
-        int before = WindowsSpawn.handleCount();
+        int before = WindowsTestSupport.handleCount();
         int threads = 4;
         int perThread = 50;
         long wrong = 0;
@@ -139,7 +139,7 @@ class WindowsSpawnTest {
             }
         }
         long millis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - begin);
-        int after = WindowsSpawn.handleCount();
+        int after = WindowsTestSupport.handleCount();
         assertThat(wrong).isZero();
         assertThat(after - before).as("handles of the JVM before=%d after=%d", before, after).isLessThan(40);
         log("02b %d runs on %d threads: %d wrong codes, %d ms, handles of the JVM before=%d after=%d", threads * perThread,
@@ -251,9 +251,9 @@ class WindowsSpawnTest {
         log("04c with the handle list the read ended at once (error %d); without it the child held the write end: read "
                 + "blocked=%b, then error %d once the child was killed", guardedResult, leakyBlocked, leakyAfterKill);
         assertThat(guarded.exit().isDone()).isFalse();
-        assertThat(guardedResult).isEqualTo(WindowsSpawn.ERROR_BROKEN_PIPE);
+        assertThat(guardedResult).isEqualTo(WindowsTestSupport.ERROR_BROKEN_PIPE);
         assertThat(leakyBlocked).as("the control must leak, or this test proves nothing").isTrue();
-        assertThat(leakyAfterKill).isEqualTo(WindowsSpawn.ERROR_BROKEN_PIPE);
+        assertThat(leakyAfterKill).isEqualTo(WindowsTestSupport.ERROR_BROKEN_PIPE);
     }
 
     // --- 5. command line ---
@@ -394,7 +394,7 @@ class WindowsSpawnTest {
 
     private static CompletableFuture<Integer> readInBackground(long handle) {
         CompletableFuture<Integer> result = new CompletableFuture<>();
-        Thread.ofPlatform().daemon().name("powerj-read").start(() -> result.complete(WindowsSpawn.readOneByte(handle)));
+        Thread.ofPlatform().daemon().name("powerj-read").start(() -> result.complete(WindowsTestSupport.readOneByte(handle)));
         return result;
     }
 

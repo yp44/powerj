@@ -20,7 +20,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
 import io.powerj.fs.Host;
@@ -54,9 +53,10 @@ final class PosixSpawn {
     private static final int O_TRUNC = MAC ? 0x400 : 01000;
     private static final int O_APPEND = MAC ? 0x8 : 02000;
     private static final int EINTR = 4;
-    static final int SIGINT = 2;
     static final int SIGKILL = 9;
     static final int SIGTERM = 15;
+    /** 18 on Linux, 19 on macOS. */
+    static final int SIGCONT = MAC ? 19 : 18;
 
     /** No process group of our own: the child stays in the group of the JVM. */
     static final int KEEP_GROUP = -1;
@@ -65,7 +65,6 @@ final class PosixSpawn {
 
     private static final Linker LINKER = Linker.nativeLinker();
     private static final ReentrantLock SPAWN_LOCK = new ReentrantLock();
-    private static final AtomicInteger LOST_STATUSES = new AtomicInteger();
 
     /** The charset in which the system names files and arguments, as {@link ProcessBuilder} uses it. */
     private static final Charset NAMES = names();
@@ -107,8 +106,6 @@ final class PosixSpawn {
     private static final MethodHandle PIPE = handle("pipe", FunctionDescriptor.of(JAVA_INT, ADDRESS));
     private static final MethodHandle CLOSE = handle("close", FunctionDescriptor.of(JAVA_INT, JAVA_INT));
     private static final MethodHandle KILL = handle("kill", FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT));
-    private static final MethodHandle GETPGID = handle("getpgid", FunctionDescriptor.of(JAVA_INT, JAVA_INT));
-    private static final MethodHandle GETPGRP = handle("getpgrp", FunctionDescriptor.of(JAVA_INT));
     private static final MethodHandle STRERROR = handle("strerror", FunctionDescriptor.of(ADDRESS, JAVA_INT));
     private static final MethodHandle WAITPID = LINKER.downcallHandle(
             LINKER.defaultLookup().find("waitpid").orElseThrow(),
@@ -180,18 +177,6 @@ final class PosixSpawn {
 
     /** A process started: its pid, and its exit code (128 + signal if a signal ended it) once waitpid has returned. */
     record Spawned(int pid, CompletableFuture<Integer> exit) { }
-
-    /** The number of children whose status {@code waitpid} could not give. */
-    static int lostStatuses() {
-        return LOST_STATUSES.get();
-    }
-
-    /** Starts a process and the thread that reaps it. */
-    static Spawned spawn(Spec spec) throws IOException {
-        Spawned spawned = spawnUnreaped(spec);
-        reap(spawned);
-        return spawned;
-    }
 
     /**
      * Starts a process but does not reap it yet: until {@link #reap} is called, a child that has ended stays a zombie
@@ -318,13 +303,11 @@ final class PosixSpawn {
                 }
                 int errno = (int) ERRNO.get(capture, 0L);
                 if (errno != EINTR) {
-                    LOST_STATUSES.incrementAndGet();
                     exit.completeExceptionally(new IOException("waitpid(" + pid + "): errno=" + errno));
                     return;
                 }
             }
         } catch (Throwable t) {
-            LOST_STATUSES.incrementAndGet();
             exit.completeExceptionally(t);
         }
     }
@@ -378,22 +361,6 @@ final class PosixSpawn {
     static int kill(int pid, int signal) {
         try {
             return (int) KILL.invokeExact(pid, signal);
-        } catch (Throwable t) {
-            throw new IllegalStateException(t);
-        }
-    }
-
-    static int getpgid(int pid) {
-        try {
-            return (int) GETPGID.invokeExact(pid);
-        } catch (Throwable t) {
-            throw new IllegalStateException(t);
-        }
-    }
-
-    static int getpgrp() {
-        try {
-            return (int) GETPGRP.invokeExact();
         } catch (Throwable t) {
             throw new IllegalStateException(t);
         }

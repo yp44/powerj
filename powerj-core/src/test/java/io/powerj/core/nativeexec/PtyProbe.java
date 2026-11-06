@@ -37,7 +37,7 @@ public final class PtyProbe {
         long background = switch (mode) {
             case "plain" -> startWithProcessBuilder(new ProcessBuilder("/bin/sh", "-c", script), inherit);
             case "shield" -> startWithProcessBuilder(new ProcessBuilder("/bin/sh", "-c", SH_SHIELD, "/bin/sh", "-c", script), inherit);
-            case "group" -> PosixSpawn.spawn(Spec.of(Path.of("/bin/sh"), "-c", script).group(PosixSpawn.OWN_GROUP)
+            case "group" -> PosixSpawnSupport.spawn(Spec.of(Path.of("/bin/sh"), "-c", script).group(PosixSpawn.OWN_GROUP)
                     .in(inherit ? Stdio.INHERIT : Stdio.NULL).out(inherit ? Stdio.INHERIT : Stdio.NULL)
                     .err(inherit ? Stdio.INHERIT : Stdio.NULL).closeFds(true)).pid();
             case "launcher" -> {

@@ -164,6 +164,14 @@ class BackgroundJobsTest {
         assertThat(Files.readString(tmp.resolve("cwd.txt"))).isEqualTo(tmp.toRealPath() + "\n");
     }
 
+    @Test
+    void aRedirectionTargetThatCannotBeOpenedIsNamedInTheError() throws Exception {
+        run("sleep 1 > nosuchdir/out.txt &");
+
+        assertThat(errors).singleElement().asString().contains("nosuchdir").contains("out.txt");
+        assertThat(session.jobs().list()).isEmpty();
+    }
+
     // --- a system that cannot start a job in a group of its own ---
 
     @Test

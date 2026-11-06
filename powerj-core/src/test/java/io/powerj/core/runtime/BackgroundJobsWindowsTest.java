@@ -108,6 +108,14 @@ class BackgroundJobsWindowsTest {
     }
 
     @Test
+    void aRedirectionTargetThatCannotBeOpenedIsNamedInTheError() throws Exception {
+        run("cmd /c echo x > nosuchdir/out.txt &");
+
+        assertThat(errors).singleElement().asString().contains("nosuchdir").contains("out.txt");
+        assertThat(session.jobs().list()).isEmpty();
+    }
+
+    @Test
     void theJobSeesTheEnvironmentOfTheSessionAndNotTheJvm() throws Exception {
         session.environment().keySet().removeIf(name -> name.equalsIgnoreCase("USERPROFILE"));
         session.environment().put("POWERJ_PROBE", "from-the-session");

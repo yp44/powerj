@@ -36,7 +36,7 @@ serializable, but rebuilds it from its message and its cause.)
 | Warning | Count | Cause | Removed by |
 |---|---|---|---|
 | "found raw type" / unchecked call (`[rawtypes]`, `[unchecked]`) | 10 | `Collected` used raw in `Collect`; AssertJ generics in tests | `Collect.Received` (open question of the PR), tests |
-| Restricted method (`[restricted]`) | 7 | FFM calls in `StandardInput`, `WindowsConsole`, `ModuleLoader` | needs `--enable-native-access` in the launcher and tests; Phase 4. `PosixSpawn` and `WindowsSpawn` (#128) make many more FFM calls and carry `@SuppressWarnings("restricted")`, so that the count above does not move |
+| Restricted method (`[restricted]`) | 7 | FFM calls in `StandardInput`, `WindowsConsole`, `ModuleLoader` | needs `--enable-native-access` in the launcher and tests; Phase 4. `PosixSpawn`, `WindowsSpawn` and `ProcessSignals` (#128) make more FFM calls and carry `@SuppressWarnings("restricted")`, so that the count above does not move |
 | Serializable class without `serialVersionUID` / non-serializable field (`[serial]`) | 0 | (was 7: `PjException` twice, `PreviewGuard.Denied`, `PreviewMode.PreviewFull`, `StageLimit.Full`, `JsonException`, `Unreadable`) | done in #84 |
 | `try` on an auto-closeable that `close()` may throw `InterruptedException` from (`[try]`) | 4 | `CmdletRunner.Context` and its test doubles (Phase 1.3) | Phase 3.4 |
 | Non-varargs call of varargs method (`FileOpsTest`) | 2 | test code | with the next change to that test |

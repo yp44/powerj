@@ -76,14 +76,14 @@ public final class WindowsConsoleProbe {
     }
 
     private static void run(List<String> lines) throws Throwable {
-        lines.add("console_window=" + (WindowsSpawn.consoleWindow() != 0));
+        lines.add("console_window=" + (WindowsTestSupport.consoleWindow() != 0));
         // If a parent had turned Ctrl+C off for its children, turn it back on for this process and for what it starts.
-        lines.add("ctrl_c_enabled=" + WindowsSpawn.setCtrlHandler(MemorySegment.NULL, false));
+        lines.add("ctrl_c_enabled=" + WindowsTestSupport.setCtrlHandler(MemorySegment.NULL, false));
         MemorySegment handler = Linker.nativeLinker().upcallStub(
                 MethodHandles.lookup().findStatic(WindowsConsoleProbe.class, "onCtrl",
                         MethodType.methodType(int.class, int.class)),
                 FunctionDescriptor.of(JAVA_INT, JAVA_INT), Arena.global());
-        lines.add("handler_installed=" + WindowsSpawn.setCtrlHandler(handler, true));
+        lines.add("handler_installed=" + WindowsTestSupport.setCtrlHandler(handler, true));
 
         Path ping = Path.of(System.getenv("SystemRoot"), "System32", "PING.EXE");
         File nul = new File("NUL");
@@ -102,16 +102,16 @@ public final class WindowsConsoleProbe {
                     .standardHandles(false))));
             // What a job at a terminal does: a new group and the output and errors of the console inherited (the handle list
             // holds the console handles of this process).
-            boolean outputInheritableBefore = WindowsSpawn.standardOutputInheritable();
+            boolean outputInheritableBefore = WindowsTestSupport.standardOutputInheritable();
             children.put("B3", of(WindowsSpawn.spawn(spec.flags(WindowsSpawn.CREATE_NEW_PROCESS_GROUP)
                     .out(WindowsSpawn.Stdio.INHERIT).err(WindowsSpawn.Stdio.INHERIT))));
             lines.add("stdout_inheritable_before=" + outputInheritableBefore);
-            lines.add("stdout_inheritable_after=" + WindowsSpawn.standardOutputInheritable());
+            lines.add("stdout_inheritable_after=" + WindowsTestSupport.standardOutputInheritable());
             children.put("C", of(WindowsSpawn.spawn(spec)));
             children.put("C2", of(WindowsSpawn.spawn(spec.standardHandles(false))));
 
             Thread.sleep(2000); // let them all start
-            int[] attached = WindowsSpawn.consoleProcessIds();
+            int[] attached = WindowsTestSupport.consoleProcessIds();
             lines.add("console_processes=" + Arrays.toString(attached));
             for (Map.Entry<String, Child> entry : children.entrySet()) {
                 Child child = entry.getValue();
@@ -120,7 +120,7 @@ public final class WindowsConsoleProbe {
                 lines.add(entry.getKey() + "_attached=" + Arrays.stream(attached).anyMatch(id -> id == child.pid()));
             }
 
-            lines.add("ctrl_c_sent=" + WindowsSpawn.ctrlEvent(WindowsSpawn.CTRL_C_EVENT, 0));
+            lines.add("ctrl_c_sent=" + WindowsTestSupport.ctrlEvent(WindowsTestSupport.CTRL_C_EVENT, 0));
 
             // A death by Ctrl+C is immediate: this is the one wait of the probe that has to be a duration, because
             // "it did not die" can only be seen by letting time pass.

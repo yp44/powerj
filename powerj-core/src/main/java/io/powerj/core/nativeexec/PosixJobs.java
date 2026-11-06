@@ -60,7 +60,10 @@ final class PosixJobs {
         // the first one fails with EPERM once the first has ended and been reaped.
         started.forEach(PosixSpawn::reap);
         return started.stream().<Process>map(s -> new SpawnedProcess(s.pid(), s.exit(),
-                () -> PosixSpawn.kill(s.pid(), PosixSpawn.SIGTERM), () -> PosixSpawn.kill(s.pid(), PosixSpawn.SIGKILL)))
+                () -> {
+                    PosixSpawn.kill(s.pid(), PosixSpawn.SIGTERM);
+                    PosixSpawn.kill(s.pid(), PosixSpawn.SIGCONT); // a job stopped by the terminal keeps SIGTERM pending
+                }, () -> PosixSpawn.kill(s.pid(), PosixSpawn.SIGKILL)))
                 .toList();
     }
 
