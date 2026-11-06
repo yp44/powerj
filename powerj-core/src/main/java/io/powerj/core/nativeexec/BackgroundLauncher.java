@@ -88,7 +88,7 @@ public final class BackgroundLauncher {
             if (Host.windows()) {
                 return WindowsSpawn.ready();
             }
-            return (Host.mac() || System.getProperty("os.name", "").startsWith("Linux")) && PosixSpawn.ready();
+            return (Host.mac() || Host.linux()) && PosixSpawn.ready();
         } catch (Throwable _) {
             return false; // a function is missing from the system: the class could not be initialised
         }

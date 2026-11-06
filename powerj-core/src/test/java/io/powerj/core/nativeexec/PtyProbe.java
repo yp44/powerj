@@ -35,8 +35,8 @@ public final class PtyProbe {
         boolean inherit = args[1].equals("inherit");
         String script = args[2];
         long background = switch (mode) {
-            case "plain" -> java(new ProcessBuilder("/bin/sh", "-c", script), inherit);
-            case "shield" -> java(new ProcessBuilder("/bin/sh", "-c", SH_SHIELD, "/bin/sh", "-c", script), inherit);
+            case "plain" -> startWithProcessBuilder(new ProcessBuilder("/bin/sh", "-c", script), inherit);
+            case "shield" -> startWithProcessBuilder(new ProcessBuilder("/bin/sh", "-c", SH_SHIELD, "/bin/sh", "-c", script), inherit);
             case "group" -> PosixSpawn.spawn(Spec.of(Path.of("/bin/sh"), "-c", script).group(PosixSpawn.OWN_GROUP)
                     .in(inherit ? Stdio.INHERIT : Stdio.NULL).out(inherit ? Stdio.INHERIT : Stdio.NULL)
                     .err(inherit ? Stdio.INHERIT : Stdio.NULL).closeFds(true)).pid();
@@ -47,13 +47,14 @@ public final class PtyProbe {
             }
             default -> throw new IllegalArgumentException(mode);
         };
-        long companion = java(new ProcessBuilder("/usr/bin/sleep", "60"), false);
+        long companion = startWithProcessBuilder(new ProcessBuilder("/usr/bin/sleep", "60"), false);
         System.out.println("B=" + background + " C=" + companion);
         System.out.flush();
         Thread.sleep(30_000);
     }
 
-    private static long java(ProcessBuilder builder, boolean inherit) throws IOException {
+    /** Starts the process with {@link ProcessBuilder} (what the JDK does for a command today), not with {@link PosixSpawn}. */
+    private static long startWithProcessBuilder(ProcessBuilder builder, boolean inherit) throws IOException {
         if (inherit) {
             builder.inheritIO();
         } else {

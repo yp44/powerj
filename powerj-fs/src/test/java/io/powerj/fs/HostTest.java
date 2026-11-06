@@ -16,29 +16,34 @@ import org.junit.jupiter.params.provider.CsvSource;
  */
 class HostTest {
 
-    @ParameterizedTest(name = "{0}: windows={1}, mac={2}, names ignore case={3}")
+    @ParameterizedTest(name = "{0}: windows={1}, mac={2}, linux={3}, names ignore case={4}")
     @CsvSource({
-            "Windows 11,           true,  false, true",
-            "Windows 10,           true,  false, true",
-            "Windows Server 2022,  true,  false, true",
-            "windows 11,           true,  false, true",
-            "Mac OS X,             false, true,  true",
-            "macOS,                false, true,  true",
-            "Linux,                false, false, false",
-            "FreeBSD,              false, false, false",
-            "SunOS,                false, false, false",
-            "AIX,                  false, false, false",
+            "Windows 11,           true,  false, false, true",
+            "Windows 10,           true,  false, false, true",
+            "Windows Server 2022,  true,  false, false, true",
+            "windows 11,           true,  false, false, true",
+            "Mac OS X,             false, true,  false, true",
+            "macOS,                false, true,  false, true",
+            "Linux,                false, false, true,  false",
+            "linux,                false, false, true,  false",
+            "FreeBSD,              false, false, false, false",
+            "SunOS,                false, false, false, false",
+            "AIX,                  false, false, false, false",
     })
-    void eachSystemIsKnownByItsName(String osName, boolean windows, boolean mac, boolean namesIgnoreCase) {
+    void eachSystemIsKnownByItsName(String osName, boolean windows, boolean mac, boolean linux,
+                                    boolean namesIgnoreCase) {
         assertThat(Host.windows(osName)).as("windows").isEqualTo(windows);
         assertThat(Host.mac(osName)).as("mac").isEqualTo(mac);
+        assertThat(Host.linux(osName)).as("linux").isEqualTo(linux);
         assertThat(Host.namesIgnoreCase(osName)).as("names ignore case").isEqualTo(namesIgnoreCase);
     }
 
     @Test
-    void anUnknownNameIsNeitherWindowsNorMacAndCaseCounts() {
+    void anUnknownNameIsNeitherWindowsNorMacNorLinuxAndCaseCounts() {
         assertThat(Host.windows("")).isFalse();
         assertThat(Host.mac("")).isFalse();
+        assertThat(Host.linux("")).isFalse();
+        assertThat(Host.linux(null)).isFalse();
         assertThat(Host.namesIgnoreCase("")).isFalse();
         assertThat(Host.windows(null)).isFalse();
         assertThat(Host.namesIgnoreCase(null)).isFalse();

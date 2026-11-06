@@ -63,7 +63,7 @@ class WindowsSpawnTest {
         // The Ctrl+C goes to every process of the console of the sender: the probe has a console of its own, with the
         // standard handles of that console as a program in a terminal has them, so that it reaches nothing of the build.
         Path result = tmp.resolve("console.txt");
-        Spawned probe = start(java(WindowsConsoleProbe.class, result.toString()).flags(WindowsSpawn.CREATE_NEW_CONSOLE)
+        Spawned probe = start(javaProgram(WindowsConsoleProbe.class, result.toString()).flags(WindowsSpawn.CREATE_NEW_CONSOLE)
                 .standardHandles(false));
         Integer code = probe.exit().get(45, TimeUnit.SECONDS);
 
@@ -167,7 +167,7 @@ class WindowsSpawnTest {
     void check04_redirectionsAndStandardInputOnTheNullDevice() throws Exception {
         Path out = tmp.resolve("out.txt");
         Path err = tmp.resolve("err.txt");
-        Spec echo = java(StdioEcho.class);
+        Spec echo = javaProgram(StdioEcho.class);
 
         assertThat(start(echo.out(Stdio.file(out)).err(Stdio.file(err))).exit().get(60, TimeUnit.SECONDS)).isZero();
         assertThat(lines(out)).containsExactly("out", "stdin=0"); // > truncates; stdin is NUL: the program ends at once
@@ -249,8 +249,8 @@ class WindowsSpawnTest {
                 "--flag=value with space");
         Path ours = tmp.resolve("ours.txt");
         Path jdk = tmp.resolve("jdk.txt");
-        assertThat(start(java(ArgvEcho.class, withFirst(ours.toString(), tricky))).exit().get(60, TimeUnit.SECONDS)).isZero();
-        runByJava(javaCommand(ArgvEcho.class, withFirst(jdk.toString(), tricky)));
+        assertThat(start(javaProgram(ArgvEcho.class, withFirst(ours.toString(), tricky))).exit().get(60, TimeUnit.SECONDS)).isZero();
+        runByJava(javaProcessBuilder(ArgvEcho.class, withFirst(jdk.toString(), tricky)));
 
         List<String> expected = tricky.stream().map(a -> "[" + a + "]").toList();
         List<String> oursGot = arguments(ours);
@@ -269,8 +269,8 @@ class WindowsSpawnTest {
         // An empty argument: informative only (the Java launcher may drop it for both).
         Path oursEmpty = tmp.resolve("ours-empty.txt");
         Path jdkEmpty = tmp.resolve("jdk-empty.txt");
-        assertThat(start(java(ArgvEcho.class, oursEmpty.toString(), "", "x")).exit().get(60, TimeUnit.SECONDS)).isZero();
-        runByJava(javaCommand(ArgvEcho.class, jdkEmpty.toString(), "", "x"));
+        assertThat(start(javaProgram(ArgvEcho.class, oursEmpty.toString(), "", "x")).exit().get(60, TimeUnit.SECONDS)).isZero();
+        runByJava(javaProcessBuilder(ArgvEcho.class, jdkEmpty.toString(), "", "x"));
         log("05 an empty argument gives %s with CreateProcessW and %s with ProcessBuilder", arguments(oursEmpty),
                 arguments(jdkEmpty));
     }
@@ -284,7 +284,7 @@ class WindowsSpawnTest {
         environment.put("windir", System.getenv("SystemRoot"));
         environment.put("POWERJ_PROBE", "deux é");
         Path file = tmp.resolve("env.txt");
-        assertThat(start(java(ArgvEcho.class, file.toString()).env(environment).directory(tmp)).exit()
+        assertThat(start(javaProgram(ArgvEcho.class, file.toString()).env(environment).directory(tmp)).exit()
                 .get(60, TimeUnit.SECONDS)).isZero();
 
         List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
@@ -382,12 +382,14 @@ class WindowsSpawnTest {
         return result;
     }
 
-    private static Spec java(Class<?> main, String... args) {
+    /** The start, by {@link WindowsSpawn}, of the JVM running the {@code main} of a helper class of the tests. */
+    private static Spec javaProgram(Class<?> main, String... args) {
         List<String> all = javaArguments(main, args);
         return Spec.of(javaExe(), all.toArray(String[]::new));
     }
 
-    private static ProcessBuilder javaCommand(Class<?> main, String... args) {
+    /** The same start, as a {@link ProcessBuilder}, to compare with what the JDK does. */
+    private static ProcessBuilder javaProcessBuilder(Class<?> main, String... args) {
         List<String> command = new ArrayList<>();
         command.add(javaExe().toString());
         command.addAll(javaArguments(main, args));
