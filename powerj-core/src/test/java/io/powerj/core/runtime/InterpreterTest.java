@@ -19,8 +19,8 @@ import org.junit.jupiter.api.io.TempDir;
 import io.powerj.core.command.CmdletRegistry;
 import io.powerj.core.error.PjException;
 import io.powerj.core.nativeexec.NativeRun;
-import io.powerj.core.support.Waits;
 import io.powerj.fs.Host;
+import io.powerj.core.support.ProcessGroups;
 
 /** Runs real native commands ({@code sh}, {@code printf}…): tests limited to Linux/macOS. */
 class InterpreterTest {
@@ -260,16 +260,11 @@ class InterpreterTest {
                 assertThat(job.command()).isEqualTo("sleep 30");
                 assertThat(job.running()).isTrue();
             });
-            // Ctrl+C in the terminal reaches the whole process group: the background command ignores it. The shell
-            // that starts it ignores the signal, then becomes `sleep`: signalled before that (a loaded macOS runner
-            // got there first) it would die, which no user can do within a millisecond of pressing Enter.
-            Waits.until("the shell to have become sleep",
-                    () -> sleep.info().command().map(command -> command.endsWith("sleep")).orElse(true));
-            new ProcessBuilder("kill", "-INT", String.valueOf(last.pid())).start().waitFor();
-            // The one wait of this suite that is a duration on purpose: "the process did NOT die" can only be
-            // observed by letting some time pass (a death would be immediate).
-            Thread.sleep(300);
-            assertThat(sleep.isAlive()).isTrue();
+            // Ctrl+C in the terminal goes to the foreground process group. The background command is not in it: it leads a
+            // group of its own (started with posix_spawn, issue #128), so the signal never reaches it. What a real Ctrl+C
+            // does is checked on a pseudo-terminal (powerj-core/src/test/tools/pty-check.py).
+            assertThat(ProcessGroups.of(last.pid())).isEqualTo(last.pid())
+                    .isNotEqualTo(ProcessGroups.of(ProcessHandle.current().pid()));
         } finally {
             sleep.destroyForcibly();
         }

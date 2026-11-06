@@ -11,7 +11,8 @@ import java.util.Map;
  * {@code os.name} (and the one that finds the home folder in an environment), so that completion, the protection of
  * {@code rm}, the native programs and the environment all say the same thing about the same system.
  * <p>
- * Only the systems that behave differently are named: Linux and the other Unixes are what is left. The names of files
+ * Only the systems that behave differently are named: Windows, macOS and Linux (the other Unixes are what is left; Linux
+ * is named because the native functions that start a background job differ between it and macOS). The names of files
  * ignore case on Windows and on macOS (their usual file systems tell {@code docs} from {@code Docs} no more than a user
  * does) and count it elsewhere; the rule is by system, not by mount, so a case-sensitive APFS volume or a
  * case-insensitive mount on Linux is not told apart.
@@ -36,6 +37,11 @@ public final class Host {
         return mac(OS_NAME);
     }
 
+    /** {@code true} on Linux. */
+    public static boolean linux() {
+        return linux(OS_NAME);
+    }
+
     /** Do the names of files ignore case on the usual file systems of this system? Windows and macOS: yes. */
     public static boolean namesIgnoreCase() {
         return namesIgnoreCase(OS_NAME);
@@ -49,6 +55,10 @@ public final class Host {
 
     static boolean mac(String osName) {
         return startsWith(osName, "mac");
+    }
+
+    static boolean linux(String osName) {
+        return startsWith(osName, "linux");
     }
 
     static boolean namesIgnoreCase(String osName) {

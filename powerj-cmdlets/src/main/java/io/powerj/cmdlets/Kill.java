@@ -10,10 +10,15 @@ import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
 import io.powerj.api.UsageException;
+import io.powerj.fs.ProcessSignals;
 
 /**
  * {@code kill}: stops processes given by pid or received from the pipeline (specification FR-74), with the JDK
  * ({@code destroy()}, or {@code destroyForcibly()} with {@code -f}). The JDK forbids stopping the current process.
+ * <p>
+ * On Unix a normal stop ({@code SIGTERM}) is followed by {@code SIGCONT} ({@link ProcessSignals}): a process that the terminal
+ * has stopped (a background job that reads it, or writes to it after {@code stty tostop}) keeps {@code SIGTERM} pending until
+ * it is continued.
  */
 @CmdletInfo(name = "kill", category = "System", summary = "Stops processes",
         examples = {"kill 1234", "ps notepad | kill", "ps notepad | kill -n", "ps java | kill -f -w -v"})
@@ -109,6 +114,9 @@ public final class Kill implements Cmdlet<Kill.Params, Object, ProcessEntry> {
         if (!requested) {
             context.error(Messages.get("kill.failed", pid, entry.name() == null ? "?" : entry.name()));
             return;
+        }
+        if (!p.force()) {
+            ProcessSignals.resume(pid); // a process stopped by the terminal keeps SIGTERM pending until it is continued
         }
         if (p.await()) {
             try {

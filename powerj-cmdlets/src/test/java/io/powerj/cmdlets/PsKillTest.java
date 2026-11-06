@@ -2,6 +2,7 @@ package io.powerj.cmdlets;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.Test;
 
 import io.powerj.api.Cmdlet;
 import io.powerj.fs.Globs;
+import io.powerj.fs.Host;
 import io.powerj.testing.CmdletDriver;
 import io.powerj.testing.TestContext;
 
@@ -112,6 +114,19 @@ class PsKillTest {
                 true, false));
         assertThat(alive(sleeper)).isFalse();
         assertThat(out).singleElement().extracting(ProcessEntry::pid).isEqualTo(sleeper.pid());
+        assertThat(context.errors).isEmpty();
+    }
+
+    /** A background job that the terminal has stopped keeps SIGTERM pending: kill must continue it (issue #128). */
+    @Test
+    void killEndsAProcessThatTheTerminalHasStopped() throws Exception {
+        assumeFalse(Host.windows(), "SIGSTOP and SIGCONT are Unix signals");
+        Process sleeper = sleeper();
+        assertThat(new ProcessBuilder("kill", "-STOP", String.valueOf(sleeper.pid())).start().waitFor()).isZero();
+
+        run(new Kill(), new Kill.Params(List.of(String.valueOf(sleeper.pid())), false, true, false, false));
+
+        assertThat(alive(sleeper)).isFalse();
         assertThat(context.errors).isEmpty();
     }
 

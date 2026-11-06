@@ -96,7 +96,8 @@ flowchart BT
 4. **Execution.** `PipelineExecutor` starts one virtual thread per stage, joined by bounded `Pipe`s; the last stage runs
    in the calling thread. A cmdlet gets `begin`, `process` for each object, `end`; the state of one run lives in
    `context.state(…)`, closed however the run ends. Consecutive native commands are chained with
-   `ProcessBuilder.startPipeline`.
+   `ProcessBuilder.startPipeline`. A command ended by `&` is the exception: `BackgroundLauncher` starts it in a process
+   group of its own through the FFM API (`posix_spawn`, `CreateProcessW`), because `ProcessBuilder` cannot (FR-75, #128).
 5. **Supervision.** `Supervisor` runs the whole line, turns any `Throwable` into an `Outcome` (sealed: `Success`,
    `Failure`, `Cancelled`, `Abandoned`), and handles Ctrl+C by interrupting; a second Ctrl+C abandons a command that does not
    stop. Cancellation is the interruption of the thread plus `CancellationException`; the stages stop in cascade.
@@ -170,3 +171,77 @@ options, the window opener). What touches the toolkit is behind ports (`FxPlatfo
 | change the prompt, history, profile | `PromptRenderer`, `Repl`, `ProfileRunner` in the shell |
 | load a third-party module | `core.command.ModuleLoader`, `NativeAccessPolicy`, `shell.NativeAccessConsent` |
 | start-up and options | `shell.ShellBootstrap` |
+| make background commands work on another system | section 11; `core.nativeexec.BackgroundLauncher`, `PosixSpawn`, `WindowsSpawn` |
+
+## 11. Background jobs: which systems, and how to add one
+
+A command ended by `&` (FR-75) is started by `BackgroundLauncher` **in a process group of its own**, so that the Ctrl+C of the
+terminal, which goes to the foreground group, never reaches it (#128). `ProcessBuilder` cannot choose the group, so every system
+is driven through its own native functions, through the FFM API.
+
+### What is supported
+
+| System | How the job is started | Classes |
+|---|---|---|
+| Windows 10 and later | `CreateProcessW` with `CREATE_NEW_PROCESS_GROUP`; only the three chosen handles are inherited (`PROC_THREAD_ATTRIBUTE_HANDLE_LIST`) | `WindowsSpawn`, `WindowsJobs` |
+| Linux, glibc 2.34 or later | `posix_spawn` with `POSIX_SPAWN_SETPGROUP`; the other descriptors are closed with `posix_spawn_file_actions_addclosefrom_np` | `PosixSpawn`, `PosixJobs` |
+| macOS 10.15 or later | the same functions; the other descriptors are closed with `POSIX_SPAWN_CLOEXEC_DEFAULT` and `posix_spawn_file_actions_addinherit_np`; other `O_*` values and `SIGCONT` | `PosixSpawn`, `PosixJobs` |
+
+`BackgroundLauncher.supportedSystem()` names these three systems, `available()` adds that every function binds. A Windows batch file
+(`.bat`, `.cmd`) is the one program that is not started this way (`cmd.exe` reads its command line by other rules): it goes to
+`ProcessBuilder`, without protection.
+
+### What is not, and what happens
+
+Any other system (FreeBSD, OpenBSD, Solaris, AIX…), or a supported system whose libc lacks a function (glibc older than 2.34,
+musl/Alpine, macOS older than 10.15): `available()` is false and `cmd &` is **refused** with a message that names the session variable
+`POWERJ_BACKGROUND_SH_FALLBACK`. With `POWERJ_BACKGROUND_SH_FALLBACK=true` (a process variable, or `env --set` in the shell) the job is
+started through `sh -c 'trap "" INT QUIT; exec …'`: it works, but it stays in the process group of the shell and only ignores `SIGINT`
+and `SIGQUIT`. The message is not the same for the two causes (`background.unavailable`, `background.unsupported`).
+
+### Why a system is not simply tried
+
+Because nothing in the code can find out what a system is. Three things are written per system and cannot be guessed:
+
+1. **Constants.** `O_WRONLY`, `O_CREAT`, `O_TRUNC`, `O_APPEND`, the `POSIX_SPAWN_*` flags, `SIGCONT`, `EINTR`. A wrong value does not fail: it
+   opens the wrong file, or sends another signal.
+2. **How the other descriptors are kept out of the child.** `ProcessBuilder` does it for us; `posix_spawn` does not. Linux has
+   `addclosefrom_np`, macOS has `CLOEXEC_DEFAULT`; another system may have neither.
+3. **What the terminal does to a process group**: the `SIGTTIN`/`SIGTTOU` that stop a job, the process groups that are orphaned, joining
+   the group of a stage that has already ended. These are observed, not read in a manual.
+
+FreeBSD is the likely next one: it has `posix_spawn`, the same `O_*` values as macOS, and, in its recent versions, `addclosefrom_np` and
+`addchdir_np` (all to be checked on the system). It is refused all the same, because none of this has been run on it and the CI has no
+FreeBSD.
+
+### How to check that a system can be supported
+
+1. **The functions.** All of these must exist in its libc: `posix_spawn`, `posix_spawnattr_init`/`_destroy`/`_setflags`/`_setpgroup`/
+   `_setsigmask`/`_setsigdefault`, `sigemptyset`, `sigfillset`, `posix_spawn_file_actions_init`/`_destroy`/`_adddup2`/`_addopen`/
+   `_addchdir_np`, and `_addclosefrom_np` or `_addinherit_np`, `pipe`, `close`, `kill`, `waitpid`, `strerror`. (`nm -D` on the libc, or the
+   manual pages.) `BackgroundLauncher.available()` is true only when all of them bind.
+2. **The constants.** Read them in the system headers and compare with `PosixSpawn` and `ProcessSignals`: `<fcntl.h>` (`O_WRONLY`, `O_CREAT`,
+   `O_TRUNC`, `O_APPEND`), `<spawn.h>` (`POSIX_SPAWN_SETPGROUP`, `_SETSIGDEF`, `_SETSIGMASK`, and `_CLOEXEC_DEFAULT` if there is one),
+   `<signal.h>` (`SIGCONT`, `SIGTERM`, `SIGKILL`), `<errno.h>` (`EINTR`).
+3. **The descriptors.** Decide how the child is kept from inheriting the JVM's descriptors (a function of the libc, or the close-on-exec
+   default), and check it with the test of descriptors (`PosixSpawnTest.check05`).
+4. **The 14 checks of `PosixSpawnTest`** (own group, a `SIGINT` sent to the foreground group spares the job, 1000 starts without a lost
+   exit status, descriptors, redirections, a pipeline, directory and environment, errors, latency). Some read `/proc` or run `lsof` or
+   `ps`: give them the equivalent of the system. Then `BackgroundJobsTest`, `InterpreterTest` and `PosixJobsTest`.
+5. **A real terminal**: `powerj-core/src/test/tools/pty-check.py` (a real Ctrl+C on a pseudo-terminal) and the rows G1 to G10 of
+   `docs/acceptance/background.md`.
+
+### How to add the support
+
+1. `Host`: a method for the system (like `linux()`), and the rows of `HostTest`.
+2. `PosixSpawn` and `ProcessSignals`: a branch for the constants and for the way the descriptors are kept (today a boolean per system,
+   `MAC`; a third system calls for a small table of constants, not a third boolean).
+3. `BackgroundLauncher.supportedSystem()`: add the system. `NativeRunner.refusal` then no longer calls it unsupported.
+4. The tests: JUnit's `@EnabledOnOs` knows Linux, macOS and Windows only, so the Unix tests need an `@EnabledIf` on `Host` for the new
+   system; `BackgroundJobsTest` asserts that the launcher is available on macOS, and must do the same for the new one (an assertion, not an
+   `assume`: a skipped test hides a failure).
+5. **The CI.** GitHub's hosted runners are Linux, macOS and Windows. A system without a job in `.github/workflows/ci.yml` (a virtual
+   machine action, or a runner of its own) is supported by its owner's word only: say so in FR-75, or do not add it.
+6. The documents: FR-75 (the list of the systems), this section, the changelog, and the checklist.
+
+**Do not** make `available()` true for "any other Unix". The `sh` fallback exists for what has not been checked.

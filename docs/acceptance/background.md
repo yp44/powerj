@@ -32,10 +32,38 @@ On Windows, read `charmap` for `xeyes`, `ping -t localhost > NUL` for `xclock`, 
 | 16 | `xeyes &`, then `exit` | PowerJ exits; the `xeyes` window stays open. |
 | 17 | `POWERJ_LANG=fr`, `sleep 1 &`, then Enter after a second | `[1] terminé sleep 1 (code 0)`. |
 
+## A job leads a process group of its own (issue #128)
+
+A background command is started with `posix_spawn` (Linux, macOS) or `CreateProcessW` + `CREATE_NEW_PROCESS_GROUP` (Windows)
+through the FFM API, **in a process group of its own**: the terminal's Ctrl+C goes to the foreground group, so it never reaches
+the job. There is no `sh` in between. Measures: [docs/plans/background-process-group.md](../plans/background-process-group.md).
+
+Build and run (any system with a JDK 25): `./mvnw -B -Pdist -DskipFx -DskipTests package`, then
+`powerj-dist/target/jpackage/powerj/bin/powerj` (Windows: `powerj-dist\target\jpackage\powerj\powerj.exe`). In the Unix rows,
+`ps` is the native one (`^ps`), `pgid` is the process group of the process and `tpgid` the foreground group of the terminal.
+
+| # | Action | Expected result |
+|---|---|---|
+| G1 | Linux: `sleep 300 &` then `^ps -o pid,pgid,tpgid,stat,args -C sleep` | `pgid` equals the `pid` of the `sleep` and differs from `tpgid`; the state has no `+` (not in the foreground). |
+| G2 | `sleep 100`, then Ctrl+C | Only this `sleep` stops. `jobs` shows the first one still running. |
+| G3 | `sleep 302 \| sleep 303 &` then the same `^ps` | One job; both processes have the same `pgid`, the pid of the first. `kill` stops the last process of the job only. |
+| G4 | `printf "b\na\n" \| ^sort > tri.txt &`, then `cat tri.txt` | `a`, `b` (`^sort`: in the real shell `sort` is the cmdlet, which `&` refuses). |
+| G5 | `jobs`, then `jobs \| kill`, then Enter | `[n] done sleep 30x (exit 143)` for each job. Show `jobs` first: in the packaged shell `jobs \| kill` alone currently fails with `kill: not a process: Job[…]` until `jobs` has been displayed once (a defect of `main`, not of this change, filed as [#130](https://github.com/yp44/powerj/issues/130); `kill $last.pid` works). |
+| G6 | Unix: `stty tostop`, then `sh -c "sleep 1; echo hi" &` and wait | The job is **stopped** by `SIGTTOU` (`T` in `ps`) and `hi` is not printed, as in bash. `stty -tostop`, then `kill <pid>`: the stopped job ends (`kill` sends `SIGCONT` after `SIGTERM`, which a stopped process would keep pending). |
+| G7 | Windows: `ping -t localhost &`, then `ping -n 100 localhost`, and Ctrl+C | Only the foreground `ping` stops. `jobs` still shows `ping -t localhost` running. Before #128 both stopped. |
+| G8 | Windows: `ping -t localhost > NUL 2> NUL &` | Same as G7 (the JDK already kept a job whose three streams are redirected off the console; the group makes the other cases equal). |
+| G9 | Windows: a batch file in the background (`hello.cmd x &`) | It runs and its output appears, but it is not protected: Ctrl+C reaches it (known limitation). |
+| G10 | A Unix system without a usable `posix_spawn` (glibc older than 2.34, Alpine): `sleep 5 &` | Refused: `cannot start a background command on this system (no usable posix_spawn); set POWERJ_BACKGROUND_SH_FALLBACK=true to start it through sh`. On a system that is not supported at all (FreeBSD…) the refusal says `only Windows, Linux and macOS are supported (docs/ARCHITECTURE.md, section 11)`. With `env --set POWERJ_BACKGROUND_SH_FALLBACK=true` it starts through `sh`, which ignores `SIGINT` and `SIGQUIT` (no process group of its own). |
+
+The same comparison on a pseudo-terminal, with a real Ctrl+C, is the script `powerj-core/src/test/tools/pty-check.py`.
+
 ## Known limitations
 
 - Windows 11: `notepad`, `calc`, `mspaint` (and other Store applications) are launchers: `notepad.exe` starts the real application through Windows, then ends at once with code 0. The job is therefore `done` right away, and its pid no longer exists; the window that opened is another process, which is not a child of PowerJ. Stop it with `ps notepad | kill`.
 
-- Windows: a **console** program in the background still receives the console's Ctrl+C (Java cannot start a process in a new process group). Graphical programs are not affected.
+- Windows: a **batch file** (`.bat`, `.cmd`) in the background still receives the console's Ctrl+C: it is started by `ProcessBuilder`, because `cmd.exe` reads its command line by rules that `CreateProcessW` cannot apply safely. Console programs and graphical programs are protected.
+- Unix: a text file without a `#!` line cannot be a background command (`Exec format error`): give it to its interpreter, `sh script &`.
+- Unix: a job is not in the process group of the shell, so a signal sent to that group does not reach it: closing the terminal (`SIGHUP`), or a harness that aborts a script by its group, leaves the jobs running (as with `nohup`). Stop them with `jobs | kill` before leaving.
+- Unix: a job that reads the terminal (`/dev/tty`) or, after `stty tostop`, writes to it, is stopped, as in a shell with job control; `kill` continues it after `SIGTERM` (`SIGCONT`), so that it ends.
 - The output of a background command is not captured: it goes to the terminal, where it may mix with the prompt, unless redirected.
 - No `fg`, `bg` or `wait`: follow a job with `jobs`, stop it with `jobs | kill`.
