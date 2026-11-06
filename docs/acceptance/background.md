@@ -53,7 +53,7 @@ Build and run (any system with a JDK 25): `./mvnw -B -Pdist -DskipFx -DskipTests
 | G7 | Windows: `ping -t localhost &`, then `ping -n 100 localhost`, and Ctrl+C | Only the foreground `ping` stops. `jobs` still shows `ping -t localhost` running. Before #128 both stopped. |
 | G8 | Windows: `ping -t localhost > NUL 2> NUL &` | Same as G7 (the JDK already kept a job whose three streams are redirected off the console; the group makes the other cases equal). |
 | G9 | Windows: a batch file in the background (`hello.cmd x &`) | It runs and its output appears, but it is not protected: Ctrl+C reaches it (known limitation). |
-| G10 | A Unix system without a usable `posix_spawn` (glibc older than 2.34, Alpine): `sleep 5 &` | Refused: `cannot start a background command on this system (no usable posix_spawn); set POWERJ_BACKGROUND_SH_FALLBACK=true to start it through sh`. With `env --set POWERJ_BACKGROUND_SH_FALLBACK=true` it starts through `sh`, which ignores `SIGINT` and `SIGQUIT` (no process group of its own). |
+| G10 | A Unix system without a usable `posix_spawn` (glibc older than 2.34, Alpine): `sleep 5 &` | Refused: `cannot start a background command on this system (no usable posix_spawn); set POWERJ_BACKGROUND_SH_FALLBACK=true to start it through sh`. On a system that is not supported at all (FreeBSD…) the refusal says `only Windows, Linux and macOS are supported (docs/ARCHITECTURE.md, section 11)`. With `env --set POWERJ_BACKGROUND_SH_FALLBACK=true` it starts through `sh`, which ignores `SIGINT` and `SIGQUIT` (no process group of its own). |
 
 The same comparison on a pseudo-terminal, with a real Ctrl+C, is the script `powerj-core/src/test/tools/pty-check.py`.
 

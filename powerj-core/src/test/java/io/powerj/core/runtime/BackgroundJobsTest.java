@@ -186,6 +186,15 @@ class BackgroundJobsTest {
     }
 
     @Test
+    void aSupportedSystemWithoutThePosixFunctionsAndAnUnsupportedSystemAreRefusedWithTheirOwnMessage() {
+        assertThat(NativeRunner.refusal(true).getMessage()).contains("posix_spawn")
+                .contains(BackgroundLauncher.SH_FALLBACK_VARIABLE);
+        assertThat(NativeRunner.refusal(false).getMessage()).contains("only Windows, Linux and macOS are supported")
+                .contains(BackgroundLauncher.SH_FALLBACK_VARIABLE).doesNotContain("posix_spawn");
+        assertThat(BackgroundLauncher.supportedSystem()).isTrue(); // the systems of the CI
+    }
+
+    @Test
     void theVariableMustBeTrueToAllowTheShFallback() throws Exception {
         interpreter = interpreter(new NativeRunner(new NativeEncoding(), () -> false));
         session.environment().put(BackgroundLauncher.SH_FALLBACK_VARIABLE, "1");

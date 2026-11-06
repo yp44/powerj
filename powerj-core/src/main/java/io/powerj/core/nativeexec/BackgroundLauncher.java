@@ -69,8 +69,19 @@ public final class BackgroundLauncher {
     }
 
     /**
-     * {@code true} if this system can start a job in a group of its own: Windows, Linux (glibc 2.34 or later) and macOS
-     * (10.15 or later). Asked once, the first time it is needed.
+     * {@code true} on the systems whose native functions this launcher knows: Windows, Linux and macOS. Any other system
+     * (FreeBSD, OpenBSD, Solaris, AIX…) is <b>not tried</b>, because the constants and the way to keep the other descriptors
+     * out of a child are written per system and a wrong one does not fail, it opens the wrong file. How to add a system:
+     * {@code docs/ARCHITECTURE.md}, section 11.
+     */
+    public static boolean supportedSystem() {
+        return Host.windows() || Host.mac() || Host.linux();
+    }
+
+    /**
+     * {@code true} if this system can start a job in a group of its own: a {@linkplain #supportedSystem() supported system} that
+     * has every function used (Windows; Linux with glibc 2.34 or later; macOS 10.15 or later). Asked once, the first time it
+     * is needed.
      */
     public static boolean available() {
         return Probe.AVAILABLE;
@@ -86,10 +97,10 @@ public final class BackgroundLauncher {
 
     private static boolean probe() {
         try {
-            if (Host.windows()) {
-                return WindowsSpawn.ready();
+            if (!supportedSystem()) {
+                return false;
             }
-            return (Host.mac() || Host.linux()) && PosixSpawn.ready();
+            return Host.windows() ? WindowsSpawn.ready() : PosixSpawn.ready();
         } catch (Throwable _) {
             return false; // a function is missing from the system: the class could not be initialised
         }

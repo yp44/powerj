@@ -594,7 +594,8 @@ structures, functions) can be built on it. The work is organised in phases (revi
   the program's. On Windows a console program in the background no longer dies of the Ctrl+C of the console: that was the known
   limit of FR-75. A pipeline is one process group on Unix; each stage has its own on Windows.
 - **The `sh` wrapper (`trap '' INT QUIT; exec`) stays as a fallback only**, for a Unix system that cannot use `posix_spawn` that
-  way (glibc older than 2.34, musl), and only when the session variable `POWERJ_BACKGROUND_SH_FALLBACK` is `true`. Without it,
+  way (glibc older than 2.34, musl) or that is not supported (anything but Linux, macOS and Windows: FreeBSD…, because the constants and
+  the handling of descriptors are written per system and none of them has been run there), and only when the session variable `POWERJ_BACKGROUND_SH_FALLBACK` is `true`. Without it,
   a background command on such a system is refused with a message that names the variable. A Windows batch file (`.bat`, `.cmd`)
   is still started by `ProcessBuilder`, without protection: `cmd.exe` reads its command line by other rules.
 - **Behaviour that changes on Unix, as in a shell with job control**: a background command that reads the terminal (`/dev/tty`:

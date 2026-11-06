@@ -351,7 +351,7 @@ public final class NativeRunner {
         }
         boolean throughSh = !Host.windows();
         if (throughSh && !BackgroundLauncher.shFallbackAllowed(session.environmentSnapshot())) {
-            throw new PjException(Messages.get("background.unavailable", BackgroundLauncher.SH_FALLBACK_VARIABLE));
+            throw refusal(BackgroundLauncher.supportedSystem());
         }
         List<ProcessBuilder> builders = new ArrayList<>(commands.size());
         for (int i = 0; i < commands.size(); i++) {
@@ -377,6 +377,18 @@ public final class NativeRunner {
         } catch (IOException e) {
             throw startFailed(commands, e);
         }
+    }
+
+    /**
+     * The refusal of a background command on a Unix system that cannot start it in a group of its own, and that the session does
+     * not allow to start through {@code sh}. Two causes, two messages: a supported system whose libc lacks a function (glibc
+     * older than 2.34, musl), or a system that is not supported at all (FreeBSD…). Both name the variable that allows the
+     * fallback.
+     */
+    static PjException refusal(boolean supportedSystem) {
+        return new PjException(supportedSystem
+                ? Messages.get("background.unavailable", BackgroundLauncher.SH_FALLBACK_VARIABLE)
+                : Messages.get("background.unsupported", BackgroundLauncher.SH_FALLBACK_VARIABLE));
     }
 
     /**
