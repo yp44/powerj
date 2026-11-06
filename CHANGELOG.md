@@ -586,6 +586,27 @@ structures, functions) can be built on it. The work is organised in phases (revi
   of `InterpreterTest` checks the environment rule for a group of natives and for a background command, where only a single
   command was checked; removing the `clear()` makes it fail.
 
+### Changed (background commands in their own process group, [#128](https://github.com/yp44/powerj/issues/128))
+- **A command started with `&` now leads a process group of its own, so the Ctrl+C of the terminal never reaches it, on
+  Linux, macOS and Windows.** `NativeRunner.startBackground` hands the job to `BackgroundLauncher`, which starts it through the
+  FFM API (already used, already enabled in the launcher): `posix_spawn` with `POSIX_SPAWN_SETPGROUP` on Linux (glibc 2.34
+  or later) and macOS, `CreateProcessW` with `CREATE_NEW_PROCESS_GROUP` on Windows. There is no `sh` in between and the pid is
+  the program's. On Windows a console program in the background no longer dies of the Ctrl+C of the console: that was the known
+  limit of FR-75. A pipeline is one process group on Unix; each stage has its own on Windows.
+- **The `sh` wrapper (`trap '' INT QUIT; exec`) stays as a fallback only**, for a Unix system that cannot use `posix_spawn` that
+  way (glibc older than 2.34, musl), and only when the session variable `POWERJ_BACKGROUND_SH_FALLBACK` is `true`. Without it,
+  a background command on such a system is refused with a message that names the variable. A Windows batch file (`.bat`, `.cmd`)
+  is still started by `ProcessBuilder`, without protection: `cmd.exe` reads its command line by other rules.
+- **Behaviour that changes on Unix, as in a shell with job control**: a background command that reads the terminal (`/dev/tty`:
+  `ssh`, `sudo`) or, after `stty tostop`, writes to it, is stopped by the terminal and ignores `SIGTERM` until it is continued
+  (`kill -f` ends it); and `kill -INT <pid>` sent straight to a job now kills it, where the `sh` wrapper ignored it. The test
+  `InterpreterTest.backgroundCommandGivesControlBackAtOnce` checks the group, no longer the ignored signal.
+- **On Windows the arguments of a background command are quoted correctly**: an argument that holds a `"` reaches the program
+  as written, where `ProcessBuilder` splits it. Measured on the CI: 12 tricky arguments out of 12 against 4. A start is also
+  faster (7 ms against 16 ms for `cmd /c exit 0`).
+- Measures and decision: [docs/plans/background-process-group.md](docs/plans/background-process-group.md); checklist:
+  [docs/acceptance/background.md](docs/acceptance/background.md).
+
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
   whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes

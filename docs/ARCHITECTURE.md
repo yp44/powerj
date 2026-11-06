@@ -96,7 +96,8 @@ flowchart BT
 4. **Execution.** `PipelineExecutor` starts one virtual thread per stage, joined by bounded `Pipe`s; the last stage runs
    in the calling thread. A cmdlet gets `begin`, `process` for each object, `end`; the state of one run lives in
    `context.state(…)`, closed however the run ends. Consecutive native commands are chained with
-   `ProcessBuilder.startPipeline`.
+   `ProcessBuilder.startPipeline`. A command ended by `&` is the exception: `BackgroundLauncher` starts it in a process
+   group of its own through the FFM API (`posix_spawn`, `CreateProcessW`), because `ProcessBuilder` cannot (FR-75, #128).
 5. **Supervision.** `Supervisor` runs the whole line, turns any `Throwable` into an `Outcome` (sealed: `Success`,
    `Failure`, `Cancelled`, `Abandoned`), and handles Ctrl+C by interrupting; a second Ctrl+C abandons a command that does not
    stop. Cancellation is the interruption of the thread plus `CancellationException`; the stages stop in cascade.

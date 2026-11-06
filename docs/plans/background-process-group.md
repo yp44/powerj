@@ -163,6 +163,9 @@ shipped. The 14 tests pass, the whole `powerj-core` suite passes (940 tests), an
 
 ## Results — in a real PowerJ shell (group mode, Linux)
 
+> The opt-in variable `POWERJ_BACKGROUND=group` of this experiment no longer exists: when option (b) was chosen the group mode became the
+> only mode (see "Decision" at the end). The measures stand.
+
 `POWERJ_BACKGROUND=group` in the session starts a background job through `GroupLauncher` (`NativeRunner.startBackground`); unset, nothing
 changes. Checked on the packaged image (`./mvnw -Pdist -DskipFx -DskipTests package`, 16 s) driven on a pseudo-terminal by a script
 that types the lines of `docs/acceptance/background.md` (E1 to E8) and a real Ctrl+C. `ps -o pid,pgid,tpgid,stat,args`:
@@ -242,3 +245,38 @@ seven `ping -t`, lists the processes of its console (`GetConsoleProcessList`), t
 5. **Phase 3 gate, Windows side: go.** With the Linux side (all checks pass, one behaviour change to accept: a job that reads the terminal or,
    with `stty tostop`, writes to it, is stopped), the data supports both (a) and (b). (a) changes nothing on Unix, where `sh` is proven;
    (b) unifies the two platforms at the price of the Unix behaviour changes and of an unverified macOS.
+
+## Decision — option (b), and what was built
+
+**(b) FFM on both platforms, `sh` dropped** was chosen after the measures above: the defect of the issue is real on Windows (a
+console program started as PowerJ starts a background command at a terminal dies of the console's Ctrl+C), the Linux prototype passes
+every check, and one mechanism for every system is simpler to explain than two. The work stays in this one pull request (#129),
+against the issue's "one platform per pull request", by the owner's choice.
+
+Built (all in `io.powerj.core.nativeexec`, `powerj-core`):
+
+| Class | Role |
+|---|---|
+| `BackgroundLauncher` | The public entry: `available()`, `handles(stages)`, `start(...)`. Chooses `PosixJobs` or `WindowsJobs`. |
+| `PosixSpawn`, `PosixJobs` | Linux and macOS: `posix_spawn`, one group per job (the first stage leads), pipes, file actions, a `waitpid` thread per process. Stages are reaped only once all are started. |
+| `WindowsSpawn`, `WindowsJobs`, `WindowsCommandLine` | Windows: `CreateProcessW` + `CREATE_NEW_PROCESS_GROUP`, the handle list, pipes, the quoted command line, the Unicode environment block, a wait on the process handle. |
+| `SpawnedProcess` | A `Process` for the jobs: `Jobs`, `PipelineExecutor.background` and `Kill` did not change. |
+| `NativeRunner.startBackground` | Delegates to `BackgroundLauncher`; keeps the `ProcessBuilder` path for a Windows batch file and for the `sh` fallback. `environment().clear()` still appears once, in `newBuilder`. |
+
+Choices, and why:
+
+1. **The `sh` wrapper stays as a fallback only**, for a Unix system that cannot use `posix_spawn` that way (glibc older than 2.34, musl),
+   and **only when the session variable `POWERJ_BACKGROUND_SH_FALLBACK` is `true`** (the owner's rule). Without it the command is refused
+   with a message that names the variable. So `sh` is no longer on the normal path, but it is not gone from the code.
+2. **A Windows batch file is started by `ProcessBuilder`**, without protection: `cmd.exe` reads its command line by other rules, and the JDK has
+   checks for them (CVE-2024-24576) that `CreateProcessW` would have to copy.
+3. **The "Done when" of the issue is amended**: "on Unix the existing background tests pass unchanged" cannot hold. `InterpreterTest.backgroundCommandGivesControlBackAtOnce`
+   sent `kill -INT <pid>` to the job and expected it to survive, which measured the *disposition* set by `trap ''`. A process group ignores
+   nothing: it is out of the reach of the terminal's signal. The test now checks that the job leads a group of its own, and
+   `PosixSpawnTest.check02` that a `SIGINT` sent to the foreground group does not reach it.
+4. **Behaviour that changes on Unix** (a shell with job control does the same): a job that reads the terminal, or writes to it after
+   `stty tostop`, is stopped; a stopped job ignores `SIGTERM`; `kill -INT <pid>` kills a job.
+5. **Windows arguments are quoted correctly** for a background command: they differ from what `ProcessBuilder` sends for an argument that holds a `"`.
+
+Not measured, to look at on a real machine: macOS (the CI runs the Unix tests there), a Windows GUI program in the background, `Ctrl+Break`,
+PowerJ started by a parent without a console, a PowerJ built on musl.
