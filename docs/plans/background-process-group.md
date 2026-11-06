@@ -268,21 +268,29 @@ console program started as PowerJ starts a background command at a terminal dies
 every check, and one mechanism for every system is simpler to explain than two. The work stays in this one pull request (#129),
 against the issue's "one platform per pull request", by the owner's choice.
 
-Built (all in `io.powerj.core.nativeexec`, `powerj-core`):
+Built (in `io.powerj.core.nativeexec` of `powerj-core`, except the last two rows):
 
 | Class | Role |
 |---|---|
-| `BackgroundLauncher` | The public entry: `available()`, `handles(stages)`, `start(...)`. Chooses `PosixJobs` or `WindowsJobs`. |
+| `BackgroundLauncher` | The public entry: `supportedSystem()`, `available()`, `handles(stages)`, `shFallbackAllowed(...)`, `start(...)`. Chooses `PosixJobs` or `WindowsJobs`. |
 | `PosixSpawn`, `PosixJobs` | Linux and macOS: `posix_spawn`, one group per job (the first stage leads), pipes, file actions, a `waitpid` thread per process. Stages are reaped only once all are started. |
 | `WindowsSpawn`, `WindowsJobs`, `WindowsCommandLine` | Windows: `CreateProcessW` + `CREATE_NEW_PROCESS_GROUP`, the handle list, pipes, the quoted command line, the Unicode environment block, a wait on the process handle. |
 | `SpawnedProcess` | A `Process` for the jobs: `Jobs`, `PipelineExecutor.background` and `Kill` did not change. |
-| `NativeRunner.startBackground` | Delegates to `BackgroundLauncher`; keeps the `ProcessBuilder` path for a Windows batch file and for the `sh` fallback. `environment().clear()` still appears once, in `newBuilder`. |
+| `NativeRunner.startBackground` | Delegates to `BackgroundLauncher`; keeps the `ProcessBuilder` path for a Windows batch file and for the `sh` fallback; refuses the command when the fallback is not allowed (`NativeRunner.refusal`). `environment().clear()` still appears once, in `newBuilder`. |
+| `io.powerj.fs.ProcessSignals` (`powerj-fs`) | `SIGCONT` through `kill(2)` by FFM, without starting a program: `Kill` sends it after `SIGTERM`, so that a job stopped by the terminal ends. The launcher enables native access for `io.powerj.fs`. |
+| `io.powerj.fs.Host` (`powerj-fs`) | `Host.linux()` next to `windows()` and `mac()`: `Host` is the one place that reads `os.name`. |
 
 Choices, and why:
 
 1. **The `sh` wrapper stays as a fallback only**, for a Unix system that cannot use `posix_spawn` that way (glibc older than 2.34, musl),
-   and **only when the session variable `POWERJ_BACKGROUND_SH_FALLBACK` is `true`** (the owner's rule). Without it the command is refused
-   with a message that names the variable. So `sh` is no longer on the normal path, but it is not gone from the code.
+   **or that is not supported at all** (anything but Linux, macOS and Windows: FreeBSD, OpenBSD, Solaris, AIX…), and **only when the session
+   variable `POWERJ_BACKGROUND_SH_FALLBACK` is `true`** (the owner's rule). Without it the command is refused with a message that names the
+   variable, and the message tells the two causes apart: `background.unavailable` (a supported system whose libc lacks a function) and
+   `background.unsupported` (a system that is not in the list). So `sh` is no longer on the normal path, but it is not gone from the code.
+   **A system is not simply tried**: the constants (`O_CREAT`, `O_TRUNC`, `O_APPEND`, the `POSIX_SPAWN_*` flags, `SIGCONT`) and the way the other
+   descriptors are kept out of the child are written per system, and a wrong one does not fail, it opens the wrong file or sends another
+   signal; none of this has been run on FreeBSD and the CI has no FreeBSD. Which systems, how to check one and how to add it:
+   `docs/ARCHITECTURE.md`, section 11.
 2. **A Windows batch file is started by `ProcessBuilder`**, without protection: `cmd.exe` reads its command line by other rules, and the JDK has
    checks for them (CVE-2024-24576) that `CreateProcessW` would have to copy.
 3. **The "Done when" of the issue is amended**: "on Unix the existing background tests pass unchanged" cannot hold. `InterpreterTest.backgroundCommandGivesControlBackAtOnce`
@@ -294,6 +302,11 @@ Choices, and why:
    shell no longer reaches the jobs**: a closed terminal (`SIGHUP`) or a CI harness that aborts a script by its group leaves them running,
    as with `nohup` (found by the review of #129, point 1; documented in FR-75).
 5. **Windows arguments are quoted correctly** for a background command: they differ from what `ProcessBuilder` sends for an argument that holds a `"`.
+6. **An executable text file without a `#!` line no longer starts in the background.** `posix_spawn` does not run it (`Exec format error`), where
+   the former `sh` wrapper, and `ProcessBuilder` for a foreground command, ran it as a shell script. Decided in the review of #129: a script has
+   to be given to its interpreter (`sh script &`), and no code is added to guess one. It is in the changelog and in the known limitations of
+   `docs/acceptance/background.md`.
 
 Not measured, to look at on a real machine: macOS (the CI runs the Unix tests there), a Windows GUI program in the background, `Ctrl+Break`,
-PowerJ started by a parent without a console, a PowerJ built on musl.
+PowerJ started by a parent without a console, a PowerJ built on musl and the `sh` fallback on a real Alpine, FreeBSD and the other systems
+(refused on purpose, see choice 1).
