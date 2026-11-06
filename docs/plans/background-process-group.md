@@ -1,5 +1,18 @@
 # Plan — background commands in their own process group, with the FFM API (issue #128)
 
+> This file is the plan as it was written (the first sections), then the measures, then the decision and what was built (the last
+> section). The plan and the measures use the names of the prototypes. Where they differ from the code today:
+>
+> | In the plan and the measures | Today |
+> |---|---|
+> | `GroupLauncher` (the experiment of "in a real PowerJ shell") | `BackgroundLauncher`, `PosixJobs`, `WindowsJobs` |
+> | `PosixSpawn` in `src/test/.../nativeexec/prototype/` | `PosixSpawn` in `src/main/.../nativeexec/` |
+> | `PosixSpawnPrototypeTest`, `WindowsSpawnPrototypeTest` | `PosixSpawnTest`, `WindowsSpawnTest` (in `src/test/.../nativeexec/`, like `PtyProbe`) |
+> | `BackgroundGroupTest` | `BackgroundJobsTest` (Unix), `BackgroundJobsWindowsTest` |
+> | `powerj-core/src/test/prototype/pty-check.py` | `powerj-core/src/test/tools/pty-check.py` |
+> | `WindowsSpawn`, `WindowsCommandLine` as test code | the same classes in `src/main/.../nativeexec/` |
+> | the variable `POWERJ_BACKGROUND=group` | gone: the group is the only mode; `POWERJ_BACKGROUND_SH_FALLBACK=true` only allows the old `sh` start on a system that cannot do it |
+
 ## Context
 
 A statement ended by `&` starts a native command in the background (FR-75). Ctrl+C must stop the foreground command only.
@@ -107,9 +120,10 @@ Commits: one step per commit, each builds and passes the tests; `type(scope): su
 
 ## Results — Linux prototype (Phase 1)
 
-Run on Linux x86_64 (Ubuntu 24.04, glibc 2.39), OpenJDK 25.0.4. Code: `powerj-core/src/test/java/io/powerj/core/nativeexec/prototype/`
+Run on Linux x86_64 (Ubuntu 24.04, glibc 2.39), OpenJDK 25.0.4. Code when it was measured: `powerj-core/src/test/java/io/powerj/core/nativeexec/prototype/`
 (`PosixSpawn`, `PosixSpawnPrototypeTest`, `PtyProbe`) and `powerj-core/src/test/prototype/pty-check.py`; test code only, nothing
-shipped. The 14 tests pass, the whole `powerj-core` suite passes (940 tests), and the javac warnings stay at 8 (main) and 5 (test).
+shipped. Today `PosixSpawn` is production code (`src/main`), the 14 checks are `PosixSpawnTest`, and the script is
+`powerj-core/src/test/tools/pty-check.py`. The 14 tests pass, the whole `powerj-core` suite passes (940 tests), and the javac warnings stay at 8 (main) and 5 (test).
 **Not run: macOS, glibc older than 2.34, musl, aarch64.**
 
 | # | Check | Result |
@@ -166,8 +180,8 @@ shipped. The 14 tests pass, the whole `powerj-core` suite passes (940 tests), an
 > The opt-in variable `POWERJ_BACKGROUND=group` of this experiment no longer exists: when option (b) was chosen the group mode became the
 > only mode (see "Decision" at the end). The measures stand.
 
-`POWERJ_BACKGROUND=group` in the session starts a background job through `GroupLauncher` (`NativeRunner.startBackground`); unset, nothing
-changes. Checked on the packaged image (`./mvnw -Pdist -DskipFx -DskipTests package`, 16 s) driven on a pseudo-terminal by a script
+`POWERJ_BACKGROUND=group` in the session started a background job through `GroupLauncher` (`NativeRunner.startBackground`; the class became
+`BackgroundLauncher`); unset, nothing changed. Checked on the packaged image (`./mvnw -Pdist -DskipFx -DskipTests package`, 16 s) driven on a pseudo-terminal by a script
 that types the lines of `docs/acceptance/background.md` (E1 to E8) and a real Ctrl+C. `ps -o pid,pgid,tpgid,stat,args`:
 
 | Step | Result |
@@ -184,12 +198,12 @@ Found on the way:
 
 1. **A pipeline whose first stage ends at once failed** (`cannot start [printf, sort]: error=1, Operation not permitted`): the
    second stage joins the group of the first with `setpgid`, which fails once the first has been reaped and its group is gone.
-   `GroupLauncher` now starts every stage first and only then starts the `waitpid` threads (a zombie keeps its group). Covered by
-   `BackgroundGroupTest.redirectionsAndPipelinesWorkAsWithoutTheExperiment`.
+   The launcher (`PosixJobs` today) now starts every stage first and only then starts the `waitpid` threads (`PosixSpawn.reap`: a zombie keeps its group).
+   Covered by `BackgroundJobsTest.redirectionsAndPipelinesWork` and `PosixJobsTest`.
 2. **A defect of `main`, unrelated to the experiment**: in the packaged shell `jobs | kill` fails with `kill: not a process: Job[...]`
    until `jobs` has been displayed once (with the variable unset too); `kill $last.pid` works. `Kill.pidOf` returns `null` for a `Job`,
    probably because `io.powerj.core.runtime` is exported to `io.powerj.shell` only and `RecordShape` of the cmdlets module cannot read the
-   record until another path has cached its shape. To file as its own issue.
+   record until another path has cached its shape. Filed as [#130](https://github.com/yp44/powerj/issues/130); not fixed here.
 3. `kill` on a pipeline job stops its last process only (the pid of the job); the other stages stay. True of the `sh` path too. A job being
    a process group, the whole job could be stopped (`kill(-pgid)`) in Phase 4.
 4. In the real shell `sort` and `cat` are cmdlets: a pipeline with `&` needs `^sort` (the acceptance row 7 of the existing checklist
@@ -197,9 +211,10 @@ Found on the way:
 
 ## Results — Windows prototype (Phase 2)
 
-Run on the `windows-latest` job of the CI (run 259, then run 260 for the Ctrl+C report), JDK 25. Code: `WindowsSpawn`,
+Run on the `windows-latest` job of the CI (run 259, then run 260 for the Ctrl+C report), JDK 25. Code when it was measured: `WindowsSpawn`,
 `WindowsCommandLine`, `WindowsConsoleProbe`, `ArgvEcho`, `StdioEcho` and `WindowsSpawnPrototypeTest` in
-`powerj-core/src/test/java/io/powerj/core/nativeexec/`, test code only. The 12 checks pass; `WindowsCommandLineTest` (the pure
+`powerj-core/src/test/java/io/powerj/core/nativeexec/`, test code only. Today `WindowsSpawn` and `WindowsCommandLine` are production code
+(`src/main`) and the checks are `WindowsSpawnTest`. The 12 checks pass; `WindowsCommandLineTest` (the pure
 quoting and environment block, 8 tests) also runs on Linux and macOS.
 
 | # | Check | Result |
