@@ -102,8 +102,11 @@ public final class WindowsConsoleProbe {
                     .standardHandles(false))));
             // What a job at a terminal does: a new group and the output and errors of the console inherited (the handle list
             // holds the console handles of this process).
+            boolean outputInheritableBefore = WindowsSpawn.standardOutputInheritable();
             children.put("B3", of(WindowsSpawn.spawn(spec.flags(WindowsSpawn.CREATE_NEW_PROCESS_GROUP)
                     .out(WindowsSpawn.Stdio.INHERIT).err(WindowsSpawn.Stdio.INHERIT))));
+            lines.add("stdout_inheritable_before=" + outputInheritableBefore);
+            lines.add("stdout_inheritable_after=" + WindowsSpawn.standardOutputInheritable());
             children.put("C", of(WindowsSpawn.spawn(spec)));
             children.put("C2", of(WindowsSpawn.spawn(spec.standardHandles(false))));
 

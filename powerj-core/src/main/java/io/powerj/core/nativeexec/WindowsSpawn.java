@@ -62,6 +62,7 @@ final class WindowsSpawn {
     private static final int OPEN_ALWAYS = 4;
     private static final int FILE_ATTRIBUTE_NORMAL = 0x80;
     private static final int HANDLE_FLAG_INHERIT = 1;
+    private static final int DUPLICATE_SAME_ACCESS = 2;
     private static final int INFINITE = 0xFFFFFFFF;
     private static final int STD_INPUT = -10;
     private static final int STD_OUTPUT = -11;
@@ -105,6 +106,10 @@ final class WindowsSpawn {
     private static final MethodHandle CLOSE_HANDLE = call("CloseHandle", FunctionDescriptor.of(JAVA_INT, ADDRESS));
     private static final MethodHandle SET_HANDLE_INFORMATION = call("SetHandleInformation",
             FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT, JAVA_INT));
+    private static final MethodHandle DUPLICATE_HANDLE = call("DuplicateHandle", FunctionDescriptor.of(JAVA_INT,
+            ADDRESS, ADDRESS, ADDRESS, ADDRESS, JAVA_INT, JAVA_INT, JAVA_INT));
+    private static final MethodHandle GET_HANDLE_INFORMATION = call("GetHandleInformation",
+            FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS));
     private static final MethodHandle GET_STD_HANDLE = call("GetStdHandle", FunctionDescriptor.of(ADDRESS, JAVA_INT));
     private static final MethodHandle WAIT = call("WaitForSingleObject", FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT));
     private static final MethodHandle EXIT_CODE = call("GetExitCodeProcess",
@@ -357,8 +362,7 @@ final class WindowsSpawn {
                     return open("NUL", input ? GENERIC_READ : GENERIC_WRITE, FILE_SHARE_READ_WRITE, OPEN_EXISTING,
                             security, arena, owned);
                 }
-                int ignored = (int) SET_HANDLE_INFORMATION.invoke(handle, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
-                return handle;
+                return inheritableCopy(handle, owned);
             }
             case NULL -> {
                 return open("NUL", input ? GENERIC_READ : GENERIC_WRITE, FILE_SHARE_READ_WRITE, OPEN_EXISTING, security,
@@ -379,6 +383,38 @@ final class WindowsSpawn {
                 return handle;
             }
             default -> throw new IllegalArgumentException(stdio.kind() + " is not a handle of its own");
+        }
+    }
+
+    /**
+     * A copy of a handle that the child can inherit, closed with the others once the child is started. The handle itself
+     * (a standard handle of the JVM) is left as it is: marking it inheritable would hand it to every process that the JDK
+     * starts later with {@code bInheritHandles}.
+     */
+    private static MemorySegment inheritableCopy(MemorySegment handle, List<Long> owned) throws Throwable {
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment copy = arena.allocate(JAVA_LONG);
+            MemorySegment self = (MemorySegment) CURRENT_PROCESS.invoke();
+            int ok = (int) DUPLICATE_HANDLE.invoke(self, handle, self, copy, 0, 1, DUPLICATE_SAME_ACCESS);
+            if (ok == 0) { // a handle that cannot be duplicated: the original is the only way to give it
+                int ignored = (int) SET_HANDLE_INFORMATION.invoke(handle, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
+                return handle;
+            }
+            long address = copy.get(JAVA_LONG, 0);
+            owned.add(address);
+            return MemorySegment.ofAddress(address);
+        }
+    }
+
+    /** {@code true} if the standard output handle of this process can be inherited by a child it starts. */
+    static boolean standardOutputInheritable() {
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment handle = (MemorySegment) GET_STD_HANDLE.invoke(STD_OUTPUT);
+            MemorySegment flags = arena.allocate(JAVA_INT);
+            int ok = (int) GET_HANDLE_INFORMATION.invoke(handle, flags);
+            return ok != 0 && (flags.get(JAVA_INT, 0) & HANDLE_FLAG_INHERIT) != 0;
+        } catch (Throwable t) {
+            throw new IllegalStateException(t);
         }
     }
 

@@ -49,7 +49,7 @@ Build and run (any system with a JDK 25): `./mvnw -B -Pdist -DskipFx -DskipTests
 | G3 | `sleep 302 \| sleep 303 &` then the same `^ps` | One job; both processes have the same `pgid`, the pid of the first. `kill` stops the last process of the job only. |
 | G4 | `printf "b\na\n" \| ^sort > tri.txt &`, then `cat tri.txt` | `a`, `b` (`^sort`: in the real shell `sort` is the cmdlet, which `&` refuses). |
 | G5 | `jobs`, then `jobs \| kill`, then Enter | `[n] done sleep 30x (exit 143)` for each job. Show `jobs` first: in the packaged shell `jobs \| kill` alone currently fails with `kill: not a process: Job[…]` until `jobs` has been displayed once (a defect of `main`, not of this change; `kill $last.pid` works). |
-| G6 | Unix: `stty tostop`, then `sh -c "sleep 1; echo hi" &` and wait | The job is **stopped** by `SIGTTOU` (`T` in `ps`) and `hi` is not printed, as in bash. `stty -tostop`, then `kill -f <pid>` clean up (a stopped job ignores `SIGTERM`). |
+| G6 | Unix: `stty tostop`, then `sh -c "sleep 1; echo hi" &` and wait | The job is **stopped** by `SIGTTOU` (`T` in `ps`) and `hi` is not printed, as in bash. `stty -tostop`, then `kill <pid>`: the stopped job ends (`kill` sends `SIGCONT` after `SIGTERM`, which a stopped process would keep pending). |
 | G7 | Windows: `ping -t localhost &`, then `ping -n 100 localhost`, and Ctrl+C | Only the foreground `ping` stops. `jobs` still shows `ping -t localhost` running. Before #128 both stopped. |
 | G8 | Windows: `ping -t localhost > NUL 2> NUL &` | Same as G7 (the JDK already kept a job whose three streams are redirected off the console; the group makes the other cases equal). |
 | G9 | Windows: a batch file in the background (`hello.cmd x &`) | It runs and its output appears, but it is not protected: Ctrl+C reaches it (known limitation). |
@@ -63,6 +63,6 @@ The same comparison on a pseudo-terminal, with a real Ctrl+C, is the script `pow
 
 - Windows: a **batch file** (`.bat`, `.cmd`) in the background still receives the console's Ctrl+C: it is started by `ProcessBuilder`, because `cmd.exe` reads its command line by rules that `CreateProcessW` cannot apply safely. Console programs and graphical programs are protected.
 - Unix: a job is not in the process group of the shell, so a signal sent to that group does not reach it: closing the terminal (`SIGHUP`), or a harness that aborts a script by its group, leaves the jobs running (as with `nohup`). Stop them with `jobs | kill` before leaving.
-- Unix: a job that reads the terminal (`/dev/tty`) or, after `stty tostop`, writes to it, is stopped, as in a shell with job control; `kill` (`SIGTERM`) does not end it until it is continued, `kill -f` does.
+- Unix: a job that reads the terminal (`/dev/tty`) or, after `stty tostop`, writes to it, is stopped, as in a shell with job control; `kill` continues it after `SIGTERM` (`SIGCONT`), so that it ends.
 - The output of a background command is not captured: it goes to the terminal, where it may mix with the prompt, unless redirected.
 - No `fg`, `bg` or `wait`: follow a job with `jobs`, stop it with `jobs | kill`.

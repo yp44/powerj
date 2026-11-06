@@ -77,6 +77,9 @@ class WindowsSpawnTest {
                 .isEqualTo("false");
         assertThat(r.get("B2_ended")).as("B2, in a new process group with the handles of the console, must survive: "
                 + report).isEqualTo("false");
+        // Giving the console to B3 must not leave the standard output of this JVM inheritable by what it starts later.
+        assertThat(r.get("stdout_inheritable_after")).as("the standard output handle is left as it was: " + report)
+                .isEqualTo(r.get("stdout_inheritable_before"));
         assertThat(r.get("B3_ended")).as("B3, in a new process group with output and errors inherited, must survive: "
                 + report).isEqualTo("false");
         // ... and that it is the flag, not our way of starting: the same start without it dies of Ctrl+C.

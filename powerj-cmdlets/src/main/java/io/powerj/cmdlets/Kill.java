@@ -1,19 +1,26 @@
 package io.powerj.cmdlets;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
 import io.powerj.api.UsageException;
+import io.powerj.fs.Host;
 
 /**
  * {@code kill}: stops processes given by pid or received from the pipeline (specification FR-74), with the JDK
  * ({@code destroy()}, or {@code destroyForcibly()} with {@code -f}). The JDK forbids stopping the current process.
+ * <p>
+ * On Unix a normal stop ({@code SIGTERM}) is followed by {@code SIGCONT}: a process that the terminal has stopped (a background
+ * job that reads it, or writes to it after {@code stty tostop}) keeps {@code SIGTERM} pending until it is continued.
  */
 @CmdletInfo(name = "kill", category = "System", summary = "Stops processes",
         examples = {"kill 1234", "ps notepad | kill", "ps notepad | kill -n", "ps java | kill -f -w -v"})
@@ -110,6 +117,9 @@ public final class Kill implements Cmdlet<Kill.Params, Object, ProcessEntry> {
             context.error(Messages.get("kill.failed", pid, entry.name() == null ? "?" : entry.name()));
             return;
         }
+        if (!p.force() && !Host.windows()) {
+            resume(pid);
+        }
         if (p.await()) {
             try {
                 process.onExit().get();
@@ -125,6 +135,27 @@ public final class Kill implements Cmdlet<Kill.Params, Object, ProcessEntry> {
         }
         if (p.verbose()) {
             context.emit(entry);
+        }
+    }
+
+    /**
+     * Continues a process that was just asked to stop, so that its {@code SIGTERM} is delivered even if the terminal had
+     * stopped it. Harmless to a process that runs. Java has no way to send {@code SIGCONT}: the native {@code kill} does it;
+     * where it is missing the process stays as it is (and {@code kill -f} still ends it).
+     */
+    private static void resume(long pid) {
+        try {
+            Process kill = new ProcessBuilder("kill", "-CONT", Long.toString(pid))
+                    .redirectInput(ProcessBuilder.Redirect.from(new File("/dev/null")))
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD).start();
+            if (!kill.waitFor(5, TimeUnit.SECONDS)) {
+                kill.destroyForcibly();
+            }
+        } catch (IOException e) {
+            // no kill program: nothing more can be done here
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new CancellationException();
         }
     }
 }

@@ -598,8 +598,8 @@ structures, functions) can be built on it. The work is organised in phases (revi
   a background command on such a system is refused with a message that names the variable. A Windows batch file (`.bat`, `.cmd`)
   is still started by `ProcessBuilder`, without protection: `cmd.exe` reads its command line by other rules.
 - **Behaviour that changes on Unix, as in a shell with job control**: a background command that reads the terminal (`/dev/tty`:
-  `ssh`, `sudo`) or, after `stty tostop`, writes to it, is stopped by the terminal and ignores `SIGTERM` until it is continued
-  (`kill -f` ends it); `kill -INT <pid>` sent straight to a job now kills it, where the `sh` wrapper ignored it; and a signal
+  `ssh`, `sudo`) or, after `stty tostop`, writes to it, is stopped by the terminal (a stopped process keeps `SIGTERM` pending, so
+  `kill` now sends `SIGCONT` after it, and the job ends); `kill -INT <pid>` sent straight to a job now kills it, where the `sh` wrapper ignored it; and a signal
   sent to the process group of the shell no longer reaches the jobs (the `SIGHUP` of a closed terminal, the signal by which a CI
   job or `timeout` aborts a script by its group): a job outlives the terminal or the script that started it, as with `nohup`. The test
   `InterpreterTest.backgroundCommandGivesControlBackAtOnce` checks the group, no longer the ignored signal.
