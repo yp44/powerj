@@ -46,8 +46,7 @@ final class PosixJobs {
                 pipe = null;
             }
         } catch (IOException | RuntimeException e) {
-            started.forEach(s -> PosixSpawn.kill(s.pid(), PosixSpawn.SIGKILL));
-            started.forEach(PosixSpawn::reap);
+            abort(started);
             throw e;
         } finally {
             closeQuietly(feeding == null ? -1 : feeding[0]);
@@ -65,6 +64,20 @@ final class PosixJobs {
                     PosixSpawn.kill(s.pid(), PosixSpawn.SIGCONT); // a job stopped by the terminal keeps SIGTERM pending
                 }, () -> PosixSpawn.kill(s.pid(), PosixSpawn.SIGKILL)))
                 .toList();
+    }
+
+    /**
+     * Kills the stages already started, then reaps them. A stage is signalled only if it has not been reaped: its pid is
+     * ours as long as nobody has called {@code waitpid} on it, and once it is reaped the number may belong to another
+     * process. Nothing is reaped before this point (see {@link #start}), and the test makes that a rule of the code.
+     */
+    private static void abort(List<PosixSpawn.Spawned> started) {
+        for (PosixSpawn.Spawned stage : started) {
+            if (!stage.exit().isDone()) {
+                PosixSpawn.kill(stage.pid(), PosixSpawn.SIGKILL);
+            }
+        }
+        started.forEach(PosixSpawn::reap);
     }
 
     private static PosixSpawn.Stdio stdio(Output output) {

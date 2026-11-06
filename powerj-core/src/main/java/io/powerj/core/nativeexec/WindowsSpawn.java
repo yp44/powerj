@@ -100,7 +100,7 @@ final class WindowsSpawn {
     private static final MethodHandle SET_HANDLE_INFORMATION = call("SetHandleInformation",
             FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT, JAVA_INT));
     private static final MethodHandle DUPLICATE_HANDLE = call("DuplicateHandle", FunctionDescriptor.of(JAVA_INT,
-            ADDRESS, ADDRESS, ADDRESS, ADDRESS, JAVA_INT, JAVA_INT, JAVA_INT));
+            ADDRESS, ADDRESS, ADDRESS, ADDRESS, JAVA_INT, JAVA_INT, JAVA_INT), CAPTURE_ERROR);
     private static final MethodHandle GET_STD_HANDLE = call("GetStdHandle", FunctionDescriptor.of(ADDRESS, JAVA_INT));
     private static final MethodHandle WAIT = call("WaitForSingleObject", FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT));
     private static final MethodHandle EXIT_CODE = call("GetExitCodeProcess",
@@ -371,16 +371,18 @@ final class WindowsSpawn {
     /**
      * A copy of a handle that the child can inherit, closed with the others once the child is started. The handle itself
      * (a standard handle of the JVM) is left as it is: marking it inheritable would hand it to every process that the JDK
-     * starts later with {@code bInheritHandles}.
+     * starts later with {@code bInheritHandles}. If the handle cannot be duplicated the job is refused.
      */
     private static MemorySegment inheritableCopy(MemorySegment handle, List<Long> owned) throws Throwable {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment copy = arena.allocate(JAVA_LONG);
+            MemorySegment capture = arena.allocate(CAPTURE);
             MemorySegment self = (MemorySegment) CURRENT_PROCESS.invoke();
-            int ok = (int) DUPLICATE_HANDLE.invoke(self, handle, self, copy, 0, 1, DUPLICATE_SAME_ACCESS);
-            if (ok == 0) { // a handle that cannot be duplicated: the original is the only way to give it
-                int ignored = (int) SET_HANDLE_INFORMATION.invoke(handle, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
-                return handle;
+            int ok = (int) DUPLICATE_HANDLE.invoke(capture, self, handle, self, copy, 0, 1, DUPLICATE_SAME_ACCESS);
+            if (ok == 0) {
+                // Not a reason to mark the original inheritable: the job is refused, and the message says why.
+                throw new IOException("the standard output or error of PowerJ cannot be given to the job: DuplicateHandle error="
+                        + lastError(capture));
             }
             long address = copy.get(JAVA_LONG, 0);
             owned.add(address);

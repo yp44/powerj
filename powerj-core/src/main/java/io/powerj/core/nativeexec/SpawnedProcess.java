@@ -7,6 +7,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import io.powerj.fs.Host;
+
 /**
  * A background process started through the FFM API ({@link PosixSpawn}, {@link WindowsSpawn}), seen as a {@link Process}
  * so that the jobs ({@code Jobs}) and {@code kill} treat it as any other. It has no streams: a background process reads the
@@ -22,6 +24,12 @@ final class SpawnedProcess extends Process {
     private final Runnable terminate;
     private final Runnable kill;
     private final CompletableFuture<Process> onExit;
+    /**
+     * The handle of the JDK, taken while the process runs. It knows the start time of the process, so it never designates
+     * another process that would get the same pid, and it stays valid (not alive) after the exit. {@code null} if the
+     * process had already ended.
+     */
+    private final ProcessHandle handle;
 
     /**
      * @param terminate asks the process to stop ({@code SIGTERM}; on Windows there is no such thing and it is a kill)
@@ -33,6 +41,7 @@ final class SpawnedProcess extends Process {
         this.terminate = terminate;
         this.kill = kill;
         this.onExit = exit.handle((_, _) -> this);
+        this.handle = ProcessHandle.of(pid).orElse(null);
     }
 
     @Override
@@ -110,8 +119,18 @@ final class SpawnedProcess extends Process {
         return this;
     }
 
+    /** The handle of the process, still valid once it has ended. */
     @Override
     public ProcessHandle toHandle() {
-        return ProcessHandle.of(pid).orElseThrow(() -> new IllegalStateException("process " + pid + " has ended"));
+        if (handle == null) {
+            throw new UnsupportedOperationException("process " + pid + " had ended before its handle could be taken");
+        }
+        return handle;
+    }
+
+    /** Windows has no gentle stop: {@link #destroy()} is a {@code TerminateProcess}, as for the JDK's own processes. */
+    @Override
+    public boolean supportsNormalTermination() {
+        return !Host.windows();
     }
 }
