@@ -20,7 +20,7 @@ import io.powerj.core.nativeexec.PosixSpawn.Stdio;
  * </pre>
  * {@code plain}: {@link ProcessBuilder}, as a Windows console program is started today; {@code shield}: through
  * {@code sh}, ignoring SIGINT and SIGQUIT, as a Unix background command is started today; {@code group}:
- * {@link PosixSpawn} with its own process group; {@code launcher}: {@link GroupLauncher}, what the shell runs in group
+ * {@link PosixSpawn} with its own process group; {@code launcher}: {@link BackgroundLauncher}, what the shell runs in group
  * mode (its standard input is always the null device).
  */
 public final class PtyProbe {
@@ -41,8 +41,8 @@ public final class PtyProbe {
                     .in(inherit ? Stdio.INHERIT : Stdio.NULL).out(inherit ? Stdio.INHERIT : Stdio.NULL)
                     .err(inherit ? Stdio.INHERIT : Stdio.NULL).closeFds(true)).pid();
             case "launcher" -> {
-                GroupLauncher.Output output = inherit ? GroupLauncher.Output.inherit() : GroupLauncher.Output.discard();
-                yield GroupLauncher.start(List.of(new GroupLauncher.Stage(Path.of("/bin/sh"), List.of("-c", script), false)),
+                BackgroundLauncher.Output output = inherit ? BackgroundLauncher.Output.inherit() : BackgroundLauncher.Output.discard();
+                yield BackgroundLauncher.start(List.of(new BackgroundLauncher.Stage(Path.of("/bin/sh"), List.of("-c", script), false)),
                         Path.of("").toAbsolutePath(), Map.of("PATH", "/usr/bin:/bin"), output, output).getFirst().pid();
             }
             default -> throw new IllegalArgumentException(mode);

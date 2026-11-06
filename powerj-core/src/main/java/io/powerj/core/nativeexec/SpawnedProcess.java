@@ -8,9 +8,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 /**
- * A process started by {@link PosixSpawn}, seen as a {@link Process} so that the jobs ({@code Jobs}) and {@code kill} treat
- * it as any other. It has no streams: a background process reads the null device and writes to the terminal or to a file.
- * Its exit code comes from the {@code waitpid} thread of {@link PosixSpawn}.
+ * A background process started through the FFM API ({@link PosixSpawn}, {@link WindowsSpawn}), seen as a {@link Process}
+ * so that the jobs ({@code Jobs}) and {@code kill} treat it as any other. It has no streams: a background process reads the
+ * null device and writes to the terminal or to a file. Its exit code comes from the thread that waits for it.
  */
 final class SpawnedProcess extends Process {
 
@@ -19,11 +19,19 @@ final class SpawnedProcess extends Process {
 
     private final int pid;
     private final CompletableFuture<Integer> exit;
+    private final Runnable terminate;
+    private final Runnable kill;
     private final CompletableFuture<Process> onExit;
 
-    SpawnedProcess(PosixSpawn.Spawned spawned) {
-        this.pid = spawned.pid();
-        this.exit = spawned.exit();
+    /**
+     * @param terminate asks the process to stop ({@code SIGTERM}; on Windows there is no such thing and it is a kill)
+     * @param kill      stops it for good ({@code SIGKILL}, {@code TerminateProcess})
+     */
+    SpawnedProcess(int pid, CompletableFuture<Integer> exit, Runnable terminate, Runnable kill) {
+        this.pid = pid;
+        this.exit = exit;
+        this.terminate = terminate;
+        this.kill = kill;
         this.onExit = exit.handle((_, _) -> this);
     }
 
@@ -86,19 +94,18 @@ final class SpawnedProcess extends Process {
         return onExit;
     }
 
-    /** {@code SIGTERM}. Nothing is sent once the process has been reaped: its pid may belong to another by now. */
+    /** Nothing is sent once the process has been reaped: its pid may belong to another by now. */
     @Override
     public void destroy() {
         if (isAlive()) {
-            PosixSpawn.kill(pid, PosixSpawn.SIGTERM);
+            terminate.run();
         }
     }
 
-    /** {@code SIGKILL}. */
     @Override
     public Process destroyForcibly() {
         if (isAlive()) {
-            PosixSpawn.kill(pid, PosixSpawn.SIGKILL);
+            kill.run();
         }
         return this;
     }

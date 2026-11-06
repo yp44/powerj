@@ -23,28 +23,36 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
+import io.powerj.fs.Host;
+
 /**
- * EXPERIMENT of issue #128, used only when the session variable {@code POWERJ_BACKGROUND} is {@code group}
- * ({@link GroupLauncher}): starts a process with {@code posix_spawn} through the FFM API, in the process group of our
- * choice, with file actions for the redirections, and reads its exit status with {@code waitpid} on a thread of its own.
- * Linux (glibc 2.34 or later) only: the flags, the {@code O_*} values and {@code addclosefrom_np} differ on macOS.
+ * Starts a process with {@code posix_spawn} through the FFM API (issue #128), in the process group of our choice, with file
+ * actions for the redirections, and reads its exit status with {@code waitpid} on a thread of its own. It is how
+ * {@link BackgroundLauncher} starts a background job on Linux (glibc 2.34 or later) and macOS (10.15 or later), so that the
+ * Ctrl+C of the terminal, which goes to the foreground process group, never reaches it.
  * <p>
- * The restricted-method warnings of the FFM calls are not counted in {@code docs/quality/javac-warnings.txt}: the
- * experiment is off by default, and the baseline may not go up.
+ * The two systems differ in three places, each written once here: the {@code O_*} values, the way the descriptors other
+ * than the standard ones are kept out of the child ({@code addclosefrom_np} on Linux; {@code POSIX_SPAWN_CLOEXEC_DEFAULT}
+ * with {@code addinherit_np} on macOS), and the {@code /proc} that only Linux has (not used here).
+ * <p>
+ * The restricted-method warnings of the FFM calls are not counted in {@code docs/quality/javac-warnings.txt}: the baseline
+ * may not go up, and these calls are the point of the class.
  */
 @SuppressWarnings("restricted")
 final class PosixSpawn {
 
-    // Linux (glibc) values; macOS: SETPGROUP 0x02, SETSIGDEF 0x04, SETSIGMASK 0x08, CLOEXEC_DEFAULT 0x4000, O_CREAT
-    // 0x200, O_TRUNC 0x400, O_APPEND 0x8.
+    private static final boolean MAC = Host.mac();
+
     private static final short POSIX_SPAWN_SETPGROUP = 0x02;
     private static final short POSIX_SPAWN_SETSIGDEF = 0x04;
     private static final short POSIX_SPAWN_SETSIGMASK = 0x08;
+    /** macOS only: every descriptor not named by a file action is closed on exec. */
+    private static final short POSIX_SPAWN_CLOEXEC_DEFAULT = 0x4000;
     private static final int O_RDONLY = 0;
     private static final int O_WRONLY = 1;
-    private static final int O_CREAT = 0100;
-    private static final int O_TRUNC = 01000;
-    private static final int O_APPEND = 02000;
+    private static final int O_CREAT = MAC ? 0x200 : 0100;
+    private static final int O_TRUNC = MAC ? 0x400 : 01000;
+    private static final int O_APPEND = MAC ? 0x8 : 02000;
     private static final int EINTR = 4;
     static final int SIGINT = 2;
     static final int SIGKILL = 9;
@@ -90,8 +98,12 @@ final class PosixSpawn {
             FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT, ADDRESS, JAVA_INT, JAVA_INT));
     private static final MethodHandle FA_CHDIR = handle("posix_spawn_file_actions_addchdir_np",
             FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS));
-    private static final MethodHandle FA_CLOSEFROM = handle("posix_spawn_file_actions_addclosefrom_np",
+    /** Linux: close every descriptor from the given one. Absent on macOS. */
+    private static final MethodHandle FA_CLOSEFROM = MAC ? null : handle("posix_spawn_file_actions_addclosefrom_np",
             FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT));
+    /** macOS: keep a descriptor open in the child although {@code POSIX_SPAWN_CLOEXEC_DEFAULT} closes the others. */
+    private static final MethodHandle FA_INHERIT = MAC ? handle("posix_spawn_file_actions_addinherit_np",
+            FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT)) : null;
     private static final MethodHandle PIPE = handle("pipe", FunctionDescriptor.of(JAVA_INT, ADDRESS));
     private static final MethodHandle CLOSE = handle("close", FunctionDescriptor.of(JAVA_INT, JAVA_INT));
     private static final MethodHandle KILL = handle("kill", FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT));
@@ -201,6 +213,9 @@ final class PosixSpawn {
                 ok("setsigmask", (int) ATTR_SIGMASK.invokeExact(attr, mask));
                 ok("setsigdefault", (int) ATTR_SIGDEF.invokeExact(attr, defaults));
                 short flags = (short) (POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF);
+                if (MAC && spec.closeFds()) {
+                    flags |= POSIX_SPAWN_CLOEXEC_DEFAULT;
+                }
                 if (spec.group() >= 0) {
                     ok("setpgroup", (int) ATTR_PGROUP.invokeExact(attr, spec.group()));
                     flags |= POSIX_SPAWN_SETPGROUP;
@@ -246,18 +261,23 @@ final class PosixSpawn {
         if (spec.directory() != null) {
             ok("addchdir_np", (int) FA_CHDIR.invokeExact(actions, arena.allocateFrom(spec.directory().toString(), NAMES)));
         }
-        stdio(actions, arena, 0, spec.in());
-        stdio(actions, arena, 1, spec.out());
-        stdio(actions, arena, 2, spec.err());
-        if (spec.closeFds()) {
+        stdio(actions, arena, 0, spec.in(), spec.closeFds());
+        stdio(actions, arena, 1, spec.out(), spec.closeFds());
+        stdio(actions, arena, 2, spec.err(), spec.closeFds());
+        if (spec.closeFds() && !MAC) {
             ok("addclosefrom_np", (int) FA_CLOSEFROM.invokeExact(actions, 3));
         }
     }
 
-    private static void stdio(MemorySegment actions, Arena arena, int fd, Stdio stdio) throws Throwable {
+    private static void stdio(MemorySegment actions, Arena arena, int fd, Stdio stdio, boolean closeFds)
+            throws Throwable {
         int write = O_WRONLY | O_CREAT;
         switch (stdio.kind()) {
-            case INHERIT -> { }
+            case INHERIT -> {
+                if (MAC && closeFds) {
+                    ok("addinherit_np", (int) FA_INHERIT.invokeExact(actions, fd));
+                }
+            }
             case NULL -> open(actions, arena, fd, "/dev/null", fd == 0 ? O_RDONLY : O_WRONLY);
             case FILE -> open(actions, arena, fd, stdio.file().toString(), fd == 0 ? O_RDONLY : write | O_TRUNC);
             case APPEND -> open(actions, arena, fd, stdio.file().toString(), write | O_APPEND);
@@ -316,8 +336,9 @@ final class PosixSpawn {
     }
 
     /**
-     * {@code true} if this system can start processes this way: Linux, and a libc that has every function used here
-     * (glibc 2.34 or later). Loading this class fails otherwise, which the caller reads as "not available".
+     * {@code true} if this system can start processes this way: Linux or macOS, with a libc that has every function used
+     * here (glibc 2.34 or later; macOS 10.15 or later). Loading this class fails otherwise, which the caller reads as
+     * "not available".
      */
     static boolean ready() {
         return true;

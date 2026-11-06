@@ -39,7 +39,7 @@ import io.powerj.core.nativeexec.WindowsSpawn.Stdio;
  * machine: the Windows job of the CI is the first place where it runs. Not shipped.
  */
 @EnabledOnOs(OS.WINDOWS)
-class WindowsSpawnPrototypeTest {
+class WindowsSpawnTest {
 
     private static final Path RESULTS = Path.of("target", "prototype", "windows-spawn-results.txt");
     private static final Pattern ERROR_NUMBER = Pattern.compile("error=(\\d+)");
@@ -77,6 +77,8 @@ class WindowsSpawnPrototypeTest {
         assertThat(r.get("B_ended")).as("B, started in a new process group, must survive Ctrl+C: " + report)
                 .isEqualTo("false");
         assertThat(r.get("B2_ended")).as("B2, in a new process group with the handles of the console, must survive: "
+                + report).isEqualTo("false");
+        assertThat(r.get("B3_ended")).as("B3, in a new process group with output and errors inherited, must survive: "
                 + report).isEqualTo("false");
         // ... and that it is the flag, not our way of starting: the same start without it dies of Ctrl+C.
         assertThat(r.get("C_ended")).as("the control C, started by CreateProcessW without the flag, must die: " + report)

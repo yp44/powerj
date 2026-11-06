@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PROTOTYPE of issue #128 (Linux), not shipped: Ctrl+C and the terminal, on a real pseudo-terminal.
+"""Issue #128 (Linux, run by hand): Ctrl+C and the terminal, on a real pseudo-terminal.
 
 The terminal is a pty. Its session leader plays the user's shell: it starts PtyProbe (see its Javadoc) in a new process
 group and makes that group the foreground group of the terminal (setpgid + tcsetpgrp, as bash does for a foreground job).
@@ -12,7 +12,7 @@ from the terminal: SIGTTOU when it writes with `stty tostop`, SIGTTIN when it re
 
 Reads: B started as `plain` (ProcessBuilder, as a console program on Windows today), `shield` (sh + trap '' INT QUIT, as
 on Unix today), `group` (posix_spawn with its own process group, the prototype, standard input inherited) or `launcher`
-(GroupLauncher, what the shell runs with POWERJ_BACKGROUND=group; standard input is the null device).
+(BackgroundLauncher, what the shell runs for a background command; standard input is the null device).
 """
 import os
 import pty

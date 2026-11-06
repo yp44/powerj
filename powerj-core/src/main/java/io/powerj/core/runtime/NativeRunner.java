@@ -18,14 +18,15 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 import io.powerj.core.error.PjError;
 import io.powerj.core.error.PjException;
 import io.powerj.core.format.OutputFormatter;
 import io.powerj.core.i18n.Messages;
+import io.powerj.core.nativeexec.BackgroundLauncher;
 import io.powerj.core.nativeexec.ExecutableKind;
-import io.powerj.core.nativeexec.GroupLauncher;
 import io.powerj.core.nativeexec.NativeEncoding;
 import io.powerj.core.nativeexec.NativeRun;
 import io.powerj.fs.Host;
@@ -62,13 +63,21 @@ public final class NativeRunner {
     public record Result(NativeRun run, List<String> capturedLines) { }
 
     private final NativeEncoding encoding;
+    /** Can the system start a background job in a process group of its own? Asked at the first background command. */
+    private final BooleanSupplier groupLauncher;
 
     public NativeRunner() {
         this(new NativeEncoding());
     }
 
     NativeRunner(NativeEncoding encoding) {
+        this(encoding, BackgroundLauncher::available);
+    }
+
+    /** @param groupLauncher {@code () -> false} stands for a system that cannot, to test what the runner does then */
+    NativeRunner(NativeEncoding encoding, BooleanSupplier groupLauncher) {
         this.encoding = encoding;
+        this.groupLauncher = groupLauncher;
     }
 
     /** Command of a native group (consecutive native stages of a pipeline). */
@@ -313,16 +322,19 @@ public final class NativeRunner {
     /**
      * Starts native commands connected to one another in the background (FR-75), without waiting for them. Their
      * standard input is the null device: they never read the console. Their output goes to the terminal (inherited)
-     * or to the file of a redirection; without a terminal, it is discarded. On Unix, the processes ignore
-     * {@code SIGINT} and {@code SIGQUIT}, which the terminal sends to the whole foreground process group on Ctrl+C:
-     * Java cannot start a process in another group, so the program is started by {@code sh}, which ignores the
-     * signals and replaces itself with the program ({@code exec}: the pid is the program's).
-     *
+     * or to the file of a redirection; without a terminal, it is discarded.
      * <p>
-     * <b>Experiment (issue #128).</b> On Linux, when the session variable {@code POWERJ_BACKGROUND} is {@code group}
-     * ({@code env --set POWERJ_BACKGROUND=group}), the job is started by {@link GroupLauncher} in a process group of its
-     * own instead: no {@code sh}, and the Ctrl+C of the terminal does not reach it because it is not in the foreground
-     * group. Without the variable nothing changes.
+     * Ctrl+C must stop the foreground command only, and the terminal sends it to the whole foreground process group. So the
+     * job is started by {@link BackgroundLauncher} in a process group of its own, through the FFM API (issue #128): no
+     * {@code sh} in between and the pid is the program's. When that cannot be done:
+     * <ul>
+     *   <li>on Windows, for a batch file (or on a system without the functions), by {@link ProcessBuilder}, which gives no
+     *       protection against the Ctrl+C of the console;</li>
+     *   <li>on Unix, on a system without {@code posix_spawn} as needed (glibc older than 2.34, musl), through {@code sh},
+     *       which ignores {@code SIGINT} and {@code SIGQUIT} and replaces itself with the program ({@code exec}), <b>only</b>
+     *       if the session variable {@value BackgroundLauncher#SH_FALLBACK_VARIABLE} is {@code true}; otherwise the
+     *       command is refused with a message that names the variable.</li>
+     * </ul>
      *
      * @param context the surroundings; the file of {@code 2>} is in append mode, shared by all stages
      * @return the processes, in order
@@ -332,14 +344,19 @@ public final class NativeRunner {
         ShellIo io = context.io();
         Optional<FileTarget> stdout = context.redirections().out();
         Optional<FileTarget> stderrFile = context.redirections().err();
-        if (GroupLauncher.GROUP.equals(session.environmentSnapshot().get(GroupLauncher.VARIABLE))
-                && GroupLauncher.available()) {
-            return startInGroup(commands, session, io, stdout, stderrFile);
+        List<BackgroundLauncher.Stage> stages = commands.stream()
+                .map(c -> new BackgroundLauncher.Stage(c.executable(), c.args(), c.errorsToOutput())).toList();
+        if (groupLauncher.getAsBoolean() && BackgroundLauncher.handles(stages)) {
+            return startInGroup(stages, commands, session, io, stdout, stderrFile);
+        }
+        boolean throughSh = !Host.windows();
+        if (throughSh && !BackgroundLauncher.shFallbackAllowed(session.environmentSnapshot())) {
+            throw new PjException(Messages.get("background.unavailable", BackgroundLauncher.SH_FALLBACK_VARIABLE));
         }
         List<ProcessBuilder> builders = new ArrayList<>(commands.size());
         for (int i = 0; i < commands.size(); i++) {
             Command command = commands.get(i);
-            var builder = newBuilder(Host.windows() ? command : shielded(command), session);
+            var builder = newBuilder(throughSh ? shielded(command) : command, session);
             if (i == 0) {
                 builder.redirectInput(ProcessBuilder.Redirect.from(NULL_DEVICE));
             }
@@ -363,19 +380,21 @@ public final class NativeRunner {
     }
 
     /**
-     * The experiment: the same job as the {@link ProcessBuilder} branch of {@link #startBackground} (null device in, then
-     * the file of the redirection, else the terminal when there is one, else nothing; {@code 2>&1}), started in a group
-     * of its own. The environment is the snapshot of the session, never the JVM's.
+     * The same job as the {@link ProcessBuilder} branch of {@link #startBackground} (null device in, then the file of the
+     * redirection, else the terminal when there is one, else nothing; {@code 2>&1}), started in a process group of its own.
+     * The environment is the snapshot of the session, never the JVM's.
      */
-    private static List<Process> startInGroup(List<Command> commands, Session session, ShellIo io,
-                                              Optional<FileTarget> stdout, Optional<FileTarget> stderrFile) {
-        GroupLauncher.Output terminal = io.interactive() ? GroupLauncher.Output.inherit() : GroupLauncher.Output.discard();
-        GroupLauncher.Output out = stdout.map(f -> GroupLauncher.Output.file(f.file(), f.append())).orElse(terminal);
-        GroupLauncher.Output err = stderrFile.map(f -> GroupLauncher.Output.file(f.file(), true)).orElse(terminal);
-        List<GroupLauncher.Stage> stages = commands.stream()
-                .map(c -> new GroupLauncher.Stage(c.executable(), c.args(), c.errorsToOutput())).toList();
+    private static List<Process> startInGroup(List<BackgroundLauncher.Stage> stages, List<Command> commands,
+                                              Session session, ShellIo io, Optional<FileTarget> stdout,
+                                              Optional<FileTarget> stderrFile) {
+        BackgroundLauncher.Output terminal = io.interactive() ? BackgroundLauncher.Output.inherit()
+                : BackgroundLauncher.Output.discard();
+        BackgroundLauncher.Output out = stdout.map(f -> BackgroundLauncher.Output.file(f.file(), f.append()))
+                .orElse(terminal);
+        BackgroundLauncher.Output err = stderrFile.map(f -> BackgroundLauncher.Output.file(f.file(), true))
+                .orElse(terminal);
         try {
-            return GroupLauncher.start(stages, session.currentDirectory(), session.environmentSnapshot(), out, err);
+            return BackgroundLauncher.start(stages, session.currentDirectory(), session.environmentSnapshot(), out, err);
         } catch (IOException e) {
             throw startFailed(commands, e);
         }
@@ -399,7 +418,8 @@ public final class NativeRunner {
 
     /**
      * The command run by {@code sh}, which ignores {@code SIGINT} and {@code SIGQUIT} and replaces itself with the program
-     * ({@code exec}): the command line of a background process on Unix.
+     * ({@code exec}): the command line of a background process on a Unix system that cannot start it in a process group of
+     * its own, when the session allows the fallback ({@value BackgroundLauncher#SH_FALLBACK_VARIABLE}).
      */
     private static Command shielded(Command command) {
         List<String> args = new ArrayList<>(command.args().size() + 4);

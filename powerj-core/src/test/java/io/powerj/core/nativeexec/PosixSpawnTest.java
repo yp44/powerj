@@ -29,12 +29,12 @@ import io.powerj.core.nativeexec.PosixSpawn.Stdio;
 
 
 /**
- * PROTOTYPE of issue #128 (Linux): start a background process in its own process group with {@code posix_spawn}
- * through the FFM API. Each test is one check of the plan ({@code docs/plans/background-process-group.md}, Phase 1);
+ * Issue #128 (Linux and macOS): start a background process in its own process group with {@code posix_spawn} through the
+ * FFM API (the checks of the plan, {@code docs/plans/background-process-group.md}, Phase 1). Each test is one check of the plan ({@code docs/plans/background-process-group.md}, Phase 1);
  * the numbers are printed and appended to {@code target/prototype/posix-spawn-results.txt}. Not shipped.
  */
-@EnabledOnOs(OS.LINUX)
-class PosixSpawnPrototypeTest {
+@EnabledOnOs({OS.LINUX, OS.MAC})
+class PosixSpawnTest {
 
     private static final Path RESULTS = Path.of("target", "prototype", "posix-spawn-results.txt");
     private static final String SH_SHIELD = "trap '' INT QUIT; exec \"$0\" \"$@\"";
@@ -64,7 +64,7 @@ class PosixSpawnPrototypeTest {
         int jvmGroup = PosixSpawn.getpgrp();
 
         assertThat(PosixSpawn.getpgid(own.pid())).isEqualTo(own.pid()).isNotEqualTo(jvmGroup);
-        assertThat(procStat(own.pid()).pgrp()).isEqualTo(own.pid());
+        assertThat(psGroup(own.pid())).isEqualTo(own.pid());
         assertThat(PosixSpawn.getpgid(shared.pid())).isEqualTo(jvmGroup);
         // The `sh` wrapper of today: same group as the JVM, so the terminal's SIGINT reaches it (and is ignored there).
         assertThat(PosixSpawn.getpgid((int) shielded.pid())).isEqualTo(jvmGroup);
@@ -331,6 +331,7 @@ class PosixSpawnPrototypeTest {
     // --- bonus: signal state of the child (what survives exec) ---
 
     @Test
+    @EnabledOnOs(OS.LINUX)
     void check12_signalStateOfTheChild() throws Exception {
         Spawned group = start(sleep().group(PosixSpawn.OWN_GROUP));
         Process java = startByJava(new ProcessBuilder(exe("sleep").toString(), "30"));
@@ -420,13 +421,12 @@ class PosixSpawnPrototypeTest {
         throw new IllegalStateException("no " + name);
     }
 
-    private record Stat(char state, int ppid, int pgrp, int session) { }
-
-    private static Stat procStat(int pid) throws IOException {
-        String line = Files.readString(Path.of("/proc", String.valueOf(pid), "stat"));
-        String[] fields = line.substring(line.lastIndexOf(')') + 2).split(" ");
-        return new Stat(fields[0].charAt(0), Integer.parseInt(fields[1]), Integer.parseInt(fields[2]),
-                Integer.parseInt(fields[3]));
+    /** The process group of a process, from {@code ps}, which Linux and macOS both have. */
+    private static int psGroup(int pid) throws IOException, InterruptedException {
+        Process ps = new ProcessBuilder("ps", "-o", "pgid=", "-p", String.valueOf(pid)).redirectErrorStream(true).start();
+        String text = new String(ps.getInputStream().readAllBytes()).strip();
+        ps.waitFor();
+        return Integer.parseInt(text);
     }
 
     private static String signals(int pid) throws IOException {
@@ -439,13 +439,24 @@ class PosixSpawnPrototypeTest {
         return wanted.entrySet().stream().map(e -> e.getKey() + "=" + e.getValue()).collect(Collectors.joining(" "));
     }
 
+    /** The numbers of the descriptors a process holds: {@code /proc} on Linux, {@code lsof} on macOS. */
     private static List<String> fds(int pid) throws IOException {
-        try (Stream<Path> entries = Files.list(Path.of("/proc", String.valueOf(pid), "fd"))) {
-            return entries.map(p -> p.getFileName().toString()).sorted().toList();
+        Path proc = Path.of("/proc", String.valueOf(pid), "fd");
+        if (Files.isDirectory(proc)) {
+            try (Stream<Path> entries = Files.list(proc)) {
+                return entries.map(p -> p.getFileName().toString()).sorted().toList();
+            }
         }
+        Process lsof = new ProcessBuilder("lsof", "-nP", "-p", String.valueOf(pid), "-Ff").redirectErrorStream(true).start();
+        String text = new String(lsof.getInputStream().readAllBytes());
+        return text.lines().filter(line -> line.matches("f\\d+")).map(line -> line.substring(1)).sorted().toList();
     }
 
+    /** The pipes the JVM holds ({@code /proc} only: empty elsewhere, where the comparison proves nothing and passes). */
     private static List<String> pipesOfTheJvm() throws IOException {
+        if (!Files.isDirectory(Path.of("/proc/self/fd"))) {
+            return List.of();
+        }
         try (Stream<Path> entries = Files.list(Path.of("/proc/self/fd"))) {
             return entries.map(p -> {
                 try {

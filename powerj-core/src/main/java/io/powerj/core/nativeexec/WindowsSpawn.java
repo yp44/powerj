@@ -25,15 +25,18 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * PROTOTYPE of issue #128 (Windows), test code, never run on the machine that wrote it: starts a process with
- * {@code CreateProcessW} through the FFM API, optionally in a new process group ({@code CREATE_NEW_PROCESS_GROUP}: Ctrl+C
- * is disabled for the processes of the group), with the standard streams we choose, and only the handles we choose
- * inherited ({@code PROC_THREAD_ATTRIBUTE_HANDLE_LIST}). Its exit code is read by a thread that waits on the process handle.
+ * Starts a process with {@code CreateProcessW} through the FFM API (issue #128), in a new process group
+ * ({@code CREATE_NEW_PROCESS_GROUP}: Ctrl+C is disabled for the processes of the group), with the standard streams we
+ * choose and only those handles inherited ({@code PROC_THREAD_ATTRIBUTE_HANDLE_LIST}). It is how {@link BackgroundLauncher}
+ * starts a background job on Windows. The exit code is read by a thread that waits on the process handle.
  * <p>
  * {@code .bat} and {@code .cmd} files are refused: {@code cmd.exe} reads its command line by other rules, and the JDK has
- * checks for them (CVE-2024-24576) that this prototype does not copy. The launcher would hand them to {@link ProcessBuilder}.
+ * checks for them (CVE-2024-24576) that this class does not copy. {@link BackgroundLauncher#handles} leaves them to
+ * {@link ProcessBuilder}.
  * <p>
- * All the downcalls use {@code invoke}, not {@code invokeExact}: nothing here could be run before the CI did.
+ * The downcalls use {@code invoke}, not {@code invokeExact}: a start costs a few milliseconds, the call is not what takes
+ * the time. The restricted-method warnings of the FFM calls are not counted in {@code docs/quality/javac-warnings.txt}:
+ * the baseline may not go up.
  */
 @SuppressWarnings("restricted")
 final class WindowsSpawn {
@@ -121,6 +124,14 @@ final class WindowsSpawn {
             FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT));
 
     private WindowsSpawn() {
+    }
+
+    /**
+     * {@code true} if this system can start processes this way. Loading this class fails if a function is missing from
+     * {@code kernel32}, which the caller reads as "not available".
+     */
+    static boolean ready() {
+        return true;
     }
 
     /** What a standard stream of the child is connected to. */

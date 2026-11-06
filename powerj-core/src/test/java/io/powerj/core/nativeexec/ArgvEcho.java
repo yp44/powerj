@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * PROTOTYPE of issue #128 (Windows), test code: the program that {@code WindowsSpawnPrototypeTest} starts to see what a
+ * PROTOTYPE of issue #128 (Windows), test code: the program that {@code WindowsSpawnTest} starts to see what a
  * child receives. The first argument is the file to write; it gets one line {@code [argument]} per other argument, then the
  * variable {@code POWERJ_PROBE}, the variable {@code USERPROFILE} and the current directory (UTF-8, {@code \n}).
  */

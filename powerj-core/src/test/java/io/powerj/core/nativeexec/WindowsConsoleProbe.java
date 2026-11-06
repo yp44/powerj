@@ -22,7 +22,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * PROTOTYPE of issue #128 (Windows), test code: the process that {@code WindowsSpawnPrototypeTest} starts <b>in a console of
+ * PROTOTYPE of issue #128 (Windows), test code: the process that {@code WindowsSpawnTest} starts <b>in a console of
  * its own</b> (so that the Ctrl+C sent here reaches nothing of the build), with the standard handles of that console as a
  * program started in a terminal has them. It starts several {@code ping -t} and sends
  * {@code GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0)}, which goes to every process of the console:
@@ -30,8 +30,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  *   <li>A, A2, A3: {@link ProcessBuilder}, with all streams redirected to the null device (A), with the configuration of a
  *       PowerJ background command at a terminal (input from the null device, output and errors inherited: A2), and with
  *       everything inherited (A3);</li>
- *   <li>B, B2: {@link WindowsSpawn} in a new process group, with the null device (B) and with the standard handles of the
- *       console (B2);</li>
+ *   <li>B, B2, B3: {@link WindowsSpawn} in a new process group, with the null device (B), with the standard handles of the
+ *       console (B2), and with output and errors inherited through the handle list (B3: what a job at a terminal gets);</li>
  *   <li>C, C2: {@link WindowsSpawn} without the flag: the controls that show that B is spared by the flag and not by the
  *       way we start it.</li>
  * </ul>
@@ -100,6 +100,10 @@ public final class WindowsConsoleProbe {
             children.put("B", of(WindowsSpawn.spawn(spec.flags(WindowsSpawn.CREATE_NEW_PROCESS_GROUP))));
             children.put("B2", of(WindowsSpawn.spawn(spec.flags(WindowsSpawn.CREATE_NEW_PROCESS_GROUP)
                     .standardHandles(false))));
+            // What a job at a terminal does: a new group and the output and errors of the console inherited (the handle list
+            // holds the console handles of this process).
+            children.put("B3", of(WindowsSpawn.spawn(spec.flags(WindowsSpawn.CREATE_NEW_PROCESS_GROUP)
+                    .out(WindowsSpawn.Stdio.INHERIT).err(WindowsSpawn.Stdio.INHERIT))));
             children.put("C", of(WindowsSpawn.spawn(spec)));
             children.put("C2", of(WindowsSpawn.spawn(spec.standardHandles(false))));
 
