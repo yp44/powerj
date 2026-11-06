@@ -42,6 +42,8 @@ class BackgroundJobsWindowsTest {
     @BeforeEach
     void setUp() throws Exception {
         assumeTrue(Host.windows(), "Windows programs");
+        // Windows always has what the launcher needs: a failure here must not hide the tests that follow as skipped.
+        assertThat(BackgroundLauncher.available()).as("CreateProcessW through the FFM API").isTrue();
         Files.createDirectories(tmp.resolve("home"));
         Map<String, String> environment = new HashMap<>(System.getenv());
         session = new Session(tmp.resolve("home"), tmp, environment);
@@ -63,18 +65,16 @@ class BackgroundJobsWindowsTest {
 
     @Test
     void theEndOfAJobIsReportedWithItsExitCode() throws Exception {
-        assumeTrue(BackgroundLauncher.available());
 
         run("cmd /c exit 7 &");
         awaitEnd();
 
         assertThat(errors).isEmpty();
-        assertThat(session.jobs().drainFinished()).singleElement().isEqualTo("[1] done cmd /c exit 7 (exit 7)");
+        assertThat(session.jobs().drainFinished()).singleElement().isEqualTo("[1] done cmd.exe /c exit 7 (exit 7)");
     }
 
     @Test
     void aJobGivesControlBackAtOnceAndCanBeStopped() throws Exception {
-        assumeTrue(BackgroundLauncher.available());
 
         long start = System.nanoTime();
         run("ping -t 127.0.0.1 &");
@@ -95,7 +95,6 @@ class BackgroundJobsWindowsTest {
 
     @Test
     void redirectionsAndPipelinesWork() throws Exception {
-        assumeTrue(BackgroundLauncher.available());
         Files.writeString(tmp.resolve("in.txt"), "b\r\na\r\n");
 
         run("cmd /c echo hello > out.txt &");
@@ -110,7 +109,6 @@ class BackgroundJobsWindowsTest {
 
     @Test
     void theJobSeesTheEnvironmentOfTheSessionAndNotTheJvm() throws Exception {
-        assumeTrue(BackgroundLauncher.available());
         session.environment().keySet().removeIf(name -> name.equalsIgnoreCase("USERPROFILE"));
         session.environment().put("POWERJ_PROBE", "from-the-session");
 

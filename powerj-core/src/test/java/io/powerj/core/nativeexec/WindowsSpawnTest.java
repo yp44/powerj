@@ -395,7 +395,8 @@ class WindowsSpawnTest {
     }
 
     private static List<String> javaArguments(Class<?> main, String... args) {
-        List<String> all = new ArrayList<>(List.of("-XX:TieredStopAtLevel=1", "-cp", classes(main).toString(), main.getName()));
+        String classpath = classes(main) + File.pathSeparator + Path.of("target", "classes").toAbsolutePath();
+        List<String> all = new ArrayList<>(List.of("-XX:TieredStopAtLevel=1", "-cp", classpath, main.getName()));
         all.addAll(Arrays.asList(args));
         return all;
     }
@@ -408,8 +409,9 @@ class WindowsSpawnTest {
     }
 
     /**
-     * The folder of the compiled test classes, where the helper programs are. Surefire runs from the folder of the module,
-     * and its code source would name {@code target/classes} here, because the test classes are patched into the module.
+     * The folder of the compiled test classes, where the helper programs are (they also need {@code target/classes}, where
+     * {@link WindowsSpawn} is). Surefire runs from the folder of the module, and the code source of a test class would
+     * name {@code target/classes}, because the test classes are patched into the module.
      */
     private static Path classes(Class<?> main) {
         Path folder = Path.of("target", "test-classes").toAbsolutePath();

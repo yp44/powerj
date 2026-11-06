@@ -45,6 +45,10 @@ class BackgroundJobsTest {
     @BeforeEach
     void setUp() throws Exception {
         assumeFalse(Host.windows(), "Unix commands");
+        if (Host.mac()) {
+            // macOS 10.15 or later has every function: a failure here must not hide the tests that follow as skipped.
+            assertThat(BackgroundLauncher.available()).as("posix_spawn through the FFM API on macOS").isTrue();
+        }
         assumeTrue(BackgroundLauncher.available(), "a system with the functions of posix_spawn in its libc");
         session = newSession();
         interpreter = interpreter(new NativeRunner());
