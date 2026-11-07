@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CancellationException;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -128,35 +129,58 @@ public final class TestContext<O> implements CmdletContext<O> {
         return compiler.apply(expression);
     }
 
+    /** The accessors of a record class by exact name, looked up once per class (a test reads a million of them). */
+    private static final ClassValue<Map<String, Method>> ACCESSORS = new ClassValue<>() {
+        @Override
+        protected Map<String, Method> computeValue(Class<?> type) {
+            Map<String, Method> accessors = new HashMap<>();
+            for (RecordComponent component : type.getRecordComponents()) {
+                Method accessor = component.getAccessor();
+                accessor.setAccessible(true);
+                accessors.put(component.getName(), accessor);
+            }
+            return accessors;
+        }
+    };
+
+    /**
+     * How {@link #readProperty} reads: by default {@linkplain #readDirectly the record or the map itself}; a test that has
+     * to know who reads sets its own.
+     */
+    public BiFunction<Object, String, Object> reader = TestContext::readDirectly;
+
+    @Override
+    public Object readProperty(Object target, String name) {
+        return reader.apply(target, name);
+    }
+
     /**
      * Reads a property by its exact name, as the engine does: a component of a record or a key of a {@link Map}. This
      * context has no engine, so it reads the record itself; a test of the access between modules is a test of the image.
+     * A failing accessor is reported as the engine does ({@code reading property 'x': cause}).
      */
-    @Override
-    public Object readProperty(Object target, String name) {
+    public static Object readDirectly(Object target, String name) {
         if (target instanceof Map<?, ?> map) {
             return map.get(name);
         }
         if (target instanceof Record record) {
-            for (RecordComponent component : record.getClass().getRecordComponents()) {
-                if (component.getName().equals(name)) {
-                    return read(component.getAccessor(), record);
-                }
+            Method accessor = ACCESSORS.get(record.getClass()).get(name);
+            if (accessor != null) {
+                return read(accessor, record, name);
             }
         }
         throw new IllegalArgumentException("no property " + name + " in "
                 + (target == null ? "null" : target.getClass().getName()));
     }
 
-    private static Object read(Method accessor, Record record) {
+    private static Object read(Method accessor, Record record, String name) {
         try {
-            accessor.setAccessible(true);
             return accessor.invoke(record);
         } catch (InvocationTargetException e) {
             if (e.getCause() instanceof CancellationException cancelled) {
                 throw cancelled;
             }
-            throw new IllegalStateException(e.getCause());
+            throw new IllegalStateException("reading property '" + name + "': " + e.getCause(), e.getCause());
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException(e);
         }

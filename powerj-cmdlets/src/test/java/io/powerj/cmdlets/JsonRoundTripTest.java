@@ -11,6 +11,7 @@ import java.util.Random;
 import org.junit.jupiter.api.Test;
 
 import io.powerj.api.Row;
+import io.powerj.testing.TestContext;
 
 /**
  * What {@link JsonWriter} writes, {@link JsonParser} reads back as the same value, for values made at random from a fixed
@@ -18,6 +19,8 @@ import io.powerj.api.Row;
  * Basic Multilingual Plane and lone surrogates; numbers; nested lists and objects.
  */
 class JsonRoundTripTest {
+
+    private static final Properties PROPERTIES = new Properties(new TestContext<>());
 
     private static final String[] PIECES = {"a", "Z", " ", "\"", "\\", "/", "\n", "\r", "\t", "\b", "\f", "\u0000",
             "\u001f", "\u007f", "é", "€", "\u2028", "\ud83d\ude00", "\ud800", "\udc00", "{", "}", "[", "]", ",", ":"};
@@ -70,7 +73,7 @@ class JsonRoundTripTest {
 
     private static String write(Object value, boolean pretty) {
         StringBuilder out = new StringBuilder();
-        new JsonWriter(pretty, 100).write(value, out, 0);
+        new JsonWriter(pretty, 100, PROPERTIES).write(value, out, 0);
         return out.toString();
     }
 

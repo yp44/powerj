@@ -21,17 +21,20 @@ final class JsonWriter {
 
     private final boolean pretty;
     private final int maxDepth;
+    private final Properties properties;
     private boolean truncated;
     private int written;
 
     /**
-     * @param pretty   indents by two spaces, one member or element per line
-     * @param maxDepth containers at this nesting level or deeper are written as their text; the object written is at
-     *                 level 0
+     * @param pretty     indents by two spaces, one member or element per line
+     * @param maxDepth   containers at this nesting level or deeper are written as their text; the object written is at
+     *                   level 0
+     * @param properties reads the components of the records written
      */
-    JsonWriter(boolean pretty, int maxDepth) {
+    JsonWriter(boolean pretty, int maxDepth, Properties properties) {
         this.pretty = pretty;
         this.maxDepth = maxDepth;
+        this.properties = properties;
     }
 
     /** {@code true} once a value deeper than the maximum depth has been written as its text. */
@@ -72,7 +75,7 @@ final class JsonWriter {
                 } else if (value instanceof Map<?, ?> map) {
                     object(map, out, depth, indent);
                 } else if (value instanceof Record record) {
-                    object(Properties.of(record), out, depth, indent);
+                    object(properties.of(record), out, depth, indent);
                 } else {
                     array(elements(value), out, depth, indent);
                 }

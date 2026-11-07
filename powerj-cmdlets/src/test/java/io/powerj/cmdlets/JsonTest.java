@@ -18,9 +18,12 @@ import org.junit.jupiter.api.Test;
 
 import io.powerj.api.Bytes;
 import io.powerj.api.Row;
+import io.powerj.testing.TestContext;
 
 /** {@link JsonWriter}, {@link JsonParser} and {@link JsonSplitter} (specification FR-73). */
 class JsonTest {
+
+    private static final Properties PROPERTIES = new Properties(new TestContext<>());
 
     enum Color { RED }
 
@@ -29,13 +32,13 @@ class JsonTest {
 
     private static String compact(Object value) {
         StringBuilder out = new StringBuilder();
-        new JsonWriter(false, 10).write(value, out, 0);
+        new JsonWriter(false, 10, PROPERTIES).write(value, out, 0);
         return out.toString();
     }
 
     private static String pretty(Object value) {
         StringBuilder out = new StringBuilder();
-        new JsonWriter(true, 10).write(value, out, 0);
+        new JsonWriter(true, 10, PROPERTIES).write(value, out, 0);
         return out.toString();
     }
 
@@ -94,14 +97,14 @@ class JsonTest {
     void deeperValuesAreWrittenAsTheirText() {
         List<Object> cycle = new ArrayList<>();
         cycle.add(cycle);
-        JsonWriter writer = new JsonWriter(false, 2);
+        JsonWriter writer = new JsonWriter(false, 2, PROPERTIES);
         StringBuilder out = new StringBuilder();
         writer.write(List.of(List.of(List.of(1))), out, 0);
         assertThat(out).hasToString("[[\"[1]\"]]");
         assertThat(writer.truncated()).isTrue();
 
         out.setLength(0);
-        new JsonWriter(false, 3).write(cycle, out, 0);
+        new JsonWriter(false, 3, PROPERTIES).write(cycle, out, 0);
         assertThat(out.toString()).startsWith("[[[\"");
     }
 

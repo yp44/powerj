@@ -28,15 +28,20 @@ public final class ToCsv implements Cmdlet<ToCsv.Params, Object, String> {
     /** One execution: the columns, known at the first object. */
     private static final class State {
         final CsvWriter writer;
+        final Properties properties;
         List<String> columns;
 
-        State(CsvWriter writer) {
+        State(CsvWriter writer, Properties properties) {
             this.writer = writer;
+            this.properties = properties;
         }
     }
 
     private static State state(Params p, CmdletContext<String> context) {
-        return context.state(State.class, () -> new State(new CsvWriter(CsvWriter.delimiter(p.delimiter()))));
+        return context.state(State.class, () -> {
+            Properties properties = new Properties(context);
+            return new State(new CsvWriter(CsvWriter.delimiter(p.delimiter()), properties), properties);
+        });
     }
 
     @Override
@@ -52,7 +57,7 @@ public final class ToCsv implements Cmdlet<ToCsv.Params, Object, String> {
         List<Object> values = new ArrayList<>(columns.size());
         try {
             for (String column : columns) {
-                values.add(Properties.get(input, column));
+                values.add(state.properties.get(input, column));
             }
         } catch (Properties.Unreadable e) {
             context.error(Messages.get("pipeline.object.skipped", e.getMessage(), Texts.abbreviate(input)));

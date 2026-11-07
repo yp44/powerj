@@ -1,6 +1,8 @@
 package io.powerj.cmdlets;
 
 import static org.assertj.core.api.Assertions.assertThat;
+
+import io.powerj.testing.TestContext;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
@@ -14,6 +16,9 @@ import org.junit.jupiter.api.Test;
 
 /** Comparison of {@code sort}, and the CSV and JSON text of the values (FR-67, FR-73). */
 class ValueFormatsTest {
+
+    private static final Properties PROPERTIES = new Properties(new TestContext<>());
+    private static final CsvWriter CSV = new CsvWriter(',', PROPERTIES);
 
     enum Size { SMALL, LARGE }
 
@@ -53,13 +58,13 @@ class ValueFormatsTest {
 
     @Test
     void csvTextOfFloatsEnumsAndOptionals() {
-        assertThat(CsvWriter.text(2.50f)).isEqualTo("2.5");
-        assertThat(CsvWriter.text(Float.NaN)).isEqualTo("NaN");
-        assertThat(CsvWriter.text(Double.POSITIVE_INFINITY)).isEqualTo("Infinity");
-        assertThat(CsvWriter.text(Size.LARGE)).isEqualTo("LARGE");
-        assertThat(CsvWriter.text(Optional.of("x"))).isEqualTo("x");
-        assertThat(CsvWriter.text(Optional.empty())).isEmpty();
-        assertThat(new CsvWriter(',').line(List.of("end ", "", "a\rb"))).isEqualTo("\"end \",,\"a\rb\"");
+        assertThat(CSV.text(2.50f)).isEqualTo("2.5");
+        assertThat(CSV.text(Float.NaN)).isEqualTo("NaN");
+        assertThat(CSV.text(Double.POSITIVE_INFINITY)).isEqualTo("Infinity");
+        assertThat(CSV.text(Size.LARGE)).isEqualTo("LARGE");
+        assertThat(CSV.text(Optional.of("x"))).isEqualTo("x");
+        assertThat(CSV.text(Optional.empty())).isEmpty();
+        assertThat(new CsvWriter(',', PROPERTIES).line(List.of("end ", "", "a\rb"))).isEqualTo("\"end \",,\"a\rb\"");
     }
 
     @Test
@@ -73,7 +78,7 @@ class ValueFormatsTest {
 
     private static String json(Object value) {
         StringBuilder out = new StringBuilder();
-        new JsonWriter(false, 10).write(value, out, 0);
+        new JsonWriter(false, 10, PROPERTIES).write(value, out, 0);
         return out.toString();
     }
 

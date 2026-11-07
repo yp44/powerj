@@ -22,12 +22,13 @@ import io.powerj.testing.TestContext;
 class JoinTest {
 
     private final TestContext<Row> context = new TestContext<>(Path.of("."));
+    private final Properties properties = new Properties(context);
 
     {
         context.hasInput = true;
         context.compiler = source -> block(source, value -> {
             String property = source.substring("$_.".length());
-            return Properties.get(value, property);
+            return properties.get(value, property);
         });
     }
 

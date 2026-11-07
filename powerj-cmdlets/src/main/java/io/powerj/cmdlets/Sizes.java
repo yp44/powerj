@@ -2,6 +2,7 @@ package io.powerj.cmdlets;
 
 
 import io.powerj.api.Bytes;
+import io.powerj.text.RecordView;
 
 /** Sizes in bytes: which values a {@link io.powerj.api.Row} shows in readable form ({@code 14.2 KB}). */
 final class Sizes {
@@ -14,6 +15,7 @@ final class Sizes {
         if (value == null || property == null || !value.getClass().isRecord()) {
             return false;
         }
-        return RecordShape.of(value.getClass()).isBytes(property);
+        RecordView.Component component = RecordView.of(value.getClass()).component(property);
+        return component != null && component.bytes();
     }
 }

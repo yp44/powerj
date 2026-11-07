@@ -1,6 +1,8 @@
 package io.powerj.cmdlets;
 
 import static org.assertj.core.api.Assertions.assertThat;
+
+import io.powerj.testing.TestContext;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
@@ -13,27 +15,30 @@ import org.junit.jupiter.api.Test;
 /** {@link CsvWriter} and {@link CsvReader} (specification FR-73). */
 class CsvTest {
 
+    private static final Properties PROPERTIES = new Properties(new TestContext<>());
+    private static final CsvWriter CSV = new CsvWriter(',', PROPERTIES);
+
     record Item(String name, long size) {
     }
 
     @Test
     void fieldsAreQuotedWhenNeeded() {
-        CsvWriter writer = new CsvWriter(',');
+        CsvWriter writer = new CsvWriter(',', PROPERTIES);
         assertThat(writer.line(List.of("a", "b,c", "say \"hi\"", "two\nlines", " edge", "x;y")))
                 .isEqualTo("a,\"b,c\",\"say \"\"hi\"\"\",\"two\nlines\",\" edge\",x;y");
-        assertThat(new CsvWriter(';').line(List.of("x;y", "a,b"))).isEqualTo("\"x;y\";a,b");
+        assertThat(new CsvWriter(';', PROPERTIES).line(List.of("x;y", "a,b"))).isEqualTo("\"x;y\";a,b");
     }
 
     @Test
     void valuesAreWrittenWithoutLocaleNorExponent() {
-        assertThat(CsvWriter.text(null)).isEmpty();
-        assertThat(CsvWriter.text(1.5)).isEqualTo("1.5");
-        assertThat(CsvWriter.text(1e20)).isEqualTo("100000000000000000000");
-        assertThat(CsvWriter.text(2.0)).isEqualTo("2");
-        assertThat(CsvWriter.text(new BigDecimal("1E+3"))).isEqualTo("1000");
-        assertThat(CsvWriter.text(Instant.parse("2026-10-18T19:23:00Z"))).isEqualTo("2026-10-18T19:23:00Z");
-        assertThat(CsvWriter.text(List.of(1, "a"))).isEqualTo("[1,\"a\"]");
-        assertThat(CsvWriter.text(new Item("a", 1))).isEqualTo("{\"name\":\"a\",\"size\":1}");
+        assertThat(CSV.text(null)).isEmpty();
+        assertThat(CSV.text(1.5)).isEqualTo("1.5");
+        assertThat(CSV.text(1e20)).isEqualTo("100000000000000000000");
+        assertThat(CSV.text(2.0)).isEqualTo("2");
+        assertThat(CSV.text(new BigDecimal("1E+3"))).isEqualTo("1000");
+        assertThat(CSV.text(Instant.parse("2026-10-18T19:23:00Z"))).isEqualTo("2026-10-18T19:23:00Z");
+        assertThat(CSV.text(List.of(1, "a"))).isEqualTo("[1,\"a\"]");
+        assertThat(CSV.text(new Item("a", 1))).isEqualTo("{\"name\":\"a\",\"size\":1}");
     }
 
     @Test
@@ -84,7 +89,7 @@ class CsvTest {
     @Test
     void roundTrip() {
         List<String> values = List.of("a,b", "\"q\"", "multi\nline", "", " s ");
-        String line = new CsvWriter(',').line(values);
+        String line = new CsvWriter(',', PROPERTIES).line(values);
         assertThat(read(',', line.split("\n"))).containsExactly(values);
     }
 }

@@ -13,9 +13,15 @@ import io.powerj.api.UsageException;
 final class CsvWriter {
 
     private final char delimiter;
+    private final Properties properties;
 
-    CsvWriter(char delimiter) {
+    /**
+     * @param delimiter  the separator of the fields
+     * @param properties reads the components of the records that a field holds (they are written as JSON)
+     */
+    CsvWriter(char delimiter, Properties properties) {
         this.delimiter = delimiter;
+        this.properties = properties;
     }
 
     /**
@@ -37,7 +43,7 @@ final class CsvWriter {
     }
 
     /** Text of a field, before quoting. */
-    static String text(Object value) {
+    String text(Object value) {
         return switch (value) {
             case null -> "";
             case CharSequence text -> text.toString();
@@ -49,7 +55,7 @@ final class CsvWriter {
             default -> {
                 if (JsonWriter.isContainer(value)) {
                     StringBuilder json = new StringBuilder();
-                    new JsonWriter(false, 10).write(value, json, 0);
+                    new JsonWriter(false, 10, properties).write(value, json, 0);
                     yield json.toString();
                 }
                 yield String.valueOf(value);

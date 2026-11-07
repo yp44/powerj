@@ -11,6 +11,7 @@ import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
 import io.powerj.api.UsageException;
 import io.powerj.fs.ProcessSignals;
+import io.powerj.text.RecordView;
 
 /**
  * {@code kill}: stops processes given by pid or received from the pipeline (specification FR-74), with the JDK
@@ -72,24 +73,34 @@ public final class Kill implements Cmdlet<Kill.Params, Object, ProcessEntry> {
             case ProcessHandle handle -> kill(p, handle.pid(), context);
             case Process process -> kill(p, process.pid(), context);
             case Long _, Integer _, Short _ -> kill(p, ((Number) input).longValue(), context);
-            case Record record when pidOf(record) != null -> kill(p, pidOf(record), context);
-            case null, default -> context.error(Messages.get("kill.not.process", Texts.abbreviate(input)));
+            case Record record -> {
+                Long pid = pidOf(record, context);
+                if (pid == null) {
+                    notAProcess(input, context);
+                } else {
+                    kill(p, pid, context);
+                }
+            }
+            case null, default -> notAProcess(input, context);
         }
     }
 
-    /** Component {@code pid} of a record ({@code jobs | kill}, FR-75), or {@code null} if it has none. */
-    private static Long pidOf(Record record) {
-        RecordShape shape = RecordShape.of(record.getClass());
-        int index = shape.indexOf("pid");
-        if (index < 0 || (shape.accessor(index).getReturnType() != long.class
-                && shape.accessor(index).getReturnType() != Long.class)) {
+    private static void notAProcess(Object input, CmdletContext<ProcessEntry> context) {
+        context.error(Messages.get("kill.not.process", Texts.abbreviate(input)));
+    }
+
+    /**
+     * Component {@code pid} of a record ({@code jobs | kill}, FR-75), or {@code null} if it has none. The name and the type
+     * of the component come from the record, its value from the context: a record of another module (the {@code Job} of
+     * {@code jobs}) cannot be read from here by reflection (#130).
+     */
+    private static Long pidOf(Record record, CmdletContext<?> context) {
+        RecordView.Component pid = RecordView.of(record.getClass()).component("pid");
+        if (pid == null || (pid.recordComponent().getType() != long.class
+                && pid.recordComponent().getType() != Long.class)) {
             return null;
         }
-        try {
-            return (Long) shape.accessor(index).invoke(record);
-        } catch (ReflectiveOperationException | RuntimeException e) {
-            return null;
-        }
+        return context.tryReadProperty(record, "pid").value() instanceof Long value ? value : null;
     }
 
     private static void kill(Params p, long pid, CmdletContext<ProcessEntry> context) {

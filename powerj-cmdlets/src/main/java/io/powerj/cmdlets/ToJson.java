@@ -47,7 +47,7 @@ public final class ToJson implements Cmdlet<ToJson.Params, Object, String> {
                 throw new UsageException(Messages.get("to-json.depth.invalid", p.depth()));
             }
             int depth = p.depth() == null ? DEFAULT_DEPTH : p.depth();
-            return new State(new JsonWriter(!p.compact() && !p.lines(), depth));
+            return new State(new JsonWriter(!p.compact() && !p.lines(), depth, new Properties(context)));
         });
     }
 

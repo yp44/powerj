@@ -65,7 +65,8 @@ public final class Join implements Cmdlet<Join.Params, Object, Row> {
      * @param dropped   right column left out of the rows (the common key of {@code --key}), {@code null} if none
      * @param columns   columns of the first right object, for the left objects without a match
      */
-    private record State(ScriptBlock leftKey, Map<Object, List<Object>> index, String dropped, List<String> columns) {
+    private record State(ScriptBlock leftKey, Map<Object, List<Object>> index, String dropped, List<String> columns,
+                         Properties properties) {
     }
 
     @Override
@@ -107,7 +108,8 @@ public final class Join implements Cmdlet<Join.Params, Object, Row> {
         }
         String dropped = p.key() instanceof String property && !property.contains(".") ? property : null;
         List<String> rightColumns = columns == null ? List.of() : columns;
-        State state = context.state(State.class, () -> new State(leftKey, index, dropped, rightColumns));
+        State state = context.state(State.class, () -> new State(leftKey, index, dropped, rightColumns,
+                new Properties(context)));
         if (left != null) {
             for (Object object : objects(left, "--left")) {
                 join(state, p, object, context);
@@ -144,7 +146,7 @@ public final class Join implements Cmdlet<Join.Params, Object, Row> {
         Map<String, Object> values = new LinkedHashMap<>();
         Set<String> sizes = new HashSet<>();
         for (String column : Properties.columns(left)) {
-            values.put(column, Properties.get(left, column));
+            values.put(column, state.properties().get(left, column));
             if (isSize(left, column)) {
                 sizes.add(column);
             }
@@ -154,7 +156,7 @@ public final class Join implements Cmdlet<Join.Params, Object, Row> {
                 continue;
             }
             String name = values.containsKey(column) ? RIGHT_PREFIX + column : column;
-            values.put(name, right == null ? null : Properties.get(right, column));
+            values.put(name, right == null ? null : state.properties().get(right, column));
             if (right != null && isSize(right, column)) {
                 sizes.add(name);
             }
