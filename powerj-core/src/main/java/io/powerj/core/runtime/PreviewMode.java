@@ -12,7 +12,8 @@ import io.powerj.core.error.PjException;
 import io.powerj.core.format.OutputFormatter;
 import io.powerj.core.format.ValueUnroller;
 import io.powerj.core.i18n.Messages;
-import io.powerj.core.java.PreviewGuard;
+import io.powerj.core.java.PreviewGuard;import io.powerj.core.java.PropertyAccess;
+
 import io.powerj.core.lang.Ast.Statement;
 import io.powerj.core.lang.Ast;
 import io.powerj.core.lang.Parser;
@@ -124,7 +125,7 @@ final class PreviewMode {
         var text = new StringWriter();
         try {
             guard.call(() -> {
-                var formatter = new OutputFormatter(new PrintWriter(text), width, colors);
+                var formatter = new OutputFormatter(new PrintWriter(text), width, colors, PropertyAccess::read);
                 shown.forEach(formatter::accept);
                 formatter.close();
                 return null;

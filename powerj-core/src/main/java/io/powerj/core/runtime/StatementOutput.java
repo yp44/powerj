@@ -10,7 +10,8 @@ import java.util.Optional;
 import io.powerj.core.error.PjError;
 import io.powerj.core.error.PjException;
 import io.powerj.core.format.OutputFormatter;
-import io.powerj.core.i18n.Messages;
+import io.powerj.core.i18n.Messages;import io.powerj.core.java.PropertyAccess;
+
 
 /**
  * Destination of a statement's values: the terminal, or the file of a {@code >} redirection.
@@ -50,9 +51,9 @@ final class StatementOutput implements AutoCloseable {
                     throw new PjException(PjError.of(Messages.get("file.writeFailed", target.get().file(),
                             e.getMessage()), e));
                 }
-                formatter = new OutputFormatter(file, FILE_WIDTH);
+                formatter = new OutputFormatter(file, FILE_WIDTH, PropertyAccess::read);
             } else {
-                formatter = new OutputFormatter(io.out(), io.width().getAsInt(), io.colors());
+                formatter = new OutputFormatter(io.out(), io.width().getAsInt(), io.colors(), PropertyAccess::read);
             }
         }
         return formatter;

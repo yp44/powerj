@@ -11,6 +11,8 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+import io.powerj.core.java.PropertyAccess;
+
 import io.powerj.api.Bytes;
 import io.powerj.api.Display;
 import io.powerj.api.Highlight;
@@ -31,7 +33,7 @@ class OutputFormatterTest {
 
     private static String renderColors(int width, Object... values) {
         var out = new StringWriter();
-        try (var formatter = new OutputFormatter(new PrintWriter(out), width, true)) {
+        try (var formatter = new OutputFormatter(new PrintWriter(out), width, true, PropertyAccess::read)) {
             for (Object v : values) {
                 formatter.accept(v);
             }
@@ -41,7 +43,7 @@ class OutputFormatterTest {
 
     private static String render(int width, Object... values) {
         var out = new StringWriter();
-        try (var formatter = new OutputFormatter(new PrintWriter(out), width)) {
+        try (var formatter = new OutputFormatter(new PrintWriter(out), width, PropertyAccess::read)) {
             for (Object v : values) {
                 formatter.accept(v);
             }
@@ -55,6 +57,35 @@ class OutputFormatterTest {
             values.put((String) namesAndValues[i], namesAndValues[i + 1]);
         }
         return io.powerj.api.Row.of(values, java.util.Set.of("size"));
+    }
+
+    /** The formatter does not reflect on a record: the reader it is given reads, and a failure shows as {@code ?} (#130). */
+    @Test
+    void theValuesOfARecordAreReadByTheReaderThatIsGiven() {
+        var out = new StringWriter();
+        var asked = new java.util.ArrayList<String>();
+        try (var formatter = new OutputFormatter(new PrintWriter(out), 80, (record, name) -> {
+            asked.add(name);
+            if (name.equals("size")) {
+                throw new IllegalStateException("cannot read");
+            }
+            return "read:" + name;
+        })) {
+            formatter.accept(new Small("a", 1));
+        }
+
+        assertThat(asked).containsExactly("name", "size");
+        assertThat(out.toString()).contains("name", "size", "read:name").doesNotContain("read:size").contains("?");
+    }
+
+    @Test
+    void anInterruptedReadEndsTheDisplayInsteadOfShowingAQuestionMark() {
+        var formatter = new OutputFormatter(new PrintWriter(new StringWriter()), 80, (record, name) -> {
+            throw new java.util.concurrent.CancellationException();
+        });
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> formatter.accept(new Small("a", 1)))
+                .isInstanceOf(java.util.concurrent.CancellationException.class);
     }
 
     @Test
