@@ -1407,6 +1407,12 @@ public interface CmdletContext<O> {
     default boolean hasInput() { return false; }  // after a |, even if no object arrives (FR-64)
     boolean cancelled();                // Ctrl+C requested
     ScriptBlock compile(String expression);
+    default ScriptBlock property(String path) { return compile("$_." + path); }  // block that reads a property or a path: { $_.size }
+    // Value of a property of an object, by ONE literal name (a key "first name" is read as it is), case-sensitive: record component,
+    // getter, public field, key of a Map or Row. The way every command, built-in or third-party, reads the objects that come from
+    // another module: the engine reads for it (a module cannot read the records of the others). Throws if the object has none.
+    default Object readProperty(Object target, String name) { return property(name).invoke(target); }
+    default Attempt<Object> tryReadProperty(Object target, String name) { /* the failure as a value; Ctrl+C is still thrown */ }
     default void stopInput() { }        // reads no more objects: the previous stage is stopped (FR-68b)
     default Optional<Path> configDirectory() { return Optional.empty(); }  // configuration folder (§8)
     // State of this execution: same object from begin, process and end, a new one for the next run; closed by the

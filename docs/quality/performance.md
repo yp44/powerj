@@ -13,8 +13,8 @@ java -cp "powerj-bench/target/classes:$(cat powerj-bench/target/classpath.txt)" 
 ```
 
 JMH needs a quiet machine: a result from a loaded laptop or a shared CI runner says little. The tests in
-`ReflectionCostTest` and `RecordShapeCostTest` are the guard that runs everywhere: they give a million reads a budget
-two orders of magnitude above the cached cost and one below the uncached cost.
+`ReflectionCostTest`, `PropertiesCostTest` and `PropertyReadCostTest` are the guard that runs everywhere: they give a million
+reads a budget two orders of magnitude above the cached cost and one below the uncached cost.
 
 ## The cost of reflection per object (C-26)
 
@@ -31,8 +31,30 @@ Measured on the machine below, `Mode.AverageTime`, one fork, 3 warm-up and 5 mea
 **Why.** `Class.getRecordComponents()` builds new `RecordComponent` objects at every call, about 7 µs. The code asked for
 them once per property read, and `to-csv` once per column of each object: `ls -r | where { $_.size > 1mb }` spent seven
 seconds per million files in that call alone, `to-csv` of a million rows of eight columns a minute. A `RecordShape` per class
-(a `ClassValue`, so that it is freed with the class) now holds the accessors, made accessible once. The static methods of a
+(a `ClassValue`, so that it is freed with the class) now holds the accessors, made accessible once (in the core: since #130 the
+cmdlets read through the context, below). The static methods of a
 class are found once per class too: `getMethods()` copies every public method of the class at each call.
+
+## Reading through the context (#130)
+
+`to-json`, `to-csv` and `join` used to read the components of a record with accessors of their own, cached by class. They now ask
+the engine (`CmdletContext.readProperty`, which reads by exact name: a lookup in a table per class, then the accessor), because a
+module cannot read the records of the others by reflection ([ADR 0011](../adr/0011-every-command-reads-the-properties-of-an-object-through-the-engine.md)).
+Same machine and same session, JMH `Mode.AverageTime`, one fork, 3 warm-up and 5 measured iterations, the commit before the
+change (`main`) and the one after; the benchmark of the cmdlets reads as the engine does (`PropertyAccess.read`).
+
+| Per object | Before | After |
+|---|---|---|
+| `$_.name` and `$_.ratio` on a record (first and last of eight components): `PropertyAccess.property` | 28 and 35 ns | 28 and 35 ns (not touched) |
+| the same by exact name: `PropertyAccess.read` | not there | 27 and 29 ns |
+| the 8 columns of a record, as `to-csv` reads them | 283 ns (± 58) | 560 ns (± 110) |
+| a record as a map, as `to-json` reads it | 156 ns (± 46) | 328 ns (± 32) |
+
+**What it costs.** About 35 ns more per column: the lookup of the name in the view of the record (to know that the column is
+there), the read by the engine, and the `Attempt` that `tryReadProperty` allocates. A million rows of eight columns take 0.3 s
+more in `to-csv`, 0.2 s more in `to-json`; the writing of the text and of the file cost more than that. **Not optimised.** The
+first thing to try, if it matters: read with `readProperty` and catch the failure (no `Attempt`), or a reader resolved once per
+class.
 
 ## The latencies of the specification
 

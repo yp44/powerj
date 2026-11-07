@@ -48,7 +48,8 @@ The helpers moved in: the formatting of sizes, dates and durations, `io.powerj.t
 stopped, `io.powerj.text.GuardedText` ([#111](https://github.com/yp44/powerj/issues/111): `cmdlets` stops it on the interrupt flag,
 `fx` on a budget of reads, one class for both); `core`, `cmdlets` and `fx` now `require io.powerj.text`. `RecordView` holds structure (components, `@Display`, `@Bytes`, `@Highlight`), not accessors: making an
 accessor accessible is allowed to the module that asks, and a record of a third-party module is opened to `io.powerj.core`
-only, so each module keeps its own accessors.
+only, so each module keeps its own accessors. *(Replaced by [0011](0011-every-command-reads-the-properties-of-an-object-through-the-engine.md): the
+`Method` of a record component is shared by whoever holds it, and a module cannot read the records of the others; the engine reads for every command.)*
 
 Settled when the module was created ([#107](https://github.com/yp44/powerj/issues/107)):
 - **It is in the image, not in the zip of `powerj-fx`.** `powerj-dist` adds `io.powerj.text` to the modules of the runtime

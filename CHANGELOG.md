@@ -612,6 +612,31 @@ structures, functions) can be built on it. The work is organised in phases (revi
 - Measures and decision: [docs/plans/background-process-group.md](docs/plans/background-process-group.md); checklist:
   [docs/acceptance/background.md](docs/acceptance/background.md).
 
+### Fixed (the built-in cmdlets read the objects that come from other modules, [#130](https://github.com/yp44/powerj/issues/130))
+- **`jobs | kill`, `jobs | to-json`, `jobs | to-csv`, and `to-json`, `to-csv` and `join` on the records of a module loaded by
+  `mod-load` no longer fail** with `cannot read …: IllegalAccessException … cannot access class …Job` (`kill: not a process: Job[…]`).
+  A module can read by reflection only the records of packages exported or opened to it, and these cmdlets reflected from
+  `io.powerj.cmdlets`. They had seemed to work once the values had been displayed: the table of the terminal made the `Method` of
+  a component accessible, and `RecordView` hands the same `Method` to every module (and only for the columns that had been shown:
+  `jobs | to-json` still failed on `start`).
+- **One way to read a property, in the engine.** `CmdletContext.readProperty(target, name)` and `tryReadProperty` (API, `default`
+  methods, in the snapshot of the API): the value of a property by **one literal name** (not a path: the key `first name` of a `Row`
+  is read as it is) and **case-sensitive**, found as `$_.name` finds it (record component, getter, public field, key of a `Map`).
+  The built-in cmdlets (`Properties`, `Kill`) read through it, `io.powerj.cmdlets.RecordShape` is removed, and the names and the
+  sizes (`@Bytes`) come from `RecordView`. A third-party cmdlet reads the objects of the built-in ones, and the built-in ones read
+  those of a third-party cmdlet, the same way. [ADR 0011](docs/adr/0011-every-command-reads-the-properties-of-an-object-through-the-engine.md)
+  replaces the sentence of [0010](docs/adr/0010-shared-output-helpers-live-in-powerj-text.md) on accessors.
+- **The table of the terminal reads through `PropertyAccess.read`** too: `OutputFormatter` is given a `ComponentReader`
+  (`PropertyAccess.read`, passed by `StatementOutput`, `PreviewMode` and `NativeRunner`) and no longer makes an accessor
+  accessible. A getter that is interrupted by Ctrl+C now ends the command, in `$_.name` as in the table, instead of being reported
+  as an unreadable property.
+- **Checked where the tests of a module cannot see it:** `ci/smoke/properties.sh` runs `jobs | to-json`, `jobs | to-csv`,
+  `jobs | kill`, `greet | to-json` and `greet | to-csv` on the packaged launcher, in fresh sessions (it fails on `main`), and
+  `ArchitectureTest.onlyTheEngineReadsAnObjectByReflection` forbids `Method.invoke`, `Field.get`/`set` and `setAccessible` outside
+  `io.powerj.core` (and the test context of `powerj-testing`).
+- **Cost:** the 8 columns of a record read by `to-csv` take 0.56 µs instead of 0.28 µs, a record turned into a map by `to-json` 0.33 µs
+  instead of 0.16 µs ([docs/quality/performance.md](docs/quality/performance.md)).
+
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
   whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes

@@ -172,6 +172,7 @@ options, the window opener). What touches the toolkit is behind ports (`FxPlatfo
 | load a third-party module | `core.command.ModuleLoader`, `NativeAccessPolicy`, `shell.NativeAccessConsent` |
 | start-up and options | `shell.ShellBootstrap` |
 | make background commands work on another system | section 11; `core.nativeexec.BackgroundLauncher`, `PosixSpawn`, `WindowsSpawn` |
+| read a property of an object, in a cmdlet or in the terminal | `CmdletContext.readProperty` (API), `core.java.PropertyAccess.read`; only the engine reflects on a record ([ADR 0011](adr/0011-every-command-reads-the-properties-of-an-object-through-the-engine.md)) |
 
 ## 11. Background jobs: which systems, and how to add one
 
