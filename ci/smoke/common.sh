@@ -6,6 +6,7 @@
 #   ci/smoke/modules.sh                  the runtime of the image holds the modules that a module loaded later needs
 #   ci/smoke/non-interactive.sh          -c, a script file, standard input
 #   ci/smoke/third-party-modules.sh      greet.jar loaded from ~/.powerj/modules
+#   ci/smoke/properties.sh               the built-in cmdlets read the objects of the core and of a third-party module
 #   ci/smoke/languages.sh                English and French messages
 #   ci/smoke/tilde.sh                    ~ is the home folder
 #   ci/smoke/wildcards.sh                wildcards in the arguments of a native command, and the case rule
