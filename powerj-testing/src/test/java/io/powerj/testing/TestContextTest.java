@@ -129,4 +129,19 @@ class TestContextTest {
         assertThat(order).containsExactly("second", "first");
         assertThat(context.state(First.class, () -> new First(order))).isNotSameAs(first);
     }
+
+    record Process(long pid, String Name) {
+    }
+
+    @Test
+    void aPropertyIsReadByItsExactName() {
+        var context = new TestContext<String>();
+
+        assertThat(context.readProperty(new Process(7, "sleep"), "pid")).isEqualTo(7L);
+        assertThat(context.readProperty(new Process(7, "sleep"), "Name")).isEqualTo("sleep");
+        assertThat(context.readProperty(java.util.Map.of("first name", "Yves"), "first name")).isEqualTo("Yves");
+        assertThatThrownBy(() -> context.readProperty(new Process(7, "sleep"), "name"))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("name");
+        assertThat(context.tryReadProperty(new Process(7, "sleep"), "uid").failed()).isTrue();
+    }
 }

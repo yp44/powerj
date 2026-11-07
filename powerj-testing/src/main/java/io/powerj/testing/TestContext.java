@@ -1,5 +1,8 @@
 package io.powerj.testing;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.RecordComponent;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -8,6 +11,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CancellationException;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -122,6 +126,40 @@ public final class TestContext<O> implements CmdletContext<O> {
     @Override
     public ScriptBlock compile(String expression) {
         return compiler.apply(expression);
+    }
+
+    /**
+     * Reads a property by its exact name, as the engine does: a component of a record or a key of a {@link Map}. This
+     * context has no engine, so it reads the record itself; a test of the access between modules is a test of the image.
+     */
+    @Override
+    public Object readProperty(Object target, String name) {
+        if (target instanceof Map<?, ?> map) {
+            return map.get(name);
+        }
+        if (target instanceof Record record) {
+            for (RecordComponent component : record.getClass().getRecordComponents()) {
+                if (component.getName().equals(name)) {
+                    return read(component.getAccessor(), record);
+                }
+            }
+        }
+        throw new IllegalArgumentException("no property " + name + " in "
+                + (target == null ? "null" : target.getClass().getName()));
+    }
+
+    private static Object read(Method accessor, Record record) {
+        try {
+            accessor.setAccessible(true);
+            return accessor.invoke(record);
+        } catch (InvocationTargetException e) {
+            if (e.getCause() instanceof CancellationException cancelled) {
+                throw cancelled;
+            }
+            throw new IllegalStateException(e.getCause());
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     @Override

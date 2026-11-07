@@ -8,6 +8,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
 
 import io.powerj.api.Row;
 import io.powerj.core.error.PjError;
@@ -37,14 +38,30 @@ public final class PropertyAccess {
         return current;
     }
 
+    /** The value of {@code $_.name}: the name is not case-sensitive, except for the key of a {@code Map}. */
     public static Object property(Object target, String name) {
+        return get(target, name, false);
+    }
+
+    /**
+     * The value of the property called {@code name}, <b>the case of which matters</b>, for a command that reads the
+     * properties of the objects it receives ({@code CmdletContext.readProperty}): a record component, a getter, a public
+     * field, a key of a {@code Map}. The same lookup as {@link #property}, in the same order, with the same errors and the
+     * same guard rails in preview mode, but {@code name} is one literal name: {@code first name} or {@code a.b} are not
+     * paths. An interrupted getter ends the command, it is not an error of the object.
+     */
+    public static Object read(Object target, String name) {
+        return get(target, name, true);
+    }
+
+    private static Object get(Object target, String name, boolean exact) {
         if (target == null) {
             throw new PjException(Messages.get("property.onNull", name));
         }
         if (target instanceof Map<?, ?> map) {
             return map.get(name);
         }
-        var direct = directProperty(target, name, false);
+        var direct = directProperty(target, name, false, exact);
         if (direct.found()) {
             return direct.value();
         }
@@ -78,7 +95,7 @@ public final class PropertyAccess {
             if (target instanceof Map<?, ?> map) {
                 return plainMap(map) ? map.get(name) : null;
             }
-            var direct = directProperty(target, name, true);
+            var direct = directProperty(target, name, true, false);
             return direct.found() ? direct.value() : null;
         } catch (RuntimeException e) {
             return null;
@@ -103,17 +120,21 @@ public final class PropertyAccess {
         static final Lookup MISSING = new Lookup(false, null);
     }
 
-    /** {@code pureOnly}: a getter that {@link PreviewPolicy} does not allow is left alone, as if it was not there. */
-    private static Lookup directProperty(Object target, String name, boolean pureOnly) {
+    /**
+     * {@code pureOnly}: a getter that {@link PreviewPolicy} does not allow is left alone, as if it was not there.
+     * {@code exact}: the case of the name matters.
+     */
+    private static Lookup directProperty(Object target, String name, boolean pureOnly, boolean exact) {
         Class<?> type = target.getClass();
         try {
             if (type.isRecord()) {
-                Method accessor = RecordShape.of(type).accessor(name);
+                RecordShape shape = RecordShape.of(type);
+                Method accessor = exact ? shape.exactAccessor(name) : shape.accessor(name);
                 if (accessor != null) {
                     return new Lookup(true, accessor.invoke(target));
                 }
             }
-            var getter = Members.getter(type, name);
+            var getter = exact ? Members.getterExact(type, name) : Members.getter(type, name);
             if (getter.isPresent()) {
                 if (pureOnly && !PreviewPolicy.allows(getter.get())) {
                     return Lookup.MISSING;
@@ -121,12 +142,15 @@ public final class PropertyAccess {
                 PreviewGuard.checkCall(getter.get()); // record components above are always read (FR-66)
                 return new Lookup(true, getter.get().invoke(target));
             }
-            var field = Members.field(type, name);
+            var field = exact ? Members.fieldExact(type, name) : Members.field(type, name);
             if (field.isPresent()) {
                 return new Lookup(true, field.get().get(target));
             }
         } catch (InvocationTargetException e) {
             Throwable cause = e.getCause();
+            if (cause instanceof CancellationException cancelled) {
+                throw cancelled; // a getter that was interrupted: the command is being stopped, not unreadable
+            }
             throw new PjException(PjError.of(Messages.get("property.readFailed", name, cause), cause));
         } catch (ReflectiveOperationException e) {
             throw new PjException(PjError.of(Messages.get("property.readImpossible", name, e), e));

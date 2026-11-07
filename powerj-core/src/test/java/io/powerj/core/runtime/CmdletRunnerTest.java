@@ -563,4 +563,20 @@ class CmdletRunnerTest {
         assertThatThrownBy(() -> run(probe, null, "w")).isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("Counter");
     }
+
+    record Pid(long pid, String Name) {
+    }
+
+    @Test
+    void theContextReadsAPropertyByItsExactNameThroughTheEngine() throws Exception {
+        Probe probe = new Probe();
+
+        run(probe, null, "w");
+
+        assertThat(probe.context.readProperty(new Pid(5, "sleep"), "pid")).isEqualTo(5L);
+        assertThat(probe.context.readProperty(new Pid(5, "sleep"), "Name")).isEqualTo("sleep");
+        assertThat(probe.context.readProperty(Map.of("first name", "Yves"), "first name")).isEqualTo("Yves");
+        assertThatThrownBy(() -> probe.context.readProperty(new Pid(5, "sleep"), "name")).isInstanceOf(PjException.class);
+        assertThat(probe.context.tryReadProperty(new Pid(5, "sleep"), "uid").failed()).isTrue();
+    }
 }

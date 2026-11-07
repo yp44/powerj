@@ -106,6 +106,41 @@ public final class Members {
                     && (method.getReturnType() == boolean.class || method.getReturnType() == Boolean.class));
     }
 
+    /**
+     * Accessible getter for the property {@code name}, the case of which matters, as it is listed by {@link #ofType}:
+     * {@code parent} is {@code getParent()}, {@code directory} is {@code isDirectory()} (a {@code boolean} or
+     * {@code Boolean}). The first letter of the name is the only one that is free, as for a JavaBean.
+     */
+    public static Optional<Method> getterExact(Class<?> type, String name) {
+        if (name.isEmpty()) {
+            return Optional.empty();
+        }
+        String suffix = Character.toUpperCase(name.charAt(0)) + name.substring(1);
+        for (Class<?> t : accessibleTypes(type)) {
+            for (Method m : t.getMethods()) {
+                if (m.getParameterCount() == 0 && !Modifier.isStatic(m.getModifiers())
+                        && isAccessible(m.getDeclaringClass())
+                        && (m.getName().equals("get" + suffix) || (m.getName().equals("is" + suffix)
+                            && (m.getReturnType() == boolean.class || m.getReturnType() == Boolean.class)))) {
+                    return Optional.of(m);
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    /** Public instance field called exactly {@code name} (the case matters), if the type is accessible. */
+    public static Optional<Field> fieldExact(Class<?> type, String name) {
+        for (Class<?> t : accessibleTypes(type)) {
+            for (Field f : t.getFields()) {
+                if (f.getName().equals(name) && !Modifier.isStatic(f.getModifiers())) {
+                    return Optional.of(f);
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
     /** Public instance field, if the type is accessible. */
     public static Optional<Field> field(Class<?> type, String name) {
         for (Class<?> t : accessibleTypes(type)) {

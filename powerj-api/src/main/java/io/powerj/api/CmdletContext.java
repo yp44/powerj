@@ -111,6 +111,47 @@ public interface CmdletContext<O> {
     }
 
     /**
+     * The value of the property {@code name} of {@code target}: the way to read an attribute of an object that comes
+     * from another module. Every command reads the properties of the objects it receives through this method (or
+     * through {@link #property}), whichever module the command or the object comes from: the engine reads for them,
+     * because the module system gives it alone the access to the records of every module.
+     * <p>
+     * It finds what {@code $_.name} finds for {@code $_ = target}, in the same order: a record component, a getter
+     * {@code getName()} / {@code isName()}, a public field, a key of a {@link java.util.Map} (a {@link Row} included),
+     * with the same guard rails in preview mode. It differs from {@link #property} in two ways: {@code name} is
+     * <b>one literal name</b>, never an expression or a path (a key {@code "first name"} or {@code "a.b"} is read as
+     * it is), and the name is <b>case-sensitive</b> (for a getter, the first letter is not: {@code name} reads
+     * {@code getName()}).
+     * <p>
+     * The default implementation reads {@code property(name)}: an approximation for a context that cannot do better
+     * (a test double), which neither takes a name that is not an identifier nor is case-sensitive.
+     *
+     * @param target the object to read, not {@code null}
+     * @param name   the name of the property, for example {@code "pid"}
+     * @return the value, possibly {@code null}
+     * @throws RuntimeException if the object has no such property or if reading it fails; the message tells the user
+     *                          what is missing. {@link java.util.concurrent.CancellationException} is never wrapped.
+     */
+    default Object readProperty(Object target, String name) {
+        return property(name).invoke(target);
+    }
+
+    /**
+     * {@link #readProperty} that returns a failure as a value instead of throwing it, as {@link ScriptBlock#tryInvoke}
+     * does: for a command that skips the objects it cannot read and goes on. {@link java.util.concurrent.CancellationException}
+     * is still thrown, so that Ctrl+C is never taken for an unreadable object.
+     */
+    default Attempt<Object> tryReadProperty(Object target, String name) {
+        try {
+            return Attempt.succeeded(readProperty(target, name));
+        } catch (java.util.concurrent.CancellationException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            return Attempt.failed(e);
+        }
+    }
+
+    /**
      * The cmdlet will read no more objects (specification FR-68b): {@link Cmdlet#process} is no longer called,
      * {@link Cmdlet#end} is called, and the previous stage of the pipeline is stopped (a cmdlet is interrupted, a
      * native command terminated) without any error. No effect at the head of a pipeline.
