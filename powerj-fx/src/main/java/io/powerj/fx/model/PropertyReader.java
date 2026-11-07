@@ -1,6 +1,9 @@
 package io.powerj.fx.model;
 
-/** Reads a property of an object, the way {@code $_.name} does in the shell. */
+/**
+ * Reads a property of an object by its exact name, the way the engine does for every command
+ * ({@code CmdletContext.readProperty}): the model does not reflect on the objects it shows.
+ */
 @FunctionalInterface
 public interface PropertyReader {
 

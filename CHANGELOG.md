@@ -626,6 +626,8 @@ structures, functions) can be built on it. The work is organised in phases (revi
   sizes (`@Bytes`) come from `RecordView`. A third-party cmdlet reads the objects of the built-in ones, and the built-in ones read
   those of a third-party cmdlet, the same way. [ADR 0011](docs/adr/0011-every-command-reads-the-properties-of-an-object-through-the-engine.md)
   replaces the sentence of [0010](docs/adr/0010-shared-output-helpers-live-in-powerj-text.md) on accessors.
+- **The grid (`powerj-fx`) reads through `CmdletContext.readProperty`** instead of `property(name)`: a name is one literal name, no longer
+  compiled as `$_.` + name, and the case matters.
 - **The table of the terminal reads through `PropertyAccess.read`** too: `OutputFormatter` is given a `ComponentReader`
   (`PropertyAccess.read`, passed by `StatementOutput`, `PreviewMode` and `NativeRunner`) and no longer makes an accessor
   accessible. A getter that is interrupted by Ctrl+C now ends the command, in `$_.name` as in the table, instead of being reported
