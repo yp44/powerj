@@ -110,8 +110,9 @@ public interface CmdletContext<O> {
      * {@code getName()} / {@code isName()}, a public field, a key of a {@link java.util.Map} (a {@link Row} included),
      * with the same guard rails in preview mode. {@code name} is <b>one literal name</b>, never an expression or a path (a
      * key {@code "first name"} or {@code "a.b"} is read as it is), and <b>the case of the name matters</b>: {@code size} is
-     * not {@code Size}. For a getter, the first letter is free, as for a JavaBean: {@code name} reads {@code getName()}. A
-     * path such as {@code owner.name}, typed by a user, is read one name after the other.
+     * not {@code Size}. A getter is found by the name of its property, as for a JavaBean: {@code name} reads {@code getName()}
+     * and {@code URL} reads {@code getURL()}. A path such as {@code owner.name}, typed by a user, is read one name after the
+     * other.
      *
      * @param target the object to read, not {@code null}
      * @param name   the name of the property, for example {@code "pid"}

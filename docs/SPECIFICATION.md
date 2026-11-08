@@ -311,7 +311,7 @@ The menu displays the signature (`of(E...) : List<E>`). Imported classes (§FR-4
 **FR-28 — Access to attributes and methods.**
 - `$x.name` (without parentheses) is a **property**, resolved in this order; **the case of the name matters** (`size` is not `Size`, and a name that differs from a property only by its case is answered with that property: `FileEntry has no property 'Size' (did you mean 'size'?)`):
   1. record component `name()`;
-  2. getter `getNom()` or `isNom()` (boolean): the name of the property is the one of the getter without its prefix, its first letter lower-case (`getURL()` is `URL`, `getName()` is `name`; only the first letter is free, as for a JavaBean);
+  2. getter `getNom()` or `isNom()` (boolean): the name of the property is the one of the getter without its prefix, its first letter lower-case unless the second is a capital too, as for a JavaBean (`getName()` is `name`, `getURL()` is `URL`), and only that name finds it (`Name` and `url` do not);
   3. public field `name`;
   4. on a `Map`: value associated with the key `"name"`.
 - The same rule holds for the name of a property that is an argument of a cmdlet (`sort size`, `--property path.fileName`, `select name`, `grid --columns name,size`): the case matters.

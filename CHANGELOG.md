@@ -629,7 +629,7 @@ structures, functions) can be built on it. The work is organised in phases (revi
 - **The case of a name matters, everywhere** (a change of the language, FR-28): `$_.name`, `where size > 1mb`, and the names given
   as arguments to the cmdlets (`sort size`, `--property path`, `select name`, `grid --columns name,size`). `$_.Size` is an error
   that says what exists: `FileEntry has no property 'Size' (did you mean 'size'?)`. A getter is found by the name of its
-  property, the first letter of which is free (`name` is `getName()`). The option names and their enumerated values stay
+  property, the one that the completion lists (`getName()` is `name` and not `Name`, `getURL()` is `URL`). The option names and their enumerated values stay
   case-insensitive. Scripts that wrote another case have to change.
 - **Breaking changes of the API** (before the first release): `CmdletContext.property(path)` is removed (it was
   `compile("$_." + path)`; the cmdlets read the names that a user types with `PropertyPath`, one name after the other through

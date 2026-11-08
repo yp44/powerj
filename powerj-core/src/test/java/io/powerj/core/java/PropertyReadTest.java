@@ -89,15 +89,19 @@ class PropertyReadTest {
     }
 
     @Test
-    void aGetterIsFoundByItsPropertyNameAndTheCaseOfTheRestMatters() {
+    void aGetterIsFoundByTheNameOfItsPropertyAndOnlyByIt() {
         var bean = new Bean();
 
         assertThat(PropertyAccess.property(bean, "name")).isEqualTo("bean");
-        assertThat(PropertyAccess.property(bean, "Name")).as("the first letter is free, as for a JavaBean").isEqualTo("bean");
         assertThat(PropertyAccess.property(bean, "active")).isEqualTo(true);
-        assertThat(PropertyAccess.property(bean, "URL")).isEqualTo("http://x");
+        assertThat(PropertyAccess.property(bean, "URL")).as("two capitals at the start: kept, as for a JavaBean")
+                .isEqualTo("http://x");
+        assertThatThrownBy(() -> PropertyAccess.property(bean, "Name")).as("getName() is name, not Name")
+                .isInstanceOf(PjException.class).hasMessageContaining("'name'");
         assertThatThrownBy(() -> PropertyAccess.property(bean, "nAME")).isInstanceOf(PjException.class);
-        assertThatThrownBy(() -> PropertyAccess.property(bean, "uRl")).isInstanceOf(PjException.class);
+        assertThatThrownBy(() -> PropertyAccess.property(bean, "uRL")).isInstanceOf(PjException.class)
+                .hasMessageContaining("'URL'");
+        assertThatThrownBy(() -> PropertyAccess.property(bean, "url")).isInstanceOf(PjException.class);
     }
 
     @Test

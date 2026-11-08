@@ -44,8 +44,8 @@ the name and made of an expression, and the private reflection of the built-in c
   `--property owner.name`) are read by `PropertyPath`, in the cmdlets, which calls `readProperty` for each name of the path.
 - **The case of a name matters, everywhere**: `$_.size`, `where size > 1mb`, `sort size`, `--property path`, `grid --columns`. A
   name that differs from a property only by its case is answered with that property (`has no property 'Size' (did you mean
-  'size'?)`). A getter is found by the name of its property, the first letter of which is free, as for a JavaBean (`name` is
-  `getName()`). This breaks the scripts that wrote another case, which is allowed before the first release.
+  'size'?)`). A getter is found by the name of its property, the one that the completion lists, as for a JavaBean (`getName()` is
+  `name` and not `Name`, `getURL()` is `URL`). This breaks the scripts that wrote another case, which is allowed before the first release.
 - The **structure** of a record (names, types, `@Display`, `@Bytes`, `@Highlight`) stays in `RecordView`, which needs no access.
 - The built-in cmdlets (`Properties` for `to-json`, `to-csv` and `join`; `Kill`) read through the context. `RecordShape` leaves
   `io.powerj.cmdlets`.

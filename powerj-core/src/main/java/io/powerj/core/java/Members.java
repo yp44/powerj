@@ -86,21 +86,15 @@ public final class Members {
     }
 
     /**
-     * Accessible getter for the property {@code name}, <b>the case of which matters</b>, as it is listed by {@link #ofType}:
-     * {@code parent} is {@code getParent()}, {@code directory} is {@code isDirectory()} (a {@code boolean} or
-     * {@code Boolean}). The first letter of the name is the only one that is free, as for a JavaBean.
+     * Accessible getter of the property called {@code name}, <b>exactly</b>: the name of the property of a getter is the one that
+     * {@link #ofType} lists, so {@code getName()} is {@code name} and not {@code Name}, {@code isDirectory()} (a {@code boolean}
+     * or {@code Boolean}) is {@code directory}, and {@code getURL()} is {@code URL}.
      */
     public static Optional<Method> getter(Class<?> type, String name) {
-        if (name.isEmpty()) {
-            return Optional.empty();
-        }
-        String suffix = Character.toUpperCase(name.charAt(0)) + name.substring(1);
         for (Class<?> t : accessibleTypes(type)) {
             for (Method m : t.getMethods()) {
-                if (m.getParameterCount() == 0 && !Modifier.isStatic(m.getModifiers())
-                        && isAccessible(m.getDeclaringClass())
-                        && (m.getName().equals("get" + suffix) || (m.getName().equals("is" + suffix)
-                            && (m.getReturnType() == boolean.class || m.getReturnType() == Boolean.class)))) {
+                if (!Modifier.isStatic(m.getModifiers()) && isAccessible(m.getDeclaringClass())
+                        && name.equals(propertyName(m))) {
                     return Optional.of(m);
                 }
             }
@@ -181,7 +175,11 @@ public final class Members {
         return all;
     }
 
-    /** {@code getParent} → {@code parent}, {@code isDirectory} → {@code directory}. */
+    /**
+     * The name of the property of a getter: {@code getParent} → {@code parent}, {@code isDirectory} → {@code directory}, and, as
+     * for a JavaBean, a name that starts with two capitals is kept: {@code getURL} → {@code URL}. {@code null} for any other
+     * method.
+     */
     private static String propertyName(Method m) {
         if (m.getParameterCount() != 0 || m.getReturnType() == void.class) {
             return null;
@@ -194,7 +192,8 @@ public final class Members {
         if (rest == null || !Character.isUpperCase(rest.charAt(0))) {
             return null;
         }
-        return Character.toLowerCase(rest.charAt(0)) + rest.substring(1);
+        return rest.length() > 1 && Character.isUpperCase(rest.charAt(1)) ? rest
+                : Character.toLowerCase(rest.charAt(0)) + rest.substring(1);
     }
 
     private static String simple(String typeName) {
