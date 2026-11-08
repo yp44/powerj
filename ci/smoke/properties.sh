@@ -7,9 +7,18 @@
 
 export POWERJ_HOME="$WORK/pjhome"
 mkdir -p "$POWERJ_HOME/modules"
-# A job outlives the session that starts it: when a session fails before its own "jobs | kill", the jobs are stopped here (each
-# has its own duration, 30 to 32 seconds, so that no other sleep is stopped).
-trap 'pkill -f "sleep 3[0-2]\$" 2> /dev/null || true; rm -rf "$WORK"' EXIT
+# A job outlives the session that starts it. When a session fails before its own "jobs | kill" (the case this script is for), the jobs
+# that the sessions announced ("[1] <pid>") are stopped here, and only those: the pid is checked to be a sleep, so that a process
+# that took the number since is left alone.
+stop_jobs() {
+    local pid
+    for pid in $(grep -hoE '^\[[0-9]+\] [0-9]+' "$WORK"/*.txt 2> /dev/null | cut -d' ' -f2); do
+        case "$(ps -o comm= -p "$pid" 2> /dev/null)" in
+            sleep|*/sleep) kill "$pid" 2> /dev/null || true ;;
+        esac
+    done
+}
+trap 'stop_jobs; rm -rf "$WORK"' EXIT
 cp examples/greet/target/greet.jar "$POWERJ_HOME/modules/"
 
 # session FILE SCRIPT: runs a session of -c, both streams go to FILE; a session that fails shows what it printed.
@@ -31,7 +40,8 @@ session "$WORK/jobs-csv.txt" 'sleep 31 &; jobs | to-csv; jobs | kill'
 expect "$WORK/jobs-csv.txt" '^id,pid,command,start,running,exitCode$' ',sleep 31,'
 refused "$WORK/jobs-csv.txt"
 
-session "$WORK/jobs-kill.txt" 'sleep 32 &; jobs | kill; jobs'
+# --wait: without it kill returns when the signal is sent, and the jobs that follows can run before the end of the process is recorded
+session "$WORK/jobs-kill.txt" 'sleep 32 &; jobs | kill --wait; jobs'
 expect "$WORK/jobs-kill.txt" 'sleep 32' ' 143 '    # the job was stopped by kill: its exit code is 128 + SIGTERM
 refused "$WORK/jobs-kill.txt"
 
