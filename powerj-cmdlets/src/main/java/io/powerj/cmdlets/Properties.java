@@ -7,7 +7,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CancellationException;
 
-import io.powerj.api.Attempt;
 import io.powerj.api.CmdletContext;
 import io.powerj.text.RecordView;
 
@@ -97,15 +96,20 @@ final class Properties {
         }
     }
 
-    /** A component read by the context; an interruption passes through, anything else makes the object unreadable. */
+    /**
+     * A component read by the context; an interruption passes through, anything else makes the object unreadable. It reads with
+     * {@code readProperty}: this is the hot path of {@code to-csv} and {@code to-json}, which would allocate an {@code Attempt}
+     * for each column of each row with {@code tryReadProperty}.
+     */
     private Object read(Record record, String name) {
-        Attempt<Object> attempt = context.tryReadProperty(record, name);
-        if (attempt.failed()) {
-            RuntimeException error = attempt.error();
+        try {
+            return context.readProperty(record, name);
+        } catch (CancellationException e) {
+            throw e;
+        } catch (RuntimeException error) {
             String message = error.getMessage() != null ? error.getMessage()
                     : Messages.get("properties.read.failed", name, error);
             throw new Unreadable(message, error);
         }
-        return attempt.value();
     }
 }

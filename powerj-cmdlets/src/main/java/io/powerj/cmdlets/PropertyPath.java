@@ -1,6 +1,7 @@
 package io.powerj.cmdlets;
 
 import java.util.Objects;
+import java.util.concurrent.CancellationException;
 
 import io.powerj.api.CmdletContext;
 import io.powerj.api.ScriptBlock;
@@ -38,6 +39,9 @@ final class PropertyPath implements ScriptBlock {
 
     @Override
     public Object invoke(Object current) {
+        if (Thread.currentThread().isInterrupted()) {
+            throw new CancellationException(); // as a compiled block does: Ctrl+C is seen by whoever evaluates keys
+        }
         Object value = current;
         for (String name : names) {
             value = context.readProperty(value, name);

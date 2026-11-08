@@ -64,6 +64,18 @@ class PropertyPathTest {
     }
 
     @Test
+    void anInterruptedThreadStopsTheEvaluation() {
+        var block = PropertyPath.of("size", context);
+        Thread.currentThread().interrupt();
+        try {
+            assertThatThrownBy(() -> block.invoke(new Entry("a", new Owner("yves"), 5)))
+                    .isInstanceOf(java.util.concurrent.CancellationException.class);
+        } finally {
+            Thread.interrupted(); // the flag is the test's, not the next one's
+        }
+    }
+
+    @Test
     void theSourceIsTheExpressionThatItStandsFor() {
         assertThat(PropertyPath.of("owner.name", context).source()).isEqualTo("$_.owner.name");
     }
