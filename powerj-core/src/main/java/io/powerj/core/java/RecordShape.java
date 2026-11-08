@@ -4,7 +4,6 @@ import java.lang.reflect.Method;
 import java.lang.reflect.RecordComponent;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.TreeMap;
 
 /**
  * The accessors of a record class, looked up once per class and not at every read (review C-26).
@@ -20,18 +19,14 @@ final class RecordShape {
         }
     };
 
-    /** Accessor of each component by name, whatever the case; the first declared wins if two names differ by case. */
-    private final Map<String, Method> accessors = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
-
     /** Accessor of each component by its exact name: two components that differ by case are both there. */
-    private final Map<String, Method> exactAccessors = new HashMap<>();
+    private final Map<String, Method> accessors = new HashMap<>();
 
     private RecordShape(Class<?> type) {
         for (RecordComponent component : type.getRecordComponents()) {
             Method accessor = component.getAccessor();
             accessor.trySetAccessible();
-            accessors.putIfAbsent(component.getName(), accessor);
-            exactAccessors.put(component.getName(), accessor);
+            accessors.put(component.getName(), accessor);
         }
     }
 
@@ -40,13 +35,8 @@ final class RecordShape {
         return SHAPES.get(recordType);
     }
 
-    /** The accessor of the component called {@code name} (any case), or {@code null} if there is none. */
+    /** The accessor of the component called exactly {@code name} (the case matters), or {@code null} if there is none. */
     Method accessor(String name) {
         return accessors.get(name);
-    }
-
-    /** The accessor of the component called exactly {@code name} (the case matters), or {@code null}. */
-    Method exactAccessor(String name) {
-        return exactAccessors.get(name);
     }
 }

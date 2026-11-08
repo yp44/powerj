@@ -13,19 +13,27 @@ class RecordShapeTest {
     record Point(int x, int y, String Label) {
     }
 
-    /** Components that differ only by case: the first declared is the one a property name finds. */
+    /** Components that differ only by case: each is found by its own name. */
     record Twins(int a, int A) {
     }
 
     @Test
-    void aComponentIsFoundWhateverTheCaseOfItsName() throws ReflectiveOperationException {
+    void aComponentIsFoundByItsExactName() throws ReflectiveOperationException {
         var shape = RecordShape.of(Point.class);
         var point = new Point(3, 4, "p");
 
         assertThat(shape.accessor("x").invoke(point)).isEqualTo(3);
-        assertThat(shape.accessor("Y").invoke(point)).isEqualTo(4);
-        assertThat(shape.accessor("label").invoke(point)).isEqualTo("p");
-        assertThat(shape.accessor("LABEL").invoke(point)).isEqualTo("p");
+        assertThat(shape.accessor("y").invoke(point)).isEqualTo(4);
+        assertThat(shape.accessor("Label").invoke(point)).isEqualTo("p");
+    }
+
+    @Test
+    void theCaseOfTheNameMatters() {
+        var shape = RecordShape.of(Point.class);
+
+        assertThat(shape.accessor("X")).isNull();
+        assertThat(shape.accessor("label")).isNull();
+        assertThat(shape.accessor("LABEL")).isNull();
     }
 
     @Test
@@ -36,11 +44,11 @@ class RecordShapeTest {
     }
 
     @Test
-    void twoComponentsThatDifferOnlyByCaseAnswerWithTheFirstDeclared() throws ReflectiveOperationException {
+    void twoComponentsThatDifferOnlyByCaseAreBothThere() throws ReflectiveOperationException {
         var twins = new Twins(1, 2);
 
         assertThat(RecordShape.of(Twins.class).accessor("a").invoke(twins)).isEqualTo(1);
-        assertThat(RecordShape.of(Twins.class).accessor("A").invoke(twins)).isEqualTo(1);
+        assertThat(RecordShape.of(Twins.class).accessor("A").invoke(twins)).isEqualTo(2);
     }
 
     @Test
@@ -55,7 +63,7 @@ class RecordShapeTest {
         Method accessor = RecordShape.of(secret.getClass()).accessor("value");
 
         assertThat(accessor.invoke(secret)).isEqualTo("s");
-        assertThat(PropertyAccess.property(secret, "SIZE")).isEqualTo(5);
+        assertThat(PropertyAccess.property(secret, "size")).isEqualTo(5);
     }
 
     // --- static methods ---

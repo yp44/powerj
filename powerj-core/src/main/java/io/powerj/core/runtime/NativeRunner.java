@@ -451,7 +451,7 @@ public final class NativeRunner {
     private static void writeObjects(Source input, Process process, Charset charset, ShellIo io) {
         var writer = new PrintWriter(new BufferedWriter(
                 new OutputStreamWriter(process.getOutputStream(), charset)));
-        var formatter = new OutputFormatter(writer, io.width().getAsInt(), PropertyAccess::read);
+        var formatter = new OutputFormatter(writer, io.width().getAsInt(), PropertyAccess::property);
         boolean complete = false;
         try {
             Object value;

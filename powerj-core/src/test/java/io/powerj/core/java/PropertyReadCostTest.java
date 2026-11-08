@@ -27,7 +27,7 @@ class PropertyReadCostTest {
             long total = 0;
             for (int row = 0; row < 125_000; row++) {
                 for (String name : names) {
-                    total += String.valueOf(PropertyAccess.read(item, name)).length();
+                    total += String.valueOf(PropertyAccess.property(item, name)).length();
                 }
             }
             return total;

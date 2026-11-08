@@ -33,7 +33,7 @@ class OutputFormatterTest {
 
     private static String renderColors(int width, Object... values) {
         var out = new StringWriter();
-        try (var formatter = new OutputFormatter(new PrintWriter(out), width, true, PropertyAccess::read)) {
+        try (var formatter = new OutputFormatter(new PrintWriter(out), width, true, PropertyAccess::property)) {
             for (Object v : values) {
                 formatter.accept(v);
             }
@@ -43,7 +43,7 @@ class OutputFormatterTest {
 
     private static String render(int width, Object... values) {
         var out = new StringWriter();
-        try (var formatter = new OutputFormatter(new PrintWriter(out), width, PropertyAccess::read)) {
+        try (var formatter = new OutputFormatter(new PrintWriter(out), width, PropertyAccess::property)) {
             for (Object v : values) {
                 formatter.accept(v);
             }

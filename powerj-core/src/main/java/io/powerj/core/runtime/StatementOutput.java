@@ -51,9 +51,9 @@ final class StatementOutput implements AutoCloseable {
                     throw new PjException(PjError.of(Messages.get("file.writeFailed", target.get().file(),
                             e.getMessage()), e));
                 }
-                formatter = new OutputFormatter(file, FILE_WIDTH, PropertyAccess::read);
+                formatter = new OutputFormatter(file, FILE_WIDTH, PropertyAccess::property);
             } else {
-                formatter = new OutputFormatter(io.out(), io.width().getAsInt(), io.colors(), PropertyAccess::read);
+                formatter = new OutputFormatter(io.out(), io.width().getAsInt(), io.colors(), PropertyAccess::property);
             }
         }
         return formatter;

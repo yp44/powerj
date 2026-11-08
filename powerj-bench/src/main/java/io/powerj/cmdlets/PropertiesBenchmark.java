@@ -25,7 +25,7 @@ import io.powerj.core.java.PropertyAccess;
  * What {@code to-csv} and {@code to-json} pay for the columns of one object (review C-26): all the columns of a record of
  * eight components, read by {@code Properties.get} as {@code to-csv} reads them, and the record turned into a map as
  * {@code to-json} does. The values are read as the engine reads them for a command ({@code CmdletContext.readProperty},
- * #130), by {@link PropertyAccess#read}. In the package of {@code Properties}, which is not public.
+ * #130), by {@link PropertyAccess#property}. In the package of {@code Properties}, which is not public.
  */
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
@@ -77,7 +77,7 @@ public class PropertiesBenchmark {
 
         @Override
         public Object readProperty(Object target, String name) {
-            return PropertyAccess.read(target, name);
+            return PropertyAccess.property(target, name);
         }
     }
 

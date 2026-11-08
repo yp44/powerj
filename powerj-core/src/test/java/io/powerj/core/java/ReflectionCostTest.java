@@ -66,8 +66,8 @@ class ReflectionCostTest {
         var item = new Item("a.txt", 42, Instant.EPOCH, Path.of("a.txt"), true, "txt", 3, 0.5);
 
         assertThat(PropertyAccess.property(item, "name")).isEqualTo("a.txt");
-        assertThat(PropertyAccess.property(item, "SIZE")).isEqualTo(42L);
-        assertThat(PropertyAccess.property(item, "Dir")).isEqualTo(true);
+        assertThat(PropertyAccess.property(item, "size")).isEqualTo(42L);
+        assertThat(PropertyAccess.property(item, "dir")).isEqualTo(true);
         assertThat(PropertyAccess.property(Map.of("k", 1), "k")).isEqualTo(1);
     }
 }

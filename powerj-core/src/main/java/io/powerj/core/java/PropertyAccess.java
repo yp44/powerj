@@ -19,8 +19,11 @@ import io.powerj.core.lang.Accessor;
 /**
  * {@code .property} and {@code [index]} access on a value (specification FR-28). A property is resolved in
  * this order: record component, getter {@code getNom()}/{@code isNom()}, public field, {@code Map} key.
+ * <b>The case of the name matters</b>, everywhere: {@code size} is not {@code Size}. A getter is found by the name of its
+ * property, as for a JavaBean: {@code name} is {@code getName()}, and only the first letter is free.
  * The property always applies to the object itself: for each element of a list, write
- * {@code list*.name}.
+ * {@code list*.name}. It is also how a command reads the properties of the objects it receives
+ * ({@code CmdletContext.readProperty}): the engine alone reflects on a record.
  */
 public final class PropertyAccess {
 
@@ -38,34 +41,30 @@ public final class PropertyAccess {
         return current;
     }
 
-    /** The value of {@code $_.name}: the name is not case-sensitive, except for the key of a {@code Map}. */
-    public static Object property(Object target, String name) {
-        return get(target, name, false);
-    }
-
     /**
-     * The value of the property called {@code name}, <b>the case of which matters</b>, for a command that reads the
-     * properties of the objects it receives ({@code CmdletContext.readProperty}): a record component, a getter, a public
-     * field, a key of a {@code Map}. The same lookup as {@link #property}, in the same order, with the same errors and the
-     * same guard rails in preview mode, but {@code name} is one literal name: {@code first name} or {@code a.b} are not
-     * paths. An interrupted getter ends the command, it is not an error of the object.
+     * The value of the property called {@code name}: a record component, a getter, a public field, a key of a {@code Map}.
+     * {@code name} is one literal name ({@code first name} or {@code a.b} are keys, not paths), and the case matters. An
+     * interrupted getter ends the command, it is not an error of the object.
+     *
+     * @throws PjException if the object has no such property (the message says which ones it has, or the same name in another
+     *                     case) or if reading it fails
      */
-    public static Object read(Object target, String name) {
-        return get(target, name, true);
-    }
-
-    private static Object get(Object target, String name, boolean exact) {
+    public static Object property(Object target, String name) {
         if (target == null) {
             throw new PjException(Messages.get("property.onNull", name));
         }
         if (target instanceof Map<?, ?> map) {
             return map.get(name);
         }
-        var direct = directProperty(target, name, false, exact);
+        var direct = directProperty(target, name, false);
         if (direct.found()) {
             return direct.value();
         }
         List<String> hints = new ArrayList<>();
+        String otherCase = sameNameInAnotherCase(target, name);
+        if (otherCase != null) {
+            hints.add(Messages.get("property.hint.case", otherCase));
+        }
         if (target instanceof Collection<?> || target.getClass().isArray()) {
             hints.add(Messages.get("property.hint.each", name));
         }
@@ -95,11 +94,17 @@ public final class PropertyAccess {
             if (target instanceof Map<?, ?> map) {
                 return plainMap(map) ? map.get(name) : null;
             }
-            var direct = directProperty(target, name, true, false);
+            var direct = directProperty(target, name, true);
             return direct.found() ? direct.value() : null;
         } catch (RuntimeException e) {
             return null;
         }
+    }
+
+    /** The property of {@code target} that {@code name} spells in another case, or {@code null}: {@code Size} for {@code size}. */
+    private static String sameNameInAnotherCase(Object target, String name) {
+        return Members.of(target).stream().filter(m -> m.kind() != Members.Kind.METHOD)
+                .map(Members.Member::name).filter(known -> known.equalsIgnoreCase(name)).findFirst().orElse(null);
     }
 
     private static boolean plainMap(Map<?, ?> map) {
@@ -120,21 +125,17 @@ public final class PropertyAccess {
         static final Lookup MISSING = new Lookup(false, null);
     }
 
-    /**
-     * {@code pureOnly}: a getter that {@link PreviewPolicy} does not allow is left alone, as if it was not there.
-     * {@code exact}: the case of the name matters.
-     */
-    private static Lookup directProperty(Object target, String name, boolean pureOnly, boolean exact) {
+    /** {@code pureOnly}: a getter that {@link PreviewPolicy} does not allow is left alone, as if it was not there. */
+    private static Lookup directProperty(Object target, String name, boolean pureOnly) {
         Class<?> type = target.getClass();
         try {
             if (type.isRecord()) {
-                RecordShape shape = RecordShape.of(type);
-                Method accessor = exact ? shape.exactAccessor(name) : shape.accessor(name);
+                Method accessor = RecordShape.of(type).accessor(name);
                 if (accessor != null) {
                     return new Lookup(true, accessor.invoke(target));
                 }
             }
-            var getter = exact ? Members.getterExact(type, name) : Members.getter(type, name);
+            var getter = Members.getter(type, name);
             if (getter.isPresent()) {
                 if (pureOnly && !PreviewPolicy.allows(getter.get())) {
                     return Lookup.MISSING;
@@ -142,7 +143,7 @@ public final class PropertyAccess {
                 PreviewGuard.checkCall(getter.get()); // record components above are always read (FR-66)
                 return new Lookup(true, getter.get().invoke(target));
             }
-            var field = exact ? Members.fieldExact(type, name) : Members.field(type, name);
+            var field = Members.field(type, name);
             if (field.isPresent()) {
                 return new Lookup(true, field.get().get(target));
             }

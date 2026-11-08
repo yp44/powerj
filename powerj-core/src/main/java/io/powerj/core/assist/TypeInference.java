@@ -229,7 +229,7 @@ final class TypeInference {
     private static TypeInfo propertyType(Class<?> type, String name) {
         if (type.isRecord()) {
             for (RecordComponent c : type.getRecordComponents()) {
-                if (c.getName().equalsIgnoreCase(name)) {
+                if (c.getName().equals(name)) {
                     return TypeInfo.instance(c.getType());
                 }
             }

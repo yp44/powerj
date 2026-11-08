@@ -212,7 +212,7 @@ public final class CmdletRunner {
         /** The one way to read a property: here, in the engine, which alone can read the records of every module. */
         @Override
         public Object readProperty(Object target, String name) {
-            return PropertyAccess.read(target, name);
+            return PropertyAccess.property(target, name);
         }
 
         @Override

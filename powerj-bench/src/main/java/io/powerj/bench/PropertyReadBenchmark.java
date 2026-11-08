@@ -18,8 +18,8 @@ import io.powerj.core.java.PropertyAccess;
 
 /**
  * What {@code $_.size} costs for each object that flows through {@code where { $_.size > 1mb }} (review C-26): the read of
- * a record component by {@link PropertyAccess#property}, and by {@link PropertyAccess#read}, which every command uses
- * through {@code CmdletContext.readProperty} (the case of the name matters, #130).
+ * a record component by {@link PropertyAccess#property}, which every command uses through
+ * {@code CmdletContext.readProperty} (the case of the name matters, #130).
  */
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
@@ -44,15 +44,5 @@ public class PropertyReadBenchmark {
     @Benchmark
     public Object lastComponent() {
         return PropertyAccess.property(item, "ratio");
-    }
-
-    @Benchmark
-    public Object firstComponentExact() {
-        return PropertyAccess.read(item, "name");
-    }
-
-    @Benchmark
-    public Object lastComponentExact() {
-        return PropertyAccess.read(item, "ratio");
     }
 }

@@ -46,7 +46,8 @@ class PropertiesAndOptionsTest {
     @Test
     void publicFieldsAreProperties() {
         assertThat(PropertyAccess.property(new InvokerFixture(), "count")).isEqualTo(3);
-        assertThat(Members.field(InvokerFixture.class, "COUNT")).isPresent();
+        assertThat(Members.field(InvokerFixture.class, "count")).isPresent();
+        assertThat(Members.field(InvokerFixture.class, "COUNT")).as("the case matters").isEmpty();
         assertThat(Members.ofType(InvokerFixture.class)).extracting(Members.Member::name).contains("count", "broken");
     }
 

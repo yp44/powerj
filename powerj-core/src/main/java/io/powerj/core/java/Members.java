@@ -12,7 +12,6 @@ import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -86,32 +85,12 @@ public final class Members {
                 && type.getModule().isExported(type.getPackageName(), Members.class.getModule());
     }
 
-    /** Accessible getter {@code getNom()} / {@code isNom()} for the property {@code name}. */
-    public static Optional<Method> getter(Class<?> type, String name) {
-        for (Class<?> t : accessibleTypes(type)) {
-            for (Method m : t.getMethods()) {
-                if (m.getParameterCount() == 0 && !Modifier.isStatic(m.getModifiers())
-                        && isAccessible(m.getDeclaringClass()) && isGetterFor(m, name)) {
-                    return Optional.of(m);
-                }
-            }
-        }
-        return Optional.empty();
-    }
-
-    private static boolean isGetterFor(Method method, String name) {
-        String m = method.getName();
-        return m.equalsIgnoreCase("get" + name)
-                || (m.equalsIgnoreCase("is" + name)
-                    && (method.getReturnType() == boolean.class || method.getReturnType() == Boolean.class));
-    }
-
     /**
-     * Accessible getter for the property {@code name}, the case of which matters, as it is listed by {@link #ofType}:
+     * Accessible getter for the property {@code name}, <b>the case of which matters</b>, as it is listed by {@link #ofType}:
      * {@code parent} is {@code getParent()}, {@code directory} is {@code isDirectory()} (a {@code boolean} or
      * {@code Boolean}). The first letter of the name is the only one that is free, as for a JavaBean.
      */
-    public static Optional<Method> getterExact(Class<?> type, String name) {
+    public static Optional<Method> getter(Class<?> type, String name) {
         if (name.isEmpty()) {
             return Optional.empty();
         }
@@ -130,22 +109,10 @@ public final class Members {
     }
 
     /** Public instance field called exactly {@code name} (the case matters), if the type is accessible. */
-    public static Optional<Field> fieldExact(Class<?> type, String name) {
-        for (Class<?> t : accessibleTypes(type)) {
-            for (Field f : t.getFields()) {
-                if (f.getName().equals(name) && !Modifier.isStatic(f.getModifiers())) {
-                    return Optional.of(f);
-                }
-            }
-        }
-        return Optional.empty();
-    }
-
-    /** Public instance field, if the type is accessible. */
     public static Optional<Field> field(Class<?> type, String name) {
         for (Class<?> t : accessibleTypes(type)) {
             for (Field f : t.getFields()) {
-                if (f.getName().equalsIgnoreCase(name) && !Modifier.isStatic(f.getModifiers())) {
+                if (f.getName().equals(name) && !Modifier.isStatic(f.getModifiers())) {
                     return Optional.of(f);
                 }
             }
@@ -177,7 +144,7 @@ public final class Members {
         Map<String, Member> properties = new LinkedHashMap<>();
         if (type.isRecord()) {
             for (RecordComponent c : type.getRecordComponents()) {
-                properties.put(c.getName().toLowerCase(Locale.ROOT),
+                properties.put(c.getName(),
                         new Member(c.getName(), Kind.PROPERTY, simple(c.getGenericType().getTypeName())));
             }
         }
@@ -192,7 +159,7 @@ public final class Members {
                 }
                 String property = propertyName(m);
                 if (property != null) {
-                    properties.putIfAbsent(property.toLowerCase(Locale.ROOT),
+                    properties.putIfAbsent(property,
                             new Member(property, Kind.PROPERTY, simple(m.getGenericReturnType().getTypeName())));
                 }
                 String signature = m.getName() + "(" + String.join(", ",
@@ -203,7 +170,7 @@ public final class Members {
             }
             for (Field f : t.getFields()) {
                 if (!Modifier.isStatic(f.getModifiers())) {
-                    properties.putIfAbsent(f.getName().toLowerCase(Locale.ROOT),
+                    properties.putIfAbsent(f.getName(),
                             new Member(f.getName(), Kind.FIELD, simple(f.getGenericType().getTypeName())));
                 }
             }

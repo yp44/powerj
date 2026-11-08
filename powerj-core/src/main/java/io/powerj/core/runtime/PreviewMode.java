@@ -125,7 +125,7 @@ final class PreviewMode {
         var text = new StringWriter();
         try {
             guard.call(() -> {
-                var formatter = new OutputFormatter(new PrintWriter(text), width, colors, PropertyAccess::read);
+                var formatter = new OutputFormatter(new PrintWriter(text), width, colors, PropertyAccess::property);
                 shown.forEach(formatter::accept);
                 formatter.close();
                 return null;

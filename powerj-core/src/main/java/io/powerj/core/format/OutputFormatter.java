@@ -77,7 +77,7 @@ public final class OutputFormatter implements AutoCloseable {
 
     /**
      * How the value of a component of a record is read: the engine's one way to read a property
-     * ({@code PropertyAccess.read}), given by the caller. The formatter does not reflect on a record itself (#130): reading
+     * ({@code PropertyAccess.property}), given by the caller. The formatter does not reflect on a record itself (#130): reading
      * is allowed to the engine alone, and a {@code Method} made accessible here would be accessible for every module that
      * holds it. It is not a dependency of this package on the one that reads, which depends on this one.
      */
