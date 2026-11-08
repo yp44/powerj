@@ -1,6 +1,5 @@
 package io.powerj.fx.grid;
 
-import java.util.Locale;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -120,7 +119,7 @@ public final class GridCmdlet implements Cmdlet<GridParams, Object, Object> {
             return;
         }
         Reading reading = execution.reader.read(input);
-        reading.columns().forEach(column -> execution.seenColumns.add(column.name().toLowerCase(Locale.ROOT)));
+        reading.columns().forEach(column -> execution.seenColumns.add(column.name()));
         // One report per column: a property that fails fails for every object.
         reading.errors().forEach((column, reason) -> {
             if (execution.reported.add(column)) {

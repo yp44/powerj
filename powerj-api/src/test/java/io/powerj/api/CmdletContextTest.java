@@ -45,6 +45,11 @@ class CmdletContextTest {
         public ScriptBlock compile(String expression) {
             throw new UnsupportedOperationException();
         }
+
+        @Override
+        public Object readProperty(Object target, String name) {
+            throw new UnsupportedOperationException();
+        }
     };
 
     @Test
@@ -70,51 +75,6 @@ class CmdletContextTest {
     }
 
     @Test
-    void propertyIsTheBlockThatReadsAPropertyOrAPathOfThem() {
-        var compiled = new java.util.ArrayList<String>();
-        var context = new CmdletContext<String>() {
-            @Override
-            public void emit(String value) {
-            }
-
-            @Override
-            public void error(String message) {
-            }
-
-            @Override
-            public Path currentDirectory() {
-                return Path.of(".");
-            }
-
-            @Override
-            public Map<String, String> environment() {
-                return Map.of();
-            }
-
-            @Override
-            public Optional<Object> variable(String name) {
-                return Optional.empty();
-            }
-
-            @Override
-            public boolean cancelled() {
-                return false;
-            }
-
-            @Override
-            public ScriptBlock compile(String expression) {
-                compiled.add(expression);
-                return null;
-            }
-        };
-
-        context.property("size");
-        context.property("path.fileName");
-
-        assertThat(compiled).containsExactly("$_.size", "$_.path.fileName");
-    }
-
-    @Test
     void aUsageExceptionIsAnIllegalArgumentExceptionWithItsMessageAndCause() {
         var cause = new RuntimeException("why");
 
@@ -123,8 +83,8 @@ class CmdletContextTest {
         assertThat(new UsageException("bad option", cause)).hasCause(cause);
     }
 
-    /** A context whose only way to read is {@code compile}, as a test double that has nothing better. */
-    private static CmdletContext<String> compilingWith(java.util.function.Function<String, ScriptBlock> compiler) {
+    /** A context whose {@code readProperty} is the one given: what {@code tryReadProperty} adds to it is under test. */
+    private static CmdletContext<String> reading(java.util.function.BiFunction<Object, String, Object> reader) {
         return new CmdletContext<>() {
             @Override
             public void emit(String value) {
@@ -156,56 +116,42 @@ class CmdletContextTest {
 
             @Override
             public ScriptBlock compile(String expression) {
-                return compiler.apply(expression);
-            }
-        };
-    }
-
-    private static ScriptBlock block(java.util.function.Function<Object, Object> reading) {
-        return new ScriptBlock() {
-            @Override
-            public Object invoke(Object current) {
-                return reading.apply(current);
+                throw new UnsupportedOperationException();
             }
 
             @Override
-            public String source() {
-                return "block";
+            public Object readProperty(Object target, String name) {
+                return reader.apply(target, name);
             }
         };
     }
 
     @Test
-    void readPropertyReadsThroughPropertyWhenTheContextHasNothingBetter() {
-        var compiled = new java.util.ArrayList<String>();
-        var context = compilingWith(source -> {
-            compiled.add(source);
-            return block(target -> "value of " + target);
-        });
+    void tryReadPropertyReturnsTheValueOfReadProperty() {
+        var attempt = reading((target, name) -> name + " of " + target).tryReadProperty("object", "size");
 
-        assertThat(context.readProperty("object", "size")).isEqualTo("value of object");
-        assertThat(compiled).containsExactly("$_.size");
+        assertThat(attempt.failed()).isFalse();
+        assertThat(attempt.value()).isEqualTo("size of object");
     }
 
     @Test
     void tryReadPropertyReturnsTheFailureAsAValue() {
         var failure = new IllegalStateException("cannot read");
-        var context = compilingWith(source -> block(target -> {
+        var context = reading((target, name) -> {
             throw failure;
-        }));
+        });
 
         var attempt = context.tryReadProperty("object", "size");
 
         assertThat(attempt.failed()).isTrue();
         assertThat(attempt.error()).isSameAs(failure);
-        assertThat(compilingWith(source -> block(target -> 7)).tryReadProperty("object", "size").value()).isEqualTo(7);
     }
 
     @Test
     void tryReadPropertyNeverTakesTheInterruptionForAnUnreadableObject() {
-        var context = compilingWith(source -> block(target -> {
+        var context = reading((target, name) -> {
             throw new java.util.concurrent.CancellationException("Ctrl+C");
-        }));
+        });
 
         assertThatThrownBy(() -> context.tryReadProperty("object", "size"))
                 .isInstanceOf(java.util.concurrent.CancellationException.class);

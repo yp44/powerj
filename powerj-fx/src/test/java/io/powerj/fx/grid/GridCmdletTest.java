@@ -338,9 +338,9 @@ class GridCmdletTest {
     @Test
     void aColumnAskedForThatNeverArrivedIsReportedAtTheEnd() throws Exception {
         TestContext<Object> context = piped();
-        CmdletDriver.run(new GridCmdlet(new RecordingOpener()), params(null, "name,Nothing,AGE,other", false), context,
+        CmdletDriver.run(new GridCmdlet(new RecordingOpener()), params(null, "name,Nothing,age,AGE,other", false), context,
                 new Person("Ada", 36));
-        assertThat(context.errors).containsExactly("no such column: Nothing, other");
+        assertThat(context.errors).as("the case of a column matters").containsExactly("no such column: Nothing, AGE, other");
     }
 
     @Test

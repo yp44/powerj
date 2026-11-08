@@ -5,7 +5,6 @@ import java.nio.file.Path;
 
 import io.powerj.api.CmdletContext;
 import io.powerj.api.ScriptBlock;
-import io.powerj.api.UsageException;
 
 /**
  * Files designated by pipeline objects (specification FR-65, FR-72): a {@code String} (a path), a {@code Path}, a
@@ -41,20 +40,13 @@ final class PipelineFiles {
      */
     PipelineFiles(String propertyName, ScriptBlock block, CmdletContext<?> context, Keys keys) {
         this.propertyName = propertyName;
-        this.property = propertyName == null ? null : compile(propertyName, context);
+        this.property = propertyName == null ? null : PropertyPath.of(propertyName, context);
         this.block = block;
         this.keys = keys;
     }
 
     boolean hasProperty() {
         return property != null;
-    }
-
-    private static ScriptBlock compile(String name, CmdletContext<?> context) {
-        if (!Texts.isPropertyPath(name)) {
-            throw new UsageException(Messages.get("where.property.invalid", name));
-        }
-        return context.property(name);
     }
 
     /** File designated by a pipeline object, or {@code null} after reporting why there is none. */

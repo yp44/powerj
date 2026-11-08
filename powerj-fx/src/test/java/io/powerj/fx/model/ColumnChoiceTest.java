@@ -23,7 +23,8 @@ class ColumnChoiceTest {
     @Test
     void aListOfNamesIsReadWithoutItsBlanksAndRepeats() {
         assertThat(ColumnChoice.parse("name, size ,,modified").names()).containsExactly("name", "size", "modified");
-        assertThat(ColumnChoice.parse("name,NAME,Name,size").names()).containsExactly("name", "size");
+        assertThat(ColumnChoice.parse("name,name,size,size").names()).containsExactly("name", "size");
+        assertThat(ColumnChoice.parse("name,NAME,Name").names()).as("the case matters").containsExactly("name", "NAME", "Name");
         assertThat(ColumnChoice.parse("one").isAll()).isFalse();
     }
 
@@ -35,10 +36,12 @@ class ColumnChoiceTest {
     }
 
     @Test
-    void onlyTheColumnsAskedForAreShownWithoutRegardToCase() {
+    void onlyTheColumnsAskedForAreShownAndTheCaseMatters() {
         ColumnChoice choice = ColumnChoice.parse("Name,size");
-        assertThat(choice.visible("name")).isTrue();
-        assertThat(choice.visible("SIZE")).isTrue();
+        assertThat(choice.visible("Name")).isTrue();
+        assertThat(choice.visible("size")).isTrue();
+        assertThat(choice.visible("name")).isFalse();
+        assertThat(choice.visible("SIZE")).isFalse();
         assertThat(choice.visible("modified")).isFalse();
     }
 
@@ -64,7 +67,7 @@ class ColumnChoiceTest {
     @Test
     void namesAskedForThatNeverCameAreListed() {
         ColumnChoice choice = ColumnChoice.parse("name,Nothing,SIZE,other");
-        assertThat(choice.missing(Set.of("name", "size", "dir"))).containsExactly("Nothing", "other");
-        assertThat(choice.missing(Set.of("name", "nothing", "size", "other"))).isEmpty();
+        assertThat(choice.missing(Set.of("name", "size", "dir"))).containsExactly("Nothing", "SIZE", "other");
+        assertThat(choice.missing(Set.of("name", "Nothing", "SIZE", "other"))).isEmpty();
     }
 }

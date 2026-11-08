@@ -101,40 +101,26 @@ public interface CmdletContext<O> {
     ScriptBlock compile(String expression);
 
     /**
-     * The block that reads a property of the received object, or a path of properties: {@code property("size")} is
-     * {@code { $_.size }} and {@code property("path.fileName")} is {@code { $_.path.fileName }}.
-     *
-     * @throws IllegalArgumentException if {@code path} is not a property name or a path of them
-     */
-    default ScriptBlock property(String path) {
-        return compile("$_." + path);
-    }
-
-    /**
-     * The value of the property {@code name} of {@code target}: the way to read an attribute of an object that comes
-     * from another module. Every command reads the properties of the objects it receives through this method (or
-     * through {@link #property}), whichever module the command or the object comes from: the engine reads for them,
-     * because the module system gives it alone the access to the records of every module.
+     * The value of the property {@code name} of {@code target}: the way to read an attribute of an object that comes from
+     * another module. Every command reads the properties of the objects it receives through this method, whichever
+     * module the command or the object comes from: the engine reads for them, because the module system gives it alone the
+     * access to the records of every module.
      * <p>
      * It finds what {@code $_.name} finds for {@code $_ = target}, in the same order: a record component, a getter
      * {@code getName()} / {@code isName()}, a public field, a key of a {@link java.util.Map} (a {@link Row} included),
-     * with the same guard rails in preview mode. It differs from {@link #property} in two ways: {@code name} is
-     * <b>one literal name</b>, never an expression or a path (a key {@code "first name"} or {@code "a.b"} is read as
-     * it is), and the name is <b>case-sensitive</b> (for a getter, the first letter is not: {@code name} reads
-     * {@code getName()}).
-     * <p>
-     * The default implementation reads {@code property(name)}: an approximation for a context that cannot do better
-     * (a test double), which neither takes a name that is not an identifier nor is case-sensitive.
+     * with the same guard rails in preview mode. {@code name} is <b>one literal name</b>, never an expression or a path (a
+     * key {@code "first name"} or {@code "a.b"} is read as it is), and <b>the case of the name matters</b>: {@code size} is
+     * not {@code Size}. For a getter, the first letter is free, as for a JavaBean: {@code name} reads {@code getName()}. A
+     * path such as {@code owner.name}, typed by a user, is read one name after the other.
      *
      * @param target the object to read, not {@code null}
      * @param name   the name of the property, for example {@code "pid"}
      * @return the value, possibly {@code null}
      * @throws RuntimeException if the object has no such property or if reading it fails; the message tells the user
-     *                          what is missing. {@link java.util.concurrent.CancellationException} is never wrapped.
+     *                          what is missing, and the name in another case if there is one.
+     *                          {@link java.util.concurrent.CancellationException} is never wrapped.
      */
-    default Object readProperty(Object target, String name) {
-        return property(name).invoke(target);
-    }
+    Object readProperty(Object target, String name);
 
     /**
      * {@link #readProperty} that returns a failure as a value instead of throwing it, as {@link ScriptBlock#tryInvoke}

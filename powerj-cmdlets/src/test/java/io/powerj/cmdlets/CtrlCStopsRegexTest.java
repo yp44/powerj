@@ -69,17 +69,7 @@ class CtrlCStopsRegexTest {
     void rangeMatchingARegexStopsOnCtrlC() throws Exception {
         var context = new TestContext<Object>(Path.of("."));
         context.hasInput = true;
-        context.compiler = source -> new io.powerj.api.ScriptBlock() {
-            @Override
-            public Object invoke(Object current) {
-                return current;
-            }
-
-            @Override
-            public String source() {
-                return source;
-            }
-        };
+        context.reader = (target, name) -> target;
         var range = new Range();
         var params = new Range.Params(CATASTROPHIC, null, "name", false, false, false, false);
 

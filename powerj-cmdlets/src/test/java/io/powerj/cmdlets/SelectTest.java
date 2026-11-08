@@ -26,22 +26,17 @@ class SelectTest {
 
     {
         context.hasInput = true;
-        // Simulated compilation of "$_.a.b": record accessors, then Path.getFileName for "fileName".
-        context.compiler = source -> block(source, current -> {
-            Object value = current;
-            for (String name : source.substring(3).split("\\.")) {
-                if (value instanceof Path path && name.equals("fileName")) {
-                    value = path.getFileName();
-                    continue;
-                }
-                try {
-                    value = value.getClass().getMethod(name).invoke(value);
-                } catch (ReflectiveOperationException e) {
-                    throw new IllegalStateException(value.getClass().getSimpleName() + " has no property '" + name + "'");
-                }
+        // The engine reads a property by its exact name: the accessor of a record, then Path.getFileName for "fileName".
+        context.reader = (target, name) -> {
+            if (target instanceof Path path && name.equals("fileName")) {
+                return path.getFileName();
             }
-            return value;
-        });
+            try {
+                return target.getClass().getMethod(name).invoke(target);
+            } catch (ReflectiveOperationException e) {
+                throw new IllegalStateException(target.getClass().getSimpleName() + " has no property '" + name + "'");
+            }
+        };
     }
 
     private static ScriptBlock block(String source, Function<Object, Object> function) {
@@ -144,9 +139,9 @@ class SelectTest {
     @Test
     void atTheHeadOfAPipelineAPropertyIsAnEmptyCellAndOneError() throws Exception {
         context.hasInput = false;
-        context.compiler = source -> block(source, current -> {
+        context.reader = (target, name) -> {
             throw new IllegalStateException("no current object");
-        });
+        };
         List<Row> rows = select(columns("name"));
         assertThat(rows).hasSize(1);
         assertThat(rows.getFirst()).containsEntry("name", null);

@@ -17,7 +17,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-import io.powerj.api.ScriptBlock;
 import io.powerj.api.Span;
 import io.powerj.testing.CmdletDriver;
 import io.powerj.testing.TestContext;
@@ -275,19 +274,9 @@ class GrepTest {
     @Test
     void propertyOfThePipelineObjects() throws Exception {
         context.hasInput = true;
-        context.compiler = source -> {
-            assertThat(source).isEqualTo("$_.name");
-            return new ScriptBlock() {
-                @Override
-                public Object invoke(Object current) {
-                    return ((FileEntry) current).name();
-                }
-
-                @Override
-                public String source() {
-                    return source;
-                }
-            };
+        context.reader = (target, name) -> {
+            assertThat(name).isEqualTo("name");
+            return ((FileEntry) target).name();
         };
         var grep = new Grep();
         var params = new Grep.Params("^a", List.of(), false, null, null, false, false, false, null, "name", false, false);
@@ -319,19 +308,11 @@ class GrepTest {
     @Test
     void propertyErrorsSkipTheObjectAndNullIsEmptyText() throws Exception {
         context.hasInput = true;
-        context.compiler = source -> new ScriptBlock() {
-            @Override
-            public Object invoke(Object current) {
-                if (current.equals("bad")) {
-                    throw new IllegalStateException("no property name");
-                }
-                return current.equals("none") ? null : current;
+        context.reader = (target, name) -> {
+            if (target.equals("bad")) {
+                throw new IllegalStateException("no property name");
             }
-
-            @Override
-            public String source() {
-                return source;
-            }
+            return target.equals("none") ? null : target;
         };
         var grep = new Grep();
         var params = full("^$", null, false, null, "name");

@@ -37,15 +37,29 @@ class KeysTest {
     }
 
     @Test
-    void aPropertyIsCompiled() {
-        var compiled = new ArrayList<String>();
-        context.compiler = source -> {
-            compiled.add(source);
-            return block(source);
+    void aPropertyIsReadThroughTheContextOneNameAfterTheOther() {
+        var asked = new ArrayList<String>();
+        context.reader = (target, name) -> {
+            asked.add(name);
+            return name + " of " + target;
         };
-        assertThat(Keys.blocks(List.of("size", "path.fileName"), context, "sort.key.invalid"))
-                .extracting(ScriptBlock::source).containsExactly("$_.size", "$_.path.fileName");
-        assertThat(compiled).containsExactly("$_.size", "$_.path.fileName");
+        var blocks = Keys.blocks(List.of("size", "path.fileName"), context, "sort.key.invalid");
+
+        assertThat(blocks).extracting(ScriptBlock::source).containsExactly("$_.size", "$_.path.fileName");
+        assertThat(asked).as("nothing is read before an object comes").isEmpty();
+        assertThat(blocks.get(1).invoke("x")).isEqualTo("fileName of path of x");
+        assertThat(asked).containsExactly("path", "fileName");
+    }
+
+    @Test
+    void theCaseOfAPropertyMatters() {
+        record Entry(long size) {
+        }
+        var block = Keys.block("Size", context, "sort.key.invalid");
+
+        assertThatThrownBy(() -> block.invoke(new Entry(1))).isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Size");
+        assertThat(Keys.block("size", context, "sort.key.invalid").invoke(new Entry(1))).isEqualTo(1L);
     }
 
     @Test

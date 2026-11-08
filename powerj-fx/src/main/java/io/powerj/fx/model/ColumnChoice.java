@@ -3,7 +3,6 @@ package io.powerj.fx.model;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -17,12 +16,12 @@ public final class ColumnChoice {
     /** Every column, as it comes. */
     public static final ColumnChoice ALL = new ColumnChoice(List.of());
 
-    /** Asked-for names by lower-case name, in order. */
+    /** Asked-for names, in order; the case matters. */
     private final Map<String, String> wanted = new LinkedHashMap<>();
 
     private ColumnChoice(List<String> names) {
         for (String name : names) {
-            wanted.putIfAbsent(name.toLowerCase(Locale.ROOT), name);
+            wanted.putIfAbsent(name, name);
         }
     }
 
@@ -54,7 +53,7 @@ public final class ColumnChoice {
 
     /** {@code true} if the column is shown from the start. */
     public boolean visible(String column) {
-        return isAll() || wanted.containsKey(column.toLowerCase(Locale.ROOT));
+        return isAll() || wanted.containsKey(column);
     }
 
     /**
@@ -74,7 +73,7 @@ public final class ColumnChoice {
     private int rank(String column) {
         int rank = 0;
         for (String key : wanted.keySet()) {
-            if (key.equals(column.toLowerCase(Locale.ROOT))) {
+            if (key.equals(column)) {
                 return rank;
             }
             rank++;
@@ -82,7 +81,7 @@ public final class ColumnChoice {
         return Integer.MAX_VALUE;
     }
 
-    /** The names asked for that are not among {@code seen} (lower-case names of the columns there are). */
+    /** The names asked for that are not among {@code seen} (the names of the columns there are, as they are). */
     public List<String> missing(Set<String> seen) {
         List<String> missing = new ArrayList<>();
         wanted.forEach((key, name) -> {
