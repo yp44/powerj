@@ -38,23 +38,24 @@ class are found once per class too: `getMethods()` copies every public method of
 ## Reading through the context (#130)
 
 `to-json`, `to-csv` and `join` used to read the components of a record with accessors of their own, cached by class. They now ask
-the engine (`CmdletContext.readProperty`, which reads by exact name: a lookup in a table per class, then the accessor), because a
-module cannot read the records of the others by reflection ([ADR 0011](../adr/0011-every-command-reads-the-properties-of-an-object-through-the-engine.md)).
-Same machine and same session, JMH `Mode.AverageTime`, one fork, 3 warm-up and 5 measured iterations, the commit before the
-change (`main`) and the one after; the benchmark of the cmdlets reads as the engine does (`PropertyAccess.read`).
+the engine (`CmdletContext.readProperty`, which is `PropertyAccess.property`: a lookup by exact name in a table per class, then the
+accessor), because a module cannot read the records of the others by reflection
+([ADR 0011](../adr/0011-every-command-reads-the-properties-of-an-object-through-the-engine.md)). The lookup of the engine is by exact name
+since the case of a name matters everywhere: a hash table instead of a case-insensitive tree.
+Same machine, JMH `Mode.AverageTime`, one fork, 3 warm-up and 5 measured iterations, the commit before the change (`main`) and the
+one after; the benchmark of the cmdlets reads as the engine does.
 
 | Per object | Before | After |
 |---|---|---|
-| `$_.name` and `$_.ratio` on a record (first and last of eight components): `PropertyAccess.property` | 28 and 35 ns | 28 and 35 ns (not touched) |
-| the same by exact name: `PropertyAccess.read` | not there | 27 and 29 ns |
-| the 8 columns of a record, as `to-csv` reads them | 283 ns (± 58) | 560 ns (± 110) |
-| a record as a map, as `to-json` reads it | 156 ns (± 46) | 328 ns (± 32) |
+| `$_.name` and `$_.ratio` on a record (first and last of eight components): `PropertyAccess.property` | 28 and 35 ns | 24 and 27 ns |
+| the 8 columns of a record, as `to-csv` reads them | 283 ns (± 58) | 492 ns (± 94) |
+| a record as a map, as `to-json` reads it | 156 ns (± 46) | 365 ns (± 48) |
 
-**What it costs.** About 35 ns more per column: the lookup of the name in the view of the record (to know that the column is
-there), the read by the engine, and the `Attempt` that `tryReadProperty` allocates. A million rows of eight columns take 0.3 s
-more in `to-csv`, 0.2 s more in `to-json`; the writing of the text and of the file cost more than that. **Not optimised.** The
-first thing to try, if it matters: read with `readProperty` and catch the failure (no `Attempt`), or a reader resolved once per
-class.
+**What it costs.** About 25 ns more per column: the lookup of the name in the view of the record (to know that the column is
+there), the read by the engine, and the `Attempt` that `tryReadProperty` allocates. A million rows of eight columns take 0.2 s
+more in `to-csv` and in `to-json`; the writing of the text and of the file cost more than that. **Not optimised.** The first thing to
+try, if it matters: read with `readProperty` and catch the failure (no `Attempt`), or a reader resolved once per class. The
+expressions (`$_.name`) got faster, by the same change.
 
 ## The latencies of the specification
 

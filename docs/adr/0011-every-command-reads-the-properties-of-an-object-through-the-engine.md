@@ -26,21 +26,30 @@ caller (`RecordView` caches the components), and the table of the terminal, in t
 `trySetAccessible()`. The flag is on the object, so every module then read the record, but only for the columns that had been
 displayed. The isolation that 0010 assumed does not exist: the accessibility of a `Method` is shared by whoever holds it.
 
-A third-party cmdlet, meanwhile, reads any object through `CmdletContext.property(path)`, which the engine evaluates, and it
-worked for the records of every origin. The same object could be read by a third-party cmdlet and not by a built-in one.
+A third-party cmdlet, meanwhile, read any object through `CmdletContext.property(path)`, which compiled `$_.` + the path and
+let the engine evaluate it, and it worked for the records of every origin. The same object could be read by a third-party
+cmdlet and not by a built-in one. And there were two ways to read a property in the API: that one, tolerant of the case of
+the name and made of an expression, and the private reflection of the built-in cmdlets.
 
 ## Decision
 **The engine alone reads the value of a property by reflection; every other command asks it, through the API.**
 
-- `CmdletContext.readProperty(Object target, String name)` and `tryReadProperty` (`powerj-api`, `default` methods): the value of
-  one property, found as `$_.name` finds it (record component, getter, public field, key of a `Map` or `Row`), with the
-  guard rails of the preview mode. The name is **one literal name**, not a path or an expression (`first name` and `a.b` are
-  keys), and **its case matters** (for a getter, the first letter is free, as for a JavaBean). The engine implements it with
-  `PropertyAccess.read`; the test context of `powerj-testing` reads the record itself.
+- `CmdletContext.readProperty(Object target, String name)` (`powerj-api`, abstract) and `tryReadProperty` (`default`, the failure
+  as a value, as `ScriptBlock.tryInvoke`): the value of one property, found as `$_.name` finds it (record component, getter,
+  public field, key of a `Map` or `Row`), with the guard rails of the preview mode. The name is **one literal name**, not a
+  path or an expression (`first name` and `a.b` are keys). The engine implements it with `PropertyAccess.property`, the lookup
+  of `$_.name`; the test context of `powerj-testing` reads the record itself.
+- **`CmdletContext.property(path)` is removed.** It was `compile("$_." + path)`: an expression compiled for a name, case-insensitive,
+  that the cmdlets called after their own check of the path. The names that a user types as an argument (`sort size`,
+  `--property owner.name`) are read by `PropertyPath`, in the cmdlets, which calls `readProperty` for each name of the path.
+- **The case of a name matters, everywhere**: `$_.size`, `where size > 1mb`, `sort size`, `--property path`, `grid --columns`. A
+  name that differs from a property only by its case is answered with that property (`has no property 'Size' (did you mean
+  'size'?)`). A getter is found by the name of its property, the first letter of which is free, as for a JavaBean (`name` is
+  `getName()`). This breaks the scripts that wrote another case, which is allowed before the first release.
 - The **structure** of a record (names, types, `@Display`, `@Bytes`, `@Highlight`) stays in `RecordView`, which needs no access.
 - The built-in cmdlets (`Properties` for `to-json`, `to-csv` and `join`; `Kill`) read through the context. `RecordShape` leaves
   `io.powerj.cmdlets`.
-- The table of the terminal reads through the same `PropertyAccess.read`, given to `OutputFormatter` as a `ComponentReader`
+- The table of the terminal reads through the same `PropertyAccess.property`, given to `OutputFormatter` as a `ComponentReader`
   (the package of `PropertyAccess` depends on `core.format`, the other way would be a cycle). Nothing makes a `Method`
   accessible except the engine.
 - **Enforced**: `ArchitectureTest.onlyTheEngineReadsAnObjectByReflection` forbids `Method.invoke`, `Field.get`/`set` and
@@ -54,19 +63,24 @@ Not retained:
   that is not known when the code is compiled (`powerj-fx`, loaded in a layer of its own) cannot be named.
 - **A utility class in `powerj-text` or in `powerj-cmdlets`**: the access check is on the module of the code that calls
   `Method.invoke`, so the class that reflects is the one that needs the access, whatever the module that asks it to.
-- **`property(path)` as the mechanism**: it compiles `$_.` + the path for every name (more than a read), and a name that is not a
-  path (the key `first name` of a `Row`) is not an identifier.
+- **`property(path)` as the one mechanism**: it compiles `$_.` + the path for every name (more than a read), a name that is not a
+  path (the key `first name` of a `Row`) is not an identifier, and an expression cannot be case-sensitive without changing the
+  language: the case rule is the language's, so it is applied to the language.
+- **Two methods in the API, an exact one and a tolerant one**: the cmdlets would have to say which they want, and the user would
+  meet two rules for the same name (`sort Size` working where `$_.Size` does not, or the other way round).
 
 ## Consequences
 - One way to read a property, in the engine; a built-in cmdlet reads what a third-party cmdlet produced and the other way round,
   without any export or `opens` to maintain.
-- The API grows by two `default` methods, before the first release ([#47](https://github.com/yp44/powerj/issues/47)): the snapshot
-  moves, nothing breaks. A cmdlet that has an object in hand and wants one of its properties has what `property(path)` gave it
-  for a block, and a literal name.
-- A read costs more in `to-csv` and `to-json` than the cached accessor did (about 35 ns more per column, measured in
-  [docs/quality/performance.md](../quality/performance.md): a million rows of eight columns, 0.3 s more). Not optimised: the display
-  and the writing of the file cost more. A reader resolved once per class would be the first thing to try.
+- The API loses `property(path)` and gains `readProperty` and `tryReadProperty`, before the first release
+  ([#47](https://github.com/yp44/powerj/issues/47)): a break, announced in the CHANGELOG. A module that read a path with
+  `property` writes `context.compile("$_." + path)` (and keeps the language's rules, the case included) or reads one name after the
+  other with `readProperty`. Every implementation of `CmdletContext` has to give `readProperty`.
+- A read costs more in `to-csv` and `to-json` than the cached accessor did (about 25 ns more per column, measured in
+  [docs/quality/performance.md](../quality/performance.md): a million rows of eight columns, 0.2 s more). Not optimised: the display
+  and the writing of the file cost more. A reader resolved once per class would be the first thing to try. The expressions
+  (`$_.name`) are faster: the lookup is by exact name in a hash table.
 - The unit tests of a cmdlet read with the test context, which does not prove the access between modules: the smoke test does,
   and the architecture rule keeps the reflection out of the cmdlets.
-- `readProperty` is case-sensitive and `$_.name` is not: the first reads the name that `RecordView` lists, the second what a
-  user types.
+- The option names of a cmdlet (`--Property`) and its enumerated values stay case-insensitive: they are not the name of an
+  attribute of an object (FR-18).
