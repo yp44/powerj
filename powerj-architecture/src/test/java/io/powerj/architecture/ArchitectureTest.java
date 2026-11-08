@@ -195,7 +195,8 @@ class ArchitectureTest {
      * alone is granted them all. Every other command reads through {@code CmdletContext.readProperty}, so that a built-in
      * cmdlet reads what a third-party cmdlet produced and the other way round. The test context of {@code powerj-testing}
      * stands in for the engine in the tests of a cmdlet. Making a {@code Method} accessible is as forbidden as calling it:
-     * the flag is shared by every module that holds the same {@code Method}.
+     * the flag is shared by every module that holds the same {@code Method}. The other ways to reflect (a constructor, a method
+     * handle taken from a record, a private lookup) have the same problem and are forbidden too.
      */
     @Test
     void onlyTheEngineReadsAnObjectByReflection() {
@@ -206,6 +207,12 @@ class ArchitectureTest {
                         .and(target(nameMatching("setAccessible|trySetAccessible"))))
                 .orShould().callMethodWhere(target(owner(assignableTo(java.lang.reflect.Field.class)))
                         .and(target(nameMatching("get|set"))))
+                .orShould().callMethodWhere(target(owner(assignableTo(java.lang.reflect.Constructor.class)))
+                        .and(target(nameMatching("newInstance"))))
+                .orShould().callMethodWhere(target(owner(assignableTo(java.lang.invoke.MethodHandles.class)))
+                        .and(target(nameMatching("privateLookupIn"))))
+                .orShould().callMethodWhere(target(owner(assignableTo(java.lang.invoke.MethodHandles.Lookup.class)))
+                        .and(target(nameMatching("unreflect.*|findVirtual|findGetter|findVarHandle|unreflectVarHandle"))))
                 .because("the engine reads for every command (CmdletContext.readProperty), a module cannot read the records of the others"));
     }
 
