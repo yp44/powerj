@@ -67,7 +67,7 @@ class OutputFormatterTest {
         try (var formatter = new OutputFormatter(new PrintWriter(out), 80, (record, name) -> {
             asked.add(name);
             if (name.equals("size")) {
-                throw new IllegalStateException("cannot read");
+                throw new io.powerj.core.error.PjException("cannot read");
             }
             return "read:" + name;
         })) {
@@ -76,6 +76,16 @@ class OutputFormatterTest {
 
         assertThat(asked).containsExactly("name", "size");
         assertThat(out.toString()).contains("name", "size", "read:name").doesNotContain("read:size").contains("?");
+    }
+
+    @Test
+    void aDefectOfTheReaderIsNotHiddenBehindAQuestionMark() {
+        var formatter = new OutputFormatter(new PrintWriter(new StringWriter()), 80, (record, name) -> {
+            throw new ClassCastException("a reader that is wrong");
+        });
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> formatter.accept(new Small("a", 1)))
+                .isInstanceOf(ClassCastException.class);
     }
 
     @Test

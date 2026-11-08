@@ -10,7 +10,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CancellationException;
 import java.util.function.Function;
 
 import io.powerj.api.Bytes;
@@ -18,6 +17,7 @@ import io.powerj.api.Display;
 import io.powerj.api.Highlight;
 import io.powerj.api.Language;
 import io.powerj.api.Span;
+import io.powerj.core.error.PjException;
 import io.powerj.core.i18n.Messages;
 import io.powerj.text.Formats;
 import io.powerj.text.RecordView;
@@ -370,13 +370,15 @@ public final class OutputFormatter implements AutoCloseable {
         return result.append(text, position, text.length()).toString();
     }
 
-    /** The value of a component, or {@code ?} if it cannot be read (an interruption is not an unreadable value). */
+    /**
+     * The value of a component, or {@code ?} if it cannot be read: the reader reports that with a {@link PjException}. An
+     * interruption is not an unreadable value, and neither is a defect of the reader (a {@code ClassCastException}, a
+     * {@code NullPointerException}): it goes up instead of showing as a table of question marks.
+     */
     private Object read(Record record, String name) {
         try {
             return reader.read(record, name);
-        } catch (CancellationException e) {
-            throw e;
-        } catch (RuntimeException e) {
+        } catch (PjException e) {
             return "?";
         }
     }
