@@ -629,7 +629,8 @@ structures, functions) can be built on it. The work is organised in phases (revi
 - **The case of a name matters, everywhere** (a change of the language, FR-28): `$_.name`, `where size > 1mb`, and the names given
   as arguments to the cmdlets (`sort size`, `--property path`, `select name`, `grid --columns name,size`). `$_.Size` is an error
   that says what exists: `FileEntry has no property 'Size' (did you mean 'size'?)`. A getter is found by the name of its
-  property, the one that the completion lists (`getName()` is `name` and not `Name`, `getURL()` is `URL`). The option names and their enumerated values stay
+  property, the one that the completion lists (`getName()` is `name` and not `Name`, `getURL()` is `URL`). The rule is written once, in `io.powerj.text.BeanProperties`, for the engine that reads
+  the property and for the grid that shows it as a column. The option names and their enumerated values stay
   case-insensitive. Scripts that wrote another case have to change.
 - **Breaking changes of the API** (before the first release): `CmdletContext.property(path)` is removed (it was
   `compile("$_." + path)`; the cmdlets read the names that a user types with `PropertyPath`, one name after the other through
@@ -640,8 +641,8 @@ structures, functions) can be built on it. The work is organised in phases (revi
   `jobs | kill`, `greet | to-json` and `greet | to-csv` on the packaged launcher, in fresh sessions (it fails on `main`), and
   `ArchitectureTest.onlyTheEngineReadsAnObjectByReflection` forbids `Method.invoke`, `Field.get`/`set` and `setAccessible` outside
   `io.powerj.core` (and the test context of `powerj-testing`).
-- **Cost:** the 8 columns of a record read by `to-csv` take 0.49 µs instead of 0.28 µs, a record turned into a map by `to-json` 0.37 µs
-  instead of 0.16 µs; `$_.name` is faster (24 ns instead of 28, a hash table by exact name instead of a case-insensitive tree)
+- **Cost:** the 8 columns of a record read by `to-csv` take 0.46 µs instead of 0.28 µs, a record turned into a map by `to-json` 0.29 µs
+  instead of 0.16 µs; `$_.name` is faster (23 ns instead of 28, a hash table by exact name instead of a case-insensitive tree)
   ([docs/quality/performance.md](docs/quality/performance.md)).
 
 ### Examined, not changed

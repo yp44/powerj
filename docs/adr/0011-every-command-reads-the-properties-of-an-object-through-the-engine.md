@@ -76,8 +76,8 @@ Not retained:
   ([#47](https://github.com/yp44/powerj/issues/47)): a break, announced in the CHANGELOG. A module that read a path with
   `property` writes `context.compile("$_." + path)` (and keeps the language's rules, the case included) or reads one name after the
   other with `readProperty`. Every implementation of `CmdletContext` has to give `readProperty`.
-- A read costs more in `to-csv` and `to-json` than the cached accessor did (about 25 ns more per column, measured in
-  [docs/quality/performance.md](../quality/performance.md): a million rows of eight columns, 0.2 s more). Not optimised: the display
+- A read costs more in `to-csv` and `to-json` than the cached accessor did (about 20 ns more per column, measured in
+  [docs/quality/performance.md](../quality/performance.md): a million rows of eight columns, 0.1 to 0.2 s more). Not optimised: the display
   and the writing of the file cost more. A reader resolved once per class would be the first thing to try. The expressions
   (`$_.name`) are faster: the lookup is by exact name in a hash table.
 - The unit tests of a cmdlet read with the test context, which does not prove the access between modules: the smoke test does,
