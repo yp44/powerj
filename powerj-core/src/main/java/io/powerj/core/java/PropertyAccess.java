@@ -5,7 +5,9 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CancellationException;
@@ -101,10 +103,27 @@ public final class PropertyAccess {
         }
     }
 
+    /**
+     * The properties of a class by their name in lower case, for the hint of a name written in another case. Worked out once per
+     * class (and freed with it): a command that skips the objects it cannot read asks for it once per object.
+     */
+    private static final ClassValue<Map<String, String>> PROPERTIES_BY_LOWER_CASE = new ClassValue<>() {
+        @Override
+        protected Map<String, String> computeValue(Class<?> type) {
+            Map<String, String> byLowerCase = new HashMap<>();
+            for (Members.Member member : Members.ofType(type)) {
+                if (member.kind() != Members.Kind.METHOD) {
+                    byLowerCase.putIfAbsent(member.name().toLowerCase(Locale.ROOT), member.name());
+                }
+            }
+            return Map.copyOf(byLowerCase);
+        }
+    };
+
     /** The property of {@code target} that {@code name} spells in another case, or {@code null}: {@code Size} for {@code size}. */
     private static String sameNameInAnotherCase(Object target, String name) {
-        return Members.of(target).stream().filter(m -> m.kind() != Members.Kind.METHOD)
-                .map(Members.Member::name).filter(known -> known.equalsIgnoreCase(name)).findFirst().orElse(null);
+        String known = PROPERTIES_BY_LOWER_CASE.get(target.getClass()).get(name.toLowerCase(Locale.ROOT));
+        return known != null && !known.equals(name) ? known : null;
     }
 
     private static boolean plainMap(Map<?, ?> map) {

@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import io.powerj.text.BeanProperties;
 import io.powerj.core.i18n.Messages;
 
 /**
@@ -94,7 +95,7 @@ public final class Members {
         for (Class<?> t : accessibleTypes(type)) {
             for (Method m : t.getMethods()) {
                 if (!Modifier.isStatic(m.getModifiers()) && isAccessible(m.getDeclaringClass())
-                        && name.equals(propertyName(m))) {
+                        && name.equals(BeanProperties.nameOf(m))) {
                     return Optional.of(m);
                 }
             }
@@ -151,7 +152,7 @@ public final class Members {
                         || m.getName().equals("equals") || m.getName().equals("hashCode")) {
                     continue;
                 }
-                String property = propertyName(m);
+                String property = BeanProperties.nameOf(m);
                 if (property != null) {
                     properties.putIfAbsent(property,
                             new Member(property, Kind.PROPERTY, simple(m.getGenericReturnType().getTypeName())));
@@ -173,27 +174,6 @@ public final class Members {
         methods.sort(Comparator.comparing(Member::name));
         all.addAll(methods);
         return all;
-    }
-
-    /**
-     * The name of the property of a getter: {@code getParent} → {@code parent}, {@code isDirectory} → {@code directory}, and, as
-     * for a JavaBean, a name that starts with two capitals is kept: {@code getURL} → {@code URL}. {@code null} for any other
-     * method.
-     */
-    private static String propertyName(Method m) {
-        if (m.getParameterCount() != 0 || m.getReturnType() == void.class) {
-            return null;
-        }
-        String name = m.getName();
-        String rest = name.startsWith("get") && name.length() > 3 ? name.substring(3)
-                : name.startsWith("is") && name.length() > 2
-                        && (m.getReturnType() == boolean.class || m.getReturnType() == Boolean.class) ? name.substring(2)
-                : null;
-        if (rest == null || !Character.isUpperCase(rest.charAt(0))) {
-            return null;
-        }
-        return rest.length() > 1 && Character.isUpperCase(rest.charAt(1)) ? rest
-                : Character.toLowerCase(rest.charAt(0)) + rest.substring(1);
     }
 
     private static String simple(String typeName) {

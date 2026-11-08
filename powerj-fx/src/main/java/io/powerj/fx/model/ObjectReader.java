@@ -15,7 +15,6 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -25,6 +24,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import io.powerj.api.Display;
 import io.powerj.api.Row;
+import io.powerj.text.BeanProperties;
 import io.powerj.text.RecordView;
 
 /**
@@ -206,25 +206,15 @@ public final class ObjectReader {
         return List.copyOf(byName.values().stream().sorted(Comparator.comparing(ColumnSpec::name)).toList());
     }
 
-    /** {@code getName()} / {@code isDir()} give {@code name} / {@code dir}; {@code null} for any other method. */
+    /**
+     * {@code getName()} / {@code isDir()} give {@code name} / {@code dir}; {@code null} for any other method. The rule is the one of
+     * the engine that will read the column ({@link BeanProperties}).
+     */
     static String property(Method method) {
-        if (method.getParameterCount() != 0 || Modifier.isStatic(method.getModifiers())
-                || method.getReturnType() == void.class || method.getDeclaringClass() == Object.class) {
+        if (Modifier.isStatic(method.getModifiers()) || method.getDeclaringClass() == Object.class) {
             return null;
         }
-        String name = method.getName();
-        String stem;
-        if (name.startsWith("get") && name.length() > 3) {
-            stem = name.substring(3);
-        } else if (name.startsWith("is") && name.length() > 2
-                && (method.getReturnType() == boolean.class || method.getReturnType() == Boolean.class)) {
-            stem = name.substring(2);
-        } else {
-            return null;
-        }
-        // Introspector rules: URL → URL, Name → name.
-        return stem.length() > 1 && Character.isUpperCase(stem.charAt(1)) ? stem
-                : stem.substring(0, 1).toLowerCase(Locale.ROOT) + stem.substring(1);
+        return BeanProperties.nameOf(method);
     }
 
     /** An object shown as one value rather than read property by property. */
