@@ -50,6 +50,7 @@ one after; the benchmark of the cmdlets reads as the engine does.
 | `$_.name` and `$_.ratio` on a record (first and last of eight components): `PropertyAccess.property` | 28 and 35 ns | 23 and 25 ns |
 | the 8 columns of a record, as `to-csv` reads them | 283 ns (± 58) | 463 ns (± 140) |
 | a record as a map, as `to-json` reads it | 156 ns (± 46) | 292 ns (± 58) |
+| a getter, not a record component (`sort path.fileName` reads `Path.getFileName()` for each file): `PropertyAccess.property` | 1 148 ns (± 160) | 24 ns (± 3) |
 
 **What it costs.** About 20 ns more per column: the lookup of the name in the view of the record (to know that the column is
 there, for `to-csv` and `join`) and the read by the engine. The cmdlets read with `readProperty` and catch the failure, since
@@ -57,6 +58,10 @@ an `Attempt` for each column of each row (`tryReadProperty`) cost about as much 
 0.2 s more in `to-csv` and 0.14 s more in `to-json`; the writing of the text and of the file cost more than that. **Not
 optimised further.** The first thing to try, if it matters: a reader resolved once per class. The expressions (`$_.name`) got
 faster, by the same change. The error bars of the cmdlet benchmarks are wide (a shared machine): read the order of magnitude.
+
+**A getter** was not cached like a record component: the engine scanned the public methods of the class at each read (a
+`getMethods()` copy and a derived name for each), about a microsecond. The getters and the public fields of a class are now
+found in a table worked out once per class, as the components of a record are.
 
 ## The latencies of the specification
 

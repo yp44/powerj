@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -87,32 +88,55 @@ public final class Members {
     }
 
     /**
+     * The accessible getters of a class by the name of their property, and its accessible public fields by name, worked out once
+     * per class (and freed with it): {@code getMethods()} copies every public method at each call, and a command that reads a
+     * getter ({@code sort path.fileName}) reads it for each object, so scanning the methods at each read cost about a microsecond.
+     * The first getter found in {@link #accessibleTypes} wins, as the scan did.
+     */
+    private static final ClassValue<Map<String, Method>> GETTERS = new ClassValue<>() {
+        @Override
+        protected Map<String, Method> computeValue(Class<?> type) {
+            Map<String, Method> getters = new HashMap<>();
+            for (Class<?> t : accessibleTypes(type)) {
+                for (Method m : t.getMethods()) {
+                    String property = Modifier.isStatic(m.getModifiers()) || !isAccessible(m.getDeclaringClass()) ? null
+                            : BeanProperties.nameOf(m);
+                    if (property != null) {
+                        getters.putIfAbsent(property, m);
+                    }
+                }
+            }
+            return Map.copyOf(getters);
+        }
+    };
+
+    private static final ClassValue<Map<String, Field>> FIELDS = new ClassValue<>() {
+        @Override
+        protected Map<String, Field> computeValue(Class<?> type) {
+            Map<String, Field> fields = new HashMap<>();
+            for (Class<?> t : accessibleTypes(type)) {
+                for (Field f : t.getFields()) {
+                    if (!Modifier.isStatic(f.getModifiers())) {
+                        fields.putIfAbsent(f.getName(), f);
+                    }
+                }
+            }
+            return Map.copyOf(fields);
+        }
+    };
+
+    /**
      * Accessible getter of the property called {@code name}, <b>exactly</b>: the name of the property of a getter is the one that
      * {@link #ofType} lists, so {@code getName()} is {@code name} and not {@code Name}, {@code isDirectory()} (a {@code boolean}
      * or {@code Boolean}) is {@code directory}, and {@code getURL()} is {@code URL}.
      */
     public static Optional<Method> getter(Class<?> type, String name) {
-        for (Class<?> t : accessibleTypes(type)) {
-            for (Method m : t.getMethods()) {
-                if (!Modifier.isStatic(m.getModifiers()) && isAccessible(m.getDeclaringClass())
-                        && name.equals(BeanProperties.nameOf(m))) {
-                    return Optional.of(m);
-                }
-            }
-        }
-        return Optional.empty();
+        return Optional.ofNullable(GETTERS.get(type).get(name));
     }
 
     /** Public instance field called exactly {@code name} (the case matters), if the type is accessible. */
     public static Optional<Field> field(Class<?> type, String name) {
-        for (Class<?> t : accessibleTypes(type)) {
-            for (Field f : t.getFields()) {
-                if (f.getName().equals(name) && !Modifier.isStatic(f.getModifiers())) {
-                    return Optional.of(f);
-                }
-            }
-        }
-        return Optional.empty();
+        return Optional.ofNullable(FIELDS.get(type).get(name));
     }
 
     /** Methods of {@code Map} that a {@link io.powerj.api.Row} refuses (it is immutable): not listed. */

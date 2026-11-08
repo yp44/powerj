@@ -35,4 +35,23 @@ class PropertyReadCostTest {
 
         assertThat(length).isPositive();
     }
+
+    /**
+     * A getter is found in a table worked out once per class. Found by scanning the public methods (a {@code getMethods()} copy
+     * and a name for each) it cost about a microsecond: five million reads then take more than the budget.
+     */
+    @Test
+    void fiveMillionReadsOfAGetterTakeSeconds() {
+        Path path = Path.of("/home/user/a.txt");
+
+        long length = assertTimeoutPreemptively(Duration.ofSeconds(3), () -> {
+            long total = 0;
+            for (int read = 0; read < 5_000_000; read++) {
+                total += PropertyAccess.property(path, "fileName").toString().length();
+            }
+            return total;
+        });
+
+        assertThat(length).isPositive();
+    }
 }

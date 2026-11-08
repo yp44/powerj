@@ -641,6 +641,8 @@ structures, functions) can be built on it. The work is organised in phases (revi
   `jobs | kill`, `greet | to-json` and `greet | to-csv` on the packaged launcher, in fresh sessions (it fails on `main`), and
   `ArchitectureTest.onlyTheEngineReadsAnObjectByReflection` forbids `Method.invoke`, `Field.get`/`set` and `setAccessible` outside
   `io.powerj.core` (and the test context of `powerj-testing`).
+- **A getter is found in a table per class** (`Members.getter`, `Members.field`) instead of by a scan of the public methods at each
+  read: `$_.path.fileName` takes 24 ns instead of 1.1 µs, which `sort path.fileName` pays for each file.
 - **Cost:** the 8 columns of a record read by `to-csv` take 0.46 µs instead of 0.28 µs, a record turned into a map by `to-json` 0.29 µs
   instead of 0.16 µs; `$_.name` is faster (23 ns instead of 28, a hash table by exact name instead of a case-insensitive tree)
   ([docs/quality/performance.md](docs/quality/performance.md)).

@@ -35,6 +35,7 @@ public class PropertyReadBenchmark {
     }
 
     private final Item item = new Item("a.txt", 42, Instant.EPOCH, Path.of("a.txt"), false, "txt", 3, 0.5);
+    private final Path path = Path.of("/home/user/a.txt");
 
     @Benchmark
     public Object firstComponent() {
@@ -44,5 +45,11 @@ public class PropertyReadBenchmark {
     @Benchmark
     public Object lastComponent() {
         return PropertyAccess.property(item, "ratio");
+    }
+
+    /** A getter, not a record component: {@code sort path.fileName} reads {@code Path.getFileName()} for each file. */
+    @Benchmark
+    public Object getter() {
+        return PropertyAccess.property(path, "fileName");
     }
 }
