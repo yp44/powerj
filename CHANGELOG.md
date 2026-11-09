@@ -630,8 +630,8 @@ structures, functions) can be built on it. The work is organised in phases (revi
   as arguments to the cmdlets (`sort size`, `--property path`, `select name`, `grid --columns name,size`). `$_.Size` is an error
   that says what exists: `FileEntry has no property 'Size' (did you mean 'size'?)`. A getter is found by the name of its
   property, the one that the completion lists (`getName()` is `name` and not `Name`, `getURL()` is `URL`). The rule is written once, in `io.powerj.text.BeanProperties`, for the engine that reads
-  the property and for the grid that shows it as a column. The option names and their enumerated values stay
-  case-insensitive. Scripts that wrote another case have to change.
+  the property and for the grid that shows it as a column. Scripts that wrote another case have to change. The options, the
+  units and the other names follow the same rule: see the next entry.
 - **Breaking changes of the API** (before the first release): `CmdletContext.property(path)` is removed (it was
   `compile("$_." + path)`; the cmdlets read the names that a user types with `PropertyPath`, one name after the other through
   `readProperty`); `readProperty` is abstract, so an implementation of `CmdletContext` has to give it. `OutputFormatter` is given a
@@ -646,6 +646,27 @@ structures, functions) can be built on it. The work is organised in phases (revi
 - **Cost:** the 8 columns of a record read by `to-csv` take 0.46 µs instead of 0.28 µs, a record turned into a map by `to-json` 0.29 µs
   instead of 0.16 µs; `$_.name` is faster (23 ns instead of 28, a hash table by exact name instead of a case-insensitive tree)
   ([docs/quality/performance.md](docs/quality/performance.md)).
+
+### Changed (the whole shell is case-sensitive, as Java is, [#130](https://github.com/yp44/powerj/issues/130))
+- **What a user writes is compared exactly** ([ADR 0012](docs/adr/0012-the-shell-is-case-sensitive.md), FR-12): the name of an
+  option and its abbreviation (`--Property` and `--REC` are refused with `did you mean --property?`), the value of an enum option in
+  **lower case** (`perf --view stages`, as the help and the completion always showed; `--view STAGES` is refused), the booleans
+  (`true`, `yes`, `oui`, `1`; not `TRUE`), the units (`2mb`; `2MB` is an error that lists the units), the literals of `where`
+  (`where dir == true`), `--delimiter tab`, the constants of a Java enum (`RoundingMode.HALF_UP`, not `half_up`), and the values of the
+  settings (`POWERJ_LANG=fr`, `POWERJ_GLOB_IGNORE_CASE=true`, `POWERJ_BACKGROUND_SH_FALLBACK=true`, `POWERJ_NATIVE_ENCODING=auto`,
+  `true`/`false` in the consent of `config.properties`). The commands, the variables and the classes already were. Scripts that wrote
+  another case have to change; each refusal names the spelling that is expected.
+- **`ps` and `env` follow the system.** The name of a process, its user and the name of a variable of the environment ignore case on
+  Windows, where the system does, and are exact on Linux and macOS (`ps JAVA*` finds nothing there). `ps` used to ignore case everywhere.
+- **Four exceptions, all written down**: the rules of the system (files on Windows and macOS, the environment and the processes of
+  Windows), what the user asks for (`sort -i`, `grep -i`, `range -i`, `POWERJ_GLOB_IGNORE_CASE`, the filter box and the order of the texts
+  of the grid window), the digits of a hexadecimal fingerprint and the other rules of the JDK (a charset name, `Enable-Native-Access`), and
+  the `Y` that answers a question.
+- **Checked by `CaseSensitivityTest`** (module `powerj-architecture`): it fails when `equalsIgnoreCase`, `compareToIgnoreCase`,
+  `Pattern.CASE_INSENSITIVE`, `Pattern.UNICODE_CASE` or `regionMatches(true, …)` appears in a class of production that is not in its list
+  of exceptions, each with its reason, and when a class of the list no longer needs to be there.
+- **Breaking change of the API** (before the first release): `SizeUnits` reads lower-case units only; `Globs.ignoreCase` reads the values
+  `true`, `1`, `false`, `0` only.
 
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the

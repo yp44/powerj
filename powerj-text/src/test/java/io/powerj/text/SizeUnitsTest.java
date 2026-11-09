@@ -12,7 +12,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
- * The units of a size (#110): {@code b kb mb gb tb}, multiples of 1024, in any case. The language ({@code 2kb}) and the
+ * The units of a size (#110): {@code b kb mb gb tb}, multiples of 1024, in lower case (#130). The language ({@code 2kb}) and the
  * filter of a column of the grid ({@code >2kb}) read their numbers their own way and take their units from here; the same
  * table is checked in {@code core} ({@code UnitsTest}) and in {@code fx} ({@code FilterParserTest}).
  */

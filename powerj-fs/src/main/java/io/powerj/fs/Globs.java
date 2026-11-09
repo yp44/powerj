@@ -83,7 +83,7 @@ public final class Globs {
      * Value of {@link #IGNORE_CASE_VARIABLE} as a rule.
      *
      * @param value the value of the variable, {@code null} or blank if it is not set
-     * @return {@code true} for {@code true} or {@code 1} (any case), {@code false} for anything unset, {@code false} or
+     * @return {@code true} for {@code true} or {@code 1}, {@code false} for anything unset, {@code false} or
      *         {@code 0}
      * @throws IllegalArgumentException for any other value
      */

@@ -15,7 +15,8 @@ import io.powerj.fs.Host;
 
 /**
  * {@code ps}: the processes of the machine, sorted by pid (specification FR-74). Patterns keep the processes whose
- * name matches (wildcards, case ignored, {@code .exe} optional); {@code --user} those of a user.
+ * name matches (wildcards, in the case written, but without regard to case on Windows, where the system ignores it; {@code .exe}
+ * optional on Windows); {@code --user} those of a user.
  */
 @CmdletInfo(name = "ps", preview = true, category = "System", summary = "Lists the processes",
         examples = {"ps", "ps java", "ps java | sort cpu --desc | first 3", "ps -u alice | count",

@@ -14,7 +14,7 @@ As in the previous steps: **Actions** tab, latest run of the **CI** workflow, ar
 |---|---|---|
 | 1 | `cd ~` then `ls` | Table `name size modified dir` (the absolute path is the `path` property, not displayed: `(ls)*.path`): folders first, then files, in alphabetical order; human-readable sizes (`14.2 KB`; `14,2 KB` in French), local dates. |
 | 2 | `ls -a` | Hidden files appear as well. |
-| 3 | `ls -r --filter *.txt` (in a folder containing `.txt` files) | All `.txt` files in subfolders; the pattern ignores case (`*.TXT` too). |
+| 3 | `ls -r --filter *.txt` (in a folder containing `.txt` files) | All `.txt` files in subfolders; the pattern is case-sensitive (`*.TXT` finds the files whose extension is in capitals, FR-40; on Windows the system ignores case). |
 | 4 | `ls -d`, then `ls --files`, then `ls C:\Windows *.ini` | Folders only; files only; contents of `C:\Windows` followed by the `.ini` files of the current directory. |
 | 5 | `(ls)*.name` | Names only, one per line (`*.`: the property of each element). |
 | 6 | `$f = ls --files` then `$f[0].size`, `$f[-1].name`, `$f[0].path.parent`, `$f[0].ext` | Size in bytes, name of the last one, parent folder, extension without the dot. |

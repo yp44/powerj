@@ -43,7 +43,7 @@ Then `cd C:\tmp\g`.
 | 8 | `grep "<version>(?<v>[^<]+)" pom.xml \| map { m -> m.named.v }` | `1.2.3`. |
 | 9 | `grep "class (\\w+)" -r \| map { m -> m.groups[1] }` | `B` and `C` (`groups[0]` is the whole match `class B`). |
 | 10 | `$m = grep TODO a.txt` then `$m[0].line`, `$m[0].path`, `$m[0].matches` | `2`, the absolute path, a `start end` table with `0 4`. |
-| 11 | `grep -i todo src\*.JAVA` | `src\B.java` line 2 (wildcards, case-insensitive). |
+| 11 | `grep -i todo src\*.JAVA` | `src\B.java` line 2 (Windows: the wildcard matches `B.java` whatever the case, as the system does; on Linux and macOS write `src/*.java`). |
 | 12 | `grep TODO latin.txt` | Error `grep: cannot read C:\tmp\g\latin.txt: not readable as UTF-8 text (choose the charset with --encoding)`. |
 | 13 | `grep café latin.txt --encoding windows-1252` | The line `café TODO`. |
 | 13b | `grep TODO image.bin` (a binary file, e.g. any `.png` renamed) then `grep TODO image.bin --binary --encoding ISO-8859-1` | Nothing the first time (binary file skipped); the second time, the lines containing `TODO` are found. |
