@@ -97,6 +97,9 @@ What goes where:
   one.
 - **Requirements are traced.** Behavior comes from a requirement `FR-nn` of [the specification](docs/SPECIFICATION.md);
   cite it in the Javadoc of the class that implements it and in the test that checks it.
+- **Compare what a user writes exactly.** The shell is case-sensitive, as Java is ([ADR 0012](docs/adr/0012-the-shell-is-case-sensitive.md)):
+  no `equalsIgnoreCase`, `compareToIgnoreCase` or `Pattern.CASE_INSENSITIVE` for a name, a value or a unit. The few exceptions
+  (the system's own rules, an option that asks to ignore case) are in the list of `CaseSensitivityTest`, each with its reason.
 - **No new dependency without agreement.** The only runtime dependency is JLine; adding another is a decision to record
   in [docs/adr/](docs/adr/).
 - **Do not lower a gate to get a green build**: no `@Disabled` without a reason and a way back, no baseline raised, no

@@ -85,7 +85,7 @@ final class CsvWriter {
         if (option == null) {
             return ',';
         }
-        if (option.equalsIgnoreCase("tab") || option.equals("\\t")) {
+        if (option.equals("tab") || option.equals("\\t")) {
             return '\t';
         }
         if (option.length() != 1 || option.charAt(0) == '"' || option.charAt(0) == '\n' || option.charAt(0) == '\r') {

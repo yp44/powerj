@@ -82,5 +82,6 @@ Not retained:
   (`$_.name`) are faster: the lookup is by exact name in a hash table.
 - The unit tests of a cmdlet read with the test context, which does not prove the access between modules: the smoke test does,
   and the architecture rule keeps the reflection out of the cmdlets.
-- The option names of a cmdlet (`--Property`) and its enumerated values stay case-insensitive: they are not the name of an
-  attribute of an object (FR-18).
+- The option names of a cmdlet (`--Property`) and its enumerated values were first left case-insensitive, as not being the name of
+  an attribute of an object (FR-18). [0012](0012-the-shell-is-case-sensitive.md) decided otherwise: the case matters
+  for every name that a user writes.

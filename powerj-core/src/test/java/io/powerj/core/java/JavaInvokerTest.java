@@ -89,7 +89,7 @@ class JavaInvokerTest {
         assertThat(JavaInvoker.cost(Path.class, "x")).isEqualTo(7);
         assertThat(JavaInvoker.cost(File.class, "x")).isEqualTo(7);
         assertThat(JavaInvoker.cost(DayOfWeek.class, "MONDAY")).isEqualTo(7);
-        assertThat(JavaInvoker.cost(DayOfWeek.class, "monday")).isEqualTo(7);
+        assertThat(JavaInvoker.cost(DayOfWeek.class, "monday")).as("a constant is spelled as in Java").isEqualTo(NO_MATCH);
         assertThat(JavaInvoker.cost(DayOfWeek.class, "someday")).isEqualTo(NO_MATCH);
         assertThat(JavaInvoker.cost(Integer.class, "1")).isEqualTo(NO_MATCH);
         assertThat(JavaInvoker.cost(Runnable.class, BLOCK)).isEqualTo(6);
@@ -115,7 +115,8 @@ class JavaInvokerTest {
         assertThat(JavaInvoker.convert(char.class, "a")).isEqualTo('a');
         assertThat(JavaInvoker.convert(Path.class, "x")).isEqualTo(Path.of("x"));
         assertThat(JavaInvoker.convert(File.class, "x")).isEqualTo(new File("x"));
-        assertThat(JavaInvoker.convert(DayOfWeek.class, "monday")).isEqualTo(DayOfWeek.MONDAY);
+        assertThat(JavaInvoker.convert(DayOfWeek.class, "MONDAY")).isEqualTo(DayOfWeek.MONDAY);
+        assertThat(JavaInvoker.convert(DayOfWeek.class, "monday")).as("a constant is spelled as in Java").isNull();
         assertThat((int[]) JavaInvoker.convert(int[].class, List.of(1, 2L))).containsExactly(1, 2);
         assertThat(JavaInvoker.convert(Runnable.class, BLOCK)).isInstanceOf(Runnable.class);
         assertThatThrownBy(() -> JavaInvoker.convert(Thread.class, "x"))

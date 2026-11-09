@@ -3,6 +3,7 @@ package io.powerj.cmdlets;
 import java.io.File;
 import java.util.Map;
 
+import io.powerj.fs.Host;
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
@@ -81,6 +82,9 @@ public final class Env implements Cmdlet<Env.Params, Void, EnvVar>, Previewable<
 
     /** Name as stored ({@code Path} on Windows when {@code PATH} is requested). */
     private static String canonicalName(Map<String, String> env, String name) {
+        if (!Host.windows()) {
+            return name; // the names of the variables are case-sensitive, except on Windows
+        }
         return env.keySet().stream().filter(k -> k.equalsIgnoreCase(name)).findFirst().orElse(name);
     }
 

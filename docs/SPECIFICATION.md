@@ -239,6 +239,15 @@ Interpreter.java
 - taken from the equivalent Unix program when one exists (`ls`, `cat`, `ps`, `find`…);
 - otherwise a short word (`where`, `select`, `sort`) or a hyphenated compound word (`to-json`).
 
+**The case matters, as in Java.** PowerJ is a shell oriented to Java, and Java is case-sensitive: what a user writes is compared exactly. This holds for the name of a
+cmdlet or of a built-in command (`jobs`, not `Jobs`; a word that is neither is looked up as a program, and where the file system ignores case, on Windows and macOS, it may find one), of a variable (`$name`, not `$Name`), of a class, a method and a constant (`Math.max`, `RoundingMode.HALF_UP`),
+of a property (FR-28), of an option (FR-18) and of its value when it is an enum (FR-20), of a unit and of a literal (FR-19, `true`, `false`, `null`), and of the
+value of a setting (`POWERJ_LANG=fr`, `POWERJ_GLOB_IGNORE_CASE=true`). A name written in the wrong case is not understood, and the error gives the name to use
+when there is one (`did you mean 'size'?`). **Four things are not names, and keep their rule**: what the system decides (the names of files on Windows and macOS, of the variables of
+the environment and of the processes on Windows: PowerJ goes with the system); what the user asks for (`sort -i`, `grep -i`, `range -i`,
+`POWERJ_GLOB_IGNORE_CASE`, the search of the filter box and the order of the texts of the grid window); the digits of a hexadecimal fingerprint; the answer typed to a question
+(`Y` is a yes). The list of the exceptions is in `CaseSensitivityTest` and in ADR 0012.
+
 There is **no** long form (`pj-ls`, `Get-ChildItem`…).
 
 **FR-13 — Resolution order.** For the first word of a stage:
@@ -270,11 +279,11 @@ There is **no** long form (`pj-ls`, `Get-ChildItem`…).
 | Positional | `ls C:\temp` |
 | End of options | `ls -- -file-starting-with-a-dash` |
 
-Option names are case-insensitive; a long option can be abbreviated as long as it is not ambiguous (`--rec`).
+Option names are **case-sensitive** (`--recurse`; `--Recurse` is refused with `ls: unknown option --Recurse, did you mean --recurse?`); a long option can be abbreviated, in the same case, as long as it is not ambiguous (`--rec`).
 
-**FR-19 — Unit literals.** Sizes `512b 2kb 500mb 1gb` (multiples of 1024) and durations `30s 5m 2h 7d` are language literals, usable both as options and in expressions.
+**FR-19 — Unit literals.** Sizes `512b 2kb 500mb 1gb` (multiples of 1024) and durations `30s 5m 2h 7d` are language literals, usable both as options and in expressions. The units are written in lower case: `2MB` is no literal (`invalid number: 2MB (units: b kb mb gb tb, ms s m h d)`).
 
-**FR-20 — Conversion and validation.** Values are converted to the declared type of the parameter (`Path`, `int`, `long`, `Duration`, `Instant`, enum, `boolean`…). Missing mandatory option, unconvertible value or unknown option → explicit error before execution, with a suggestion (`ls: unknown option --recurce, did you mean --recurse?`).
+**FR-20 — Conversion and validation.** Values are converted to the declared type of the parameter (`Path`, `int`, `long`, `Duration`, `Instant`, enum, `boolean`…). Missing mandatory option, unconvertible value or unknown option → explicit error before execution, with a suggestion (`ls: unknown option --recurce, did you mean --recurse?`). The case matters: a `boolean` is `true` or `false` (`yes`, `no`, `oui`, `non`, `1`, `0` too), and an enum is its **lower-case name** (`perf --view stages`), as the help, the completion (FR-23) and the error message show it.
 
 ### 3.6 Completion (Tab)
 
@@ -284,7 +293,7 @@ Option names are case-insensitive; a long option can be abbreviated as long as i
 **FR-22 — Option completion.** After `-` or `--`, Tab offers the options of the current command with their description, **excluding those already typed**. Options are read from the cmdlet metadata: a third-party cmdlet is therefore completed without any extra code.
 - CA: `ls --<Tab>` offers `--all --filter --recurse`.
 
-**FR-23 — Value completion.** Depending on the parameter type: enum → constants; `Path` or positional text → file paths; `boolean` → nothing. A path containing a space is inserted between quotes with Java escapes. A cmdlet will be able to provide its own completion via `@Completion(MonCompleteur.class)` (after v1).
+**FR-23 — Value completion.** Depending on the parameter type: enum → constants, in lower case; `Path` or positional text → file paths; `boolean` → nothing. A path containing a space is inserted between quotes with Java escapes. A cmdlet will be able to provide its own completion via `@Completion(MonCompleteur.class)` (after v1).
 
 **FR-24 — Property and variable completion.** After `$` → defined variables. After `$_.` in a `{ }` block → components of the record produced by the previous stage (static output type of the upstream cmdlet). After `$var.` → components of the type of the value of `$var`.
 - CA: `ls | where { $_.<Tab>` offers `name size modified path dir ext`.
@@ -593,7 +602,7 @@ where { <expression> }
 where <attribute> <operator> <value>        # short form
 ```
 
-Evaluates the condition for each received object (lambda parameter, or `$_`) and lets through only those for which it is `true`. Works on records, scalars and therefore on **`String` lines produced by a native command**. The short form `where size > 1mb` is equivalent to `where { $_.size > 1mb }`. The `>` after the first word is a comparison, not a redirection, because `where` declares `@CmdletInfo(comparison = true)` (§4.1); the parser knows no command by name.
+Evaluates the condition for each received object (lambda parameter, or `$_`) and lets through only those for which it is `true`. Works on records, scalars and therefore on **`String` lines produced by a native command**. The short form `where size > 1mb` is equivalent to `where { $_.size > 1mb }`; the attribute, the literals (`true`, `false`, `null`) and the units are written as in the language, in the case that matters. The `>` after the first word is a comparison, not a redirection, because `where` declares `@CmdletInfo(comparison = true)` (§4.1); the parser knows no command by name.
 
 The condition must return a `boolean` (FR-33b); any other value, or an evaluation error, produces a non-blocking error and the object is skipped.
 
@@ -961,7 +970,7 @@ public record ProcessEntry(long pid, Long parent, String name, String command, S
 ```
 
 - **Filters**:
-  - `name` keeps the processes whose name matches one of the patterns: wildcards, case ignored, `.exe` optional on Windows (`ps notepad`);
+  - `name` keeps the processes whose name matches one of the patterns: wildcards, in the case written on Linux and macOS and without regard to case on Windows, where the system ignores it, `.exe` optional on Windows (`ps notepad`);
   - `-u` keeps those of a user.
 - **Unknown values**: information the system does not give is `null`. On Windows without administrator rights, this is the case for the command and the user of other users' processes.
 - **Limitations**: the memory and the state of a process are not available from the JDK.
@@ -1140,7 +1149,7 @@ accessible via `$last`; `$exit` is `$last.exitCode`; `$?` is `true` if the code 
 
 | Value | Effect |
 |---|---|
-| *(not set)* or `auto` | Default: output code page of the Windows console (e.g. `cp850` on a French Windows); UTF-8 on Linux/macOS. |
+| *(not set)* or `auto` (lower case) | Default: output code page of the Windows console (e.g. `cp850` on a French Windows); UTF-8 on Linux/macOS. |
 | a Java charset name (`UTF-8`, `cp850`, `windows-1252`…) | Used for all native commands. |
 
 A program-specific value can be given by **`POWERJ_NATIVE_ENCODING_<NAME>`**, where `<NAME>` is the executable name in uppercase, without extension: `POWERJ_NATIVE_ENCODING_GIT=UTF-8` (git produces UTF-8 whereas `ipconfig` uses the console code page). The variable is set in the Windows environment or in the session with `env --set` (FR-36b), and applies from the next command onward. An invalid charset name produces an explicit error when the command is launched. The native → native stream is never decoded (FR-37).
@@ -1156,7 +1165,7 @@ A program-specific value can be given by **`POWERJ_NATIVE_ENCODING_<NAME>`**, wh
   - The expansion is not contextual: the shell cannot know what a program does with an argument, as in every Unix shell (`^find . -name *.txt` needs the quotes). A word that starts with `-` is expanded like the others, and `--include=*.c` stays as it is because it matches no file.
   - **On Windows the program expands its own wildcards** (`cmd /c dir *.txt`, `findstr`): the words go through unchanged.
 - **Wildcards of the cmdlets.** A cmdlet expands the wildcards of its own path arguments (`ls *.txt`, `cat *.txt`, `grep x *.md`, `rm *.tmp`), **whatever the quoting**: `cat "*.txt"` expands too, because the cmdlet receives the text and not how it was written. For the same reason a `*` in the quoted piece of a compound word (`ls "a*b"/x`) is still a wildcard for the cmdlet; `ls "my docs"/*.txt` works, since the cmdlet receives the one argument `my docs/*.txt`. A wildcard that is not a path stays the cmdlet's own (`ps java*` matches process names, `ls --filter *.java` is a filter, `import java.util.*` a package).
-- **Case.** Wildcards are **case-sensitive**, for the cmdlets and for the native programs: `*.txt` does not match `NOTES.TXT`. The environment variable `POWERJ_GLOB_IGNORE_CASE` set to `true` or `1` makes them case-insensitive (`false` or `0`, or nothing, keeps the case); another value is an error, reported where a wildcard is expanded. It is read from the session environment at each use: `env --set POWERJ_GLOB_IGNORE_CASE=true` applies from the next command. `ps` always ignores case (FR-74). On Windows the matcher of the platform ignores case and the variable has no effect.
+- **Case.** Wildcards are **case-sensitive**, for the cmdlets and for the native programs: `*.txt` does not match `NOTES.TXT`. The environment variable `POWERJ_GLOB_IGNORE_CASE` set to `true` or `1` makes them case-insensitive (`false` or `0`, or nothing, keeps the case); another value is an error, reported where a wildcard is expanded. It is read from the session environment at each use: `env --set POWERJ_GLOB_IGNORE_CASE=true` applies from the next command. `ps` follows the system for the names of the processes (FR-74). On Windows the matcher of the platform ignores case and the variable has no effect.
 - CA: in a folder with `a.txt`, `b.txt`, `c.log` and `Notes.TXT`: `^echo *.txt` prints `a.txt b.txt`; `^echo "*.txt"` prints `*.txt`; `^echo *.zip` prints `*.zip`; `^echo *.TXT` prints `Notes.TXT`; `env --set POWERJ_GLOB_IGNORE_CASE=true` then `^echo *.txt` prints `a.txt b.txt Notes.TXT`. See `docs/acceptance/wildcards.md`.
 
 ### 3.11 Errors
@@ -1321,7 +1330,7 @@ Java code that writes to `System.out` / `System.err` (`System.out.println("x")`)
 
 ### 3.15 Language (internationalization)
 
-**FR-61 — Language.** PowerJ displays its messages (errors, warnings, help, completion descriptions, `which`, `mod-list`, number formatting) in **English** or **French**. Supported languages: `en` and `fr`; any other value, or any other system language, gives English.
+**FR-61 — Language.** PowerJ displays its messages (errors, warnings, help, completion descriptions, `which`, `mod-list`, number formatting) in **English** or **French**. Supported languages: `en` and `fr` (in lower case); any other value, or any other system language, gives English.
 
 The language is resolved once at startup, in this order (the first non-blank value wins):
 
@@ -1673,7 +1682,7 @@ User folder `~/.powerj/` (created on first launch):
 |---|---|
 | `history` | Command history (FR-09). |
 | `modules/` | Third-party module jars (§4.4). |
-| `config.properties` | `history.size=10000`, `language=en` (or `fr`, FR-61), `modules.nativeAccess.<module>=sha256:<fingerprint>` or `=false` (consent to load a module that uses native code, tied to its content, §4.4)… Java properties syntax (a backslash in a value is written twice); a file that cannot be read is reported on the standard error at startup and the default settings apply. |
+| `config.properties` | `history.size=10000`, `language=en` (or `fr`, FR-61), `modules.nativeAccess.<module>=sha256:<fingerprint>` or `=false` (consent to load a module that uses native code, tied to its content, §4.4; `true` and `false` are lower case, the digits of the fingerprint ignore case)… Java properties syntax (a backslash in a value is written twice); a file that cannot be read is reported on the standard error at startup and the default settings apply. |
 | `logs/` | Diagnostic log, in English (FR-60). |
 | `protected-paths` | Paths that `rm` and `mv` refuse to remove (FR-72): one per line, `~` for the home folder, `#` for comments; created at first launch with the defaults of the platform. |
 | `fx-grid.properties` | Position and size of the window of `grid` (`x`, `y`, `width`, `height`), written when the window is closed (FR-77). |
@@ -1891,6 +1900,7 @@ The backlog cmdlets (§12.3) are added **one per mini-iteration**, each with a s
 | 26 | Optional JavaFX module `powerj-fx`, `grid` (table, sort, filter, progressive loading, `--pass-thru`) | FR-77 | `docs/acceptance/fx-grid.md` |
 | 27 | `join` (inner and left outer join by key) | FR-78 | `docs/acceptance/join.md` |
 | 28 | Wildcards in the arguments of a native program, case rule of wildcards | FR-40 | `docs/acceptance/wildcards.md` |
+| 29 | The shell is case-sensitive: options, enum values, units, literals, settings, `ps`, `env` | FR-12, FR-18, FR-19, FR-20 | `docs/acceptance/case-sensitivity.md` |
 
 Version 2 will introduce scripting (`if`, `foreach`, functions, `.pj` files).
 

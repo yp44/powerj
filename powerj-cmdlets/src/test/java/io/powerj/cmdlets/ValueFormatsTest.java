@@ -70,7 +70,8 @@ class ValueFormatsTest {
     @Test
     void csvDelimiters() {
         assertThat(CsvWriter.delimiter("\\t")).isEqualTo('\t');
-        assertThat(CsvWriter.delimiter("TAB")).isEqualTo('\t');
+        assertThat(CsvWriter.delimiter("tab")).isEqualTo('\t');
+        assertThatThrownBy(() -> CsvWriter.delimiter("TAB")).as("the case matters").isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> CsvWriter.delimiter("\n")).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> CsvWriter.delimiter("\r")).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> CsvWriter.delimiter("")).isInstanceOf(IllegalArgumentException.class);

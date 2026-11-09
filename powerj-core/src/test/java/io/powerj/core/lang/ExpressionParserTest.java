@@ -153,7 +153,8 @@ class ExpressionParserTest {
         assertThat(Units.parse("2gb")).contains(2L * 1024 * 1024 * 1024);
         assertThat(Units.parse("30s")).contains(Duration.ofSeconds(30));
         assertThat(Units.parse("5m")).contains(Duration.ofMinutes(5));
-        assertThat(Units.parse("10KB")).contains(10_240L);
+        assertThat(Units.parse("10kb")).contains(10_240L);
+        assertThat(Units.parse("10KB")).as("the case of a unit matters").isEmpty();
         assertThat(Units.parse("10")).isEmpty();
         assertThat(Units.parse("abc")).isEmpty();
     }

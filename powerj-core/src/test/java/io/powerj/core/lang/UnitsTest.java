@@ -21,14 +21,16 @@ class UnitsTest {
             "mb, 1048576",
             "gb, 1073741824",
             "tb, 1099511627776",
-            "KB, 1024",
-            "Mb, 1048576",
-            "gB, 1073741824",
-            "TB, 1099511627776",
     })
     void aSizeLiteralIsInBytesAsALong(String unit, long bytes) {
         assertThat(Units.parse("1" + unit)).contains(bytes);
         assertThat(Units.parse("2" + unit)).contains(2 * bytes);
+    }
+
+    @ParameterizedTest(name = "1{0} is no literal: the case of a unit matters")
+    @ValueSource(strings = {"KB", "Mb", "gB", "TB", "B", "MS", "S", "M", "H", "D", "Ms"})
+    void aUnitInAnotherCaseIsNoLiteral(String unit) {
+        assertThat(Units.parse("1" + unit)).isEmpty();
     }
 
     @ParameterizedTest(name = "{0} is {1} bytes")

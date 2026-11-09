@@ -17,7 +17,7 @@ Open two Notepad windows (`notepad`, twice). On Linux or macOS, run `sleep 600` 
 | # | Action | Expected result |
 |---|---|---|
 | 1 | `ps \| first 5` | Table `pid name user cpu start`, sorted by pid; system processes may have empty `name` and `user` (not readable without administrator rights). |
-| 2 | `ps notepad`, then `ps NOTEPAD.EXE`, then `ps note*` | The two Notepad processes each time (case ignored, `.exe` optional). |
+| 2 | `ps notepad`, then `ps NOTEPAD.EXE`, then `ps note*` | Windows: the two Notepad processes each time (case ignored as the system does, `.exe` optional). On Linux and macOS the names are exact (`ps JAVA*` finds nothing, `ps java*` the Java processes). |
 | 3 | `ps -u <your user name> \| count` | The number of your processes. |
 | 4 | `ps java* \| where { $_.pid == ProcessHandle.current().pid() }` | PowerJ itself. |
 | 5 | `ps notepad \| map { $_.commandLine }` | The command line of each Notepad. |

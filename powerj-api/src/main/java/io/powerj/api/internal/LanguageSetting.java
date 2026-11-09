@@ -50,6 +50,6 @@ public final class LanguageSetting {
     }
 
     private static Locale normalize(String language) {
-        return language != null && language.toLowerCase(Locale.ROOT).startsWith("fr") ? Locale.FRENCH : Locale.ENGLISH;
+        return language != null && language.startsWith("fr") ? Locale.FRENCH : Locale.ENGLISH;
     }
 }

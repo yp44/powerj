@@ -441,12 +441,7 @@ public final class JavaInvoker {
                 return constant;
             }
         }
-        for (Object constant : type.getEnumConstants()) {
-            if (((Enum) constant).name().equalsIgnoreCase(name)) {
-                return constant;
-            }
-        }
-        return null;
+        return null; // the name of a constant is spelled as in Java
     }
 
     public static Class<?> box(Class<?> type) {
