@@ -179,12 +179,11 @@ public final class OptionBinder {
 
     private static OptionSpec byLongName(String command, List<OptionSpec> specs, String name) {
         for (OptionSpec spec : specs) {
-            if (spec.longName().equalsIgnoreCase(name)) {
+            if (spec.longName().equals(name)) { // the case of a name matters, as in Java
                 return spec;
             }
         }
-        List<OptionSpec> prefixed = specs.stream()
-                .filter(s -> s.longName().toLowerCase(Locale.ROOT).startsWith(name.toLowerCase(Locale.ROOT))).toList();
+        List<OptionSpec> prefixed = specs.stream().filter(s -> s.longName().startsWith(name)).toList();
         if (prefixed.size() == 1 && !name.isEmpty()) {
             return prefixed.getFirst();
         }
@@ -207,7 +206,7 @@ public final class OptionBinder {
         throw new PjException(Messages.get("option.unknown.short", command, letter));
     }
 
-    /** Closest name (edit distance ≤ 2). */
+    /** Closest name (edit distance ≤ 2), the case apart: it is a hint for a name written in the wrong case, not a match. */
     static Optional<String> closest(String name, List<String> candidates) {
         String best = null;
         int bestDistance = 3;
@@ -241,7 +240,7 @@ public final class OptionBinder {
     }
 
     private static boolean parseBoolean(String command, OptionSpec spec, String text) {
-        return switch (text.toLowerCase(Locale.ROOT)) {
+        return switch (text) {
             case "true", "oui", "yes", "1" -> true;
             case "false", "non", "no", "0" -> false;
             default -> throw new PjException(Messages.get("option.booleanExpected", command, spec.longName(), text));
@@ -314,8 +313,9 @@ public final class OptionBinder {
                 return parseBoolean(command, spec, text);
             }
             if (type.isEnum()) {
+                // The value of an enumerated option is spelled in lower case (as completion and help show it), exactly.
                 for (Object constant : type.getEnumConstants()) {
-                    if (((Enum<?>) constant).name().equalsIgnoreCase(text)) {
+                    if (((Enum<?>) constant).name().toLowerCase(Locale.ROOT).equals(text)) {
                         return constant;
                     }
                 }

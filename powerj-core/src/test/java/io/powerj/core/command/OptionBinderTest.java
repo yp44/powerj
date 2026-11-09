@@ -44,7 +44,6 @@ class OptionBinderTest {
         Params grouped = bind("-ra");
         assertThat(grouped.all()).isTrue();
         assertThat(grouped.recurse()).isTrue();
-        assertThat(bind("--RECURSE").recurse()).isTrue();
         assertThat(bind("--recurse=false").recurse()).isFalse();
     }
 
@@ -64,6 +63,29 @@ class OptionBinderTest {
         assertThat(p.mode()).isEqualTo(Mode.SAFE);
         assertThat(p.output()).isEqualTo(Path.of("out.txt"));
         assertThat(bind("--max-depth", 7).maxDepth()).isEqualTo(7);
+    }
+
+    @Test
+    void theCaseOfAnOptionNameMatters() {
+        assertThatThrownBy(() -> bind("--RECURSE")).hasMessage("t: unknown option --RECURSE, did you mean --recurse?");
+        assertThatThrownBy(() -> bind("--Recurse")).hasMessageContaining("did you mean --recurse");
+        assertThatThrownBy(() -> bind("--REC")).as("an abbreviation is exact too").hasMessageContaining("unknown option --REC");
+        assertThatThrownBy(() -> bind("-R")).as("a short name is exact").hasMessage("t: unknown option -R");
+    }
+
+    @Test
+    void theValueOfAnEnumeratedOptionIsSpelledInLowerCase() {
+        assertThat(bind("--mode", "fast").mode()).isEqualTo(Mode.FAST);
+        assertThatThrownBy(() -> bind("--mode", "FAST")).hasMessageContaining("--mode accepts [fast, safe], not 'FAST'");
+        assertThatThrownBy(() -> bind("--mode", "Safe")).hasMessageContaining("not 'Safe'");
+    }
+
+    @Test
+    void aBooleanValueIsSpelledInLowerCase() {
+        assertThat(bind("--recurse=true").recurse()).isTrue();
+        assertThat(bind("--recurse=yes").recurse()).isTrue();
+        assertThatThrownBy(() -> bind("--recurse=TRUE")).hasMessageContaining("expects true or false, not 'TRUE'");
+        assertThatThrownBy(() -> bind("--recurse=No")).hasMessageContaining("not 'No'");
     }
 
     @Test
