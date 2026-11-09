@@ -121,7 +121,7 @@ public final class BackgroundLauncher {
 
     /** {@code true} if the environment of the session allows the {@code sh} fallback ({@value #SH_FALLBACK_VARIABLE}). */
     public static boolean shFallbackAllowed(Map<String, String> environment) {
-        return "true".equalsIgnoreCase(environment.get(SH_FALLBACK_VARIABLE));
+        return "true".equals(environment.get(SH_FALLBACK_VARIABLE));
     }
 
     /**

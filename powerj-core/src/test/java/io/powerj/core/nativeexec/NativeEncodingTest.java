@@ -26,6 +26,14 @@ class NativeEncodingTest {
     }
 
     @Test
+    void theValueAutoIsSpelledInLowerCase() {
+        // AUTO is no keyword: it is taken for the name of a charset, which does not exist, and the message says so
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                () -> frenchConsole.forProgram(GIT, Map.of("POWERJ_NATIVE_ENCODING", "AUTO")))
+                .isInstanceOf(io.powerj.core.error.PjException.class).hasMessageContaining("AUTO");
+    }
+
+    @Test
     void globalThenProgramSpecificVariable() {
         assertThat(frenchConsole.forProgram(GIT, Map.of("POWERJ_NATIVE_ENCODING", "windows-1252")))
                 .isEqualTo(Charset.forName("windows-1252"));

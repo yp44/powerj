@@ -81,9 +81,14 @@ class PsKillTest {
     @Test
     void psFiltersByNameAndUser() {
         String user = ProcessHandle.current().info().user().orElse(null);
-        assertThat(run(new Ps(), new Ps.Params(List.of("no-such-process", "JAV?"), user)))
+        assertThat(run(new Ps(), new Ps.Params(List.of("no-such-process", "jav?"), user)))
                 .extracting(ProcessEntry::pid).contains(self());
         context.emitted.clear();
+        if (!Host.windows()) { // the names of the processes ignore case only where the system does
+            assertThat(run(new Ps(), new Ps.Params(List.of("JAV?"), null))).extracting(ProcessEntry::pid)
+                    .doesNotContain(self());
+            context.emitted.clear();
+        }
         assertThat(run(new Ps(), new Ps.Params(List.of("no-such-process*"), null))).isEmpty();
         assertThat(context.errors).isEmpty();
     }
@@ -97,9 +102,13 @@ class PsKillTest {
         assertThat(Ps.matches("javaw.exe", List.of(Globs.matcher("java*", true)))).isTrue();
         assertThat(Ps.matches(null, java)).isFalse();
         assertThat(Ps.matches(null, List.of())).isTrue();
-        assertThat(Ps.ofUser("DESKTOP\\Alice", "alice")).isTrue();
-        assertThat(Ps.ofUser("desktop\\alice", "DESKTOP\\ALICE")).isTrue();
         assertThat(Ps.ofUser("bob", "alice")).isFalse();
+        assertThat(Ps.ofUser("alice", "alice")).isTrue();
+        assertThat(Ps.ofUser("Alice", "alice")).isEqualTo(Host.windows()); // the users of Linux and macOS are case-sensitive
+        if (Host.windows()) {
+            assertThat(Ps.ofUser("DESKTOP\\Alice", "alice")).isTrue();
+            assertThat(Ps.ofUser("desktop\\alice", "DESKTOP\\ALICE")).isTrue();
+        }
         assertThat(Ps.ofUser(null, "alice")).isFalse();
         assertThat(ProcessEntry.name("C:\\Windows\\notepad.exe")).isEqualTo("notepad.exe");
         assertThat(ProcessEntry.name("/usr/bin/java")).isEqualTo("java");

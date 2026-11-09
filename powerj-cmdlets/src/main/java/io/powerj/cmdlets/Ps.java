@@ -11,6 +11,7 @@ import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
 import io.powerj.fs.Globs;
+import io.powerj.fs.Host;
 
 /**
  * {@code ps}: the processes of the machine, sorted by pid (specification FR-74). Patterns keep the processes whose
@@ -33,7 +34,7 @@ public final class Ps implements Cmdlet<Ps.Params, Object, ProcessEntry> {
     @Override
     public void begin(Params p, CmdletContext<ProcessEntry> context) {
         List<PathMatcher> matchers = p.names() == null ? List.of()
-                : p.names().stream().map(name -> Globs.matcher(name, true)).toList();
+                : p.names().stream().map(name -> Globs.matcher(name, Host.windows())).toList(); // the names of the processes ignore case where the system does
         long[] pids = ProcessHandle.allProcesses().mapToLong(ProcessHandle::pid).sorted().toArray();
         for (long pid : pids) {
             var process = ProcessHandle.of(pid);
@@ -72,6 +73,9 @@ public final class Ps implements Cmdlet<Ps.Params, Object, ProcessEntry> {
         }
         if (owner == null) {
             return false;
+        }
+        if (!Host.windows()) {
+            return owner.equals(user); // the names of the users of Linux and macOS are case-sensitive
         }
         return owner.equalsIgnoreCase(user) || owner.substring(owner.lastIndexOf('\\') + 1).equalsIgnoreCase(user);
     }

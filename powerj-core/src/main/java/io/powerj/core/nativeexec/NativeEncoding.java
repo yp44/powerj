@@ -38,7 +38,7 @@ public final class NativeEncoding {
             value = environment.get(VARIABLE);
             source = VARIABLE;
         }
-        if (value == null || value.isBlank() || value.strip().equalsIgnoreCase("auto")) {
+        if (value == null || value.isBlank() || value.strip().equals("auto")) {
             return automatic();
         }
         try {

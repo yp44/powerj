@@ -192,6 +192,9 @@ class BackgroundJobsTest {
         assertThat(NativeRunner.refusal(false).getMessage()).contains("only Windows, Linux and macOS are supported")
                 .contains(BackgroundLauncher.SH_FALLBACK_VARIABLE).doesNotContain("posix_spawn");
         assertThat(BackgroundLauncher.supportedSystem()).isTrue(); // the systems of the CI
+        assertThat(BackgroundLauncher.shFallbackAllowed(Map.of(BackgroundLauncher.SH_FALLBACK_VARIABLE, "true"))).isTrue();
+        assertThat(BackgroundLauncher.shFallbackAllowed(Map.of(BackgroundLauncher.SH_FALLBACK_VARIABLE, "TRUE")))
+                .as("the case of the value matters").isFalse();
     }
 
     @Test

@@ -99,10 +99,24 @@ class NativeAccessConsentTest {
 
     @Test
     void aRecordedNoIsNotAskedAgainWhateverTheContent() throws IOException {
-        Files.writeString(file(), "modules.nativeAccess.io.powerj.fx = FALSE \n");
+        Files.writeString(file(), "modules.nativeAccess.io.powerj.fx = false \n");
         assertThat(ask(consent(Optional.of(true)), "io.powerj.fx")).contains(false);
         assertThat(asked).isEmpty();
         assertThat(notices).isEmpty();
+    }
+
+    @Test
+    void aNoInAnotherCaseIsNotUnderstoodAndTheQuestionIsAsked() throws IOException {
+        Files.writeString(file(), "modules.nativeAccess.io.powerj.fx = FALSE \n");
+        assertThat(ask(consent(Optional.of(true)), "io.powerj.fx")).contains(true);
+        assertThat(asked).containsExactly("io.powerj.fx");
+    }
+
+    @Test
+    void theCaseOfTheDigitsOfAFingerprintIsNoSpelling() throws IOException {
+        Files.writeString(file(), "modules.nativeAccess.io.powerj.fx = sha256:" + FINGERPRINT.toUpperCase() + "\n");
+        assertThat(ask(consent(Optional.empty()), "io.powerj.fx")).contains(true);
+        assertThat(asked).isEmpty();
     }
 
     @Test

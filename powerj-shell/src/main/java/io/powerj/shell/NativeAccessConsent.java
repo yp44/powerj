@@ -55,10 +55,10 @@ final class NativeAccessConsent implements NativeAccessPolicy {
             if (value.equals("false")) {
                 return Optional.of(false);
             }
-            if (value.equals(allowed)) {
+            if (value.equalsIgnoreCase(allowed)) { // a digest is hexadecimal: the case of its digits is no spelling
                 return Optional.of(true);
             }
-            if (value.equals("true") || DIGEST.matcher(value).matches()) {
+            if (value.equals("true") || DIGEST.matcher(value.toLowerCase(Locale.ROOT)).matches()) {
                 // A yes that does not hold: given before the answer was tied to the content, or for another version.
                 notice.accept(Messages.get("nativeAccess.stale", module));
             }
@@ -71,10 +71,10 @@ final class NativeAccessConsent implements NativeAccessPolicy {
         return answer;
     }
 
-    /** What the file says for {@code setting}, stripped and in lower case. */
+    /** What the file says for {@code setting}, stripped, as it is written: {@code true} and {@code false} are lower case. */
     private Optional<String> recorded(String setting) {
         try {
-            return config.get(setting).map(value -> value.strip().toLowerCase(Locale.ROOT));
+            return config.get(setting).map(String::strip);
         } catch (IOException e) {
             LOG.log(Level.WARNING, "Cannot read " + config.path(), e);
             return Optional.empty();
@@ -91,7 +91,10 @@ final class NativeAccessConsent implements NativeAccessPolicy {
         }
     }
 
-    /** {@code true} for {@code y}, {@code yes}, {@code o}, {@code oui} (any case); everything else, empty included, is no. */
+    /**
+     * {@code true} for {@code y}, {@code yes}, {@code o}, {@code oui} (any case); everything else, empty included, is no. The answer to a
+     * question is not a name: {@code Y} is a yes, since a refused {@code Y} would be recorded as a no for good.
+     */
     static boolean isYes(String answer) {
         return answer != null && YES.contains(answer.strip().toLowerCase(Locale.ROOT));
     }

@@ -37,9 +37,10 @@ class LanguageTest {
 
     @Test
     void valuesAreNormalizedToEnglishOrFrench() {
-        for (String french : new String[] {"fr", "fr_FR", "FR", " fr "}) {
+        for (String french : new String[] {"fr", "fr_FR", " fr "}) {
             assertThat(LanguageSetting.resolve(french, null, null, Locale.ENGLISH)).as(french).isEqualTo(Locale.FRENCH);
         }
+        assertThat(LanguageSetting.resolve("FR", null, null, Locale.FRENCH)).as("the case of a language matters").isEqualTo(Locale.ENGLISH);
         assertThat(LanguageSetting.resolve("de", null, null, Locale.FRENCH)).isEqualTo(Locale.ENGLISH);
         assertThat(LanguageSetting.resolve(null, null, null, null)).isEqualTo(Locale.ENGLISH);
         assertThat(LanguageSetting.resolve(null, null, null, Locale.GERMAN)).isEqualTo(Locale.ENGLISH);

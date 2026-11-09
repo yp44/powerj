@@ -68,7 +68,7 @@ class GlobsTest {
     void theVariableThatIgnoresCaseIsTrueOr1() {
         assertThat(Globs.IGNORE_CASE_VARIABLE).isEqualTo("POWERJ_GLOB_IGNORE_CASE");
         assertThat(Globs.ignoreCase("true")).isTrue();
-        assertThat(Globs.ignoreCase("TRUE")).isTrue();
+        assertThatThrownBy(() -> Globs.ignoreCase("TRUE")).as("the case matters").isInstanceOf(IllegalArgumentException.class);
         assertThat(Globs.ignoreCase(" 1 ")).isTrue();
         assertThat(Globs.ignoreCase("false")).isFalse();
         assertThat(Globs.ignoreCase("0")).isFalse();

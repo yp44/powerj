@@ -91,7 +91,7 @@ public final class Globs {
         if (value == null || value.isBlank()) {
             return false;
         }
-        return switch (value.strip().toLowerCase(Locale.ROOT)) {
+        return switch (value.strip()) {
             case "true", "1" -> true;
             case "false", "0" -> false;
             default -> throw new IllegalArgumentException(value);
