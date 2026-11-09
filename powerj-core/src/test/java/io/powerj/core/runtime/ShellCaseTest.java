@@ -2,6 +2,7 @@ package io.powerj.core.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import io.powerj.core.command.CmdletRegistry;
+import io.powerj.fs.Host;
 
 /**
  * The shell is case-sensitive, as Java is (#130): a name that is written in another case is another name. The built-in commands,
@@ -60,6 +62,8 @@ class ShellCaseTest {
     void aBuiltInCommandIsCalledByItsExactName() throws Exception {
         run("jobs");
         assertThat(errors).isEmpty();
+        assumeFalse(Host.namesIgnoreCase(), "a word that is no built-in is looked up as a program, and where the file system ignores "
+                + "case Jobs finds one (/usr/bin/jobs on macOS): the rule of the system, ADR 0012");
         run("Jobs");
         assertThat(errors).as("Jobs is not jobs: it is taken for a program").isNotEmpty();
     }
@@ -89,6 +93,8 @@ class ShellCaseTest {
     void theLiteralsAreWrittenInLowerCase() throws Exception {
         assertThat(run("true")).isEqualTo("true");
         assertThat(run("null == null")).isEqualTo("true");
+        assumeFalse(Host.namesIgnoreCase(), "TRUE alone is a word, looked up as a program: where the file system ignores case it "
+                + "finds true (/usr/bin/true, true.exe), the rule of the system (the parser's own rule is in ExpressionParserTest)");
         run("TRUE");
         assertThat(errors).as("TRUE is not true").isNotEmpty();
     }
