@@ -1,15 +1,23 @@
 package io.powerj.cmdlets;
 
-import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CancellationException;
 
+import io.powerj.api.CmdletContext;
+import io.powerj.text.RecordView;
+
 /**
- * Named values of an object, for {@code to-json} and {@code to-csv} (specification FR-73): the components of a
- * record, the entries of a map ({@code Row} included), or a single column {@code value} for anything else.
+ * Named values of an object, for {@code to-json}, {@code to-csv} and {@code join} (specification FR-73): the components of
+ * a record, the entries of a map ({@code Row} included), or a single column {@code value} for anything else.
+ * <p>
+ * The <b>names</b> come from {@link RecordView}, which needs no access to the record. The <b>values</b> are read by the
+ * context ({@link CmdletContext#readProperty}), never by reflection here: a module can read by reflection only the
+ * records of packages that are exported or opened to it, and an object comes from any module (the core, one loaded by
+ * {@code mod-load}); the engine alone can read them all (#130).
  */
 final class Properties {
 
@@ -30,19 +38,22 @@ final class Properties {
         }
     }
 
-    private Properties() {
+    private final CmdletContext<?> context;
+
+    /** The reader of one execution: the context of the cmdlet that asks. */
+    Properties(CmdletContext<?> context) {
+        this.context = Objects.requireNonNull(context, "context");
     }
 
     /**
      * Components of a record, in declaration order.
      *
-     * @throws IllegalStateException if a component cannot be read
+     * @throws Unreadable if a component cannot be read
      */
-    static Map<String, Object> of(Record record) {
-        RecordShape shape = RecordShape.of(record.getClass());
+    Map<String, Object> of(Record record) {
         Map<String, Object> values = new LinkedHashMap<>();
-        for (int i = 0; i < shape.names().size(); i++) {
-            values.put(shape.names().get(i), read(record, shape, i));
+        for (String name : RecordView.of(record.getClass()).names()) {
+            values.put(name, read(record, name));
         }
         return values;
     }
@@ -51,7 +62,7 @@ final class Properties {
     static List<String> columns(Object value) {
         List<String> columns = new ArrayList<>();
         switch (value) {
-            case Record record -> columns.addAll(RecordShape.of(record.getClass()).names());
+            case Record record -> columns.addAll(RecordView.of(record.getClass()).names());
             case Map<?, ?> map -> map.keySet().forEach(key -> columns.add(String.valueOf(key)));
             case null, default -> columns.add(VALUE);
         }
@@ -63,12 +74,10 @@ final class Properties {
      *
      * @throws Unreadable if a record component cannot be read
      */
-    static Object get(Object value, String column) {
+    Object get(Object value, String column) {
         switch (value) {
             case Record record -> {
-                RecordShape shape = RecordShape.of(record.getClass());
-                int index = shape.indexOf(column);
-                return index < 0 ? null : read(record, shape, index);
+                return RecordView.of(record.getClass()).indexOf(column) < 0 ? null : read(record, column);
             }
             case Map<?, ?> map -> {
                 if (map.containsKey(column)) {
@@ -87,17 +96,20 @@ final class Properties {
         }
     }
 
-    private static Object read(Record record, RecordShape shape, int index) {
-        String name = shape.names().get(index);
+    /**
+     * A component read by the context; an interruption passes through, anything else makes the object unreadable. It reads with
+     * {@code readProperty}: this is the hot path of {@code to-csv} and {@code to-json}, which would allocate an {@code Attempt}
+     * for each column of each row with {@code tryReadProperty}.
+     */
+    private Object read(Record record, String name) {
         try {
-            return shape.accessor(index).invoke(record);
-        } catch (InvocationTargetException e) {
-            if (e.getCause() instanceof CancellationException cancelled) {
-                throw cancelled; // an accessor that was interrupted: the command is being stopped
-            }
-            throw new Unreadable(Messages.get("properties.read.failed", name, e.getCause()), e.getCause());
-        } catch (IllegalAccessException e) {
-            throw new Unreadable(Messages.get("properties.read.failed", name, e), e);
+            return context.readProperty(record, name);
+        } catch (CancellationException e) {
+            throw e;
+        } catch (RuntimeException error) {
+            String message = error.getMessage() != null ? error.getMessage()
+                    : Messages.get("properties.read.failed", name, error);
+            throw new Unreadable(message, error);
         }
     }
 }

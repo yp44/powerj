@@ -9,14 +9,15 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import io.powerj.text.BeanProperties;
 import io.powerj.core.i18n.Messages;
 
 /**
@@ -86,36 +87,56 @@ public final class Members {
                 && type.getModule().isExported(type.getPackageName(), Members.class.getModule());
     }
 
-    /** Accessible getter {@code getNom()} / {@code isNom()} for the property {@code name}. */
+    /**
+     * The accessible getters of a class by the name of their property, and its accessible public fields by name, worked out once
+     * per class (and freed with it): {@code getMethods()} copies every public method at each call, and a command that reads a
+     * getter ({@code sort path.fileName}) reads it for each object, so scanning the methods at each read cost about a microsecond.
+     * The first getter found in {@link #accessibleTypes} wins, as the scan did.
+     */
+    private static final ClassValue<Map<String, Method>> GETTERS = new ClassValue<>() {
+        @Override
+        protected Map<String, Method> computeValue(Class<?> type) {
+            Map<String, Method> getters = new HashMap<>();
+            for (Class<?> t : accessibleTypes(type)) {
+                for (Method m : t.getMethods()) {
+                    String property = Modifier.isStatic(m.getModifiers()) || !isAccessible(m.getDeclaringClass()) ? null
+                            : BeanProperties.nameOf(m);
+                    if (property != null) {
+                        getters.putIfAbsent(property, m);
+                    }
+                }
+            }
+            return Map.copyOf(getters);
+        }
+    };
+
+    private static final ClassValue<Map<String, Field>> FIELDS = new ClassValue<>() {
+        @Override
+        protected Map<String, Field> computeValue(Class<?> type) {
+            Map<String, Field> fields = new HashMap<>();
+            for (Class<?> t : accessibleTypes(type)) {
+                for (Field f : t.getFields()) {
+                    if (!Modifier.isStatic(f.getModifiers())) {
+                        fields.putIfAbsent(f.getName(), f);
+                    }
+                }
+            }
+            return Map.copyOf(fields);
+        }
+    };
+
+    /**
+     * Accessible getter of the property called {@code name}, <b>exactly</b>: the name of the property of a getter is the one that
+     * {@link #ofType} lists, so {@code getName()} is {@code name} and not {@code Name}, {@code isDirectory()} (a {@code boolean}
+     * or {@code Boolean}) is {@code directory}, and {@code getURL()} is {@code URL}.
+     */
     public static Optional<Method> getter(Class<?> type, String name) {
-        for (Class<?> t : accessibleTypes(type)) {
-            for (Method m : t.getMethods()) {
-                if (m.getParameterCount() == 0 && !Modifier.isStatic(m.getModifiers())
-                        && isAccessible(m.getDeclaringClass()) && isGetterFor(m, name)) {
-                    return Optional.of(m);
-                }
-            }
-        }
-        return Optional.empty();
+        return Optional.ofNullable(GETTERS.get(type).get(name));
     }
 
-    private static boolean isGetterFor(Method method, String name) {
-        String m = method.getName();
-        return m.equalsIgnoreCase("get" + name)
-                || (m.equalsIgnoreCase("is" + name)
-                    && (method.getReturnType() == boolean.class || method.getReturnType() == Boolean.class));
-    }
-
-    /** Public instance field, if the type is accessible. */
+    /** Public instance field called exactly {@code name} (the case matters), if the type is accessible. */
     public static Optional<Field> field(Class<?> type, String name) {
-        for (Class<?> t : accessibleTypes(type)) {
-            for (Field f : t.getFields()) {
-                if (f.getName().equalsIgnoreCase(name) && !Modifier.isStatic(f.getModifiers())) {
-                    return Optional.of(f);
-                }
-            }
-        }
-        return Optional.empty();
+        return Optional.ofNullable(FIELDS.get(type).get(name));
     }
 
     /** Methods of {@code Map} that a {@link io.powerj.api.Row} refuses (it is immutable): not listed. */
@@ -142,7 +163,7 @@ public final class Members {
         Map<String, Member> properties = new LinkedHashMap<>();
         if (type.isRecord()) {
             for (RecordComponent c : type.getRecordComponents()) {
-                properties.put(c.getName().toLowerCase(Locale.ROOT),
+                properties.put(c.getName(),
                         new Member(c.getName(), Kind.PROPERTY, simple(c.getGenericType().getTypeName())));
             }
         }
@@ -155,9 +176,9 @@ public final class Members {
                         || m.getName().equals("equals") || m.getName().equals("hashCode")) {
                     continue;
                 }
-                String property = propertyName(m);
+                String property = BeanProperties.nameOf(m);
                 if (property != null) {
-                    properties.putIfAbsent(property.toLowerCase(Locale.ROOT),
+                    properties.putIfAbsent(property,
                             new Member(property, Kind.PROPERTY, simple(m.getGenericReturnType().getTypeName())));
                 }
                 String signature = m.getName() + "(" + String.join(", ",
@@ -168,7 +189,7 @@ public final class Members {
             }
             for (Field f : t.getFields()) {
                 if (!Modifier.isStatic(f.getModifiers())) {
-                    properties.putIfAbsent(f.getName().toLowerCase(Locale.ROOT),
+                    properties.putIfAbsent(f.getName(),
                             new Member(f.getName(), Kind.FIELD, simple(f.getGenericType().getTypeName())));
                 }
             }
@@ -177,22 +198,6 @@ public final class Members {
         methods.sort(Comparator.comparing(Member::name));
         all.addAll(methods);
         return all;
-    }
-
-    /** {@code getParent} → {@code parent}, {@code isDirectory} → {@code directory}. */
-    private static String propertyName(Method m) {
-        if (m.getParameterCount() != 0 || m.getReturnType() == void.class) {
-            return null;
-        }
-        String name = m.getName();
-        String rest = name.startsWith("get") && name.length() > 3 ? name.substring(3)
-                : name.startsWith("is") && name.length() > 2
-                        && (m.getReturnType() == boolean.class || m.getReturnType() == Boolean.class) ? name.substring(2)
-                : null;
-        if (rest == null || !Character.isUpperCase(rest.charAt(0))) {
-            return null;
-        }
-        return Character.toLowerCase(rest.charAt(0)) + rest.substring(1);
     }
 
     private static String simple(String typeName) {

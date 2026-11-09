@@ -1,7 +1,6 @@
 package io.powerj.core.format;
 
 import java.io.PrintWriter;
-import java.lang.reflect.Method;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
@@ -18,6 +17,7 @@ import io.powerj.api.Display;
 import io.powerj.api.Highlight;
 import io.powerj.api.Language;
 import io.powerj.api.Span;
+import io.powerj.core.error.PjException;
 import io.powerj.core.i18n.Messages;
 import io.powerj.text.Formats;
 import io.powerj.text.RecordView;
@@ -52,10 +52,10 @@ public final class OutputFormatter implements AutoCloseable {
      *
      * @param reader    reads the value of the column in a record or a {@link io.powerj.api.Row}
      * @param type      declared type of the values (right alignment of numbers)
-     * @param highlight accessor of the {@code List<Span>} component of a {@link Highlight} column, or {@code null}
+     * @param highlight name of the {@code List<Span>} component of a {@link Highlight} column, or {@code null}
      */
     private record Column(String name, Function<Object, Object> reader, Class<?> type, boolean bytes,
-                          Method highlight) { }
+                          String highlight) { }
 
     /** Row of a table: the text of the cells and, for each one, the parts to highlight ({@code null}: none). */
     private record Row(String[] cells, List<List<Span>> highlights) {
@@ -75,19 +75,39 @@ public final class OutputFormatter implements AutoCloseable {
     private int[] widths;
     private boolean[] rightAligned;
 
-    /** @param width terminal width in characters (0 or less: 120) */
-    public OutputFormatter(PrintWriter out, int width) {
-        this(out, width, false);
+    /**
+     * How the value of a component of a record is read: the engine's one way to read a property
+     * ({@code PropertyAccess.property}), given by the caller. The formatter does not reflect on a record itself (#130): reading
+     * is allowed to the engine alone, and a {@code Method} made accessible here would be accessible for every module that
+     * holds it. It is not a dependency of this package on the one that reads, which depends on this one.
+     */
+    @FunctionalInterface
+    public interface ComponentReader {
+
+        /** The value of the component called {@code name} (the case matters) of {@code record}. */
+        Object read(Record record, String name);
+    }
+
+    private final ComponentReader reader;
+
+    /**
+     * @param width  terminal width in characters (0 or less: 120)
+     * @param reader reads the components of the records shown
+     */
+    public OutputFormatter(PrintWriter out, int width, ComponentReader reader) {
+        this(out, width, false, reader);
     }
 
     /**
      * @param width  terminal width in characters (0 or less: 120)
      * @param colors {@code true} if the output accepts ANSI colors
+     * @param reader reads the components of the records shown
      */
-    public OutputFormatter(PrintWriter out, int width, boolean colors) {
+    public OutputFormatter(PrintWriter out, int width, boolean colors, ComponentReader reader) {
         this.out = out;
         this.width = width > 0 ? width : 120;
         this.colors = colors;
+        this.reader = reader;
     }
 
     public void accept(Object value) {
@@ -298,35 +318,34 @@ public final class OutputFormatter implements AutoCloseable {
     }
 
     /** Table columns for this type, or {@code null} if it is displayed as a list. */
-    private static List<Column> tableColumns(Class<?> type) {
+    private List<Column> tableColumns(Class<?> type) {
         RecordView view = RecordView.of(type);
         List<RecordView.Component> chosen = view.displayed();
         if (view.declaresDisplay()) {
-            return chosen.isEmpty() ? null : chosen.stream().map(OutputFormatter::column).toList();
+            return chosen.isEmpty() ? null : chosen.stream().map(this::column).toList();
         }
         List<RecordView.Component> all = view.components();
         if (all.isEmpty() || all.size() > MAX_TABLE_COLUMNS) {
             return null;
         }
-        return all.stream().map(OutputFormatter::column).toList();
+        return all.stream().map(this::column).toList();
     }
 
-    /** The column of a component; its value is read with an accessor that this module made accessible. */
-    private static Column column(RecordView.Component component) {
-        Method accessor = component.recordComponent().getAccessor();
-        accessor.trySetAccessible();
-        Method highlight = null;
-        if (component.highlight() != null) {
-            highlight = component.highlight().getAccessor();
-        }
-        return new Column(component.name(), value -> read(accessor, (Record) value), accessor.getReturnType(),
+    /**
+     * The column of a component. The structure comes from {@link RecordView}; the value is read by the
+     * {@link ComponentReader}, as every command reads a property (#130).
+     */
+    private Column column(RecordView.Component component) {
+        String name = component.name();
+        String highlight = component.highlight() == null ? null : component.highlight().getName();
+        return new Column(name, value -> read((Record) value, name), component.recordComponent().getType(),
                 component.bytes(), highlight);
     }
 
     /** Parts to highlight in the text of {@code value}, or {@code null} if none (or no colors). */
-    private List<Span> highlights(Object value, Method highlight, Record record) {
+    private List<Span> highlights(Object value, String highlight, Record record) {
         if (!colors || highlight == null || !(value instanceof CharSequence)
-                || !(read(highlight, record) instanceof List<?> spans) || spans.isEmpty()) {
+                || !(read(record, highlight) instanceof List<?> spans) || spans.isEmpty()) {
             return null;
         }
         return spans.stream().filter(Span.class::isInstance).map(Span.class::cast).toList();
@@ -351,11 +370,15 @@ public final class OutputFormatter implements AutoCloseable {
         return result.append(text, position, text.length()).toString();
     }
 
-    private static Object read(Method accessor, Record record) {
+    /**
+     * The value of a component, or {@code ?} if it cannot be read: the reader reports that with a {@link PjException}. An
+     * interruption is not an unreadable value, and neither is a defect of the reader (a {@code ClassCastException}, a
+     * {@code NullPointerException}): it goes up instead of showing as a table of question marks.
+     */
+    private Object read(Record record, String name) {
         try {
-            accessor.trySetAccessible();
-            return accessor.invoke(record);
-        } catch (ReflectiveOperationException e) {
+            return reader.read(record, name);
+        } catch (PjException e) {
             return "?";
         }
     }

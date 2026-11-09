@@ -18,7 +18,8 @@ import io.powerj.core.java.PropertyAccess;
 
 /**
  * What {@code $_.size} costs for each object that flows through {@code where { $_.size > 1mb }} (review C-26): the read of
- * a record component by {@link PropertyAccess#property}.
+ * a record component by {@link PropertyAccess#property}, which every command uses through
+ * {@code CmdletContext.readProperty} (the case of the name matters, #130).
  */
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
@@ -34,6 +35,7 @@ public class PropertyReadBenchmark {
     }
 
     private final Item item = new Item("a.txt", 42, Instant.EPOCH, Path.of("a.txt"), false, "txt", 3, 0.5);
+    private final Path path = Path.of("/home/user/a.txt");
 
     @Benchmark
     public Object firstComponent() {
@@ -43,5 +45,11 @@ public class PropertyReadBenchmark {
     @Benchmark
     public Object lastComponent() {
         return PropertyAccess.property(item, "ratio");
+    }
+
+    /** A getter, not a record component: {@code sort path.fileName} reads {@code Path.getFileName()} for each file. */
+    @Benchmark
+    public Object getter() {
+        return PropertyAccess.property(path, "fileName");
     }
 }

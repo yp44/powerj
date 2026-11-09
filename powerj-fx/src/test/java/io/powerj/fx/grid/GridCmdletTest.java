@@ -12,7 +12,6 @@ import org.junit.jupiter.api.Test;
 import io.powerj.fx.Threads;
 
 import io.powerj.api.CmdletInfo;
-import io.powerj.api.ScriptBlock;
 import io.powerj.fx.model.ColumnKind;
 import io.powerj.fx.model.ColumnSpec;
 import io.powerj.fx.model.GridRow;
@@ -64,29 +63,13 @@ class GridCmdletTest {
     private static final GridParams NO_OPTIONS = new GridParams(null);
 
     /**
-     * A context as the shell gives one to a cmdlet placed after a {@code |}: there is input, and {@code $_.name} is read
-     * by reflection, which is what the shell does for a property.
+     * A context as the shell gives one to a cmdlet placed after a {@code |}: there is input, and a property is read by
+     * reflection, which is what the engine does for {@code CmdletContext.readProperty}.
      */
     private static TestContext<Object> piped() {
         var context = new TestContext<Object>();
         context.hasInput = true;
-        context.compiler = expression -> {
-            if (!expression.startsWith("$_.")) {
-                throw new IllegalArgumentException(expression);
-            }
-            String name = expression.substring(3);
-            return new ScriptBlock() {
-                @Override
-                public Object invoke(Object current) {
-                    return Reflect.read(current, name);
-                }
-
-                @Override
-                public String source() {
-                    return expression;
-                }
-            };
-        };
+        context.reader = Reflect::read;
         return context;
     }
 
@@ -355,9 +338,9 @@ class GridCmdletTest {
     @Test
     void aColumnAskedForThatNeverArrivedIsReportedAtTheEnd() throws Exception {
         TestContext<Object> context = piped();
-        CmdletDriver.run(new GridCmdlet(new RecordingOpener()), params(null, "name,Nothing,AGE,other", false), context,
+        CmdletDriver.run(new GridCmdlet(new RecordingOpener()), params(null, "name,Nothing,age,AGE,other", false), context,
                 new Person("Ada", 36));
-        assertThat(context.errors).containsExactly("no such column: Nothing, other");
+        assertThat(context.errors).as("the case of a column matters").containsExactly("no such column: Nothing, AGE, other");
     }
 
     @Test
@@ -564,6 +547,22 @@ class GridCmdletTest {
     }
 
     // --- errors, usage ---
+
+    @Test
+    void thePropertiesAreReadByTheContextAndNotByTheGrid() throws Exception {
+        TestContext<Object> context = piped();
+        List<String> asked = new ArrayList<>();
+        context.reader = (target, name) -> {
+            asked.add(name);
+            return "read:" + name;
+        };
+        RecordingOpener opener = new RecordingOpener();
+
+        CmdletDriver.run(new GridCmdlet(opener), NO_OPTIONS, context, new Person("Ada", 36));
+
+        assertThat(asked).contains("name");
+        assertThat(opener.show().rows().get(0).get("name")).isEqualTo("read:name");
+    }
 
     @Test
     void aPropertyThatCannotBeReadIsReportedOncePerColumn() throws Exception {

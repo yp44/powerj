@@ -5,9 +5,12 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
 
 import io.powerj.api.Row;
 import io.powerj.core.error.PjError;
@@ -18,8 +21,11 @@ import io.powerj.core.lang.Accessor;
 /**
  * {@code .property} and {@code [index]} access on a value (specification FR-28). A property is resolved in
  * this order: record component, getter {@code getNom()}/{@code isNom()}, public field, {@code Map} key.
+ * <b>The case of the name matters</b>, everywhere: {@code size} is not {@code Size}. A getter is found by the name of its
+ * property, the one that the completion lists: {@code getName()} is {@code name}, {@code getURL()} is {@code URL}.
  * The property always applies to the object itself: for each element of a list, write
- * {@code list*.name}.
+ * {@code list*.name}. It is also how a command reads the properties of the objects it receives
+ * ({@code CmdletContext.readProperty}): the engine alone reflects on a record.
  */
 public final class PropertyAccess {
 
@@ -37,6 +43,14 @@ public final class PropertyAccess {
         return current;
     }
 
+    /**
+     * The value of the property called {@code name}: a record component, a getter, a public field, a key of a {@code Map}.
+     * {@code name} is one literal name ({@code first name} or {@code a.b} are keys, not paths), and the case matters. An
+     * interrupted getter ends the command, it is not an error of the object.
+     *
+     * @throws PjException if the object has no such property (the message says which ones it has, or the same name in another
+     *                     case) or if reading it fails
+     */
     public static Object property(Object target, String name) {
         if (target == null) {
             throw new PjException(Messages.get("property.onNull", name));
@@ -49,6 +63,10 @@ public final class PropertyAccess {
             return direct.value();
         }
         List<String> hints = new ArrayList<>();
+        String otherCase = sameNameInAnotherCase(target, name);
+        if (otherCase != null) {
+            hints.add(Messages.get("property.hint.case", otherCase));
+        }
         if (target instanceof Collection<?> || target.getClass().isArray()) {
             hints.add(Messages.get("property.hint.each", name));
         }
@@ -83,6 +101,29 @@ public final class PropertyAccess {
         } catch (RuntimeException e) {
             return null;
         }
+    }
+
+    /**
+     * The properties of a class by their name in lower case, for the hint of a name written in another case. Worked out once per
+     * class (and freed with it): a command that skips the objects it cannot read asks for it once per object.
+     */
+    private static final ClassValue<Map<String, String>> PROPERTIES_BY_LOWER_CASE = new ClassValue<>() {
+        @Override
+        protected Map<String, String> computeValue(Class<?> type) {
+            Map<String, String> byLowerCase = new HashMap<>();
+            for (Members.Member member : Members.ofType(type)) {
+                if (member.kind() != Members.Kind.METHOD) {
+                    byLowerCase.putIfAbsent(member.name().toLowerCase(Locale.ROOT), member.name());
+                }
+            }
+            return Map.copyOf(byLowerCase);
+        }
+    };
+
+    /** The property of {@code target} that {@code name} spells in another case, or {@code null}: {@code Size} for {@code size}. */
+    private static String sameNameInAnotherCase(Object target, String name) {
+        String known = PROPERTIES_BY_LOWER_CASE.get(target.getClass()).get(name.toLowerCase(Locale.ROOT));
+        return known != null && !known.equals(name) ? known : null;
     }
 
     private static boolean plainMap(Map<?, ?> map) {
@@ -127,6 +168,9 @@ public final class PropertyAccess {
             }
         } catch (InvocationTargetException e) {
             Throwable cause = e.getCause();
+            if (cause instanceof CancellationException cancelled) {
+                throw cancelled; // a getter that was interrupted: the command is being stopped, not unreadable
+            }
             throw new PjException(PjError.of(Messages.get("property.readFailed", name, cause), cause));
         } catch (ReflectiveOperationException e) {
             throw new PjException(PjError.of(Messages.get("property.readImpossible", name, e), e));

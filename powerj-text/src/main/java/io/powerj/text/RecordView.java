@@ -17,7 +17,9 @@ import io.powerj.api.Highlight;
  * <p>
  * It holds <b>structure, not accessors</b>. Reading the value of a component needs an accessor made accessible, and that
  * is allowed or not to the module that asks: a record of a third-party module is opened to {@code io.powerj.core} only,
- * so each module keeps the accessors it can read ({@link RecordComponent#getAccessor()} on the component given here).
+ * so the value of a component is read by the engine ({@code CmdletContext.readProperty}, ADR 0011), never from here. Do not
+ * make {@link RecordComponent#getAccessor()} accessible either: it is the same {@code Method} for every caller, so the flag set
+ * by one module would be set for all.
  */
 public final class RecordView {
 

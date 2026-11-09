@@ -24,6 +24,7 @@ import io.powerj.core.error.PjException;
 import io.powerj.core.format.Values;
 import io.powerj.core.i18n.Messages;
 import io.powerj.core.java.PreviewGuard;
+import io.powerj.core.java.PropertyAccess;
 
 /** Runs a cmdlet: option binding, common option {@code --on-error} (FR-42), context. */
 public final class CmdletRunner {
@@ -206,6 +207,12 @@ public final class CmdletRunner {
         @Override
         public ScriptBlock compile(String expression) {
             return compiler.apply(expression);
+        }
+
+        /** The one way to read a property: here, in the engine, which alone can read the records of every module. */
+        @Override
+        public Object readProperty(Object target, String name) {
+            return PropertyAccess.property(target, name);
         }
 
         @Override

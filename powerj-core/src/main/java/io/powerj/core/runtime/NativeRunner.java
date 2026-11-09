@@ -24,7 +24,8 @@ import java.util.function.Consumer;
 import io.powerj.core.error.PjError;
 import io.powerj.core.error.PjException;
 import io.powerj.core.format.OutputFormatter;
-import io.powerj.core.i18n.Messages;
+import io.powerj.core.i18n.Messages;import io.powerj.core.java.PropertyAccess;
+
 import io.powerj.core.nativeexec.BackgroundLauncher;
 import io.powerj.core.nativeexec.ExecutableKind;
 import io.powerj.core.nativeexec.NativeEncoding;
@@ -450,7 +451,7 @@ public final class NativeRunner {
     private static void writeObjects(Source input, Process process, Charset charset, ShellIo io) {
         var writer = new PrintWriter(new BufferedWriter(
                 new OutputStreamWriter(process.getOutputStream(), charset)));
-        var formatter = new OutputFormatter(writer, io.width().getAsInt());
+        var formatter = new OutputFormatter(writer, io.width().getAsInt(), PropertyAccess::property);
         boolean complete = false;
         try {
             Object value;

@@ -130,7 +130,7 @@ streams. There is no dependency-injection framework (see ADR 0007).
 |---|---|---|
 | A cmdlet or a set of cmdlets | implement `CmdletProvider`, `provides … with …` in `module-info`, or a jar in `~/.powerj/modules` | `powerj-api`, loaded by `ModuleLoader` into its own `ModuleLayer` |
 | What a cmdlet can do beyond `begin/process/end` | implement a capability interface: `Previewable`, `ColumnProvider`, `AutoCloseable` state | `powerj-api` |
-| What a cmdlet can ask of the shell | `context.service(PerfReports.class)`, `context.property("a.b")`, `context.setEnvironment(…)` | `CmdletContext` |
+| What a cmdlet can ask of the shell | `context.service(PerfReports.class)`, `context.readProperty(object, "name")`, `context.setEnvironment(…)` | `CmdletContext` |
 | A profiler | a `Profiler` service of `powerj-core` (JFR is the one provided) | `core.perf` |
 
 `ApiSurfaceTest` fails when the public surface changes without its snapshot being regenerated. Nothing is published yet, so
@@ -172,6 +172,7 @@ options, the window opener). What touches the toolkit is behind ports (`FxPlatfo
 | load a third-party module | `core.command.ModuleLoader`, `NativeAccessPolicy`, `shell.NativeAccessConsent` |
 | start-up and options | `shell.ShellBootstrap` |
 | make background commands work on another system | section 11; `core.nativeexec.BackgroundLauncher`, `PosixSpawn`, `WindowsSpawn` |
+| read a property of an object, in a cmdlet or in the terminal | `CmdletContext.readProperty` (API), `core.java.PropertyAccess.property`; only the engine reflects on a record ([ADR 0011](adr/0011-every-command-reads-the-properties-of-an-object-through-the-engine.md)) |
 
 ## 11. Background jobs: which systems, and how to add one
 

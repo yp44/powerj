@@ -201,9 +201,11 @@ Found on the way:
    The launcher (`PosixJobs` today) now starts every stage first and only then starts the `waitpid` threads (`PosixSpawn.reap`: a zombie keeps its group).
    Covered by `BackgroundJobsTest.redirectionsAndPipelinesWork` and `PosixJobsTest`.
 2. **A defect of `main`, unrelated to the experiment**: in the packaged shell `jobs | kill` fails with `kill: not a process: Job[...]`
-   until `jobs` has been displayed once (with the variable unset too); `kill $last.pid` works. `Kill.pidOf` returns `null` for a `Job`,
-   probably because `io.powerj.core.runtime` is exported to `io.powerj.shell` only and `RecordShape` of the cmdlets module cannot read the
-   record until another path has cached its shape. Filed as [#130](https://github.com/yp44/powerj/issues/130); not fixed here.
+   until `jobs` has been displayed once (with the variable unset too); `kill $last.pid` works. `Kill.pidOf` returns `null` for a `Job`:
+   `io.powerj.core.runtime` is exported to `io.powerj.shell` only, so the cmdlets module cannot read the record by reflection, unless the
+   display of the core has made the same `Method` accessible (`RecordView` hands one `Method` to every module). The defect is wider
+   (`jobs | to-json`, `greet | to-json`). Filed as [#130](https://github.com/yp44/powerj/issues/130), not fixed by this change; fixed
+   by making every command read through the engine ([ADR 0011](../adr/0011-every-command-reads-the-properties-of-an-object-through-the-engine.md)).
 3. `kill` on a pipeline job stops its last process only (the pid of the job); the other stages stay. True of the `sh` path too. A job being
    a process group, the whole job could be stopped (`kill(-pgid)`) in Phase 4.
 4. In the real shell `sort` and `cat` are cmdlets: a pipeline with `&` needs `^sort` (the acceptance row 7 of the existing checklist

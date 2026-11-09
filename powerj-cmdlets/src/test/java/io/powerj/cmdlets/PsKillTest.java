@@ -155,6 +155,29 @@ class PsKillTest {
         assertThat(context.errors).singleElement().asString().startsWith("not a process: ");
     }
 
+    /** A record that this module could not read by reflection: it is the core's, as the job of {@code jobs} (#130). */
+    @Test
+    void theNumberOfARecordIsReadByTheContextAndNotByTheCmdlet() throws Exception {
+        Process sleeper = sleeper();
+        context.reader = (target, name) -> name.equals("pid") ? (Object) sleeper.pid() : "?";
+
+        run(new Kill(), new Kill.Params(List.of(), false, true, false, false), new WithPid(1, 123_456_789L));
+
+        assertThat(alive(sleeper)).as("the pid is the one the context answered, not the one in the record").isFalse();
+        assertThat(context.errors).isEmpty();
+    }
+
+    @Test
+    void aRecordWhoseNumberCannotBeReadIsNotAProcess() {
+        context.reader = (target, name) -> {
+            throw new IllegalStateException("cannot read " + name);
+        };
+
+        run(new Kill(), new Kill.Params(List.of(), false, false, false, false), new WithPid(1, 5L));
+
+        assertThat(context.errors).singleElement().asString().startsWith("not a process: ");
+    }
+
     @Test
     void dryRunStopsNothing() throws Exception {
         Process sleeper = sleeper();

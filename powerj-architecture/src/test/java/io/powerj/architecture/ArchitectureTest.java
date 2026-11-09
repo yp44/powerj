@@ -189,6 +189,33 @@ class ArchitectureTest {
                 .should().dependOnClassesThat().resideInAPackage("io.powerj.cmdlets.."));
     }
 
+    /**
+     * [#130] Only the engine reads an object by reflection. A module can read by reflection only the records of packages that
+     * are exported or opened to it, and an object comes from any module (the core, one loaded by {@code mod-load}): the engine
+     * alone is granted them all. Every other command reads through {@code CmdletContext.readProperty}, so that a built-in
+     * cmdlet reads what a third-party cmdlet produced and the other way round. The test context of {@code powerj-testing}
+     * stands in for the engine in the tests of a cmdlet. Making a {@code Method} accessible is as forbidden as calling it:
+     * the flag is shared by every module that holds the same {@code Method}. The other ways to reflect (a constructor, a method
+     * handle taken from a record, a private lookup) have the same problem and are forbidden too.
+     */
+    @Test
+    void onlyTheEngineReadsAnObjectByReflection() {
+        check(noClasses().that().resideOutsideOfPackages("io.powerj.core..", "io.powerj.testing..")
+                .should().callMethodWhere(target(owner(assignableTo(java.lang.reflect.Method.class)))
+                        .and(target(nameMatching("invoke"))))
+                .orShould().callMethodWhere(target(owner(assignableTo(java.lang.reflect.AccessibleObject.class)))
+                        .and(target(nameMatching("setAccessible|trySetAccessible"))))
+                .orShould().callMethodWhere(target(owner(assignableTo(java.lang.reflect.Field.class)))
+                        .and(target(nameMatching("get|set"))))
+                .orShould().callMethodWhere(target(owner(assignableTo(java.lang.reflect.Constructor.class)))
+                        .and(target(nameMatching("newInstance"))))
+                .orShould().callMethodWhere(target(owner(assignableTo(java.lang.invoke.MethodHandles.class)))
+                        .and(target(nameMatching("privateLookupIn"))))
+                .orShould().callMethodWhere(target(owner(assignableTo(java.lang.invoke.MethodHandles.Lookup.class)))
+                        .and(target(nameMatching("unreflect.*|findVirtual|findGetter|findVarHandle|unreflectVarHandle"))))
+                .because("the engine reads for every command (CmdletContext.readProperty), a module cannot read the records of the others"));
+    }
+
     /** [C-10, C-13] No global mutable state: a static field is final. */
     @Test
     void staticFieldsAreFinal() {

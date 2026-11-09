@@ -101,13 +101,41 @@ public interface CmdletContext<O> {
     ScriptBlock compile(String expression);
 
     /**
-     * The block that reads a property of the received object, or a path of properties: {@code property("size")} is
-     * {@code { $_.size }} and {@code property("path.fileName")} is {@code { $_.path.fileName }}.
+     * The value of the property {@code name} of {@code target}: the way to read an attribute of an object that comes from
+     * another module. Every command reads the properties of the objects it receives through this method, whichever
+     * module the command or the object comes from: the engine reads for them, because the module system gives it alone the
+     * access to the records of every module.
+     * <p>
+     * It finds what {@code $_.name} finds for {@code $_ = target}, in the same order: a record component, a getter
+     * {@code getName()} / {@code isName()}, a public field, a key of a {@link java.util.Map} (a {@link Row} included),
+     * with the same guard rails in preview mode. {@code name} is <b>one literal name</b>, never an expression or a path (a
+     * key {@code "first name"} or {@code "a.b"} is read as it is), and <b>the case of the name matters</b>: {@code size} is
+     * not {@code Size}. A getter is found by the name of its property, as for a JavaBean: {@code name} reads {@code getName()}
+     * and {@code URL} reads {@code getURL()}. A path such as {@code owner.name}, typed by a user, is read one name after the
+     * other.
      *
-     * @throws IllegalArgumentException if {@code path} is not a property name or a path of them
+     * @param target the object to read, not {@code null}
+     * @param name   the name of the property, for example {@code "pid"}
+     * @return the value, possibly {@code null}
+     * @throws RuntimeException if the object has no such property or if reading it fails; the message tells the user
+     *                          what is missing, and the name in another case if there is one.
+     *                          {@link java.util.concurrent.CancellationException} is never wrapped.
      */
-    default ScriptBlock property(String path) {
-        return compile("$_." + path);
+    Object readProperty(Object target, String name);
+
+    /**
+     * {@link #readProperty} that returns a failure as a value instead of throwing it, as {@link ScriptBlock#tryInvoke}
+     * does: for a command that skips the objects it cannot read and goes on. {@link java.util.concurrent.CancellationException}
+     * is still thrown, so that Ctrl+C is never taken for an unreadable object.
+     */
+    default Attempt<Object> tryReadProperty(Object target, String name) {
+        try {
+            return Attempt.succeeded(readProperty(target, name));
+        } catch (java.util.concurrent.CancellationException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            return Attempt.failed(e);
+        }
     }
 
     /**

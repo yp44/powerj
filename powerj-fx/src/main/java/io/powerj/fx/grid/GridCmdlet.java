@@ -1,16 +1,12 @@
 package io.powerj.fx.grid;
 
-import java.util.Locale;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
-import io.powerj.api.ScriptBlock;
 import io.powerj.api.UsageException;
 import io.powerj.fx.Messages;
 import io.powerj.fx.model.ColumnChoice;
@@ -123,7 +119,7 @@ public final class GridCmdlet implements Cmdlet<GridParams, Object, Object> {
             return;
         }
         Reading reading = execution.reader.read(input);
-        reading.columns().forEach(column -> execution.seenColumns.add(column.name().toLowerCase(Locale.ROOT)));
+        reading.columns().forEach(column -> execution.seenColumns.add(column.name()));
         // One report per column: a property that fails fails for every object.
         reading.errors().forEach((column, reason) -> {
             if (execution.reported.add(column)) {
@@ -182,13 +178,14 @@ public final class GridCmdlet implements Cmdlet<GridParams, Object, Object> {
     }
 
     /**
-     * Reads the properties the way the shell does ({@code $_.name}): it works for any object, including the records of
-     * other third-party modules, whose packages are open to PowerJ only.
+     * Reads the properties through the context ({@link CmdletContext#readProperty}), as every command does: the engine reads
+     * for it, so it works for any object, including the records of other modules, whose packages are open to the engine
+     * only. The name is one literal name, the case of which matters: a column called {@code first name} or {@code a.b} is a
+     * key, not a path.
      */
     private static final class ScriptReader implements PropertyReader {
 
         private final CmdletContext<?> context;
-        private final Map<String, ScriptBlock> blocks = new HashMap<>();
 
         ScriptReader(CmdletContext<?> context) {
             this.context = context;
@@ -196,7 +193,7 @@ public final class GridCmdlet implements Cmdlet<GridParams, Object, Object> {
 
         @Override
         public Object read(Object target, String name) {
-            return blocks.computeIfAbsent(name, n -> context.property(n)).invoke(target);
+            return context.readProperty(target, name);
         }
     }
 }

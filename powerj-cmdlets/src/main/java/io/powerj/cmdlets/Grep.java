@@ -147,19 +147,12 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
             charset = FileArguments.charset(params.encoding(), "grep.encoding.unknown");
             detectBinary = !params.binary()
                     && !charset.name().startsWith("UTF-16") && !charset.name().startsWith("UTF-32");
-            property = params.property() == null ? null : property(params.property(), context);
+            property = params.property() == null ? null : PropertyPath.of(params.property(), context);
             singleMatch = params.singleMatch();
             int maxDepth = params.maxDepth() != null ? params.maxDepth()
                     : params.recurse() ? Integer.MAX_VALUE : 1;
             walker = FileWalker.builder().maxDepth(maxDepth).includeHidden(params.all()).order(FileArguments.BY_NAME)
                     .parallelism(parallelism).build();
-        }
-
-        private static ScriptBlock property(String name, CmdletContext<?> context) {
-            if (!Texts.isPropertyPath(name)) {
-                throw new UsageException(Messages.get("where.property.invalid", name));
-            }
-            return context.property(name);
         }
 
         /** Searches the files below the roots; the lines of a file are emitted together, in order. */

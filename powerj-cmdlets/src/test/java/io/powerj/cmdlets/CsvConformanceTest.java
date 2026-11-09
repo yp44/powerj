@@ -2,6 +2,8 @@ package io.powerj.cmdlets;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.powerj.testing.TestContext;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -13,6 +15,8 @@ import org.junit.jupiter.api.Test;
  * is read back as the same records, for records made at random from a fixed seed.
  */
 class CsvConformanceTest {
+
+    private static final Properties PROPERTIES = new Properties(new TestContext<>());
 
     /** The records of the text, given as the pieces the reader receives (each one ends with a line break). */
     private static List<List<String>> read(char delimiter, String... pieces) {
@@ -121,7 +125,7 @@ class CsvConformanceTest {
     void whatIsWrittenIsReadBackAsTheSameRecords() {
         var random = new Random(4180L);
         for (char delimiter : new char[] {',', ';', '\t'}) {
-            var writer = new CsvWriter(delimiter);
+            var writer = new CsvWriter(delimiter, PROPERTIES);
             for (int i = 0; i < 3000; i++) {
                 List<String> fields = new ArrayList<>();
                 for (int n = 1 + random.nextInt(4); n > 0; n--) {
@@ -137,9 +141,9 @@ class CsvConformanceTest {
 
     @Test
     void aRecordOfOneEmptyFieldIsWrittenQuotedSoThatItIsNotTakenForAnEmptyLine() {
-        assertThat(new CsvWriter(',').line(List.of(""))).isEqualTo("\"\"");
-        assertThat(new CsvWriter(',').line(java.util.Collections.singletonList(null))).isEqualTo("\"\"");
-        assertThat(new CsvWriter(',').line(List.of("", ""))).isEqualTo(",");
-        assertThat(new CsvWriter(',').line(List.of("a"))).isEqualTo("a");
+        assertThat(new CsvWriter(',', PROPERTIES).line(List.of(""))).isEqualTo("\"\"");
+        assertThat(new CsvWriter(',', PROPERTIES).line(java.util.Collections.singletonList(null))).isEqualTo("\"\"");
+        assertThat(new CsvWriter(',', PROPERTIES).line(List.of("", ""))).isEqualTo(",");
+        assertThat(new CsvWriter(',', PROPERTIES).line(List.of("a"))).isEqualTo("a");
     }
 }

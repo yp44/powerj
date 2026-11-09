@@ -23,18 +23,14 @@ class SortTest {
 
     {
         context.hasInput = true;
-        // Simulated compilation of "$_.a.b": record accessors called one after the other.
-        context.compiler = source -> block(source, current -> {
-            Object value = current;
-            for (String name : source.substring(3).split("\\.")) {
-                try {
-                    value = value.getClass().getMethod(name).invoke(value);
-                } catch (ReflectiveOperationException e) {
-                    throw new IllegalStateException("no property " + name);
-                }
+        // The engine reads a property by its exact name: here the accessor of a record.
+        context.reader = (target, name) -> {
+            try {
+                return target.getClass().getMethod(name).invoke(target);
+            } catch (ReflectiveOperationException e) {
+                throw new IllegalStateException("no property " + name);
             }
-            return value;
-        });
+        };
     }
 
     private static ScriptBlock block(String source, Function<Object, Object> function) {
@@ -114,10 +110,7 @@ class SortTest {
     void propertyPath() throws Exception {
         var b = file("b.txt", 1, false);
         var a = file("a.txt", 2, false);
-        context.compiler = source -> {
-            assertThat(source).isEqualTo("$_.path.fileName");
-            return block(source, f -> ((FileEntry) f).path().getFileName());
-        };
+        context.reader = (target, name) -> name.equals("path") ? ((FileEntry) target).path() : ((Path) target).getFileName();
         assertThat(sort(params(false, false, "path.fileName"), b, a)).containsExactly(a, b);
     }
 

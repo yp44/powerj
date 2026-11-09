@@ -309,11 +309,12 @@ The menu displays the signature (`of(E...) : List<E>`). Imported classes (§FR-4
 **Records remain the recommended format** for cmdlet outputs (table display, attribute completion, automatic documentation), but they are not mandatory: a cmdlet can produce any type.
 
 **FR-28 — Access to attributes and methods.**
-- `$x.name` (without parentheses) is a **property**, resolved in this order, case-insensitively:
+- `$x.name` (without parentheses) is a **property**, resolved in this order; **the case of the name matters** (`size` is not `Size`, and a name that differs from a property only by its case is answered with that property: `FileEntry has no property 'Size' (did you mean 'size'?)`):
   1. record component `name()`;
-  2. getter `getNom()` or `isNom()` (boolean);
+  2. getter `getNom()` or `isNom()` (boolean): the name of the property is the one of the getter without its prefix, its first letter lower-case unless the second is a capital too, as for a JavaBean (`getName()` is `name`, `getURL()` is `URL`), and only that name finds it (`Name` and `url` do not);
   3. public field `name`;
   4. on a `Map`: value associated with the key `"name"`.
+- The same rule holds for the name of a property that is an argument of a cmdlet (`sort size`, `--property path.fileName`, `select name`, `grid --columns name,size`): the case matters.
 - `$x.name(args)` (with parentheses) is always a **method call** (§3.13).
 - Access can be chained: `$x.path.parent`, `$f.toPath().fileName`.
 - **`.` always applies to the object itself**, as in Java: on a list, `$f.size()` is the number of elements and `$f.empty` calls `isEmpty()`.
@@ -1023,7 +1024,7 @@ Acceptance criteria (CA):
 |---|---|
 | `--max-rows <n>` | Most rows read, 100 000 by default, at least 1. One more object than the limit stops the reading (`stopInput`, FR-68b) and the status bar says `truncated at n rows`. |
 | `--title <text>` | Title of the window (`PowerJ grid`). |
-| `--columns a,b,c` | Columns shown first, in this order; the others are hidden and are in the `Columns` menu. Names are matched without regard to case; a name that never arrives is reported once at the end (`no such column: x`, non-blocking); a list without a name is an error. |
+| `--columns a,b,c` | Columns shown first, in this order; the others are hidden and are in the `Columns` menu. Names are matched as they are written, the case matters; a name that never arrives is reported once at the end (`no such column: x`, non-blocking); a list without a name is an error. |
 | `--wait` | Does not give the prompt back until the window is closed; Ctrl+C closes the window and ends the command. |
 | `--raw` | The real values, without units: a size (`@Bytes`, `Row` size column) is shown as its number of bytes (`14520` instead of `14.2 KB`), a `Duration` as a number of seconds (`1.31` instead of `1.310 s`, `90` instead of `1:30`). These columns become plain numbers: sorted and filtered as such (a filter is `>1000` or `1000..2000`, with no unit), copied and exported with the same values. Without `--raw`, units are shown. |
 | `--pass-thru` | The user ticks rows; OK gives them back (below). It waits for the window as `--wait`. |
@@ -1407,6 +1408,12 @@ public interface CmdletContext<O> {
     default boolean hasInput() { return false; }  // after a |, even if no object arrives (FR-64)
     boolean cancelled();                // Ctrl+C requested
     ScriptBlock compile(String expression);
+    // Value of a property of an object, by ONE literal name (a key "first name" is read as it is), case-sensitive: record component,
+    // getter, public field, key of a Map or Row. The way every command, built-in or third-party, reads the objects that come from
+    // another module: the engine reads for it (a module cannot read the records of the others). Throws if the object has none.
+    // A path typed by a user (owner.name) is read one name after the other.
+    Object readProperty(Object target, String name);
+    default Attempt<Object> tryReadProperty(Object target, String name) { /* the failure as a value; Ctrl+C is still thrown */ }
     default void stopInput() { }        // reads no more objects: the previous stage is stopped (FR-68b)
     default Optional<Path> configDirectory() { return Optional.empty(); }  // configuration folder (§8)
     // State of this execution: same object from begin, process and end, a new one for the next run; closed by the

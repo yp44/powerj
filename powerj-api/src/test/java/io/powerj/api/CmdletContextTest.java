@@ -45,6 +45,11 @@ class CmdletContextTest {
         public ScriptBlock compile(String expression) {
             throw new UnsupportedOperationException();
         }
+
+        @Override
+        public Object readProperty(Object target, String name) {
+            throw new UnsupportedOperationException();
+        }
     };
 
     @Test
@@ -70,9 +75,17 @@ class CmdletContextTest {
     }
 
     @Test
-    void propertyIsTheBlockThatReadsAPropertyOrAPathOfThem() {
-        var compiled = new java.util.ArrayList<String>();
-        var context = new CmdletContext<String>() {
+    void aUsageExceptionIsAnIllegalArgumentExceptionWithItsMessageAndCause() {
+        var cause = new RuntimeException("why");
+
+        assertThat(new UsageException("bad option")).isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("bad option").hasNoCause();
+        assertThat(new UsageException("bad option", cause)).hasCause(cause);
+    }
+
+    /** A context whose {@code readProperty} is the one given: what {@code tryReadProperty} adds to it is under test. */
+    private static CmdletContext<String> reading(java.util.function.BiFunction<Object, String, Object> reader) {
+        return new CmdletContext<>() {
             @Override
             public void emit(String value) {
             }
@@ -103,23 +116,44 @@ class CmdletContextTest {
 
             @Override
             public ScriptBlock compile(String expression) {
-                compiled.add(expression);
-                return null;
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public Object readProperty(Object target, String name) {
+                return reader.apply(target, name);
             }
         };
-
-        context.property("size");
-        context.property("path.fileName");
-
-        assertThat(compiled).containsExactly("$_.size", "$_.path.fileName");
     }
 
     @Test
-    void aUsageExceptionIsAnIllegalArgumentExceptionWithItsMessageAndCause() {
-        var cause = new RuntimeException("why");
+    void tryReadPropertyReturnsTheValueOfReadProperty() {
+        var attempt = reading((target, name) -> name + " of " + target).tryReadProperty("object", "size");
 
-        assertThat(new UsageException("bad option")).isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("bad option").hasNoCause();
-        assertThat(new UsageException("bad option", cause)).hasCause(cause);
+        assertThat(attempt.failed()).isFalse();
+        assertThat(attempt.value()).isEqualTo("size of object");
+    }
+
+    @Test
+    void tryReadPropertyReturnsTheFailureAsAValue() {
+        var failure = new IllegalStateException("cannot read");
+        var context = reading((target, name) -> {
+            throw failure;
+        });
+
+        var attempt = context.tryReadProperty("object", "size");
+
+        assertThat(attempt.failed()).isTrue();
+        assertThat(attempt.error()).isSameAs(failure);
+    }
+
+    @Test
+    void tryReadPropertyNeverTakesTheInterruptionForAnUnreadableObject() {
+        var context = reading((target, name) -> {
+            throw new java.util.concurrent.CancellationException("Ctrl+C");
+        });
+
+        assertThatThrownBy(() -> context.tryReadProperty("object", "size"))
+                .isInstanceOf(java.util.concurrent.CancellationException.class);
     }
 }

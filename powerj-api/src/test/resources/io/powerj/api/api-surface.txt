@@ -22,6 +22,7 @@ public abstract interface io.powerj.api.Cmdlet<P extends java.lang.Record,I,O>
 public abstract interface io.powerj.api.CmdletContext<O>
   public abstract boolean io.powerj.api.CmdletContext.cancelled()
   public abstract io.powerj.api.ScriptBlock io.powerj.api.CmdletContext.compile(java.lang.String)
+  public abstract java.lang.Object io.powerj.api.CmdletContext.readProperty(java.lang.Object,java.lang.String)
   public abstract java.nio.file.Path io.powerj.api.CmdletContext.currentDirectory()
   public abstract java.util.Map<java.lang.String, java.lang.String> io.powerj.api.CmdletContext.environment()
   public abstract java.util.Optional<java.lang.Object> io.powerj.api.CmdletContext.variable(java.lang.String)
@@ -31,7 +32,7 @@ public abstract interface io.powerj.api.CmdletContext<O>
   public default <S> java.util.Optional<S> io.powerj.api.CmdletContext.service(java.lang.Class<S>)
   public default boolean io.powerj.api.CmdletContext.hasInput()
   public default boolean io.powerj.api.CmdletContext.unsetEnvironment(java.lang.String)
-  public default io.powerj.api.ScriptBlock io.powerj.api.CmdletContext.property(java.lang.String)
+  public default io.powerj.api.Attempt<java.lang.Object> io.powerj.api.CmdletContext.tryReadProperty(java.lang.Object,java.lang.String)
   public default java.util.Optional<java.nio.file.Path> io.powerj.api.CmdletContext.configDirectory()
   public default void io.powerj.api.CmdletContext.setEnvironment(java.lang.String,java.lang.String)
   public default void io.powerj.api.CmdletContext.stopInput()
