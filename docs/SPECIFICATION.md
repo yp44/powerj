@@ -240,7 +240,7 @@ Interpreter.java
 - otherwise a short word (`where`, `select`, `sort`) or a hyphenated compound word (`to-json`).
 
 **The case matters, as in Java.** PowerJ is a shell oriented to Java, and Java is case-sensitive: what a user writes is compared exactly. This holds for the name of a
-cmdlet or of a built-in command (`jobs`, not `Jobs`), of a variable (`$name`, not `$Name`), of a class, a method and a constant (`Math.max`, `RoundingMode.HALF_UP`),
+cmdlet or of a built-in command (`jobs`, not `Jobs`; a word that is neither is looked up as a program, and where the file system ignores case, on Windows and macOS, it may find one), of a variable (`$name`, not `$Name`), of a class, a method and a constant (`Math.max`, `RoundingMode.HALF_UP`),
 of a property (FR-28), of an option (FR-18) and of its value when it is an enum (FR-20), of a unit and of a literal (FR-19, `true`, `false`, `null`), and of the
 value of a setting (`POWERJ_LANG=fr`, `POWERJ_GLOB_IGNORE_CASE=true`). A name written in the wrong case is not understood, and the error gives the name to use
 when there is one (`did you mean 'size'?`). **Four things are not names, and keep their rule**: what the system decides (the names of files on Windows and macOS, of the variables of

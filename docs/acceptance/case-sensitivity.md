@@ -27,7 +27,7 @@ A folder with `a.txt`, `Notes.TXT` and a sub-folder. Where a row says "Windows" 
 | 9 | `ls \| where dir == true`, then `ls \| where dir == TRUE` | The first lists the folders; the second lists nothing (`TRUE` is a text, not the literal, and no boolean equals it). |
 | 10 | `5s`, then `5S` | `5.000 s`; then `syntax: invalid number: 5S (units: b kb mb gb tb, ms s m h d)`. |
 | 11 | `$name = 1` then `$name`, then `$Name` | `1`; then `unknown variable: $Name`. |
-| 12 | `Jobs`, then `jobs` | `unknown command: Jobs`; `jobs` works. |
+| 12 | `Jobs`, then `jobs` | **Linux**: `unknown command: Jobs`; `jobs` works. **macOS and Windows**: `Jobs` is not the built-in either, but the word is looked up as a program and the file system ignores case, so it runs the program `jobs` if the system has one (macOS has `/usr/bin/jobs`); the same for `TRUE` and `/usr/bin/true`. |
 | 13 | `Math.max(1, 2)`, then `math.max(1, 2)` | `2`; then `"math" unknown: neither a Java class nor a command here (a variable is written $math)`. |
 | 14 | `import java.math.RoundingMode` then `RoundingMode.HALF_UP`, then `RoundingMode.half_up` | `HALF_UP`; then `RoundingMode has no static field half_up` (the constants of Java are written as Java writes them). |
 | 15 | Start PowerJ with `POWERJ_LANG=FR`, then with `POWERJ_LANG=fr`, and type `ls --Recurse` | The first shows the English message (`FR` is not a language, FR-61); the second the French one (`ls : option inconnue --Recurse, vouliez-vous dire --recurse ?`). |

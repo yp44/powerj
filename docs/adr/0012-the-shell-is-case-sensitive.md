@@ -46,7 +46,10 @@ belongs to one is in the list of `CaseSensitivityTest` with its reason.
 
 1. **What the system decides.** The names of files on Windows and macOS, the variables of the environment and the processes on
    Windows: PowerJ follows the system, it does not add a rule of its own (`Host.windows()`, `Host.namesIgnoreCase()`). On Linux and
-   macOS the name of a process and of its user are exact; on Windows they are not (`ps notepad` finds `NOTEPAD.EXE`).
+   macOS the name of a process and of its user are exact; on Windows they are not (`ps notepad` finds `NOTEPAD.EXE`). A word that
+   is neither a cmdlet nor a built-in is looked up as a **program**, by the file system: where it ignores case, `Jobs` is not an
+   unknown command but the program `jobs` (`/usr/bin/jobs` on macOS), and `TRUE` is `true` (`/usr/bin/true`, `true.exe`). The shell
+   still tells `jobs` from `Jobs`; the system finds a program for both.
 2. **What the user asks for.** `sort -i`, `grep -i`, `range -i`, `POWERJ_GLOB_IGNORE_CASE=true`; and, in the window of the grid, the
    box of the filter ("contains", regular expressions) and the order of the texts, which a person reads in a window and does not
    type as a name.
