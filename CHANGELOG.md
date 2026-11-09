@@ -649,13 +649,13 @@ structures, functions) can be built on it. The work is organised in phases (revi
 
 ### Changed (the whole shell is case-sensitive, as Java is, [#130](https://github.com/yp44/powerj/issues/130))
 - **What a user writes is compared exactly** ([ADR 0012](docs/adr/0012-the-shell-is-case-sensitive.md), FR-12): the name of an
-  option and its abbreviation (`--Property` and `--REC` are refused with `did you mean --property?`), the value of an enum option in
+  option and its abbreviation (`--Property` is refused with `did you mean --property?`, `--REC` is refused), the value of an enum option in
   **lower case** (`perf --view stages`, as the help and the completion always showed; `--view STAGES` is refused), the booleans
   (`true`, `yes`, `oui`, `1`; not `TRUE`), the units (`2mb`; `2MB` is an error that lists the units), the literals of `where`
   (`where dir == true`), `--delimiter tab`, the constants of a Java enum (`RoundingMode.HALF_UP`, not `half_up`), and the values of the
   settings (`POWERJ_LANG=fr`, `POWERJ_GLOB_IGNORE_CASE=true`, `POWERJ_BACKGROUND_SH_FALLBACK=true`, `POWERJ_NATIVE_ENCODING=auto`,
   `true`/`false` in the consent of `config.properties`). The commands, the variables and the classes already were. Scripts that wrote
-  another case have to change; each refusal names the spelling that is expected.
+  another case have to change; the refusal gives the spelling that is expected where there is one (a hint, or the list of the values).
 - **`ps` and `env` follow the system.** The name of a process, its user and the name of a variable of the environment ignore case on
   Windows, where the system does, and are exact on Linux and macOS (`ps JAVA*` finds nothing there). `ps` used to ignore case everywhere.
 - **Four exceptions, all written down**: the rules of the system (files on Windows and macOS, the environment and the processes of

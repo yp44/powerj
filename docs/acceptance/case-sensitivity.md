@@ -17,23 +17,23 @@ A folder with `a.txt`, `Notes.TXT` and a sub-folder. Where a row says "Windows" 
 | # | Action | Expected result |
 |---|---|---|
 | 1 | `ls --recurse`, then `ls --Recurse` | The first works; the second: `ls: unknown option --Recurse, did you mean --recurse?` |
-| 2 | `ls --rec`, then `ls --REC` | The abbreviation works in the case written; the second is refused with the same kind of hint. |
-| 3 | `ls \| sort size`, then `ls \| sort Size` | The first works; the second: `FileEntry has no property 'Size' (did you mean 'size'?)`. |
-| 4 | `ls \| select name`, then `ls \| select Name` | The same rule for the columns of `select` (FR-69). |
-| 5 | `(ls)*.name`, then `(ls)*.Name` | The same rule for `$_.name`, `*.name` (FR-28). |
-| 6 | `perf --view stages` (or Tab after `perf --view `), then `perf --view STAGES` | The first is accepted and the completion offers the lower-case names; the second is refused with the hint `did you mean stages?`. |
-| 7 | `ls \| to-csv --delimiter tab`, then `ls \| to-csv --delimiter TAB` | The first writes the tab-separated text; the second is refused. |
-| 8 | `ls \| where size > 1kb`, then `ls \| where size > 1KB`, then `ls \| where size > 1Kb` | The first works; the others: `invalid number: 1KB (units: b kb mb gb tb, ms s m h d)`. |
-| 9 | `ls \| where dir == true`, then `ls \| where dir == TRUE` | The first lists the folders; the second does not understand `TRUE` (`TRUE` is not a literal). |
-| 10 | `sleep 5s` (or `1+1` then `5s`), then `5S` | `5s` is a duration; `5S` is an error that lists the units. |
-| 11 | `$name = 1` then `$name`, then `$Name` | `1`; then an error: the variable `Name` does not exist (the one that exists is `name`). |
-| 12 | `Jobs`, then `jobs` | `Jobs` is not a command (it is not found, FR-13); `jobs` works. |
-| 13 | `Math.max(1, 2)`, then `math.max(1, 2)` | `2`; then an error: `math` is not a class or a variable. |
-| 14 | `import java.math.RoundingMode` then `RoundingMode.HALF_UP`, then `RoundingMode.half_up` | The constant; then an error: no constant `half_up` (the constants of Java are written as Java writes them). |
-| 15 | `env --set POWERJ_LANG=FR` then `help ls`, then `env --set POWERJ_LANG=fr` then `help ls` | The first leaves the English text (`FR` is not a language, FR-61); the second shows the French text. Put the language back afterwards. |
-| 16 | `env --set POWERJ_GLOB_IGNORE_CASE=TRUE` then `^echo *.txt` | An error that names the variable and the value `TRUE`. `env --set POWERJ_GLOB_IGNORE_CASE=false` restores the default. |
-| 17 | `env --set POWERJ_NATIVE_ENCODING=AUTO` then `^echo x` | An error: `AUTO` is read as the name of a charset and is unknown. `env --set POWERJ_NATIVE_ENCODING=auto` restores the default. |
-| 18 | `ps java*`, then `ps JAVA*` | **Linux and macOS**: the Java processes for `java*`, none for `JAVA*`. **Windows**: both find them (the system ignores case). |
+| 2 | `ls --rec`, then `ls --REC` | The abbreviation works in the case written; the second is refused: `ls: unknown option --REC`. |
+| 3 | `ls \| sort size`, then `ls \| sort Size` | The first works; the second, for each object: `sort: FileEntry has no property 'Size' (did you mean 'size'? The case of a name matters) (object skipped: …)`. |
+| 4 | `ls \| select name`, then `ls \| select Name` | The same rule for the columns of `select` (FR-69): `select: column Name: FileEntry has no property 'Name' (did you mean 'name'? The case of a name matters)`. |
+| 5 | `(ls)*.name`, then `(ls)*.Name` | The same rule for `$_.name` and `*.name` (FR-28): `FileEntry has no property 'Name' (did you mean 'name'? The case of a name matters)`. |
+| 6 | `perf --view stages` (or Tab after `perf --view `), then `perf --view STAGES` | The first is accepted and the completion offers the lower-case names; the second is refused: `perf: --view accepts [stages, blocks, natives, …], not 'STAGES'`. |
+| 7 | `ls \| to-csv --delimiter tab`, then `ls \| to-csv --delimiter TAB` | The first writes the tab-separated text; the second: `to-csv: --delimiter expects one character or tab, got TAB`. |
+| 8 | `ls \| where size > 1kb`, then `ls \| where { $_.size > 1KB }`, then `ls \| where size > 1KB` | The first works; the second: `syntax: invalid number: 1KB (units: b kb mb gb tb, ms s m h d)`; in the short form `1KB` is a text, so the third: `where: ">" is not possible between Long 0 and String "1KB"` for each object. |
+| 9 | `ls \| where dir == true`, then `ls \| where dir == TRUE` | The first lists the folders; the second lists nothing (`TRUE` is a text, not the literal, and no boolean equals it). |
+| 10 | `5s`, then `5S` | `5.000 s`; then `syntax: invalid number: 5S (units: b kb mb gb tb, ms s m h d)`. |
+| 11 | `$name = 1` then `$name`, then `$Name` | `1`; then `unknown variable: $Name`. |
+| 12 | `Jobs`, then `jobs` | `unknown command: Jobs`; `jobs` works. |
+| 13 | `Math.max(1, 2)`, then `math.max(1, 2)` | `2`; then `"math" unknown: neither a Java class nor a command here (a variable is written $math)`. |
+| 14 | `import java.math.RoundingMode` then `RoundingMode.HALF_UP`, then `RoundingMode.half_up` | `HALF_UP`; then `RoundingMode has no static field half_up` (the constants of Java are written as Java writes them). |
+| 15 | Start PowerJ with `POWERJ_LANG=FR`, then with `POWERJ_LANG=fr`, and type `ls --Recurse` | The first shows the English message (`FR` is not a language, FR-61); the second the French one (`ls : option inconnue --Recurse, vouliez-vous dire --recurse ?`). |
+| 16 | `env --set POWERJ_GLOB_IGNORE_CASE=TRUE` then `^echo *.txt` | `the variable POWERJ_GLOB_IGNORE_CASE must be true, false, 1 or 0, not 'TRUE'`. `env --set POWERJ_GLOB_IGNORE_CASE=false` restores the default. |
+| 17 | `env --set POWERJ_NATIVE_ENCODING=AUTO` then `^echo x` | `unknown encoding 'AUTO' (variable POWERJ_NATIVE_ENCODING)`: `AUTO` is read as the name of a charset. `env --set POWERJ_NATIVE_ENCODING=auto` restores the default. |
+| 18 | `ps powerj*`, then `ps POWERJ*`; then `ps -u <your user>`, then `ps -u <YOUR USER>` | **Linux and macOS**: PowerJ itself for `powerj*`, none for `POWERJ*`; your processes for the first user name, none for the second. **Windows**: both find them (the system ignores case; the process is `powerj.exe`). |
 | 19 | `env --set Foo=1`, then `env \| where { $_.name == "FOO" }` | **Linux and macOS**: nothing (`Foo` and `FOO` are two variables). **Windows**: the variable, as the system sees it. |
 
 ### What keeps its own rule
