@@ -35,7 +35,7 @@ public final class Where implements Cmdlet<Where.Params, Object, Object> {
 
     private static final Set<String> OPERATORS = Set.of("==", "!=", "<", "<=", ">", ">=");
     private static final Pattern LITERAL = Pattern.compile(
-            "-?\\d+(\\.\\d+)?(L|b|kb|mb|gb|tb|ms|s|m|h|d)?|true|false|null", Pattern.CASE_INSENSITIVE);
+            "-?\\d+(\\.\\d+)?(L|b|kb|mb|gb|tb|ms|s|m|h|d)?|true|false|null");
 
     /** The condition of this execution, compiled once. */
     private record Compiled(ScriptBlock condition) {

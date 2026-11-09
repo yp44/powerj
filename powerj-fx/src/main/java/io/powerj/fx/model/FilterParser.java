@@ -141,8 +141,8 @@ public final class FilterParser {
         BigDecimal exact = number(text, semantics);
         if (semantics == ColumnKind.SIZE) {
             Matcher m = SIZE.matcher(text);
-            if (m.matches() && m.group(2) != null && SizeUnits.power(m.group(2)) > 0 && decimals(m.group(1)) <= 1) {
-                BigDecimal half = new BigDecimal("0.05").multiply(SizeUnits.factor(m.group(2)));
+            if (m.matches() && m.group(2) != null && SizeUnits.power(lower(m.group(2))) > 0 && decimals(m.group(1)) <= 1) {
+                BigDecimal half = new BigDecimal("0.05").multiply(SizeUnits.factor(lower(m.group(2))));
                 return new Interval<>(exact.subtract(half), true, exact.add(half), false);
             }
         }
@@ -208,7 +208,7 @@ public final class FilterParser {
                 throw new Invalid(Messages.get("grid.filter.size.invalid", text));
             }
             BigDecimal value = new BigDecimal(m.group(1).replace(',', '.'));
-            return SizeUnits.bytes(value, m.group(2) == null ? "b" : m.group(2));
+            return SizeUnits.bytes(value, m.group(2) == null ? "b" : lower(m.group(2)));
         }
         if (!NUMBER.matcher(text).matches()) {
             throw new Invalid(Messages.get("grid.filter.number.invalid", text));

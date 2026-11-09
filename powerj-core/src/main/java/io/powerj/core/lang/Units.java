@@ -3,7 +3,6 @@ package io.powerj.core.lang;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
-import java.util.Locale;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -16,8 +15,8 @@ import io.powerj.text.SizeUnits;
  */
 public final class Units {
 
-    private static final Pattern LITERAL = Pattern.compile("(\\d+(?:\\.\\d+)?)(" + SizeUnits.PATTERN + "|ms|s|m|h|d)",
-            Pattern.CASE_INSENSITIVE);
+    /** The case of the unit matters: {@code 2mb}, not {@code 2MB}. */
+    private static final Pattern LITERAL = Pattern.compile("(\\d+(?:\\.\\d+)?)(" + SizeUnits.PATTERN + "|ms|s|m|h|d)");
 
     private Units() {
     }
@@ -29,7 +28,7 @@ public final class Units {
             return Optional.empty();
         }
         var number = new BigDecimal(m.group(1));
-        String unit = m.group(2).toLowerCase(Locale.ROOT);
+        String unit = m.group(2);
         if (SizeUnits.isUnit(unit)) {
             return Optional.of(bytes(number, unit));
         }
