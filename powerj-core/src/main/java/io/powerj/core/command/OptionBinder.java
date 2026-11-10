@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import java.util.stream.IntStream;
 
 import io.powerj.api.Option;
 import io.powerj.core.error.PjError;
@@ -26,8 +27,9 @@ import io.powerj.core.lang.Units;
 
 /**
  * Builds a cmdlet's parameter record from the arguments entered, Unix style
- * (specification FR-18 to FR-20): {@code -r}, {@code -ra}, {@code --recurse}, {@code --rec} (unambiguous
- * abbreviation), {@code --filter *.java}, {@code --filter=*.java}, positionals, {@code --} end of options.
+ * (specification FR-18 to FR-20): {@code -r}, {@code -ra}, {@code --recurse}, {@code --filter *.java},
+ * {@code --filter=*.java}, positionals, {@code --} end of options. A long option is written whole, in the case of the
+ * help: {@code --rec} is not {@code --recurse}. A {@code boolean} value is {@code true} or {@code false}.
  */
 public final class OptionBinder {
 
@@ -67,10 +69,17 @@ public final class OptionBinder {
     /** Where a camel-case name is cut into words: {@code onError} gives {@code on-Error}. */
     private static final Pattern CAMEL_BOUNDARY = Pattern.compile("([a-z0-9])([A-Z])");
 
+    /**
+     * What a parameter record declares: its options in component order, and the indexes (in that list) of those that can
+     * be given without a name, in the order of their position.
+     */
+    private record Declared(List<OptionSpec> specs, int[] positionals) {
+    }
+
     /** The options of each parameter record, read once: the same list serves every command, the help and the completion. */
-    private static final ClassValue<List<OptionSpec>> SPECS = new ClassValue<>() {
+    private static final ClassValue<Declared> DECLARED = new ClassValue<>() {
         @Override
-        protected List<OptionSpec> computeValue(Class<?> type) {
+        protected Declared computeValue(Class<?> type) {
             List<OptionSpec> specs = new ArrayList<>();
             for (RecordComponent c : type.getRecordComponents()) {
                 Option option = c.getAnnotation(Option.class);
@@ -82,13 +91,15 @@ public final class OptionBinder {
                             option.description()));
                 }
             }
-            return List.copyOf(specs);
+            int[] positionals = IntStream.range(0, specs.size()).filter(i -> specs.get(i).isPositional()).boxed()
+                    .sorted(Comparator.comparingInt(i -> specs.get(i).position())).mapToInt(Integer::intValue).toArray();
+            return new Declared(List.copyOf(specs), positionals);
         }
     };
 
     /** Options declared by a parameter record, in component order. The list is shared and cannot be changed. */
     public static List<OptionSpec> specs(Class<? extends Record> type) {
-        return SPECS.get(type);
+        return DECLARED.get(type).specs();
     }
 
     /**
@@ -96,11 +107,11 @@ public final class OptionBinder {
      * @param args    evaluated arguments: words ({@code String}) or expression values
      */
     public static <P extends Record> P bind(String command, Class<P> type, List<Object> args) {
-        List<OptionSpec> specs = specs(type);
-        Binding binding = new Binding(command, specs, args);
+        Declared declared = DECLARED.get(type);
+        Binding binding = new Binding(command, declared, args);
         binding.readArguments();
         binding.checkMandatoryAndFillDefaults();
-        return construct(command, type, specs, binding.values);
+        return construct(command, type, declared.specs(), binding.values);
     }
 
     /** The reading of one command line: the values given so far, and where the next argument is. */
@@ -110,19 +121,18 @@ public final class OptionBinder {
         final List<Object> args;
         final Object[] values;
         final boolean[] given;
-        final List<OptionSpec> positionals;
+        final int[] positionals;
         int cursor; // the next argument to read
         int nextPositional;
         boolean optionsEnded;
 
-        Binding(String command, List<OptionSpec> specs, List<Object> args) {
+        Binding(String command, Declared declared, List<Object> args) {
             this.command = command;
-            this.specs = specs;
+            this.specs = declared.specs();
             this.args = args;
             this.values = new Object[specs.size()];
             this.given = new boolean[specs.size()];
-            this.positionals = specs.stream().filter(OptionSpec::isPositional)
-                    .sorted(Comparator.comparingInt(OptionSpec::position)).toList();
+            this.positionals = declared.positionals();
         }
 
         void readArguments() {
@@ -151,8 +161,8 @@ public final class OptionBinder {
                 inline = name.substring(equals + 1);
                 name = name.substring(0, equals);
             }
-            OptionSpec spec = byLongName(command, specs, name);
-            int index = specs.indexOf(spec);
+            int index = byLongName(command, specs, name);
+            OptionSpec spec = specs.get(index);
             if (spec.isFlag()) {
                 values[index] = inline == null || parseBoolean(command, spec, inline);
             } else if (inline != null) {
@@ -170,8 +180,8 @@ public final class OptionBinder {
         private void shortOptions(String word) {
             String letters = word.substring(1);
             for (int k = 0; k < letters.length(); k++) {
-                OptionSpec spec = byShortName(command, specs, letters.charAt(k));
-                int index = specs.indexOf(spec);
+                int index = byShortName(command, specs, letters.charAt(k));
+                OptionSpec spec = specs.get(index);
                 given[index] = true;
                 if (spec.isFlag()) {
                     values[index] = Boolean.TRUE;
@@ -190,11 +200,11 @@ public final class OptionBinder {
         }
 
         private void positional(Object arg) {
-            if (nextPositional >= positionals.size()) {
+            if (nextPositional >= positionals.length) {
                 throw new PjException(Messages.get("option.unexpectedArgument", command, Values.text(arg)));
             }
-            OptionSpec spec = positionals.get(nextPositional);
-            int index = specs.indexOf(spec);
+            int index = positionals[nextPositional];
+            OptionSpec spec = specs.get(index);
             if (given[index] && !spec.isList()) {
                 // the option already received its value by name: move on to the next positional, with the same argument
                 nextPositional++;
@@ -226,36 +236,39 @@ public final class OptionBinder {
         return word.length() > 1 && word.charAt(0) == '-' && !NEGATIVE_NUMBER.matcher(word).matches();
     }
 
-    /** The option written as the help shows it: the name is exact (no other case, no beginning of a name). */
-    private static OptionSpec byLongName(String command, List<OptionSpec> specs, String name) {
-        for (OptionSpec spec : specs) {
-            if (spec.longName().equals(name)) {
-                return spec;
+    /** Index of the option written as the help shows it: the name is exact (no other case, no beginning of a name). */
+    private static int byLongName(String command, List<OptionSpec> specs, String name) {
+        for (int i = 0; i < specs.size(); i++) {
+            if (specs.get(i).longName().equals(name)) {
+                return i;
             }
         }
-        List<String> names = specs.stream().map(OptionSpec::longName).toList();
-        Optional<String> suggestion = onlyNameBeginningWith(name, names).or(() -> closest(name, names));
+        Optional<String> suggestion = suggestion(name, specs.stream().map(OptionSpec::longName).toList());
         throw new PjException(suggestion.isPresent()
                 ? Messages.get("option.unknown.long.suggestion", command, name, suggestion.get())
                 : Messages.get("option.unknown.long", command, name));
     }
 
     /**
-     * The one name that begins with {@code text}, for the error of someone who wrote the beginning of it: a hint, never a
-     * match. Several names, or none, give nothing: the error does not pick one.
+     * The name to suggest to someone who wrote {@code text}, which is none: a hint, never a match.
+     * <ul>
+     * <li>exactly one name begins with {@code text}: it is the beginning of that name;</li>
+     * <li>several do: none is suggested, the error does not pick one (Tab shows them);</li>
+     * <li>none does: a typo, so the nearest name within two edits, if there is one.</li>
+     * </ul>
      */
-    private static Optional<String> onlyNameBeginningWith(String text, List<String> names) {
-        if (text.isEmpty()) {
-            return Optional.empty();
+    private static Optional<String> suggestion(String text, List<String> names) {
+        List<String> beginning = text.isEmpty() ? List.of() : names.stream().filter(n -> n.startsWith(text)).toList();
+        if (beginning.isEmpty()) {
+            return closest(text, names);
         }
-        List<String> found = names.stream().filter(n -> n.startsWith(text)).toList();
-        return found.size() == 1 ? Optional.of(found.getFirst()) : Optional.empty();
+        return beginning.size() == 1 ? Optional.of(beginning.getFirst()) : Optional.empty();
     }
 
-    private static OptionSpec byShortName(String command, List<OptionSpec> specs, char letter) {
-        for (OptionSpec spec : specs) {
-            if (spec.shortName() == letter) {
-                return spec;
+    private static int byShortName(String command, List<OptionSpec> specs, char letter) {
+        for (int i = 0; i < specs.size(); i++) {
+            if (specs.get(i).shortName() == letter) {
+                return i;
             }
         }
         throw new PjException(Messages.get("option.unknown.short", command, letter));

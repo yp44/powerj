@@ -120,6 +120,21 @@ class OptionBinderTest {
         assertThatThrownBy(() -> bind("--m", "x")).hasMessage("t: unknown option --m");
     }
 
+    /** Two names a typo apart: {@code --dir} begins both, so the error picks neither, though one is one edit away. */
+    record Near(boolean dirs, boolean dirty) {
+    }
+
+    @Test
+    void severalNamesBeginningWithTheTextAreNotPickedByEditDistance() {
+        assertThatThrownBy(() -> OptionBinder.bind("t", Near.class, List.of("--dir"))).hasMessage("t: unknown option --dir");
+        // no name begins with --dirz: it is a typo, and the nearest name is suggested
+        assertThatThrownBy(() -> OptionBinder.bind("t", Near.class, List.of("--dirz")))
+                .hasMessage("t: unknown option --dirz, did you mean --dirs?");
+        // exactly one name begins with --dirt
+        assertThatThrownBy(() -> OptionBinder.bind("t", Near.class, List.of("--dirt")))
+                .hasMessage("t: unknown option --dirt, did you mean --dirty?");
+    }
+
     @Test
     void aNameIsExactAboutItsHyphens() {
         assertThatThrownBy(() -> bind("--maxdepth", "2")).hasMessage("t: unknown option --maxdepth, did you mean --max-depth?");

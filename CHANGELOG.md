@@ -670,7 +670,8 @@ structures, functions) can be built on it. The work is organised in phases (revi
 
 ### Changed (an option is written as the help shows it, [#88](https://github.com/yp44/powerj/issues/88))
 - **A long option is written whole.** `--rec` is no longer `--recurse`: it is refused with `ls: unknown option --rec, did you mean
-  --recurse?` (the error gives the name when exactly one name begins with the text typed, or when one is within two edits of it).
+  --recurse?` (the error gives the name when exactly one name begins with the text typed; when several begin with it, it picks none; when none
+  does, it gives the one within two edits, if there is one).
   The reason: a script that wrote `--rec` broke the day a cmdlet added `--recover`, so adding an option was a breaking change for
   the scripts and for the authors of modules. Tab still completes the beginning of a name. Hyphens were already part of the name
   (`--maxdepth` is not `--max-depth`); the case has been exact since [#130](https://github.com/yp44/powerj/issues/130).

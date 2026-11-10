@@ -31,11 +31,11 @@ written in the wrong case is not understood, and the error gives the name to use
 did you mean --property?`).
 
 - **Options.** `--recurse` is not `--Recurse`, and a long option is written whole: `--rec` is not `--recurse`
-  (*amended by [#88](https://github.com/yp44/powerj/issues/88): the first version of this record kept the abbreviation, in the
-  same case; a script that wrote `--rec` broke when a cmdlet added `--recover`, so adding an option was a breaking change*).
+  (*amended by [#88](https://github.com/yp44/powerj/issues/88): the first version of this record, written for #130 (pull request #134),
+  kept the abbreviation, in the same case; a script that wrote `--rec` broke when a cmdlet added `--recover`, so adding an option was a breaking change*).
   The suggestion of the error message is the one place that still compares without regard to case, and that still looks at the
   beginning of a name: it only helps to find the name to write (`--rec` → `did you mean --recurse?`).
-- **Values.** A `boolean` is `true` or `false` and nothing else (*amended by #88: the first version also took `yes`, `no`, `oui`,
+- **Values.** A `boolean` is `true` or `false` and nothing else (*amended by [#88](https://github.com/yp44/powerj/issues/88): the first version, written for #130 (pull request #134), also took `yes`, `no`, `oui`,
   `non`, `1` and `0`; the message already said "expects true or false"*); an enum is its **lower-case name**
   (`perf --view stages`), which is what the help, the completion and the messages show. The constants of a Java enum keep their Java name.
   The enum of an option cannot have two constants that differ only by their case (they would have the same lower-case name).
