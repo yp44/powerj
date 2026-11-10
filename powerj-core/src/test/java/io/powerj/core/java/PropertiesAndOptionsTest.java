@@ -98,8 +98,8 @@ class PropertiesAndOptionsTest {
         assertThat(typed("--size", "10kb").size()).isEqualTo(10_240L);
         assertThat(typed("-s", "5").size()).isEqualTo(5L);
         assertThat(typed("--ratio", "1.5").ratio()).isEqualTo(1.5);
-        assertThat(typed("--flag=yes").flag()).isTrue();
-        assertThat(typed("--flag=0").flag()).isFalse();
+        assertThat(typed("--flag=true").flag()).isTrue();
+        assertThat(typed("--flag=false").flag()).isFalse();
         assertThat(typed("--timeout", "30s").timeout()).isEqualTo(Duration.ofSeconds(30));
         assertThat(typed("--raw", "a", "--raw", "b").raw()).containsExactly("a", "b");
     }

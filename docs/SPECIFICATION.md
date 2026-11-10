@@ -279,11 +279,11 @@ There is **no** long form (`pj-ls`, `Get-ChildItem`…).
 | Positional | `ls C:\temp` |
 | End of options | `ls -- -file-starting-with-a-dash` |
 
-Option names are **case-sensitive** (`--recurse`; `--Recurse` is refused with `ls: unknown option --Recurse, did you mean --recurse?`); a long option can be abbreviated, in the same case, as long as it is not ambiguous (`--rec`).
+Option names are **case-sensitive** (`--recurse`; `--Recurse` is refused with `ls: unknown option --Recurse, did you mean --recurse?`); and the name is **exact**: the one the help shows. A long option is not abbreviated (`--rec` is refused with `ls: unknown option --rec, did you mean --recurse?`; Tab completes the beginning of a name, FR-23), and the hyphens are part of it (`--maxdepth` is not `--max-depth`).
 
 **FR-19 — Unit literals.** Sizes `512b 2kb 500mb 1gb` (multiples of 1024) and durations `30s 5m 2h 7d` are language literals, usable both as options and in expressions. The units are written in lower case: `2MB` is no literal (`invalid number: 2MB (units: b kb mb gb tb, ms s m h d)`).
 
-**FR-20 — Conversion and validation.** Values are converted to the declared type of the parameter (`Path`, `int`, `long`, `Duration`, `Instant`, enum, `boolean`…). Missing mandatory option, unconvertible value or unknown option → explicit error before execution, with a suggestion (`ls: unknown option --recurce, did you mean --recurse?`). The case matters: a `boolean` is `true` or `false` (`yes`, `no`, `oui`, `non`, `1`, `0` too), and an enum is its **lower-case name** (`perf --view stages`), as the help, the completion (FR-23) and the error message show it.
+**FR-20 — Conversion and validation.** Values are converted to the declared type of the parameter (`Path`, `int`, `long`, `Duration`, `Instant`, enum, `boolean`…). Missing mandatory option, unconvertible value or unknown option → explicit error before execution, with a suggestion (`ls: unknown option --recurce, did you mean --recurse?`). The case matters: a `boolean` is `true` or `false` and nothing else (`--recurse=yes`, `=1`, `=TRUE` are refused: `ls: --recurse expects true or false, not 'yes'`), and an enum is its **lower-case name** (`perf --view stages`), as the help, the completion (FR-23) and the error message show it.
 
 ### 3.6 Completion (Tab)
 

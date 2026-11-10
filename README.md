@@ -66,7 +66,7 @@ It runs on **Linux, macOS and Windows**: the build produces a self-contained lau
 ## Philosophy
 
 - **Objects, not text.** A cmdlet emits records; you select on properties (`where { $_.size > 1mb }`) instead of cutting columns with `awk`. Displaying is the last step: tables are formatted only when the objects reach the terminal.
-- **Short names, Unix options.** PowerShell's ideas without `Get-ChildItem -Recurse`: each cmdlet has one short lowercase name, and options follow the Unix convention (`-r`, `-ra`, `--recurse`, `--rec`, `--filter=*.java`, `--`).
+- **Short names, Unix options.** PowerShell's ideas without `Get-ChildItem -Recurse`: each cmdlet has one short lowercase name, and options follow the Unix convention (`-r`, `-ra`, `--recurse`, `--filter=*.java`, `--`; a long option is written whole, as the help shows it).
 - **Native commands are first-class.** `git`, `mvn` or `notepad` run exactly as in a classic shell; their stdout/stderr stay streams; cmdlets and native commands mix freely in a pipeline. `^ls` always runs the native program when a cmdlet has the same name.
 - **Java is the expression language.** No new DSL to learn: Java syntax, operators, lambdas and method references, plus direct access to every public class of the `java.*` modules.
 - **The shell never crashes.** Every line runs under a supervisor; Ctrl+C cancels the running command (a second Ctrl+C abandons a stuck computation) without leaving the shell; errors are short readable messages (`$debug = true` shows the Java stack trace).
@@ -326,7 +326,7 @@ The whole line runs under the `Supervisor`, which catches any `Throwable` and ha
 
 ### Command resolution and options
 
-For the first word of a stage, the `Interpreter` looks for a built-in command, then a cmdlet in the `CmdletRegistry` (built-in cmdlets and third-party modules), then an executable via `CommandResolver` (`PATH`, `PATHEXT` on Windows, explicit paths). For a cmdlet, the `OptionBinder` builds its **parameter record** from the arguments: short and long options, grouped flags, unambiguous abbreviations, `--opt=value`, positionals, typed conversion (`Path`, `int`, `Duration`, enums, sizes…), and errors with suggestions (`unknown option --recurce, did you mean --recurse?`).
+For the first word of a stage, the `Interpreter` looks for a built-in command, then a cmdlet in the `CmdletRegistry` (built-in cmdlets and third-party modules), then an executable via `CommandResolver` (`PATH`, `PATHEXT` on Windows, explicit paths). For a cmdlet, the `OptionBinder` builds its **parameter record** from the arguments: short and long options (written whole, in the case of the help), grouped flags, `--opt=value`, positionals, typed conversion (`Path`, `int`, `Duration`, enums, sizes…), and errors with suggestions (`unknown option --recurce, did you mean --recurse?`), and booleans that are `true` or `false`.
 
 ### Pipeline
 

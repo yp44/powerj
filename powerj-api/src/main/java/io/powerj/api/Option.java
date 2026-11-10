@@ -19,7 +19,10 @@ public @interface Option {
     /** Letter of the short form ({@code -r}); none by default. */
     char shortName() default '\0';
 
-    /** Name of the long form ({@code --recurse}); by default, the component name. */
+    /**
+     * Name of the long form ({@code --recurse}); by default, the component name in kebab case ({@code ignoreCase} gives
+     * {@code --ignore-case}). The user writes it exactly as it is: the case matters, and it is not abbreviated.
+     */
     String longName() default "";
 
     /** Mandatory option. */

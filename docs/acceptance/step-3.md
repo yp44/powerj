@@ -21,7 +21,7 @@ As in the previous steps: **Actions** tab, latest run of the **CI** workflow, ar
 | 7 | `$f*.name`, then `$f.size()` and `$f.name` | The names of all files; the number of files; an error saying to write `*.name` (without `*`, `.` applies to the list itself). |
 | 8 | `$f[0].siz` | Error in red: `FileEntry has no property 'siz' (properties: name, size, …)`. |
 | 9 | `ls --recurce` | `ls: unknown option --recurce, did you mean --recurse?` |
-| 10 | `ls --rec`, `ls -ra`, `ls --filter=*.txt`, `ls -f*.txt` | Abbreviation, grouped options, `=` and attached value: all accepted. |
+| 10 | `ls -ra`, `ls --filter=*.txt`, `ls -f*.txt` | Grouped options, `=` and attached value: all accepted. |
 | 11 | `ls C:\nulle\part; "suite"` | `ls: not found: C:\nulle\part` in red, then `suite`. |
 | 12 | `ls C:\nulle\part --on-error silent` | No message; `$?` is `false`. |
 | 13 | `help` | Built-in commands, then cmdlets by category (`Files`: `ls`; `Filters`: `where`, `map`, `collect`; `System`: `env`). |
