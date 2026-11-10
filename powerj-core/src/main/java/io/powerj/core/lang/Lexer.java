@@ -203,7 +203,8 @@ public final class Lexer {
 
     /**
      * Does an expression start at {@code at}, in command position? Variables, strings, groups,
-     * blocks, lists and conversions, characters, numbers, {@code true}/{@code false}/{@code null}/{@code now},
+     * blocks, lists and conversions, characters, numbers and unit literals (a word such as {@code 7z} that only starts with a
+     * digit is a command), {@code true}/{@code false}/{@code null}/{@code now},
      * {@code new Class(…)}, and qualified names attached to {@code (} or designating a class or a static
      * field ({@code Math.max(3, 7)}, {@code java.lang.Math.PI}). Otherwise it is a command
      * ({@code java -version}, {@code notepad.exe x}).
@@ -220,8 +221,18 @@ public final class Lexer {
         if (c == '$') {
             return at + 1 < input.length() && (isIdentifierStart(input.charAt(at + 1)) || input.charAt(at + 1) == '?');
         }
-        if (c == '"' || c == '(' || c == '{' || c == '[' || c == '\'' || Character.isDigit(c)) {
+        if (c == '"' || c == '(' || c == '{' || c == '[' || c == '\'') {
             return true;
+        }
+        if (Character.isDigit(c)) {
+            // A number, or a unit literal; a word that only starts with a digit is a program (7z, 2to3, 7z.exe). Only the run of
+            // letters, digits, '_' and '.' is looked at: an operator ends it, so 3+4 and 10*2 are still expressions.
+            int end = at;
+            while (end < input.length() && (Character.isLetterOrDigit(input.charAt(end))
+                    || input.charAt(end) == '_' || input.charAt(end) == '.')) {
+                end++;
+            }
+            return Units.looksLikeLiteral(input.substring(at, end));
         }
         if (!isIdentifierStart(c)) {
             return false;

@@ -206,6 +206,17 @@ class LexerTest {
     }
 
     @Test
+    void aWordThatOnlyStartsWithADigitIsACommand() {
+        for (String command : new String[] {"7z", "7z a x.zip", "7za", "7z.exe", "2to3", "1password", "7z-x"}) {
+            assertThat(Lexer.expressionAt(command, 0, _ -> false)).as(command).isFalse();
+        }
+        for (String literal : new String[] {"42", "1.5", "3L", "7d", "10kb", "250ms", "3+4", "10*2", "7d + 1", "5S", "2MB", "(1)"}) {
+            assertThat(Lexer.expressionAt(literal, 0, _ -> false)).as(literal).isTrue();
+        }
+        assertThat(Lexer.tokenize("7z a x.zip")).containsExactly(w("7z"), w("a"), w("x.zip"));
+    }
+
+    @Test
     void errorRedirectionOnlyAfterABlank() {
         assertThat(Lexer.tokenize("a2>b")).containsExactly(w("a2"), new Token.Redirection(RedirectedStream.OUT, false), w("b"));
         assertThat(Lexer.tokenize("2>x")).containsExactly(new Token.Redirection(RedirectedStream.ERR, false), w("x"));
