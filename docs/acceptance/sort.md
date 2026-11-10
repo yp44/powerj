@@ -23,7 +23,7 @@ Then `cd C:\tmp\s`.
 | # | Action | Expected result |
 |---|---|---|
 | 1 | `ls \| sort size --desc` | `big.txt` first, then `notes.txt`; `a.md` and `docs` (size 0) last, in their `ls` order. |
-| 2 | `ls \| sort size -d`, then `ls \| sort size --des` | Same as row 1 (short form, abbreviated long form). |
+| 2 | `ls \| sort size -d`, then `ls \| sort size --des` | The first is the same as row 1 (short form); the second is refused: `sort: unknown option --des, did you mean --desc?` (a long option is written whole). |
 | 3 | `ls \| sort dir name` | The files `a.md`, `big.txt`, `notes.txt`, then the folder `docs`. |
 | 4 | `ls \| sort { $_.name.length() } -d` | `notes.txt`, `big.txt`, then `a.md` and `docs` (4 characters each, in their `ls` order: stable sort). |
 | 5 | `ls \| sort { f -> f.ext }` | `docs` first (empty extension), then `a.md`, then the two `.txt`. |

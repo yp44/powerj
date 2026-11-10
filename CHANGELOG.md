@@ -668,6 +668,25 @@ structures, functions) can be built on it. The work is organised in phases (revi
 - **Breaking change of the API** (before the first release): `SizeUnits` reads lower-case units only; `Globs.ignoreCase` reads the values
   `true`, `1`, `false`, `0` only.
 
+### Changed (an option is written as the help shows it, [#88](https://github.com/yp44/powerj/issues/88))
+- **A long option is written whole.** `--rec` is no longer `--recurse`: it is refused with `ls: unknown option --rec, did you mean
+  --recurse?` (the error gives the name when exactly one name begins with the text typed, or when one is within two edits of it).
+  The reason: a script that wrote `--rec` broke the day a cmdlet added `--recover`, so adding an option was a breaking change for
+  the scripts and for the authors of modules. Tab still completes the beginning of a name. Hyphens were already part of the name
+  (`--maxdepth` is not `--max-depth`); the case has been exact since [#130](https://github.com/yp44/powerj/issues/130).
+- **A `boolean` is `true` or `false` and nothing else.** `--recurse=yes`, `=no`, `=oui`, `=non`, `=1`, `=0` are refused with the
+  message that already said it: `--recurse expects true or false, not 'yes'`. This amends [ADR 0012](docs/adr/0012-the-shell-is-case-sensitive.md),
+  which had kept them. The prompt that asks to load a module still takes `y`, `yes`, `o`, `oui`: it is an answer to a question, not
+  a value, and `POWERJ_GLOB_IGNORE_CASE` keeps its own words.
+- **`OptionBinder` is shorter and does less work per command.** The two regular expressions (a negative number, the cut of a
+  camel-case name) are constants; the options of a parameter record are read once (`ClassValue`) and shared by the binder, the help and
+  the completion; `bind()` (90 lines) is a cursor over the arguments and three small methods (`longOption`, `shortOptions`,
+  `positional`). The message `option.ambiguous` is gone with the abbreviations.
+- `Option.longName` (Javadoc of the API): the default is the kebab case of the component name (`ignoreCase` gives `--ignore-case`),
+  not the component name as the text said. No signature changes.
+- Breaking, allowed before 1.0 ([#47](https://github.com/yp44/powerj/issues/47)): `--rec`, `--des`, `--max 2`, `--flag=yes`,
+  `--flag=1`. The acceptance sheets of `sort`, `ls` and the case rule are corrected.
+
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
   whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes

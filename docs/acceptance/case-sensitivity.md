@@ -17,7 +17,7 @@ A folder with `a.txt`, `Notes.TXT` and a sub-folder. Where a row says "Windows" 
 | # | Action | Expected result |
 |---|---|---|
 | 1 | `ls --recurse`, then `ls --Recurse` | The first works; the second: `ls: unknown option --Recurse, did you mean --recurse?` |
-| 2 | `ls --rec`, then `ls --REC` | The abbreviation works in the case written; the second is refused: `ls: unknown option --REC`. |
+| 2 | `ls --rec`, then `ls --REC` | Both are refused (a long option is written whole): `ls: unknown option --rec, did you mean --recurse?` and `ls: unknown option --REC`. |
 | 3 | `ls \| sort size`, then `ls \| sort Size` | The first works; the second, for each object: `sort: FileEntry has no property 'Size' (did you mean 'size'? The case of a name matters) (object skipped: …)`. |
 | 4 | `ls \| select name`, then `ls \| select Name` | The same rule for the columns of `select` (FR-69): `select: column Name: FileEntry has no property 'Name' (did you mean 'name'? The case of a name matters)`. |
 | 5 | `(ls)*.name`, then `(ls)*.Name` | The same rule for `$_.name` and `*.name` (FR-28): `FileEntry has no property 'Name' (did you mean 'name'? The case of a name matters)`. |

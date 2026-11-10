@@ -81,11 +81,14 @@ class OptionBinderTest {
     }
 
     @Test
-    void aBooleanValueIsSpelledInLowerCase() {
+    void aBooleanValueIsTrueOrFalseAndNothingElse() {
         assertThat(bind("--recurse=true").recurse()).isTrue();
-        assertThat(bind("--recurse=yes").recurse()).isTrue();
-        assertThatThrownBy(() -> bind("--recurse=TRUE")).hasMessageContaining("expects true or false, not 'TRUE'");
-        assertThatThrownBy(() -> bind("--recurse=No")).hasMessageContaining("not 'No'");
+        assertThat(bind("--recurse=false").recurse()).isFalse();
+        for (String other : List.of("yes", "no", "oui", "non", "1", "0", "TRUE", "True", "FALSE", "No", "")) {
+            assertThatThrownBy(() -> bind("--recurse=" + other))
+                    .as("--recurse=%s", other)
+                    .hasMessage("t: --recurse expects true or false, not '" + other + "'");
+        }
     }
 
     @Test
@@ -102,10 +105,25 @@ class OptionBinderTest {
         assertThat(bind(List.of("a", "b"), "c").paths()).containsExactly("a", "b", "c");
     }
 
+    /** An option is written as the help shows it: the beginning of a name is not the name (#88). */
     @Test
-    void unambiguousAbbreviation() {
-        assertThat(bind("--rec").recurse()).isTrue();
-        assertThat(bind("--max", "2").maxDepth()).isEqualTo(2);
+    void anAbbreviationIsNotAName() {
+        assertThatThrownBy(() -> bind("--rec")).hasMessage("t: unknown option --rec, did you mean --recurse?");
+        assertThatThrownBy(() -> bind("--max", "2")).hasMessage("t: unknown option --max, did you mean --max-depth?");
+        assertThatThrownBy(() -> bind("--fil", "*.java")).hasMessage("t: unknown option --fil, did you mean --filter?");
+        assertThatThrownBy(() -> bind("--recurse-all")).hasMessage("t: unknown option --recurse-all");
+    }
+
+    @Test
+    void aBeginningThatFitsSeveralNamesSuggestsNone() {
+        // --m begins --max-depth and --mode: neither is the name, and the error does not pick one.
+        assertThatThrownBy(() -> bind("--m", "x")).hasMessage("t: unknown option --m");
+    }
+
+    @Test
+    void aNameIsExactAboutItsHyphens() {
+        assertThatThrownBy(() -> bind("--maxdepth", "2")).hasMessage("t: unknown option --maxdepth, did you mean --max-depth?");
+        assertThat(bind("--max-depth", "2").maxDepth()).isEqualTo(2);
     }
 
     @Test
@@ -117,7 +135,6 @@ class OptionBinderTest {
         assertThatThrownBy(() -> bind("--max-depth", "trois"))
                 .hasMessage("t: invalid value for --max-depth: 'trois'");
         assertThatThrownBy(() -> bind("--mode", "slow")).hasMessageContaining("--mode accepts [fast, safe]");
-        assertThatThrownBy(() -> bind("--m", "x")).hasMessageContaining("ambiguous option --m");
     }
 
     @Test

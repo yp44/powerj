@@ -15,6 +15,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 import io.powerj.api.Option;
 import io.powerj.core.error.PjError;
@@ -61,20 +62,33 @@ public final class OptionBinder {
     private OptionBinder() {
     }
 
-    /** Options declared by a parameter record, in component order. */
-    public static List<OptionSpec> specs(Class<? extends Record> type) {
-        List<OptionSpec> specs = new ArrayList<>();
-        for (RecordComponent c : type.getRecordComponents()) {
-            Option option = c.getAnnotation(Option.class);
-            if (option == null) {
-                specs.add(new OptionSpec(c, '\0', kebab(c.getName()), false, -1, ""));
-            } else {
-                String longName = option.longName().isEmpty() ? kebab(c.getName()) : option.longName();
-                specs.add(new OptionSpec(c, option.shortName(), longName, option.mandatory(), option.position(),
-                        option.description()));
+    /** A negative number is an argument, not an option: {@code -5}, {@code -1.5}. */
+    private static final Pattern NEGATIVE_NUMBER = Pattern.compile("-\\d+(\\.\\d+)?");
+    /** Where a camel-case name is cut into words: {@code onError} gives {@code on-Error}. */
+    private static final Pattern CAMEL_BOUNDARY = Pattern.compile("([a-z0-9])([A-Z])");
+
+    /** The options of each parameter record, read once: the same list serves every command, the help and the completion. */
+    private static final ClassValue<List<OptionSpec>> SPECS = new ClassValue<>() {
+        @Override
+        protected List<OptionSpec> computeValue(Class<?> type) {
+            List<OptionSpec> specs = new ArrayList<>();
+            for (RecordComponent c : type.getRecordComponents()) {
+                Option option = c.getAnnotation(Option.class);
+                if (option == null) {
+                    specs.add(new OptionSpec(c, '\0', kebab(c.getName()), false, -1, ""));
+                } else {
+                    String longName = option.longName().isEmpty() ? kebab(c.getName()) : option.longName();
+                    specs.add(new OptionSpec(c, option.shortName(), longName, option.mandatory(), option.position(),
+                            option.description()));
+                }
             }
+            return List.copyOf(specs);
         }
-        return specs;
+    };
+
+    /** Options declared by a parameter record, in component order. The list is shared and cannot be changed. */
+    public static List<OptionSpec> specs(Class<? extends Record> type) {
+        return SPECS.get(type);
     }
 
     /**
@@ -83,118 +97,159 @@ public final class OptionBinder {
      */
     public static <P extends Record> P bind(String command, Class<P> type, List<Object> args) {
         List<OptionSpec> specs = specs(type);
-        Object[] values = new Object[specs.size()];
-        boolean[] given = new boolean[specs.size()];
-        List<OptionSpec> positionals = specs.stream().filter(OptionSpec::isPositional)
-                .sorted(Comparator.comparingInt(OptionSpec::position)).toList();
-        int nextPositional = 0;
-        boolean optionsEnded = false;
+        Binding binding = new Binding(command, specs, args);
+        binding.readArguments();
+        binding.checkMandatoryAndFillDefaults();
+        return construct(command, type, specs, binding.values);
+    }
 
-        for (int i = 0; i < args.size(); i++) {
-            Object arg = args.get(i);
-            if (!optionsEnded && arg instanceof String word && isOption(word)) {
-                if (word.equals("--")) {
-                    optionsEnded = true;
-                    continue;
-                }
-                if (word.startsWith("--")) {
-                    String name = word.substring(2);
-                    String inline = null;
-                    int equals = name.indexOf('=');
-                    if (equals >= 0) {
-                        inline = name.substring(equals + 1);
-                        name = name.substring(0, equals);
-                    }
-                    OptionSpec spec = byLongName(command, specs, name);
-                    int index = specs.indexOf(spec);
-                    if (spec.isFlag()) {
-                        values[index] = inline == null || parseBoolean(command, spec, inline);
-                    } else if (inline != null) {
-                        values[index] = add(values[index], convert(command, spec, inline));
+    /** The reading of one command line: the values given so far, and where the next argument is. */
+    private static final class Binding {
+        final String command;
+        final List<OptionSpec> specs;
+        final List<Object> args;
+        final Object[] values;
+        final boolean[] given;
+        final List<OptionSpec> positionals;
+        int cursor; // the next argument to read
+        int nextPositional;
+        boolean optionsEnded;
+
+        Binding(String command, List<OptionSpec> specs, List<Object> args) {
+            this.command = command;
+            this.specs = specs;
+            this.args = args;
+            this.values = new Object[specs.size()];
+            this.given = new boolean[specs.size()];
+            this.positionals = specs.stream().filter(OptionSpec::isPositional)
+                    .sorted(Comparator.comparingInt(OptionSpec::position)).toList();
+        }
+
+        void readArguments() {
+            while (cursor < args.size()) {
+                Object arg = args.get(cursor++);
+                if (!optionsEnded && arg instanceof String word && isOption(word)) {
+                    if (word.equals("--")) {
+                        optionsEnded = true;
+                    } else if (word.startsWith("--")) {
+                        longOption(word);
                     } else {
-                        if (i + 1 >= args.size()) {
-                            throw new PjException(Messages.get("option.valueExpected.long", command, spec.longName()));
-                        }
-                        values[index] = add(values[index], convert(command, spec, args.get(++i)));
+                        shortOptions(word);
                     }
-                    given[index] = true;
                 } else {
-                    // Short options, possibly grouped: -ra, -f *.java, -fvaleur
-                    String letters = word.substring(1);
-                    for (int k = 0; k < letters.length(); k++) {
-                        OptionSpec spec = byShortName(command, specs, letters.charAt(k));
-                        int index = specs.indexOf(spec);
-                        given[index] = true;
-                        if (spec.isFlag()) {
-                            values[index] = Boolean.TRUE;
-                            continue;
-                        }
-                        String rest = letters.substring(k + 1);
-                        if (!rest.isEmpty()) {
-                            values[index] = add(values[index], convert(command, spec, rest));
-                        } else if (i + 1 < args.size()) {
-                            values[index] = add(values[index], convert(command, spec, args.get(++i)));
-                        } else {
-                            throw new PjException(Messages.get("option.valueExpected.short", command, spec.shortName()));
-                        }
-                        break;
-                    }
-                }
-            } else {
-                if (nextPositional >= positionals.size()) {
-                    throw new PjException(Messages.get("option.unexpectedArgument", command, Values.text(arg)));
-                }
-                OptionSpec spec = positionals.get(nextPositional);
-                int index = specs.indexOf(spec);
-                if (given[index] && !spec.isList()) {
-                    // the option already received its value by name: move on to the next positional
-                    nextPositional++;
-                    i--;
-                    continue;
-                }
-                values[index] = add(values[index], convert(command, spec, arg));
-                given[index] = true;
-                if (!spec.isList()) {
-                    nextPositional++;
+                    positional(arg);
                 }
             }
         }
 
-        for (int i = 0; i < specs.size(); i++) {
-            OptionSpec spec = specs.get(i);
-            if (spec.mandatory() && !given[i]) {
-                throw new PjException(Messages.get("option.missingMandatory", command, spec.longName()));
+        /** {@code --name}, {@code --name=value}, {@code --name value}: the name is exact. */
+        private void longOption(String word) {
+            String name = word.substring(2);
+            String inline = null;
+            int equals = name.indexOf('=');
+            if (equals >= 0) {
+                inline = name.substring(equals + 1);
+                name = name.substring(0, equals);
             }
-            if (values[i] == null) {
-                values[i] = defaultValue(spec.component().getType());
+            OptionSpec spec = byLongName(command, specs, name);
+            int index = specs.indexOf(spec);
+            if (spec.isFlag()) {
+                values[index] = inline == null || parseBoolean(command, spec, inline);
+            } else if (inline != null) {
+                values[index] = add(values[index], convert(command, spec, inline));
+            } else {
+                if (cursor >= args.size()) {
+                    throw new PjException(Messages.get("option.valueExpected.long", command, spec.longName()));
+                }
+                values[index] = add(values[index], convert(command, spec, args.get(cursor++)));
+            }
+            given[index] = true;
+        }
+
+        /** Short options, possibly grouped: {@code -ra}, {@code -f *.java}, {@code -fvalue}. */
+        private void shortOptions(String word) {
+            String letters = word.substring(1);
+            for (int k = 0; k < letters.length(); k++) {
+                OptionSpec spec = byShortName(command, specs, letters.charAt(k));
+                int index = specs.indexOf(spec);
+                given[index] = true;
+                if (spec.isFlag()) {
+                    values[index] = Boolean.TRUE;
+                    continue;
+                }
+                String rest = letters.substring(k + 1);
+                if (!rest.isEmpty()) {
+                    values[index] = add(values[index], convert(command, spec, rest));
+                } else if (cursor < args.size()) {
+                    values[index] = add(values[index], convert(command, spec, args.get(cursor++)));
+                } else {
+                    throw new PjException(Messages.get("option.valueExpected.short", command, spec.shortName()));
+                }
+                break;
             }
         }
-        return construct(command, type, specs, values);
+
+        private void positional(Object arg) {
+            if (nextPositional >= positionals.size()) {
+                throw new PjException(Messages.get("option.unexpectedArgument", command, Values.text(arg)));
+            }
+            OptionSpec spec = positionals.get(nextPositional);
+            int index = specs.indexOf(spec);
+            if (given[index] && !spec.isList()) {
+                // the option already received its value by name: move on to the next positional, with the same argument
+                nextPositional++;
+                cursor--;
+                return;
+            }
+            values[index] = add(values[index], convert(command, spec, arg));
+            given[index] = true;
+            if (!spec.isList()) {
+                nextPositional++;
+            }
+        }
+
+        void checkMandatoryAndFillDefaults() {
+            for (int i = 0; i < specs.size(); i++) {
+                OptionSpec spec = specs.get(i);
+                if (spec.mandatory() && !given[i]) {
+                    throw new PjException(Messages.get("option.missingMandatory", command, spec.longName()));
+                }
+                if (values[i] == null) {
+                    values[i] = defaultValue(spec.component().getType());
+                }
+            }
+        }
     }
 
     /** {@code -x}, {@code --xx}, {@code --}; but not a negative number nor {@code -} alone. */
     private static boolean isOption(String word) {
-        return word.length() > 1 && word.charAt(0) == '-' && !word.matches("-\\d+(\\.\\d+)?");
+        return word.length() > 1 && word.charAt(0) == '-' && !NEGATIVE_NUMBER.matcher(word).matches();
     }
 
+    /** The option written as the help shows it: the name is exact (no other case, no beginning of a name). */
     private static OptionSpec byLongName(String command, List<OptionSpec> specs, String name) {
         for (OptionSpec spec : specs) {
-            if (spec.longName().equals(name)) { // the case of a name matters, as in Java
+            if (spec.longName().equals(name)) {
                 return spec;
             }
         }
-        List<OptionSpec> prefixed = specs.stream().filter(s -> s.longName().startsWith(name)).toList();
-        if (prefixed.size() == 1 && !name.isEmpty()) {
-            return prefixed.getFirst();
-        }
-        if (prefixed.size() > 1 && !name.isEmpty()) {
-            throw new PjException(Messages.get("option.ambiguous", command, name,
-                    String.join(", ", prefixed.stream().map(s -> "--" + s.longName()).toList())));
-        }
-        Optional<String> suggestion = closest(name, specs.stream().map(OptionSpec::longName).toList());
+        List<String> names = specs.stream().map(OptionSpec::longName).toList();
+        Optional<String> suggestion = onlyNameBeginningWith(name, names).or(() -> closest(name, names));
         throw new PjException(suggestion.isPresent()
                 ? Messages.get("option.unknown.long.suggestion", command, name, suggestion.get())
                 : Messages.get("option.unknown.long", command, name));
+    }
+
+    /**
+     * The one name that begins with {@code text}, for the error of someone who wrote the beginning of it: a hint, never a
+     * match. Several names, or none, give nothing: the error does not pick one.
+     */
+    private static Optional<String> onlyNameBeginningWith(String text, List<String> names) {
+        if (text.isEmpty()) {
+            return Optional.empty();
+        }
+        List<String> found = names.stream().filter(n -> n.startsWith(text)).toList();
+        return found.size() == 1 ? Optional.of(found.getFirst()) : Optional.empty();
     }
 
     private static OptionSpec byShortName(String command, List<OptionSpec> specs, char letter) {
@@ -240,9 +295,9 @@ public final class OptionBinder {
     }
 
     private static boolean parseBoolean(String command, OptionSpec spec, String text) {
-        return switch (text) {
-            case "true", "oui", "yes", "1" -> true;
-            case "false", "non", "no", "0" -> false;
+        return switch (text) { // exactly the two words of the language: no yes, no, oui, non, 1, 0, and no other case
+            case "true" -> true;
+            case "false" -> false;
             default -> throw new PjException(Messages.get("option.booleanExpected", command, spec.longName(), text));
         };
     }
@@ -368,6 +423,6 @@ public final class OptionBinder {
 
     /** {@code onError} → {@code on-error}. */
     private static String kebab(String name) {
-        return name.replaceAll("([a-z0-9])([A-Z])", "$1-$2").toLowerCase(Locale.ROOT);
+        return CAMEL_BOUNDARY.matcher(name).replaceAll("$1-$2").toLowerCase(Locale.ROOT);
     }
 }
