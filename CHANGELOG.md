@@ -31,6 +31,10 @@ structures, functions) can be built on it. The work is organised in phases (revi
   could not fail, now can.
 
 ### Fixed (Phase 1, targeted fixes — done)
+- **A program whose name starts with a digit can be run** (`7z archive.zip`). In command position, any word starting with a digit
+  was read as a number and refused (`invalid number: 7z`). Now only a word that has the shape of a number or of a unit literal
+  (`42`, `7d`, `10kb`, and `5S` or `2MB`, which are still reported as badly written) is an expression; `7z`, `7z.exe` and `2to3` are
+  looked up as programs. `Units.looksLikeLiteral` carries the rule, shared by the parser, the highlighting and the completion.
 - **`System.exit` can no longer end the shell by another road** (review C-12, step 1.1). The guard used to be written for
   the direct call only; `[0] | map System::exit` or `Method.invoke` ended the JVM. It is now a `CallPolicy` consulted by
   `JavaInvoker`, the one place every Java call goes through. `System.exit("x")` now reports the usual "no overload"

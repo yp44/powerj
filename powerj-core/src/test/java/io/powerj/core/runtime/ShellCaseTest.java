@@ -104,5 +104,16 @@ class ShellCaseTest {
         assertThat(run("2kb")).isEqualTo("2048");
         assertThatThrownBy(() -> run("2KB")).as("2KB is no literal, and the message gives the units")
                 .hasMessageContaining("invalid number: 2KB").hasMessageContaining("units: b kb mb gb tb");
+        assertThatThrownBy(() -> run("5S")).hasMessageContaining("invalid number: 5S");
+    }
+
+    @Test
+    void aProgramNameThatStartsWithADigitIsNotANumber() throws Exception {
+        // 7z is looked up as a program, as any word: it is not found here, but it is no "invalid number".
+        try {
+            run("7z test0-runner.zip");
+        } catch (RuntimeException e) {
+            assertThat(e.getMessage()).doesNotContain("invalid number");
+        }
     }
 }

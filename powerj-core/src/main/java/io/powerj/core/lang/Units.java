@@ -3,6 +3,7 @@ package io.powerj.core.lang;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -18,7 +19,22 @@ public final class Units {
     /** The case of the unit matters: {@code 2mb}, not {@code 2MB}. */
     private static final Pattern LITERAL = Pattern.compile("(\\d+(?:\\.\\d+)?)(" + SizeUnits.PATTERN + "|ms|s|m|h|d)");
 
+    /**
+     * What a number looks like, read in lower case: digits, an optional fraction, and nothing, {@code L} or a unit. It is a test of
+     * shape, not of value: {@code 5S} has the shape of a literal and is reported as one that is badly written.
+     */
+    private static final Pattern SHAPE = Pattern.compile(
+            "\\d+(?:\\.\\d+)?(?:l|" + SizeUnits.PATTERN + "|ms|s|m|h|d)?");
+
     private Units() {
+    }
+
+    /**
+     * Has the word the shape of a number or of a unit literal ({@code 42}, {@code 1.5}, {@code 3L}, {@code 7d}, {@code 2MB})? A word that
+     * starts with a digit and has not ({@code 7z}, {@code 2to3}, {@code 7z.exe}) is the name of a program, not a literal.
+     */
+    public static boolean looksLikeLiteral(String word) {
+        return SHAPE.matcher(word.toLowerCase(Locale.ROOT)).matches();
     }
 
     /** Value of the literal, or empty if the text is not one. */
