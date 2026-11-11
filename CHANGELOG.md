@@ -692,6 +692,14 @@ structures, functions) can be built on it. The work is organised in phases (revi
 - Breaking, allowed before 1.0 ([#47](https://github.com/yp44/powerj/issues/47)): `--rec`, `--des`, `--max 2`, `--flag=yes`,
   `--flag=1`. The acceptance sheets of `sort`, `ls` and the case rule are corrected.
 
+### Fixed (a test of the background jobs failed at random, [#128](https://github.com/yp44/powerj/issues/128))
+- `PosixSpawnTest.check05_theChildInheritsNoOtherDescriptorThanTheStandardOnes` failed once on the CI (a descriptor `3` in the
+  child) and passed on the re-run, with the same code. **Nothing leaked**: right after `exec`, the dynamic loader opens the C library on
+  descriptor 3 and closes it a few hundred microseconds later, and the test listed `/proc/<pid>/fd` in that instant (2 reads of
+  1,000 measured on Linux; 395 of 400 when the read is immediate in a tight loop). The test now reads again, every 5 ms, until
+  the list is the one expected (`ChildFds`, five seconds at most) and fails only with the list that is still wrong then. A real
+  leak does not go away: with the child started without `addclosefrom_np` the test still fails. Test only; no change to the code of PowerJ.
+
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
   whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes
