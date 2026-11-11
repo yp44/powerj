@@ -34,4 +34,13 @@ cat "$WORK/out.txt"
 [ "$code" -eq 3 ] || { echo "expected exit code 3, got $code" >&2; exit 1; }
 expect "$WORK/out.txt" '/usr$' 'line: deux' 'fallback' 'ls → cmdlet (io.powerj.cmdlets)' 'usr$' 'filter: usr' \
     'sort: \[a, b\]' 'java: 7' 'lambda: 2' 'reference: A' 'collect: 1'
+
+# A start-up directory that does not exist: an error naming it, exit code 1, and no shell started (FR-04d).
+set +e
+"$PJ" --cd "$WORK/absent" -c 'pwd' < /dev/null > "$WORK/cd-out.txt" 2> "$WORK/cd-err.txt"
+code=$?
+set -e
+[ "$code" -eq 1 ] || { echo "expected exit code 1 for a missing --cd directory, got $code" >&2; exit 1; }
+expect "$WORK/cd-err.txt" "--cd" "absent"
+[ ! -s "$WORK/cd-out.txt" ] || { echo "the command ran although --cd failed" >&2; exit 1; }
 echo "launcher: OK"

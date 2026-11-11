@@ -158,8 +158,12 @@ The current directory belongs to the shell: it is the base for relative paths of
 | `powerj -c "<line>"` | Runs the line then exits. |
 | `powerj file.pj` | Runs the file line by line (in v1: a sequence of lines, without control structures) then exits. |
 | `… \| powerj -c "where { $_.contains(\"x\") }"` | If stdin is not a terminal, its lines feed the first stage (`String` lines). |
+| `powerj --cd <dir> …` (or `--cd=<dir>`) | Sets the **initial current directory** (FR-04b) of the session, in the interactive shell as in non-interactive mode. |
 
 In this mode: no prompt, no history, no colors if the output is not a terminal, and a terminating error stops execution. Process **return code**: `exit <n>` if called; otherwise 0 if the last command succeeded, the code of the last native command if it failed, 1 for a PowerJ terminating error.
+
+`--cd` is an option of the shell, like `--debug` and `--no-profile`, not an argument of the script. Its value is an absolute path or a path relative to the directory `powerj` was started in, and a leading `~` is expanded (FR-62) because `cmd.exe` and quoted arguments do not do it. It sets what FR-04b calls the current directory: the base of relative paths for cmdlets, redirections and Java calls, the working directory of native commands, `$pwd` and the prompt; the JVM's own working directory is not touched, and the path of `powerj script.pj` is still looked up where `powerj` was started. It is applied **before** `profile.pj` (FR-63), so a `cd` in the profile wins, and it is independent of `--no-profile`. If the directory does not exist or is not a directory, PowerJ prints an error with the path and exits with code 1 without starting the shell (no fallback to the current directory); `--cd` without a value is a usage error (exit code 2, with the usage line). `--help` lists the option.
+- CA: `powerj --cd C:\dev -c pwd` displays `C:\dev` whatever the directory of `cmd.exe`; `powerj --cd ~/docs` shows the prompt `PJ <home>/docs>`; `powerj --cd build script.pj` runs `script.pj` (found where it was typed) from `build`; `powerj --cd absent -c pwd` prints an error naming `absent` and `%ERRORLEVEL%` is 1; `powerj --cd` prints the usage; a `cd` in `profile.pj` overrides `--cd`.
 - CA: `powerj -c "ls | where { $_.size > 1mb }"` from `cmd.exe`; `powerj -c "^cmd /c exit 3"` then `echo %ERRORLEVEL%` displays 3; `dir /b | powerj -c "where { $_.endsWith(\".txt\") }"`.
 
 ### 3.2 Line editing

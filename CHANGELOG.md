@@ -700,6 +700,21 @@ structures, functions) can be built on it. The work is organised in phases (revi
   the list is the one expected (`ChildFds`, five seconds at most) and fails only with the list that is still wrong then. A real
   leak does not go away: with the child started without `addclosefrom_np` the test still fails. Test only; no change to the code of PowerJ.
 
+### Added (a start-up option to choose the directory the shell opens in, [#121](https://github.com/yp44/powerj/issues/121))
+- **`powerj --cd <dir>` (or `--cd=<dir>`)** sets the initial current directory of the session (FR-04d, FR-04b), for a terminal
+  profile, a shortcut or an alias that cannot choose it: `powerj --cd ~/dev/myproject`, `powerj --cd /var/log -c "ls | first 5"`,
+  `powerj --cd build script.pj`. It works in the interactive shell and with `-c`, a `.pj` file or standard input; it is an option of
+  the shell (like `--debug` and `--no-profile`), not an argument of the script. The value is absolute or relative to where `powerj`
+  was started, and a leading `~` is expanded (FR-62). The prompt, `pwd`, `$pwd`, relative paths, redirections and native commands
+  agree; the JVM's own working directory is not touched, and the `.pj` file is still looked up where `powerj` was started.
+- **Applied before `profile.pj`**, so a `cd` in the profile still wins; `--no-profile` is independent.
+- **No silent fallback**: a directory that does not exist, or is a file, prints an error with the path (English and French,
+  `startDirectory.notFound` / `startDirectory.notDirectory`) and exits with code 1 without starting the shell. `--cd` without a
+  value is a usage error (code 2). `--help` and the usage line list the option.
+- `Session.expandTilde(word, environment, startupHome)` expands `~` before a session exists, with the same rules as inside it.
+- Tests: `ShellBootstrapTest` (parsing, absolute / relative / `~`, `-c`, `.pj`, interactive prompt, profile, errors in both
+  languages), `SessionStateTest`; smoke scripts `non-interactive.sh` and `launcher.sh`; acceptance rows 21a–21f of `step-4.md`.
+
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
   whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes

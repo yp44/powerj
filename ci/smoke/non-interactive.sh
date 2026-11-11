@@ -17,9 +17,12 @@ printf 'daemon:x:1\nroot:x:0\n' > "$WORK/passwd.txt"
 (cd "$WORK" && "$PJ" -c 'grep -i "^ROOT:" passwd.txt -p 2 | map { m -> "grep: " + m.line }' < /dev/null > grep.txt)
 cat "$WORK/grep.txt"
 [ "$(cat "$WORK/grep.txt")" = "grep: 2" ] || { echo "grep through the launcher failed" >&2; exit 1; }
+# --cd chooses the directory the session starts in (FR-04d), whatever the directory powerj was started in.
+(cd / && "$PJ" --cd "$WORK" -c pwd < /dev/null > "$WORK/cd.txt")
+expect "$WORK/cd.txt" "$(basename "$WORK")\$"
 # --version and --help answer without starting the shell (and without touching the home folder).
 "$PJ" --version > "$WORK/version.txt"
 expect "$WORK/version.txt" "^PowerJ " "(Java "
 "$PJ" --help > "$WORK/help.txt"
-expect "$WORK/help.txt" "usage: powerj" "--version" "--help"
+expect "$WORK/help.txt" "usage: powerj" "--cd" "--version" "--help"
 echo "non-interactive: OK"

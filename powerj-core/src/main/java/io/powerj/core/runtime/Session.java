@@ -11,6 +11,7 @@ import java.util.TreeSet;
 import io.powerj.api.perf.PerfReport;
 import io.powerj.core.java.JavaClasses;
 import io.powerj.core.nativeexec.NativeRun;
+import io.powerj.fs.Host;
 
 /**
  * State of a shell session. It is what the interpreter, the cmdlets and the shell hold on to, and it is made of
@@ -47,6 +48,14 @@ public final class Session {
     /** Tilde expansion of an unquoted word (FR-62): {@code ~} and {@code ~/x}; any other word is unchanged. */
     public String expandTilde(String word) {
         return state.expandTilde(word);
+    }
+
+    /**
+     * Tilde expansion (FR-62) before a session exists, with the rules of {@link #expandTilde(String)}: the home is
+     * {@code HOME}, else {@code USERPROFILE}, else {@code startupHome}. Used for the start-up directory ({@code --cd}).
+     */
+    public static String expandTilde(String word, Map<String, String> environment, Path startupHome) {
+        return SessionState.expandTilde(word, Host.home(environment, startupHome.toAbsolutePath().normalize()));
     }
 
     public Path currentDirectory() {

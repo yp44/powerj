@@ -57,11 +57,16 @@ final class SessionState {
      * {@code ~\x} a path under it; any other word is returned unchanged ({@code ~user} included).
      */
     String expandTilde(String word) {
+        return expandTilde(word, home());
+    }
+
+    /** The same expansion for a known home, when there is no session yet (the start-up directory option). */
+    static String expandTilde(String word, Path home) {
         if (word.equals("~")) {
-            return home().toString();
+            return home.toString();
         }
         if (word.startsWith("~/") || word.startsWith("~\\")) {
-            return home().resolve(word.substring(2)).toString();
+            return home.resolve(word.substring(2)).toString();
         }
         return word;
     }
