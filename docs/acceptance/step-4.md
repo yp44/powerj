@@ -1,6 +1,6 @@
 # Acceptance test — Step 4: pipeline and `where`
 
-**Goal:** verify the `|` pipeline (cmdlets and native commands mixed), `{ }` blocks with Java syntax, the `where` cmdlet, the `2>&1` redirection, Ctrl+C on a pipeline and non-interactive mode (`powerj -c`, `.pj` file).
+**Goal:** verify the `|` pipeline (cmdlets and native commands mixed), `{ }` blocks with Java syntax, the `where` cmdlet, the `2>&1` redirection, Ctrl+C on a pipeline and non-interactive mode (`powerj -c`, `.pj` file, `--cd` start-up directory).
 
 > Messages are shown in the system language; set `language=en` in config.properties (or `POWERJ_LANG=en`) to get the English texts quoted here.
 
@@ -33,6 +33,12 @@ As in the previous steps: **Actions** tab, latest run of the **CI** workflow, ar
 | 19 | `dir /b C:\Windows \| powerj -c "where { $_.endsWith(\".exe\") }"` | The `.exe` files of `C:\Windows`: the lines from standard input feed `where`. |
 | 20 | Create `test.pj` containing the two lines `ls C:\Windows \| where dir == true` and `exit 5`, then `powerj test.pj` and `echo %ERRORLEVEL%` | The folders of `C:\Windows`, then `5`. |
 | 21 | `powerj -c "commandeinconnue"` then `echo %ERRORLEVEL%` | `unknown command: commandeinconnue`, then `1`. |
+| 21a | From `cmd.exe`, in any folder: `powerj --cd C:\Windows -c pwd`, then `powerj --cd=C:\Windows\System32` and read the prompt | `C:\Windows`, then the prompt `PJ C:\Windows\System32>`: the session starts in the folder given. |
+| 21b | `powerj --cd ~ -c pwd`, then `powerj --cd ..` from a subfolder of your home folder | Your home folder (`~` expanded although `cmd.exe` does not), then the prompt shows the parent of the folder you were in. |
+| 21c | Create `C:\work\test.pj` containing `pwd`, go to `C:\work`, run `powerj --cd C:\Windows test.pj` | `C:\Windows`: the file is found where it was typed, and runs in the `--cd` folder. |
+| 21d | `powerj --cd C:\absent -c pwd` then `echo %ERRORLEVEL%` | `PowerJ: --cd: directory not found: C:\absent` (a file instead of a folder: `not a directory`), then `1`; the shell is not started. |
+| 21e | `powerj --cd`, `powerj --cd C:\a --cd C:\b` and `powerj --cd -c pwd`, each followed by `echo %ERRORLEVEL%` | The usage line (which lists `[--cd <dir>]`), then `2`, each time: one `--cd` only, and its value is a path, not an option. |
+| 21f | Put `cd C:\Users` in `profile.pj`, run `powerj --cd C:\Windows`, then `powerj --no-profile --cd C:\Windows` | First prompt `PJ C:\Users>` (the profile wins), then `PJ C:\Windows>`. |
 
 Linux / macOS variant (archive `powerj-linux-x64`): replace `ipconfig` with `ip addr`, `^cmd /c …` with `sh -c "…"`, `dir /b` with `ls -1`, and launch `bin/powerj`.
 

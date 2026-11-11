@@ -68,6 +68,16 @@ class SessionStateTest {
     }
 
     @Test
+    void theTildeCanBeExpandedBeforeThereIsASession() {
+        Path startup = tmp.resolve("startup-home");
+
+        assertThat(Session.expandTilde("~/docs", Map.of("HOME", tmp.toString()), startup))
+                .isEqualTo(tmp.resolve("docs").toString());
+        assertThat(Session.expandTilde("~", Map.of(), startup)).isEqualTo(startup.toAbsolutePath().toString());
+        assertThat(Session.expandTilde("~someone", Map.of(), startup)).isEqualTo("~someone");
+    }
+
+    @Test
     void changingDirectoryRemembersTheOneWeLeft() throws IOException {
         Path sub = Files.createDirectory(tmp.resolve("sub"));
         var state = state(Map.of());

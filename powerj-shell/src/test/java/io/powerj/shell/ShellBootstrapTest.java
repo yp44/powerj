@@ -1,6 +1,7 @@
 package io.powerj.shell;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assumptions.assumeThat;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -83,6 +84,45 @@ class ShellBootstrapTest {
     }
 
     @Test
+    void theStartDirectoryIsTheNextWordOrWhatFollowsTheEqualSign() {
+        var spaced = ShellBootstrap.Options.parse("--cd", "build", "-c", "pwd");
+        var equal = ShellBootstrap.Options.parse("--cd=D:\\dev\\my project", "script.pj", "--no-profile");
+
+        assertThat(spaced.startDirectory()).isEqualTo("build");
+        assertThat(spaced.usageError()).isFalse();
+        assertThat(spaced.script()).containsExactly("-c", "pwd");
+        assertThat(equal.startDirectory()).isEqualTo("D:\\dev\\my project");
+        assertThat(equal.noProfile()).isTrue();
+        assertThat(equal.script()).containsExactly("script.pj");
+        assertThat(ShellBootstrap.Options.parse("--cd", "./-x").usageError()).isFalse();
+        assertThat(ShellBootstrap.Options.parse("-c", "pwd").startDirectory()).isNull();
+    }
+
+    @Test
+    void aMissingOrEmptyStartDirectoryIsAUsageError() {
+        assertThat(ShellBootstrap.Options.parse("--cd").usageError()).isTrue();
+        assertThat(ShellBootstrap.Options.parse("-c", "pwd", "--cd").usageError()).isTrue();
+        assertThat(ShellBootstrap.Options.parse("--cd=").usageError()).isTrue();
+        assertThat(ShellBootstrap.Options.parse("--cd", "").usageError()).isTrue();
+    }
+
+    @Test
+    void aValueThatStartsWithADashIsNotAPath() {
+        assertThat(ShellBootstrap.Options.parse("--cd", "--debug").usageError()).isTrue();
+        assertThat(ShellBootstrap.Options.parse("--cd", "-c", "pwd").usageError()).isTrue();
+        assertThat(ShellBootstrap.Options.parse("--cd=-x").usageError()).isTrue();
+        assertThat(ShellBootstrap.Options.parse("--cd", "-").usageError()).isTrue();
+    }
+
+    @Test
+    void onlyOneStartDirectoryIsAllowed() {
+        assertThat(ShellBootstrap.Options.parse("--cd", "a", "--cd", "b").usageError()).isTrue();
+        assertThat(ShellBootstrap.Options.parse("--cd=a", "--cd=a").usageError()).isTrue();
+        assertThat(ShellBootstrap.Options.parse("--cd", "a", "--cd=b", "-c", "pwd").usageError()).isTrue();
+        assertThat(ShellBootstrap.Options.parse("--cd", "a", "-c", "pwd").usageError()).isFalse();
+    }
+
+    @Test
     void versionPrintsTheBannerAndTouchesNothing() throws Exception {
         assertThat(execute("--version")).isZero();
 
@@ -95,7 +135,7 @@ class ShellBootstrapTest {
     void helpPrintsTheUsageAndTouchesNothing() throws Exception {
         assertThat(execute("--help")).isZero();
 
-        assertThat(text(stdout)).contains("usage: powerj").contains("--version").contains("--help");
+        assertThat(text(stdout)).contains("usage: powerj").contains("--cd").contains("--version").contains("--help");
         assertThat(tmp.resolve("home")).doesNotExist();
     }
 
@@ -240,5 +280,156 @@ class ShellBootstrapTest {
 
             assertThat(terminal.screen()).contains("unknown variable").doesNotContain("from the profile");
         }
+    }
+
+    // --- The start-up directory (--cd, FR-04d) ---
+
+    private Path directory(String name) throws IOException {
+        return Files.createDirectories(tmp.resolve("work").resolve(name));
+    }
+
+    @Test
+    void theStartDirectoryMayBeAbsoluteRelativeOrUnderTheHome() throws Exception {
+        Path build = directory("build");
+        Path docs = Files.createDirectories(tmp.resolve("userhome").resolve("docs"));
+        variables.put("HOME", tmp.resolve("userhome").toString());
+
+        assertThat(execute("--cd", build.toString(), "-c", "pwd")).isZero();
+        assertThat(text(stdout).strip()).isEqualTo(build.toString());
+        stdout.reset();
+        assertThat(execute("--cd", "build", "-c", "pwd")).isZero();
+        assertThat(text(stdout).strip()).isEqualTo(build.toString());
+        stdout.reset();
+        assertThat(execute("--cd=~/docs", "-c", "pwd")).isZero();
+        assertThat(text(stdout).strip()).isEqualTo(docs.toString());
+        stdout.reset();
+        assertThat(execute("--cd", "~", "-c", "pwd")).isZero();
+        assertThat(text(stdout).strip()).isEqualTo(tmp.resolve("userhome").toString());
+    }
+
+    @Test
+    void thePathsOfTheSessionStartFromTheStartDirectory() throws Exception {
+        Path build = directory("build");
+        Files.writeString(build.resolve("here.txt"), "x");
+
+        assertThat(execute("--cd=build", "-c", "$pwd")).isZero();
+        assertThat(text(stdout).strip()).isEqualTo(build.toString());
+        stdout.reset();
+        assertThat(execute("--cd", "build", "-c", "ls")).isZero();
+        assertThat(text(stdout)).contains("here.txt");
+        stdout.reset();
+        assertThat(execute("--cd", "build", "-c", "\"hello\" > out.txt")).isZero();
+        assertThat(build.resolve("out.txt")).exists();
+        assertThat(tmp.resolve("work").resolve("out.txt")).doesNotExist();
+    }
+
+    @Test
+    void aNativeCommandRunsInTheStartDirectory() throws Exception {
+        assumeThat(Path.of("/bin/sh")).exists();
+        variables.put("PATH", "/bin:/usr/bin");
+        Path build = directory("build");
+
+        // The output of a native command goes to the real standard output, not to the test's: a redirection catches it.
+        assertThat(execute("--cd", "build", "-c", "sh -c pwd > native.txt")).isZero();
+
+        assertThat(Path.of(Files.readString(build.resolve("native.txt")).strip()).toRealPath())
+                .isEqualTo(build.toRealPath());
+    }
+
+    @Test
+    void theScriptFileIsLookedUpWhereYouTypedItAndRunsInTheStartDirectory() throws Exception {
+        Path build = directory("build");
+        Files.writeString(tmp.resolve("work").resolve("s.pj"), "pwd\n");
+
+        assertThat(execute("--cd", "build", "s.pj")).isZero();
+
+        assertThat(text(stdout).strip()).isEqualTo(build.toString());
+    }
+
+    @Test
+    void theStartDirectoryAppliesToTheInteractivePromptAndWorksWithNoProfile() throws Exception {
+        Path build = directory("build");
+        try (var terminal = new TestTerminal("exit" + TestTerminal.ENTER)) {
+            terminals = _ -> terminal.terminal();
+            terminal.startTyping();
+
+            assertThat(execute("--no-profile", "--cd", "build")).isZero();
+
+            assertThat(terminal.screen()).contains("PJ " + build);
+        }
+    }
+
+    @Test
+    void aCdInTheProfileStillWins() throws Exception {
+        directory("build");
+        Path other = directory("other");
+        Files.createDirectories(tmp.resolve("home"));
+        Files.writeString(tmp.resolve("home").resolve("profile.pj"), "cd " + other + "\n");
+        try (var terminal = new TestTerminal("exit" + TestTerminal.ENTER)) {
+            terminals = _ -> terminal.terminal();
+            terminal.startTyping();
+
+            execute("--cd", "build");
+
+            assertThat(terminal.screen()).contains("PJ " + other);
+        }
+    }
+
+    @Test
+    void aMissingDirectoryGivesOneAndStartsNothing() throws Exception {
+        assertThat(execute("--cd", "absent", "-c", "\"never\"")).isEqualTo(1);
+
+        assertThat(text(messages)).contains("--cd: directory not found: " + tmp.resolve("work").resolve("absent"));
+        assertThat(text(stdout)).isEmpty();
+    }
+
+    @Test
+    void aFileInsteadOfADirectoryGivesOne() throws Exception {
+        Files.writeString(directory("d").resolve("f.txt"), "x");
+
+        assertThat(execute("--cd=d/f.txt", "-c", "\"never\"")).isEqualTo(1);
+
+        assertThat(text(messages)).contains("--cd: not a directory: " + tmp.resolve("work").resolve("d").resolve("f.txt"));
+        assertThat(text(stdout)).isEmpty();
+    }
+
+    @Test
+    void theStartDirectoryErrorIsInTheLanguageOfTheSettings() throws Exception {
+        Files.createDirectories(tmp.resolve("home"));
+        Files.writeString(tmp.resolve("home").resolve("config.properties"), "language=fr\n");
+
+        assertThat(execute("--cd", "absent", "-c", "pwd")).isEqualTo(1);
+
+        assertThat(text(messages)).contains("--cd : dossier introuvable : ");
+    }
+
+    @Test
+    void aStartDirectoryWithoutValueIsAUsageErrorAndHelpStillWins() throws Exception {
+        assertThat(execute("--cd")).isEqualTo(2);
+        assertThat(text(messages)).contains("usage: powerj").contains("--cd");
+
+        assertThat(execute("--cd", "absent", "--help")).isZero();
+    }
+
+    @Test
+    void twoStartDirectoriesOrADashValueGiveTwoAndNothingRuns() throws Exception {
+        directory("a");
+        directory("b");
+
+        assertThat(execute("--cd", "a", "--cd", "b", "-c", "\"never\"")).isEqualTo(2);
+        assertThat(execute("--cd", "-c", "\"never\"")).isEqualTo(2);
+        assertThat(execute("--cd=-a", "-c", "\"never\"")).isEqualTo(2);
+
+        assertThat(text(messages)).contains("usage: powerj");
+        assertThat(text(stdout)).isEmpty();
+    }
+
+    @Test
+    void aFolderWhoseNameStartsWithADashIsWrittenWithADotSlash() throws Exception {
+        Path dash = directory("-x");
+
+        assertThat(execute("--cd", "./-x", "-c", "pwd")).isZero();
+
+        assertThat(text(stdout).strip()).isEqualTo(dash.toString());
     }
 }
