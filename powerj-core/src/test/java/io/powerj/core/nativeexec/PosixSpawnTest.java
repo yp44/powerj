@@ -219,8 +219,11 @@ class PosixSpawnTest {
         try {
             Spawned clean = start(sleep().closeFds(true));
             Spawned leaky = start(sleep().closeFds(false));
-            List<String> cleanFds = fds(clean.pid());
-            List<String> leakyFds = fds(leaky.pid());
+            // Read again until the list is the one expected: right after exec the dynamic loader holds the C library on
+            // descriptor 3 for an instant (ChildFds). A leak stays; only a list that is still wrong after five seconds fails.
+            List<String> cleanFds = ChildFds.until(() -> fds(clean.pid()), list -> list.equals(List.of("0", "1", "2")));
+            List<String> leakyFds = ChildFds.until(() -> fds(leaky.pid()),
+                    list -> list.containsAll(List.of(String.valueOf(leak[0]), String.valueOf(leak[1]))));
             assertThat(cleanFds).containsExactlyInAnyOrder("0", "1", "2");
             assertThat(leakyFds).contains(String.valueOf(leak[0]), String.valueOf(leak[1]));
             log("05 descriptors of the child: with addclosefrom_np(3) %s; without (control, leaks the JVM's pipe %d/%d) "
