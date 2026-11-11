@@ -710,7 +710,7 @@ structures, functions) can be built on it. The work is organised in phases (revi
 - **Applied before `profile.pj`**, so a `cd` in the profile still wins; `--no-profile` is independent.
 - **No silent fallback**: a directory that does not exist, or is a file, prints an error with the path (English and French,
   `startDirectory.notFound` / `startDirectory.notDirectory`) and exits with code 1 without starting the shell. `--cd` without a
-  value is a usage error (code 2). `--help` and the usage line list the option.
+  value, given twice, or with a value that starts with `-` is a usage error (code 2): one `--cd` only, and its value is a path. `--help` and the usage line list the option.
 - `Session.expandTilde(word, environment, startupHome)` expands `~` before a session exists, with the same rules as inside it.
 - Tests: `ShellBootstrapTest` (parsing, absolute / relative / `~`, `-c`, `.pj`, interactive prompt, profile, errors in both
   languages), `SessionStateTest`; smoke scripts `non-interactive.sh` and `launcher.sh`; acceptance rows 21a–21f of `step-4.md`.

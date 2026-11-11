@@ -45,7 +45,8 @@ final class ShellBootstrap {
      * @param help           {@code --help}: print the usage and stop
      * @param startDirectory {@code --cd <dir>} or {@code --cd=<dir>}: initial current directory, as typed; {@code null}
      *                       when absent (FR-04d)
-     * @param usageError     {@code --cd} without a value: the command line is wrong
+     * @param usageError     the command line is wrong: {@code --cd} given twice, without a value, or with a value that
+     *                       starts with {@code -} (an option, not a path; write {@code ./-x} for such a folder)
      * @param script         what remains: {@code -c "line"}, a {@code .pj} file, or nothing for the interactive shell
      */
     record Options(boolean debug, boolean noProfile, boolean version, boolean help, String startDirectory,
@@ -63,19 +64,14 @@ final class ShellBootstrap {
             List<String> script = new ArrayList<>();
             for (int i = 0; i < args.length; i++) {
                 String arg = args[i];
-                if (arg.equals(CD)) {
-                    // The next word is the value, whatever it looks like (as `git -C`).
-                    if (i + 1 < args.length) {
-                        startDirectory = args[++i];
-                        usageError = startDirectory.isEmpty();
-                    } else {
-                        usageError = true;
+                boolean cd = arg.equals(CD);
+                if (cd || arg.startsWith(CD + "=")) {
+                    // One --cd only, and a value that is a path: nothing, empty or an option (-…) is a usage error.
+                    String value = cd ? (i + 1 < args.length ? args[++i] : null) : arg.substring(CD.length() + 1);
+                    usageError |= startDirectory != null || value == null || value.isEmpty() || value.startsWith("-");
+                    if (startDirectory == null) {
+                        startDirectory = value;
                     }
-                    continue;
-                }
-                if (arg.startsWith(CD + "=")) {
-                    startDirectory = arg.substring(CD.length() + 1);
-                    usageError = startDirectory.isEmpty();
                     continue;
                 }
                 switch (arg) {

@@ -94,8 +94,7 @@ class ShellBootstrapTest {
         assertThat(equal.startDirectory()).isEqualTo("D:\\dev\\my project");
         assertThat(equal.noProfile()).isTrue();
         assertThat(equal.script()).containsExactly("script.pj");
-        assertThat(ShellBootstrap.Options.parse("--cd", "--debug").startDirectory()).isEqualTo("--debug");
-        assertThat(ShellBootstrap.Options.parse("--cd", "a", "--cd=b").startDirectory()).isEqualTo("b");
+        assertThat(ShellBootstrap.Options.parse("--cd", "./-x").usageError()).isFalse();
         assertThat(ShellBootstrap.Options.parse("-c", "pwd").startDirectory()).isNull();
     }
 
@@ -105,6 +104,22 @@ class ShellBootstrapTest {
         assertThat(ShellBootstrap.Options.parse("-c", "pwd", "--cd").usageError()).isTrue();
         assertThat(ShellBootstrap.Options.parse("--cd=").usageError()).isTrue();
         assertThat(ShellBootstrap.Options.parse("--cd", "").usageError()).isTrue();
+    }
+
+    @Test
+    void aValueThatStartsWithADashIsNotAPath() {
+        assertThat(ShellBootstrap.Options.parse("--cd", "--debug").usageError()).isTrue();
+        assertThat(ShellBootstrap.Options.parse("--cd", "-c", "pwd").usageError()).isTrue();
+        assertThat(ShellBootstrap.Options.parse("--cd=-x").usageError()).isTrue();
+        assertThat(ShellBootstrap.Options.parse("--cd", "-").usageError()).isTrue();
+    }
+
+    @Test
+    void onlyOneStartDirectoryIsAllowed() {
+        assertThat(ShellBootstrap.Options.parse("--cd", "a", "--cd", "b").usageError()).isTrue();
+        assertThat(ShellBootstrap.Options.parse("--cd=a", "--cd=a").usageError()).isTrue();
+        assertThat(ShellBootstrap.Options.parse("--cd", "a", "--cd=b", "-c", "pwd").usageError()).isTrue();
+        assertThat(ShellBootstrap.Options.parse("--cd", "a", "-c", "pwd").usageError()).isFalse();
     }
 
     @Test
@@ -394,5 +409,27 @@ class ShellBootstrapTest {
         assertThat(text(messages)).contains("usage: powerj").contains("--cd");
 
         assertThat(execute("--cd", "absent", "--help")).isZero();
+    }
+
+    @Test
+    void twoStartDirectoriesOrADashValueGiveTwoAndNothingRuns() throws Exception {
+        directory("a");
+        directory("b");
+
+        assertThat(execute("--cd", "a", "--cd", "b", "-c", "\"never\"")).isEqualTo(2);
+        assertThat(execute("--cd", "-c", "\"never\"")).isEqualTo(2);
+        assertThat(execute("--cd=-a", "-c", "\"never\"")).isEqualTo(2);
+
+        assertThat(text(messages)).contains("usage: powerj");
+        assertThat(text(stdout)).isEmpty();
+    }
+
+    @Test
+    void aFolderWhoseNameStartsWithADashIsWrittenWithADotSlash() throws Exception {
+        Path dash = directory("-x");
+
+        assertThat(execute("--cd", "./-x", "-c", "pwd")).isZero();
+
+        assertThat(text(stdout).strip()).isEqualTo(dash.toString());
     }
 }

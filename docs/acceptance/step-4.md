@@ -37,7 +37,7 @@ As in the previous steps: **Actions** tab, latest run of the **CI** workflow, ar
 | 21b | `powerj --cd ~ -c pwd`, then `powerj --cd ..` from a subfolder of your home folder | Your home folder (`~` expanded although `cmd.exe` does not), then the prompt shows the parent of the folder you were in. |
 | 21c | Create `C:\work\test.pj` containing `pwd`, go to `C:\work`, run `powerj --cd C:\Windows test.pj` | `C:\Windows`: the file is found where it was typed, and runs in the `--cd` folder. |
 | 21d | `powerj --cd C:\absent -c pwd` then `echo %ERRORLEVEL%` | `PowerJ: --cd: directory not found: C:\absent` (a file instead of a folder: `not a directory`), then `1`; the shell is not started. |
-| 21e | `powerj --cd` then `echo %ERRORLEVEL%` | The usage line (which lists `[--cd <dir>]`), then `2`. |
+| 21e | `powerj --cd`, `powerj --cd C:\a --cd C:\b` and `powerj --cd -c pwd`, each followed by `echo %ERRORLEVEL%` | The usage line (which lists `[--cd <dir>]`), then `2`, each time: one `--cd` only, and its value is a path, not an option. |
 | 21f | Put `cd C:\Users` in `profile.pj`, run `powerj --cd C:\Windows`, then `powerj --no-profile --cd C:\Windows` | First prompt `PJ C:\Users>` (the profile wins), then `PJ C:\Windows>`. |
 
 Linux / macOS variant (archive `powerj-linux-x64`): replace `ipconfig` with `ip addr`, `^cmd /c …` with `sh -c "…"`, `dir /b` with `ls -1`, and launch `bin/powerj`.
