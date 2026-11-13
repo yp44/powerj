@@ -19,6 +19,8 @@ structures, functions) can be built on it. The work is organised in phases (revi
 - **Architecture rules** (ArchUnit, module `powerj-architecture`): module dependencies, no cycles, only `Main` ends the
   JVM, every cmdlet declared and registered. Violations that exist today are frozen and may only disappear.
 - **Per-module coverage floors** next to the aggregate threshold; a default 60 s timeout per test.
+  Every module's floor is at least 80 % of lines and branches, tightened to a few points under what is measured
+  (`powerj-api` reaches 100 % with tests of the `perf` records and of the default methods of `Cmdlet` and `CmdletProvider`).
 - **Static analysis**: `-Xlint:all`, Spotless, stricter Maven Enforcer rules, an opt-in Error Prone profile
   (`-Pquality`); the baselines are in `docs/quality/`.
 - **CI**: the smoke tests are scripts (`ci/smoke/*.sh`) that run on a developer's machine too; actions pinned by commit,

@@ -14,9 +14,9 @@
     <name>PowerJ Shell</name>
 
     <properties>
-        <!-- Coverage floor of the tests of this module alone (parent pom, jacoco module-check). -->
-        <coverage.module.line>0.83</coverage.module.line>
-        <coverage.module.branch>0.78</coverage.module.branch>
+        <!-- Coverage floor of the tests of this module alone (parent pom, jacoco module-check). Measured 93.9 % / 87.4 % (Linux, JDK 25). -->
+        <coverage.module.line>0.93</coverage.module.line>
+        <coverage.module.branch>0.85</coverage.module.branch>
     </properties>
 
     <dependencies>

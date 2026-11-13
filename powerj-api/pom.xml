@@ -14,8 +14,8 @@
     <name>PowerJ API</name>
 
     <properties>
-        <!-- Coverage floor of the tests of this module alone (parent pom, jacoco module-check). -->
-        <coverage.module.line>0.70</coverage.module.line>
+        <!-- Coverage floor of the tests of this module alone (parent pom, jacoco module-check). Measured 100 % / 100 %; every module keeps at least 80 % (issue #85). -->
+        <coverage.module.line>0.95</coverage.module.line>
         <coverage.module.branch>1.00</coverage.module.branch>
     </properties>
 
