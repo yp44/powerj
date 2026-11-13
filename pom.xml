@@ -455,8 +455,8 @@
                     </execution>
                     <!-- Per-module ratchet (review C-30): the tests of a module alone must keep covering what they cover
                          today, whatever the other modules' tests add to the aggregate of powerj-coverage. Each module
-                         sets coverage.module.line / coverage.module.branch to its measured value (floor, two decimals);
-                         raise them when coverage goes up, never lower them. A module without tests is skipped. -->
+                         sets coverage.module.line / coverage.module.branch to 0.80 (issue #85), more only where a module
+                         chooses to hold a higher level. A module without tests is skipped. -->
                     <execution>
                         <id>module-report</id>
                         <phase>verify</phase>

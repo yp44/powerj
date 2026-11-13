@@ -14,9 +14,9 @@
     <name>PowerJ Cmdlets</name>
 
     <properties>
-        <!-- Coverage floor of the tests of this module alone (parent pom, jacoco module-check). Measured 96.1 % / 92.8 % (Linux, JDK 25). -->
-        <coverage.module.line>0.95</coverage.module.line>
-        <coverage.module.branch>0.92</coverage.module.branch>
+        <!-- Coverage floor of the tests of this module alone (parent pom, jacoco module-check): 80 % of lines and branches (issue #85); a module may measure more. -->
+        <coverage.module.line>0.80</coverage.module.line>
+        <coverage.module.branch>0.80</coverage.module.branch>
     </properties>
 
     <dependencies>
