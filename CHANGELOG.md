@@ -759,6 +759,21 @@ structures, functions) can be built on it. The work is organised in phases (revi
 - Found on the way, not part of this change: the smoke test of the graphical module failed once on a Linux runner and passed
   on the same commit ([#190](https://github.com/yp44/powerj/issues/190)).
 
+### Fixed (tests that depended on how Surefire lays out the test classes, [#143](https://github.com/yp44/powerj/issues/143))
+- **The update of the Maven plugins ([#133](https://github.com/yp44/powerj/pull/133)) is no longer blocked by the tests.**
+  Surefire 3.5.3 runs the tests of a module from the class path; Surefire 3.6.1 runs them on the module path, with the test
+  classes patched into the module under test. Four tests described that detail of the test runtime and not a behaviour of
+  the product (audit v2, B-03): `CommandResolutionTest.whichSaysWhatExecutionWouldRun` and two rows of
+  `InterpreterCharacterizationTest` (`which items`, `help items`) expected the module of the test cmdlet to be
+  `(no module)`, where Surefire 3.6.1 makes the registry report `io.powerj.core`; and `PropertiesTest` made the test context
+  call `setAccessible` on a record of a test package, which is only allowed when the package is open to the reader (the
+  issue did not list it: the build of #133 stopped at `powerj-core` before reaching `powerj-cmdlets`).
+- **They now pass with both versions.** `FakeCmdlets.module()` says which module the registry reports for the test cmdlets
+  (from the module of the class itself) and the three assertions use it; `PropertiesTest` reads its hidden record as the
+  owner of the class. A full `./mvnw verify`, with the graphical module and the application image, is green with Surefire
+  3.5.3 and with the plugin versions of #133 (Surefire 3.6.1 among them). Each assertion was seen failing when the code it
+  checks was broken on purpose. Only tests changed.
+
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
   whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes
