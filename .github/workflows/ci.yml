@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      repeat-core-tests:
+        description: 'Run the tests of powerj-core this many more times on macOS, to hunt a flaky test (docs/quality/clock-dependent-tests.md)'
+        type: number
+        default: 0
 
 permissions:
   contents: read
@@ -156,6 +161,19 @@ jobs:
       # -fae: every module that can be built is, so that one run shows all that macOS breaks.
       - name: Build, tests and application image
         run: ./mvnw -B -fae -Pdist verify
+
+      # Only by hand (`gh workflow run ci.yml -f repeat-core-tests=20`): the suite has just run once above, and a test that
+      # fails once in twenty is not seen by one run. The first failure stops the loop and names its run.
+      - name: Repeat the tests of the core
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.repeat-core-tests > 0 }}
+        env:
+          REPEATS: ${{ inputs.repeat-core-tests }}
+        run: |
+          for i in $(seq 1 "$REPEATS"); do
+            echo "::group::powerj-core tests, extra run $i of $REPEATS"
+            ./mvnw -B -q -pl powerj-core -am -Djacoco.skip=true test || { echo "::error::failed on extra run $i of $REPEATS"; exit 1; }
+            echo "::endgroup::"
+          done
 
       # jpackage makes an application bundle on macOS: the launcher is inside it. The smoke test of the profiler looks for
       # the layout of the Linux and Windows images and is left out.
