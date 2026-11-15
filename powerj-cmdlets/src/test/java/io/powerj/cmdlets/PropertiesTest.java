@@ -3,6 +3,8 @@ package io.powerj.cmdlets;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.lang.invoke.MethodHandles;
+import java.lang.reflect.RecordComponent;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CancellationException;
@@ -83,9 +85,30 @@ class PropertiesTest {
         assertThat(Sizes.isSizeProperty(null, "size")).isFalse();
     }
 
+    /**
+     * Reads a component of a record that this module owns and others cannot see. In the shell the engine makes the accessors
+     * accessible; the context of the tests does it with {@code setAccessible}, which a reader outside this module is only
+     * allowed when the package is open to it, and whether it is depends on how the test runtime lays out the test classes
+     * (Surefire 3.5.3: class path, 3.6.1: module path, #143). The owner of the class can always read it.
+     */
+    private static Object readAsOwner(Object target, String name) {
+        try {
+            for (RecordComponent component : target.getClass().getRecordComponents()) {
+                if (component.getName().equals(name)) {
+                    return MethodHandles.privateLookupIn(target.getClass(), MethodHandles.lookup())
+                            .unreflect(component.getAccessor()).invoke(target);
+                }
+            }
+        } catch (Throwable e) {
+            throw new IllegalStateException(e);
+        }
+        throw new IllegalArgumentException("no property " + name);
+    }
+
     @Test
     void aRecordThatOtherCodeCannotSeeIsReadAndItsSizesAreKnown() {
         Object secret = io.powerj.cmdlets.support.HiddenRecords.secret();
+        context.reader = PropertiesTest::readAsOwner;
 
         assertThat(properties.get(secret, "value")).isEqualTo("s");
         assertThat(properties.of((Record) secret)).containsEntry("size", 5L);
