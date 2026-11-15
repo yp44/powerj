@@ -33,8 +33,8 @@ import io.powerj.fs.Host;
  * <p>
  * Notes on the surprising ones: {@code items --fail | count} succeeds although an error was reported (the status is the
  * one of the last stage); {@code 1 < 2 && 2 < 3} is two statements chained, not a boolean; {@code !true} is a command
- * name; {@code which items} shows {@code ((no module))} with doubled parentheses; a syntax error is thrown to the
- * caller, which is the supervisor of the shell.
+ * name; {@code which items} puts the module in parentheses, so a cmdlet with no module shows {@code ((no module))};
+ * a syntax error is thrown to the caller, which is the supervisor of the shell.
  */
 class InterpreterCharacterizationTest {
 
@@ -174,7 +174,7 @@ class InterpreterCharacterizationTest {
                     "<tmp>\n",
                     "[]", true, null, null),
             row("which items",
-                    "items → cmdlet ((no module))\n",
+                    "items → cmdlet (" + FakeCmdlets.module() + ")\n",
                     "[]", true, null, null),
             row("which nosuchcommand",
                     "",
@@ -201,7 +201,7 @@ class InterpreterCharacterizationTest {
                     "3\n",
                     "[]", true, null, null),
             row("items --help",
-                    "items — Produces test objects\nUsage: items [options]\n\nOptions:\n  -n, --count <value>  Number of objects\n      --fail           Reports a non-blocking error\n  --on-error <mode>    non-blocking errors: stop, continue (default) or silent\n\nOutput: Item (name, size)\nModule: (no module)\n\nExamples:\n  items -n 2\n",
+                    "items — Produces test objects\nUsage: items [options]\n\nOptions:\n  -n, --count <value>  Number of objects\n      --fail           Reports a non-blocking error\n  --on-error <mode>    non-blocking errors: stop, continue (default) or silent\n\nOutput: Item (name, size)\nModule: " + FakeCmdlets.module() + "\n\nExamples:\n  items -n 2\n",
                     "[]", true, null, null),
             row("items --nosuchoption",
                     "",

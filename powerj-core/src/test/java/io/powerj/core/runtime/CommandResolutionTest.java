@@ -127,7 +127,7 @@ class CommandResolutionTest {
         interpreter.execute("which ^items");
 
         assertThat(out.toString().lines()).containsExactly("cd → built-in command",
-                "items → cmdlet ((no module))", "tool → native " + tmp.resolve("bin/tool"),
+                "items → cmdlet (" + FakeCmdlets.module() + ")", "tool → native " + tmp.resolve("bin/tool"),
                 "^items → native " + tmp.resolve("bin/items"));
     }
 

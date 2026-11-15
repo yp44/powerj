@@ -7,11 +7,23 @@ import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
 import io.powerj.api.ScriptBlock;
+import io.powerj.core.i18n.Messages;
 
 /** Test cmdlets. */
 public final class FakeCmdlets {
 
     private FakeCmdlets() {
+    }
+
+    /**
+     * The module the registry reports for these cmdlets, which is the module of the test classes. It depends on how the
+     * test runtime lays them out: none ({@code (no module)}) when Surefire 3.5.3 runs them from the class path,
+     * {@code io.powerj.core} since 3.6.1, which patches them into the module of the code under test. A test that shows
+     * what the registry says about a test cmdlet writes it with this, not with one of the two (audit v2, B-03).
+     */
+    public static String module() {
+        Module module = FakeCmdlets.class.getModule();
+        return module.isNamed() ? module.getName() : Messages.get("module.unnamed");
     }
 
     public record Item(String name, int size) { }
