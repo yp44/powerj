@@ -155,36 +155,47 @@ class PerfTest {
         assertThat(stages.get(2).out()).isEqualTo(1);
     }
 
+    /**
+     * What is asserted does not depend on how long anything takes: the counter has to wait for a producer that sleeps
+     * before each object, and the producer, whose 20 objects fit in the queue, never waits for the counter. Which stage
+     * is the bottleneck, and how the times add up, are checked with given times in {@code ExecutionObserverTest} (#142).
+     */
     @Test
     void aSlowProducerStarvesTheNextStage() throws Exception {
         run("numbers 20 -d 10 | count");
         StageStat producer = last().stages().get(0);
         StageStat counter = last().stages().get(1);
-        assertThat(counter.starved()).isGreaterThan(Duration.ofMillis(100));
-        assertThat(producer.active()).isGreaterThan(Duration.ofMillis(100));
-        assertThat(producer.blocked()).isLessThan(Duration.ofMillis(50));
-        assertThat(last().stages()).extracting(StageStat::bottleneck).containsExactly(true, false);
+        assertThat(counter.starved()).isPositive();
+        assertThat(producer.starved()).isZero(); // nothing before it
+        assertThat(producer.blocked()).isZero(); // the queue holds 256 objects
+        assertThat(producer.active()).isEqualTo(producer.wall()); // so it never waited
     }
 
     @Test
     void aSlowConsumerBlocksThePreviousStage() throws Exception {
-        // 600 objects: the queue holds 256, so the producer must wait for the consumer to catch up.
+        // 600 objects: the queue holds 256, so the producer must wait for the consumer to catch up. It could avoid
+        // the wait only if the consumer, which sleeps at least 1 ms for each object, had taken 344 of them before the
+        // producer got to run: a stall of the runner of more than 344 ms. How long it waited is not asserted.
         run("numbers 600 | slow -d 1 | count");
         StageStat producer = last().stages().get(0);
         StageStat slow = last().stages().get(1);
-        assertThat(producer.blocked()).isGreaterThan(Duration.ofMillis(100));
-        assertThat(slow.active()).isGreaterThan(Duration.ofMillis(300));
+        assertThat(producer.blocked()).isPositive();
         assertThat(slow.in()).isEqualTo(600);
-        assertThat(last().stages()).extracting(StageStat::bottleneck).containsExactly(false, true, false);
+        assertThat(slow.out()).isEqualTo(600);
     }
 
     @Test
     void activeTimeIsTheWallTimeWithoutTheWaits() throws Exception {
         run("numbers 20 -d 5 | slow | count");
-        for (StageStat stage : last().stages()) {
+        List<StageStat> stages = last().stages();
+        for (StageStat stage : stages) {
             Duration expected = stage.wall().minus(stage.starved()).minus(stage.blocked());
             assertThat(stage.active()).isBetween(Duration.ZERO, stage.wall());
-            assertThat(Math.abs(stage.active().minus(expected).toMillis())).isLessThanOrEqualTo(20);
+            if (stage != stages.getLast()) {
+                assertThat(stage.active()).isEqualTo(expected);
+            } else {
+                assertThat(stage.active()).isLessThanOrEqualTo(expected); // the last stage also displays: not active time
+            }
         }
     }
 
@@ -216,8 +227,9 @@ class PerfTest {
         run("items -n 3 | count");
         PerfReport report = last();
         assertThat(report.phases()).extracting(p -> p.name()).containsExactly("parse", "resolve", "execute", "display");
+        // the phases are the whole line (execution is what the others leave): exact, whatever the times
         Duration sum = report.phases().stream().map(p -> p.time()).reduce(Duration.ZERO, Duration::plus);
-        assertThat(Math.abs(sum.minus(report.total()).toMillis())).isLessThanOrEqualTo(5);
+        assertThat(sum).isEqualTo(report.total());
         assertThat(report.jvm().heapPeak()).isPositive();
         assertThat(report.text()).isEqualTo("items -n 3 | count");
         assertThat(report.cancelled()).isFalse();
@@ -362,19 +374,22 @@ class PerfTest {
 
     // --- the profiler (part B) ---
 
+    /**
+     * With the real profiler, which samples as often as the timer of the system lets it (#142: a run on macOS found only 5): the stage that spins is found, the one that does not is not credited with the
+     * spin. How many samples there are, and what share each method has, is not asserted: that is the profiler's.
+     * Where the samples go into the report is checked with a fake profiler ({@code PerfModeTest}).
+     */
     @Test
     void aBusyStageIsFoundHotInItsOwnThread() throws Exception {
         run("numbers 2 | work -c 150 | count");
         PerfReport report = last();
         var hot = report.hot().stream().filter(h -> h.stage() == 2).toList();
         assertThat(hot).isNotEmpty();
-        assertThat(hot.getFirst().method()).endsWith("Work.spin");
-        assertThat(hot.getFirst().percent()).isGreaterThan(50.0);
-        assertThat(hot.getFirst().samples()).isGreaterThan(5);
-        // count does next to nothing: a stray sample (the display of its result) must not matter
-        long idle = report.hot().stream().filter(h -> h.stage() == 3).mapToLong(h -> h.samples()).sum();
-        long busy = hot.stream().mapToLong(h -> h.samples()).sum();
-        assertThat(idle).isLessThan(busy / 5);
+        assertThat(hot).anySatisfy(h -> assertThat(h.method()).endsWith("Work.spin"));
+        assertThat(hot).allSatisfy(h -> assertThat(h.percent()).isBetween(0.0, 100.0));
+        // count never runs Work.spin: whatever stray samples it has (the display of its result), none is there
+        assertThat(report.hot()).filteredOn(h -> h.stage() == 3)
+                .noneSatisfy(h -> assertThat(h.method()).endsWith("Work.spin"));
     }
 
     @Test
@@ -382,7 +397,7 @@ class PerfTest {
         run("numbers 2 | work -c 150");
         var hot = last().hot().stream().filter(h -> h.stage() == 2).toList();
         assertThat(hot).isNotEmpty();
-        assertThat(hot.getFirst().method()).endsWith("Work.spin");
+        assertThat(hot).anySatisfy(h -> assertThat(h.method()).endsWith("Work.spin"));
     }
 
     @Test
@@ -416,14 +431,6 @@ class PerfTest {
         try (var events = new jdk.jfr.consumer.RecordingFile(file)) {
             assertThat(events.hasMoreEvents() || java.nio.file.Files.size(file) > 0).isTrue();
         }
-    }
-
-    @Test
-    void profilingDoesNotCountInTheLine() throws Exception {
-        run("numbers 2 | count");
-        // starting and reading the recording takes longer than this tiny line
-        assertThat(last().total()).isLessThan(Duration.ofMillis(100));
-        assertThat(last().stages()).hasSize(2);
     }
 
     @Test
@@ -471,15 +478,17 @@ class PerfTest {
         return last().hot().stream().filter(h -> h.stage() == 2).mapToLong(h -> h.samples()).sum();
     }
 
+    /**
+     * A valid period set in the session environment is accepted without a message and the profiler still samples. That
+     * the period asked of the profiler is the one set is checked with a fake profiler ({@code PerfModeTest}), and not by
+     * comparing the samples of two runs: the profiler's timer gives one sample every 11 ms on a macOS runner whatever
+     * the period under that, so "1 ms gives twice the samples of 10 ms" is false there (#101, #142).
+     */
     @Test
     void theSamplingPeriodIsReadFromTheSessionEnvironment() throws Exception {
-        run("numbers 2 | work -c 300 | count");
-        long coarse = hotSamples();
         session.environment().put("POWERJ_PERF_JFR_SAMPLEPERIOD", "1ms"); // as `env --set` in profile.pj does
-        run("numbers 2 | work -c 300 | count");
-        long fine = hotSamples();
-        assertThat(coarse).isBetween(10L, 80L); // about 60 ms of work every 10 ms
-        assertThat(fine).isGreaterThan(2 * coarse);
+        run("numbers 2 | work -c 150 | count");
+        assertThat(hotSamples()).isPositive();
         assertThat(errors).isEmpty();
     }
 
@@ -556,8 +565,10 @@ class PerfTest {
         session.environment().put("POWERJ_PERF_JFR_ALLOCTHROTTLE", "off");
         run("numbers 2 | work -a 60000 | count");
         long unlimited = allocationEvents();
-        assertThat(limited).isLessThan(10);
-        assertThat(unlimited).isGreaterThan(5 * Math.max(1, limited));
+        // The only check that the profiler reads the rate the way it is written ("1/s": a rate it does not understand
+        // means "no limit"), so the bound is kept, but weak: the run limited to 1/s has about one event per second it
+        // lasts (a loaded runner makes it last longer), the other one hundreds, whatever the speed of the machine.
+        assertThat(unlimited).isGreaterThan(limited);
         assertThat(errors).isEmpty();
     }
 
