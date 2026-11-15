@@ -2,17 +2,21 @@ package io.powerj.core.perf;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.function.Consumer;
 
 import org.junit.jupiter.api.Test;
 
+import io.powerj.api.perf.PhaseStat;
+import io.powerj.api.perf.StageStat;
 import io.powerj.core.java.PreviewGuard;
 import io.powerj.core.runtime.ExecutionObserver;
 import io.powerj.core.runtime.ExecutionObserver.PipelineObserver;
 import io.powerj.core.runtime.ExecutionObserver.StageObserver;
 import io.powerj.core.runtime.MeasuredPipe;
 import io.powerj.core.runtime.Pipe;
+import io.powerj.core.support.Waits;
 
 /** The observer that measures nothing, and the one that does (perf mode, FR-76). */
 class ExecutionObserverTest {
@@ -113,5 +117,75 @@ class ExecutionObserverTest {
             assertThat(phase.name()).isEqualTo("display");
             assertThat(phase.time().toNanos()).isEqualTo(7_000_000);
         });
+    }
+
+    // --- what the report derives from the counters, checked with the times given instead of the ones the machine measures ---
+
+    @Test
+    void theStageThatWorkedLongestIsTheBottleneck() {
+        var recorder = new PerfRecorder("line", System.nanoTime(), 0);
+        PipelineObserver observed = recorder.pipelineEntered();
+        // `measured` is how a native stage reports its time: the wall time of the stage is the one given
+        long[] millis = {5, 50, 20};
+        for (int i = 0; i < millis.length; i++) {
+            observed.stage(i + 1, "s" + i, false).measured(millis[i] * 1_000_000);
+        }
+
+        var stats = recorder.finish(1, false).stages();
+
+        assertThat(stats).extracting(stat -> stat.wall().toMillis()).containsExactly(5L, 50L, 20L);
+        assertThat(stats).extracting(StageStat::bottleneck).containsExactly(false, true, false);
+    }
+
+    @Test
+    void theTimeSpentWaitingForTheOtherStagesIsNotActiveTime() throws Exception {
+        var recorder = new PerfRecorder("line", System.nanoTime(), 0);
+        PipelineObserver observed = recorder.pipelineEntered();
+        StageObserver writer = observed.stage(1, "a", false);
+        StageObserver reader = observed.stage(2, "b", false);
+        Pipe pipe = observed.pipe(writer, reader);
+        Thread waiting = Thread.ofVirtual().start(() -> {
+            try {
+                pipe.next();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
+        Waits.until("the reader waits for an object", () -> waiting.getState() == Thread.State.WAITING
+                || waiting.getState() == Thread.State.TIMED_WAITING);
+        pipe.put("x");
+        waiting.join();
+        writer.measured(10_000_000_000L); // ten seconds: far more than the wait that was just measured
+        reader.measured(10_000_000_000L);
+
+        var stats = recorder.finish(1, false).stages();
+
+        assertThat(stats.get(1).starved()).isPositive();
+        assertThat(stats.get(1).active()).isEqualTo(stats.get(1).wall().minus(stats.get(1).starved()));
+        assertThat(stats.get(0).blocked()).isZero(); // the queue never filled up
+        assertThat(stats.get(0).active()).isEqualTo(stats.get(0).wall());
+    }
+
+    @Test
+    void theParsingTheResolutionTheDisplayAndTheExecutionAreTheWholeLine() {
+        long begin = System.nanoTime() - 1_000_000_000L; // the line started a second ago
+        var recorder = new PerfRecorder("line", begin, 100_000_000L);
+        recorder.resolved(200_000_000L);
+        recorder.displayed(300_000_000L);
+
+        var report = recorder.finish(1, false);
+
+        assertThat(report.total()).isGreaterThanOrEqualTo(Duration.ofSeconds(1));
+        assertThat(report.phases()).extracting(PhaseStat::name).containsExactly("parse", "resolve", "execute", "display");
+        assertThat(report.phases().stream().map(PhaseStat::time).reduce(Duration.ZERO, Duration::plus))
+                .isEqualTo(report.total());
+        assertThat(report.phases().get(2).time()).isEqualTo(report.total().minus(Duration.ofMillis(600)));
+    }
+
+    @Test
+    void theExecutionIsNeverNegative() {
+        var recorder = new PerfRecorder("line", System.nanoTime(), 5_000_000_000L); // a parse longer than the line
+
+        assertThat(recorder.finish(1, false).phases().get(2).time()).isZero();
     }
 }

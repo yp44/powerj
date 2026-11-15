@@ -44,6 +44,10 @@ class PerfModeTest {
         final List<Path> files = new ArrayList<>();
         boolean canStart = true;
         JfrData data = JfrData.EMPTY;
+        /** {@code System.nanoTime()} when the line asked for the recording's data, then {@link #work} is done. */
+        long finishedAskedAt;
+        /** What reading the recording costs. */
+        Runnable work = () -> { };
 
         @Override
         public boolean available() {
@@ -74,6 +78,8 @@ class PerfModeTest {
                 @Override
                 public JfrData finish(int line, List<StageProbe> stages) {
                     calls.add("finish " + line);
+                    finishedAskedAt = System.nanoTime();
+                    work.run();
                     return data;
                 }
             };
@@ -267,6 +273,27 @@ class PerfModeTest {
             assertThat(report.hot()).extracting(hot -> hot.method()).containsExactly("a.B.run");
             assertThat(report.recording()).isEqualTo(fake.files.getLast());
         });
+    }
+
+    /**
+     * The work of the profiler, which reads its recording after the line, is not the line's: the line ends before the
+     * profiler is asked for its data (so {@code total} cannot be more than the time up to that call), whatever it costs.
+     */
+    @Test
+    void whatTheProfilerDoesAfterTheLineIsNotCountedInIt() {
+        fake.work = () -> {
+            long end = System.nanoTime() + 1_000_000; // reading the recording takes at least a millisecond
+            while (System.nanoTime() < end) {
+                Thread.onSpinWait();
+            }
+        };
+        withFakeProfiler().on(true);
+        long begin = System.nanoTime();
+
+        mode.start("items", script("items"), begin, 0).finish(false);
+
+        assertThat(session.perfReports()).singleElement().satisfies(report ->
+                assertThat(report.total()).isLessThanOrEqualTo(Duration.ofNanos(fake.finishedAskedAt - begin)));
     }
 
     @Test
