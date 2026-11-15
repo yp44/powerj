@@ -120,6 +120,9 @@ What goes where:
   (`FR-70`) or the review finding (`C-13`) when there is one.
 - **Requirements are traced.** Behavior comes from a requirement `FR-nn` of [the specification](docs/SPECIFICATION.md);
   cite it in the Javadoc of the class that implements it and in the test that checks it.
+- **A test does not assert what the machine happens to deliver**: no number of milliseconds, no count of profiler samples.
+  Wait for a state, or check the rule with a given time. [docs/quality/clock-dependent-tests.md](docs/quality/clock-dependent-tests.md)
+  lists the tests that read the real clock and the margin each one relies on.
 - **Compare what a user writes exactly.** The shell is case-sensitive, as Java is ([ADR 0012](docs/adr/0012-the-shell-is-case-sensitive.md)):
   no `equalsIgnoreCase`, `compareToIgnoreCase` or `Pattern.CASE_INSENSITIVE` for a name, a value or a unit. The few exceptions
   (the system's own rules, an option that asks to ignore case) are in the list of `CaseSensitivityTest`, each with its reason.
