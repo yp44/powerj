@@ -739,6 +739,26 @@ structures, functions) can be built on it. The work is organised in phases (revi
   ([#170](https://github.com/yp44/powerj/issues/170)); `ps | kill` has no safety net
   ([#161](https://github.com/yp44/powerj/issues/161)).
 
+### Fixed (`PerfTest` no longer depends on the speed of the machine, [#142](https://github.com/yp44/powerj/issues/142))
+- **`main` no longer fails at random on `PerfTest`.** On 2026-11-10 the macOS job of `main` failed on
+  `PerfTest.aBusyStageIsFoundHotInItsOwnThread` ("5 > 5 expected") and passed on the next run with no change: the class
+  asserted durations of the stages and the number of samples the real profiler happens to give (audit v2, S-01). It now
+  asserts no duration and no number of samples of the real run. The real profiler has to find the stage that spins and not
+  credit the spin to the one that does not; a valid sampling period is accepted and the profiler still samples; the
+  allocation limit keeps one weak relative bound (1 event against 1627 without the limit), the only check that the profiler
+  reads the rate as written.
+- **The rules those assertions stood for are checked where they are decided, with given times**
+  (`ExecutionObserverTest`, `PerfModeTest`): the slowest stage is the bottleneck, active time is wall time without the waits,
+  the phases make up the line, and the work of the profiler after the line is not counted in it. Each test was seen failing
+  when the matching line of `PerfRecorder`, `StageProbe` or `PerfMode` was broken on purpose. Only tests changed.
+- **The tests that read the real clock are listed** in [docs/quality/clock-dependent-tests.md](docs/quality/clock-dependent-tests.md)
+  (25 test sources of four modules, with what each needs from the clock and its margin), and
+  [CONTRIBUTING.md](CONTRIBUTING.md) says that a test does not assert what the machine happens to deliver.
+- **A manual run of the CI can repeat the tests of the core on macOS**: `workflow_dispatch` with `repeat-core-tests=20`. The
+  20 extra runs of this change passed (run 43728102905); the other runs of the CI are unchanged.
+- Found on the way, not part of this change: the smoke test of the graphical module failed once on a Linux runner and passed
+  on the same commit ([#190](https://github.com/yp44/powerj/issues/190)).
+
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
   whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes
