@@ -724,8 +724,8 @@ structures, functions) can be built on it. The work is organised in phases (revi
   smoke scripts and the last 40 CI runs. Nothing was compiled or run. The report is
   [docs/AUDIT-v2-2026-11-14.md](docs/AUDIT-v2-2026-11-14.md) (in French, like the architecture review): 14 things worth
   keeping, 85 findings, the critical ones, and six phases of work.
-- **The plan is the epic [#141](https://github.com/yp44/powerj/issues/141) and its 45 sub-issues** `[AUDITv2] …`
-  ([#142](https://github.com/yp44/powerj/issues/142) to [#186](https://github.com/yp44/powerj/issues/186)), with the rules of
+- **The plan is the epic [#141](https://github.com/yp44/powerj/issues/141) and its 46 sub-issues** `[AUDITv2] …`
+  ([#142](https://github.com/yp44/powerj/issues/142) to [#186](https://github.com/yp44/powerj/issues/186), and [#190](https://github.com/yp44/powerj/issues/190) added on 2026-11-15), with the rules of
   #77: a red test first, one pull request per issue, one window for what touches `powerj-api`. The most serious findings:
   Ctrl+C is lost when a Java call is interrupted ([#165](https://github.com/yp44/powerj/issues/165)); a non-deterministic
   `PerfTest` turned `main` red ([#142](https://github.com/yp44/powerj/issues/142)); eight Dependabot pull requests are blocked
