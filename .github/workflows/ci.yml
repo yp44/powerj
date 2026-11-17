@@ -43,6 +43,10 @@ jobs:
       - name: javac warnings do not go up
         run: ci/check-javac-warnings.sh build.log
 
+      # No test writes to the native stream of the forked JVM: Surefire keeps what it lost in a .dumpstream file (#145).
+      - name: Surefire channel is not corrupted
+        run: ci/check-surefire-channel.sh
+
       - name: Test coverage report
         if: always()
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
@@ -161,6 +165,9 @@ jobs:
       # -fae: every module that can be built is, so that one run shows all that macOS breaks.
       - name: Build, tests and application image
         run: ./mvnw -B -fae -Pdist verify
+
+      - name: Surefire channel is not corrupted
+        run: ci/check-surefire-channel.sh
 
       # Only by hand (`gh workflow run ci.yml -f repeat-core-tests=20`): the suite has just run once above, and a test that
       # fails once in twenty is not seen by one run. The first failure stops the loop and names its run.

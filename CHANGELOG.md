@@ -778,6 +778,17 @@ structures, functions) can be built on it. The work is organised in phases (revi
   build-helper plugins), by a commit of the phase 0 branch rather than by the Dependabot pull request, which targets `main`
   and is then superseded.
 
+### Fixed (Surefire's "Corrupted channel" warning, [#145](https://github.com/yp44/powerj/issues/145))
+- **No build of `powerj-core` ends with "Corrupted channel by directly writing to native stream" any more** (audit v2, B-06).
+  The bytes Surefire had kept in its `.dumpstream` file were `x` and `a`: `ConsoleInputTest` runs `printf a | cat` and
+  `"x" | cat` in an interactive shell, where the last native program writes to the terminal, which is the stdout of the
+  forked JVM, the stream Surefire talks through. The two lines now redirect the output of `cat` to a file of the test (the
+  console is still checked to be paused around a program that reads it). The writers named in the issue (`PosixSpawnTest`,
+  `BackgroundJobsTest`, `NativeRunnerTest`, `Environment.system()`) were not the ones.
+- **The CI looks for it.** `ci/check-surefire-channel.sh` fails when a `target/surefire-reports/*.dumpstream` file exists,
+  after the build of the Linux and macOS jobs; it was seen failing on `ConsoleInputTest` before the fix. Only a test, a
+  script and the workflow changed.
+
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
   whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes
