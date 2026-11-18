@@ -854,7 +854,7 @@ A **block** `{ … }` instead of a path is evaluated for each object: for `mkdir
 - `mkdir` creates folders (`-p`: with their missing parents, and an existing folder is not an error); `touch` creates an empty file or sets the modification time of an existing one. Both emit the `FileEntry` created or updated.
 - `cp` copies (`-r` for folders), `mv` moves or renames (atomically when possible; across file systems, a copy then a removal, the source being removed only once the copy has succeeded), `rm` removes (`-r` for a non-empty folder; `-f`: a missing path is not an error). They emit nothing, except with `-v`: the `FileEntry` of each destination, or of each removed entry.
 - `cp` and `mv` never overwrite an existing target without `-f` (not even one that appears between the check and the move: without `-f` `mv` uses no atomic move, which replaces on Unix); copying a folder into itself is refused, also through a link or an alias.
-- Symbolic links are never followed: `rm` removes the link, `cp` copies the link.
+- Symbolic links are never followed: `rm` removes the link, `cp` copies the link. The one exception is the **destination** of `cp` and `mv`: a link to a folder is a folder (`cp a.txt alias/` copies into the target of `alias`, `mv -f a.txt alias` never replaces the link; on macOS `/tmp` is a link).
 - `-n`/`--dry-run` changes nothing and emits one `FileOperation(action, path, target)` per action that would be done.
 - Each error (not found, exists, is a folder, parent missing, access denied, protected path) is non-blocking: the other paths are processed.
 - None of these cmdlets runs in preview mode (FR-66).
