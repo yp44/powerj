@@ -47,10 +47,14 @@ final class ShellBootstrap {
      *                       when absent (FR-04d)
      * @param usageError     the command line is wrong: {@code --cd} given twice, without a value, or with a value that
      *                       starts with {@code -} (an option, not a path; write {@code ./-x} for such a folder)
-     * @param script         what remains: {@code -c "line"}, a {@code .pj} file, or nothing for the interactive shell
+     * @param unknownOption  the first word that starts with {@code -} and is no option of the shell (and comes before
+     *                       {@code --}); {@code null} when there is none (U-08)
+     * @param script         what remains: {@code -c "line"} or a {@code .pj} file, then the arguments of the script
+     *                       (what follows {@code --} is one, even if it starts with {@code -}); nothing for the
+     *                       interactive shell
      */
     record Options(boolean debug, boolean noProfile, boolean version, boolean help, String startDirectory,
-                   boolean usageError, List<String> script) {
+                   boolean usageError, String unknownOption, List<String> script) {
 
         private static final String CD = "--cd";
 
@@ -61,9 +65,19 @@ final class ShellBootstrap {
             boolean help = false;
             String startDirectory = null;
             boolean usageError = false;
+            String unknownOption = null;
+            boolean optionsEnded = false;
             List<String> script = new ArrayList<>();
             for (int i = 0; i < args.length; i++) {
                 String arg = args[i];
+                if (optionsEnded) {
+                    script.add(arg);
+                    continue;
+                }
+                if (arg.equals("--")) {
+                    optionsEnded = true; // what follows belongs to the script, even if it looks like an option
+                    continue;
+                }
                 boolean cd = arg.equals(CD);
                 if (cd || arg.startsWith(CD + "=")) {
                     // One --cd only, and a value that is a path: nothing, empty or an option (-…) is a usage error.
@@ -79,10 +93,24 @@ final class ShellBootstrap {
                     case "--no-profile" -> noProfile = true;
                     case "--version" -> version = true;
                     case "--help", "-h" -> help = true;
-                    default -> script.add(arg);
+                    default -> {
+                        if (arg.equals("-c") && script.isEmpty()) {
+                            script.add(arg);
+                            if (i + 1 < args.length) {
+                                script.add(args[++i]); // the line, whatever it starts with
+                            }
+                        } else if (arg.length() > 1 && arg.startsWith("-")) {
+                            if (unknownOption == null) {
+                                unknownOption = arg;
+                            }
+                        } else {
+                            script.add(arg);
+                        }
+                    }
                 }
             }
-            return new Options(debug, noProfile, version, help, startDirectory, usageError, List.copyOf(script));
+            return new Options(debug, noProfile, version, help, startDirectory, usageError, unknownOption,
+                    List.copyOf(script));
         }
     }
 
@@ -123,6 +151,11 @@ final class ShellBootstrap {
         LanguageSetting.set(LanguageSetting.resolve(environment.properties().get(Language.PROPERTY),
                 environment.variables().get(Language.ENVIRONMENT_VARIABLE), config.language(),
                 environment.systemLocale()));
+        if (options.unknownOption() != null) {
+            environment.messages().println(Messages.get("usage.unknownOption", options.unknownOption()));
+            environment.messages().println(Messages.get("usage"));
+            return 2;
+        }
         if (options.usageError()) {
             environment.messages().println(Messages.get("usage"));
             return 2;
