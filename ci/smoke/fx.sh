@@ -30,8 +30,9 @@ expect "$WORK/fx.txt" 'no answer is recorded for this version of it (set modules
     'native access refused for module io.powerj.fx' 'does not hold for the module as it is now' \
     'io.powerj.fx .*\[grid\]' '--max-rows' \
     'the graphical toolkit cannot start'
-if grep -Eiq 'restricted method|cannot start|exception' "$WORK/fxwin.txt"; then
-    echo "window: unexpected message" >&2
+unexpected="$(unexpected_window_messages "$WORK/fxwin.txt")"
+if [ -n "$unexpected" ]; then
+    echo "window: unexpected message: $unexpected" >&2
     exit 1
 fi
 echo "fx: OK"
