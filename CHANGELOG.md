@@ -786,8 +786,10 @@ structures, functions) can be built on it. The work is organised in phases (revi
   console is still checked to be paused around a program that reads it). The writers named in the issue (`PosixSpawnTest`,
   `BackgroundJobsTest`, `NativeRunnerTest`, `Environment.system()`) were not the ones.
 - **The CI looks for it.** `ci/check-surefire-channel.sh` fails when a `target/surefire-reports/*.dumpstream` file exists,
-  after the build of the Linux and macOS jobs; it was seen failing on `ConsoleInputTest` before the fix. Only a test, a
-  script and the workflow changed.
+  after the build of the Linux, macOS and Windows jobs (also after a failing build, `if: always()`); it fails too when no
+  `target/surefire-reports` folder exists, since it would then have examined nothing. It was seen failing on
+  `ConsoleInputTest` before the fix. The Windows step has not been run on Windows by its author: the CI is its first run. Only a
+  test, a script and the workflow changed.
 
 ### Fixed (the smoke test of the graphical module no longer fails at random, [#190](https://github.com/yp44/powerj/issues/190))
 - **`ci/smoke/fx.sh` failed in about one run out of seven with "window: unexpected message"**, on a commit that had passed
@@ -796,9 +798,11 @@ structures, functions) can be built on it. The work is organised in phases (revi
   picking of the scene (a pointer event). It was reproduced on a development machine under xvfb (6 runs out of 40): `-c`
   ends the shell, and the JVM, as soon as the window is shown, so JavaFX is torn down while it still handles an event of the
   pointer. Nothing of PowerJ or of the JDK is in that message and no check of the smoke test depends on it.
-- **That one line is now ignored, and nothing else.** `unexpected_window_messages` (in `ci/smoke/common.sh`) still reports
-  any other exception, a restricted-method warning or a toolkit that cannot start; it was checked on a real failing output
-  (ignored), with another exception added (reported) and on a clean output. 60 runs in a row of the window step then gave 5
+- **That exception is now ignored, and nothing else.** `unexpected_window_messages` (in `ci/smoke/common.sh`) ignores it only
+  when the stack that follows is that of the picking of the scene (`PickResultChooser.processOffer`) and holds no `io.powerj`
+  frame; any other exception, a restricted-method warning, a toolkit that cannot start, or this exception worded differently
+  by another JDK is reported. It was checked on a real failing output (ignored), without the picking frame and with an
+  `io.powerj` frame added (reported), with another exception added (reported) and on a clean output. 60 runs in a row of the window step then gave 5
   runs with the line and 0 failures. Tried and dropped: a pause of 2 s after the window opens (3 failures out of 40, the
   race is at the exit), and `Platform.exit()` in a shutdown hook of the JVM (the JVM then does not exit).
 - **What is not fixed**: the same race can print that exception when a user exits the shell while a `grid` window is open.
@@ -826,9 +830,10 @@ structures, functions) can be built on it. The work is organised in phases (revi
   included (the repository is in English, CONTRIBUTING "Language"). The two texts above have no accent, so the accents the
   test looked for in the Java literals were not enough: it also looks for words that are French and not English (`avec`,
   `lanceur`, `installeur`, `exemple`, `l'application`…), and it was seen failing on the two poms before the translation and
-  nowhere else. The French that is test data stays allowed, by file and by line: `ci/smoke/languages.sh` (it checks the
-  French messages of the launcher) and the same check inline in the Windows job of `ci.yml`. Only the test and two build
-  texts changed.
+  nowhere else. The French that is test data stays allowed, only on the lines that hold it: `ci/smoke/languages.sh` (it checks
+  the French messages of the launcher) and the same check inline in the Windows job of `ci.yml`, so French written
+  elsewhere in those files is still found. `pour` (an English word) is not in the list and `l'`/`d'` do not match after a
+  letter or a hyphen (`tr -d'x'`); the walk skips `.git` and the `target` folders. Only the test and two build texts changed.
 
 ### Changed (Dependabot: one group for the actions, and the rule for the queue, [#144](https://github.com/yp44/powerj/issues/144))
 - **The minor and patch updates of the GitHub Actions come in one pull request a week** (a `github-actions` group in
