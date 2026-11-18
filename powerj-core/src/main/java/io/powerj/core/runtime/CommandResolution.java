@@ -1,12 +1,14 @@
 package io.powerj.core.runtime;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
 import io.powerj.core.command.CmdletRegistry;
 import io.powerj.core.nativeexec.CommandResolver;
+import io.powerj.core.nativeexec.NativeCommands;
 
 /**
  * The rule that gives a command name its meaning (specification FR-13), written once: a built-in command comes first,
@@ -20,6 +22,7 @@ public final class CommandResolution {
     private final Map<String, Builtin> builtins;
     private final CmdletRegistry registry;
     private final CommandResolver natives;
+    private final NativeCommands nativeNames = new NativeCommands();
 
     /**
      * @param builtins the built-in commands: a live view, the shell adds its own before the first line runs
@@ -66,10 +69,20 @@ public final class CommandResolution {
         return registry.find(name).map(Resolved.CmdletCall::new);
     }
 
+    /** Every cmdlet that is registered. */
+    List<CmdletRegistry.Registered> cmdlets() {
+        return registry.all();
+    }
+
     /** The cmdlet that runs under this name, if a built-in command does not take the name first. */
     public Optional<CmdletRegistry.Registered> cmdlet(String name) {
         return inProcess(name).flatMap(resolved ->
                 resolved instanceof Resolved.CmdletCall(var cmdlet) ? Optional.of(cmdlet) : Optional.empty());
+    }
+
+    /** The names of the programs of the {@code PATH}, cached: shared by the completion and the hint of an unknown command. */
+    public NativeCommands nativeNames() {
+        return nativeNames;
     }
 
     /** Names of the built-in commands, in the order they were registered. */

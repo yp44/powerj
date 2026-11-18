@@ -63,7 +63,7 @@ public final class Completions {
     private final ArgumentCompleter arguments;
 
     public Completions(CommandCatalog catalog) {
-        this(catalog, new JavaIndex(), new NativeCommands());
+        this(catalog, new JavaIndex(), catalog.nativeCommands());
     }
 
     Completions(CommandCatalog catalog, JavaIndex index, NativeCommands natives) {

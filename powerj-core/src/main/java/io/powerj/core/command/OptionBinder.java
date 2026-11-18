@@ -243,26 +243,10 @@ public final class OptionBinder {
                 return i;
             }
         }
-        Optional<String> suggestion = suggestion(name, specs.stream().map(OptionSpec::longName).toList());
+        Optional<String> suggestion = Suggestions.forName(name, specs.stream().map(OptionSpec::longName).toList());
         throw new PjException(suggestion.isPresent()
                 ? Messages.get("option.unknown.long.suggestion", command, name, suggestion.get())
                 : Messages.get("option.unknown.long", command, name));
-    }
-
-    /**
-     * The name to suggest to someone who wrote {@code text}, which is none: a hint, never a match.
-     * <ul>
-     * <li>exactly one name begins with {@code text}: it is the beginning of that name;</li>
-     * <li>several do: none is suggested, the error does not pick one (Tab shows them);</li>
-     * <li>none does: a typo, so the nearest name within two edits, if there is one.</li>
-     * </ul>
-     */
-    private static Optional<String> suggestion(String text, List<String> names) {
-        List<String> beginning = text.isEmpty() ? List.of() : names.stream().filter(n -> n.startsWith(text)).toList();
-        if (beginning.isEmpty()) {
-            return closest(text, names);
-        }
-        return beginning.size() == 1 ? Optional.of(beginning.getFirst()) : Optional.empty();
     }
 
     private static int byShortName(String command, List<OptionSpec> specs, char letter) {
@@ -272,39 +256,6 @@ public final class OptionBinder {
             }
         }
         throw new PjException(Messages.get("option.unknown.short", command, letter));
-    }
-
-    /** Closest name (edit distance ≤ 2), the case apart: it is a hint for a name written in the wrong case, not a match. */
-    static Optional<String> closest(String name, List<String> candidates) {
-        String best = null;
-        int bestDistance = 3;
-        for (String candidate : candidates) {
-            int d = distance(name.toLowerCase(Locale.ROOT), candidate.toLowerCase(Locale.ROOT));
-            if (d < bestDistance) {
-                bestDistance = d;
-                best = candidate;
-            }
-        }
-        return Optional.ofNullable(best);
-    }
-
-    private static int distance(String a, String b) {
-        int[] previous = new int[b.length() + 1];
-        int[] current = new int[b.length() + 1];
-        for (int j = 0; j <= b.length(); j++) {
-            previous[j] = j;
-        }
-        for (int i = 1; i <= a.length(); i++) {
-            current[0] = i;
-            for (int j = 1; j <= b.length(); j++) {
-                int cost = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
-                current[j] = Math.min(Math.min(current[j - 1] + 1, previous[j] + 1), previous[j - 1] + cost);
-            }
-            int[] swap = previous;
-            previous = current;
-            current = swap;
-        }
-        return previous[b.length()];
     }
 
     private static boolean parseBoolean(String command, OptionSpec spec, String text) {

@@ -4,6 +4,9 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -17,6 +20,7 @@ import io.powerj.api.Collected;
 import io.powerj.api.ScriptBlock;
 import io.powerj.core.command.Help;
 import io.powerj.core.command.CmdletRegistry;
+import io.powerj.core.command.Suggestions;
 import io.powerj.core.error.PjError;
 import io.powerj.core.error.PjException;
 import io.powerj.core.format.Values;
@@ -384,7 +388,23 @@ final class PipelineExecutor {
                         command.name().substring(dot + 1)));
             }
         }
-        return new PjException(Messages.get("command.unknown", command.name()));
+        return new PjException(suggestion(command.name())
+                .map(near -> Messages.get("command.unknown.suggestion", command.name(), near))
+                .orElseGet(() -> Messages.get("command.unknown", command.name())));
+    }
+
+    /**
+     * The built-in command, cmdlet or program that {@code name} is probably a typo of (U-02). The programs are the
+     * names already cached by completion: the error never waits for a scan of the {@code PATH}.
+     */
+    private Optional<String> suggestion(String name) {
+        Set<String> names = new TreeSet<>(resolution.builtinNames());
+        for (var cmdlet : resolution.cmdlets()) {
+            names.add(cmdlet.name());
+            names.add(cmdlet.qualifiedName());
+        }
+        names.addAll(resolution.nativeNames().cachedNames());
+        return Suggestions.forName(name, names);
     }
 
     private boolean runCmdlet(CmdletRegistry.Registered cmdlet, List<Object> args, Source input,

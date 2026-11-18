@@ -5,6 +5,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import io.powerj.core.command.CmdletRegistry;
+import io.powerj.core.nativeexec.NativeCommands;
 
 /**
  * What the assistance (completion, highlighting) asks of the interpreter: which commands exist, what a name stands
@@ -27,6 +28,14 @@ public interface CommandCatalog {
 
     /** What a command name typed as text stands for, as execution would resolve it (FR-13); launches nothing. */
     Resolved resolve(String name);
+
+    /**
+     * The names of the programs of the {@code PATH}, with the cache that completion fills and that the error of an unknown
+     * command reads. A catalog that does not share one gives each caller its own.
+     */
+    default NativeCommands nativeCommands() {
+        return new NativeCommands();
+    }
 
     /** Kind of a command, for highlighting. */
     CommandKind commandKind(String name);

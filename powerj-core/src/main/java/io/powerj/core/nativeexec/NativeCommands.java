@@ -51,6 +51,14 @@ public final class NativeCommands {
         return cached;
     }
 
+    /**
+     * The names found by the last scan, without scanning again: empty until completion or highlighting has asked for
+     * them. For what must never wait for the {@code PATH}, such as the hint of an error.
+     */
+    public synchronized Set<String> cachedNames() {
+        return cached;
+    }
+
     private Set<String> scan(String path, String pathext) {
         List<String> extensions = List.of(pathext.toLowerCase(Locale.ROOT).split(";"));
         Set<String> names = new TreeSet<>();

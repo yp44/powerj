@@ -25,6 +25,7 @@ import io.powerj.core.lang.ParseContext;
 import io.powerj.core.lang.SyntaxException;
 import io.powerj.core.lang.RedirectedStream;
 import io.powerj.core.nativeexec.CommandResolver;
+import io.powerj.core.nativeexec.NativeCommands;
 
 /**
  * Executes a line: statements chained by {@code ;}, {@code &&}, {@code ||} (FR-04c) or launched in the background
@@ -142,6 +143,11 @@ public final class Interpreter implements CommandCatalog {
     @Override
     public Resolved resolve(String name) {
         return resolution.resolve(name, session);
+    }
+
+    @Override
+    public NativeCommands nativeCommands() {
+        return resolution.nativeNames();
     }
 
     /** What a command name stands for (FR-13): the rule that execution, {@code which}, highlighting and completion share. */

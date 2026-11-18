@@ -262,7 +262,8 @@ There is **no** long form (`pj-ls`, `Get-ChildItem`…).
 2. user-defined alias;
 3. **cmdlet** (built-in or provided by a module);
 4. **native command** found in the `PATH` (with `PATHEXT` on Windows);
-5. otherwise: error `unknown command: xxx` with suggestions (edit distance).
+5. otherwise: error `unknown command: xxx`, with `, did you mean yyy?` when one built-in command, cmdlet or program is the obvious name: the only name that begins with the word, or else the only name within two edits (an exchange of two letters is one edit, the case is ignored); never a choice between several. The programs offered are the names of the `PATH` that completion has already cached: the error never waits for a scan.
+- CA: `grpe x` prints `unknown command: grpe, did you mean grep?`; `gr` (grep, grid, group…) and `xyzzy` print no hint.
 
 **FR-14 — `^` prefix.** `^name` skips steps 1 to 3 and always launches the native command: `^ls`, `^find "foo" a.txt`, `^sort data.txt`.
 - CA: on Windows, `^find "x" a.txt` runs `C:\Windows\System32\find.exe`.

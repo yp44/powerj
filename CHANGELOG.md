@@ -940,6 +940,18 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   `$args` = `[b.pj]`. FR-04d, the README table, `step-4.md` (21g to 21i) and `ci/smoke/non-interactive.sh` say so.
   Left out: named options for scripts.
 
+### Added ("unknown command: grpe, did you mean grep?", [#150](https://github.com/yp44/powerj/issues/150))
+- **A mistyped command gets the hint a mistyped option already had** (audit v2, U-02). `grpe`, `whre` or `fisrt` printed
+  `unknown command: …` and nothing else. The error now adds `, did you mean grep?` when one built-in command, cmdlet
+  (qualified names included) or program is the obvious name. Programs are the names of the `PATH` that completion has already
+  cached (`NativeCommands.cachedNames`): the error never waits for a scan of the `PATH`, and a non-interactive run, where
+  nothing completes, suggests built-in commands and cmdlets only.
+- **One rule for options and commands**: `OptionBinder`'s private helpers became `Suggestions.forName`. It keeps the rule
+  (the only name that begins with the text; else the nearest within two edits, the case apart) and tightens it where it
+  guessed: **two names equally near give no hint** (the first used to win), and an exchange of two letters counts for one
+  edit, so `grpe` is found. `CommandCatalog.nativeCommands()` lets the interpreter and completion share one cache.
+  Tests: `SuggestionsTest`, `UnknownCommandTest`, and the option tests as they were.
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.
