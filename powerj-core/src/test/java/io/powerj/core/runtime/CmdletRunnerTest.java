@@ -341,7 +341,8 @@ class CmdletRunnerTest {
 
     // --- The state of an execution (review C-01) ---
 
-    /** A state that records being closed in the log of the probe. */
+    /** A state that records being closed in the log of the probe; it fails with whatever the test asks for. */
+    @SuppressWarnings("try")
     private static class Resource implements AutoCloseable {
 
         private final List<String> log;
@@ -362,12 +363,14 @@ class CmdletRunnerTest {
         }
     }
 
+    @SuppressWarnings("try")
     private static final class First extends Resource {
         First(List<String> log) {
             super(log, "first");
         }
     }
 
+    @SuppressWarnings("try")
     private static final class Second extends Resource {
         Second(List<String> log) {
             super(log, "second");

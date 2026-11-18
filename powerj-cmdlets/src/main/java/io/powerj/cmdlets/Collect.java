@@ -20,7 +20,7 @@ import io.powerj.api.Collected;
 @CmdletInfo(name = "collect", preview = true, category = "Filters", summary = "Gathers the pipeline objects into a single list",
         examples = {"(ls -r | collect).size()", "$l = ls | where { f -> f.dir } | collect",
                 "ls -r | collect | map { l -> l.stream().sorted((a, b) -> Long.compare(b.size, a.size)).limit(5).toList() }"})
-public final class Collect implements Cmdlet<Collect.Params, Object, Collected> {
+public final class Collect implements Cmdlet<Collect.Params, Object, Collected<Object>> {
 
     /** {@code collect} has no options. */
     public record Params() {
@@ -32,12 +32,12 @@ public final class Collect implements Cmdlet<Collect.Params, Object, Collected> 
     }
 
     @Override
-    public void process(Params p, Object input, CmdletContext<Collected> context) {
+    public void process(Params p, Object input, CmdletContext<Collected<Object>> context) {
         context.state(Received.class, Received::new).objects.add(input);
     }
 
     @Override
-    public void end(Params p, CmdletContext<Collected> context) {
+    public void end(Params p, CmdletContext<Collected<Object>> context) {
         context.emit(new Collected<>(context.state(Received.class, Received::new).objects));
     }
 }

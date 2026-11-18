@@ -144,14 +144,14 @@ class WhereMapCollectTest {
     void collectGathersEverythingIntoOneList() throws Exception {
         var collect = new Collect();
         var params = new Collect.Params();
-        TestContext<Collected> collected = new TestContext<>(Path.of("."));
+        TestContext<Collected<Object>> collected = new TestContext<>(Path.of("."));
         collect.begin(params, collected);
         collect.process(params, "a", collected);
         collect.process(params, 2, collected);
         collect.end(params, collected);
         assertThat(collected.emitted).singleElement().satisfies(list -> assertThat(list).containsExactly("a", 2));
 
-        TestContext<Collected> empty = new TestContext<>(Path.of("."));
+        TestContext<Collected<Object>> empty = new TestContext<>(Path.of("."));
         collect.begin(params, empty);
         collect.end(params, empty);
         assertThat(empty.emitted).singleElement().satisfies(list -> assertThat(list).isEmpty());

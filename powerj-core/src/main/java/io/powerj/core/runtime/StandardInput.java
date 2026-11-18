@@ -33,6 +33,7 @@ public final class StandardInput {
         }
     }
 
+    @SuppressWarnings("restricted") // the FFM calls are the point of this method; like those of PosixSpawn
     private static boolean posixTty() throws Throwable {
         Linker linker = Linker.nativeLinker();
         MemorySegment isatty = linker.defaultLookup().find("isatty").orElseThrow();
@@ -40,6 +41,7 @@ public final class StandardInput {
         return (int) handle.invokeExact(0) == 1;
     }
 
+    @SuppressWarnings("restricted") // the FFM calls are the point of this method; like those of PosixSpawn
     private static boolean windowsConsole() throws Throwable {
         Linker linker = Linker.nativeLinker();
         SymbolLookup kernel32 = SymbolLookup.libraryLookup("kernel32", Arena.global());

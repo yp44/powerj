@@ -121,7 +121,12 @@ public final class CmdletRunner {
         return result;
     }
 
-    /** Context provided to the cmdlet; closing it closes the state of the execution. */
+    /**
+     * Context provided to the cmdlet; closing it closes the state of the execution. {@code close} rethrows the failure of a
+     * state of the cmdlet, whatever it is, an {@code InterruptedException} included: {@code run} lets it through to its
+     * caller, which is how a cancellation is reported, so the interrupt is not lost.
+     */
+    @SuppressWarnings("try")
     private static final class Context implements CmdletContext<Object>, AutoCloseable {
 
         private final String command;
