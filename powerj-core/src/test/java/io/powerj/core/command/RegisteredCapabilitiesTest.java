@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletInfo;
+import io.powerj.api.Collected;
 import io.powerj.api.ColumnProvider;
 import io.powerj.api.Previewable;
 import io.powerj.api.Row;
@@ -36,8 +37,21 @@ class RegisteredCapabilitiesTest {
         }
     }
 
+    /** What {@code collect} declares: the type arguments are parameterized ({@code Collected<Object>}). */
+    @CmdletInfo(name = "generic", summary = "Declares parameterized types", preview = true)
+    static final class Generic implements Cmdlet<Params, Collected<Object>, Collected<Object>> { }
+
     private static CmdletRegistry.Registered registered(Cmdlet<?, ?, ?> cmdlet, String name) {
         return CmdletRegistry.of(List.of(cmdlet)).find(name).orElseThrow();
+    }
+
+    /** The registry reads the types of a cmdlet from its generic declaration; every reader after it sees a class (#146). */
+    @Test
+    void aParameterizedInputOrOutputTypeIsRegisteredAsItsClass() {
+        var generic = registered(new Generic(), "generic");
+
+        assertThat(generic.input()).isEqualTo(Collected.class);
+        assertThat(generic.output()).isEqualTo(Collected.class);
     }
 
     @Test
