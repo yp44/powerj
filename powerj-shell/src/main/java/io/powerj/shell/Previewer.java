@@ -1,6 +1,7 @@
 package io.powerj.shell;
 
 import java.time.Duration;
+import java.util.concurrent.CancellationException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.ArrayList;
@@ -104,6 +105,13 @@ final class Previewer {
      * {@code Throwable.toString()} (U-13, R-20). The detail goes to the log, as the message says.
      */
     static PreviewResult failed(Throwable failure) {
+        if (failure instanceof InterruptedException || failure instanceof CancellationException
+                || Thread.currentThread().isInterrupted()) {
+            // The runner itself interrupts an evaluation that a newer line overtook or that passed its deadline: that is
+            // no failure, and nothing is logged. (A result that was overtaken is dropped; one that passed the deadline
+            // is the time limit.)
+            return new PreviewResult.TimedOut(0, false);
+        }
         LOG.log(Level.WARNING, "A preview failed", failure);
         return new PreviewResult.Failed(Supervisor.messageOf(failure));
     }

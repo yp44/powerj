@@ -55,6 +55,41 @@ class ShellHygieneTest {
         }
     }
 
+    /** What the runner does to an evaluation that a newer line overtook, or that passed its deadline (review of the PR). */
+    @Test
+    void anInterruptionOfAPreviewIsNotAFailureAndIsNotLogged() {
+        Logger logger = Logger.getLogger(Previewer.class.getName());
+        List<LogRecord> records = new ArrayList<>();
+        Handler handler = new Handler() {
+            @Override
+            public void publish(LogRecord record) {
+                records.add(record);
+            }
+
+            @Override
+            public void flush() { }
+
+            @Override
+            public void close() { }
+        };
+        logger.addHandler(handler);
+        try {
+            assertThat(Previewer.failed(new InterruptedException())).isInstanceOf(PreviewResult.TimedOut.class);
+            assertThat(Previewer.failed(new java.util.concurrent.CancellationException()))
+                    .isInstanceOf(PreviewResult.TimedOut.class);
+            Thread.currentThread().interrupt(); // the runner's interruption, which came as some other error
+            try {
+                assertThat(Previewer.failed(new IllegalStateException("closed by interrupt")))
+                        .isInstanceOf(PreviewResult.TimedOut.class);
+            } finally {
+                Thread.interrupted();
+            }
+            assertThat(records).isEmpty();
+        } finally {
+            logger.removeHandler(handler);
+        }
+    }
+
     @Test
     void anErrorOfAPreviewIsWordedAsTheShellWordsItForARunningLine() {
         assertThat(Previewer.failed(new OutOfMemoryError("Java heap space")))

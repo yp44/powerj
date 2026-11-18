@@ -1000,7 +1000,8 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
 - **The preview words an `Error` as the shell does for a running line.** An `OutOfMemoryError` showed as
   `java.lang.OutOfMemoryError: Java heap space` under the line. `Previewer.failed` uses `Supervisor.messageOf` (new, shared
   with the supervisor: `out of memory: filter the data earlier…`, `recursion too deep`, `internal error: … (details in the log)`)
-  and logs the failure at `WARNING`. Tests: `ShellHygieneTest`, `DiagnosticLogTest`, `ConfigFileTest`.
+  and logs the failure at `WARNING`; an interruption (the runner interrupts an evaluation that a newer line overtook or
+  that passed its deadline) is no failure: it gives the time-out result and logs nothing. Tests: `ShellHygieneTest`, `DiagnosticLogTest`, `ConfigFileTest`.
 
 ## [0.1.0] — never released (baseline)
 
