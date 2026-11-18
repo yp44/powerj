@@ -851,6 +851,16 @@ structures, functions) can be built on it. The work is organised in phases (revi
   (#65, #66, #68, #69, #70, #71, #132, #133). They target `main`; #133 is superseded by the update of the plugins applied in
   the phase 0 branch (#143).
 
+### Changed (the low-risk Dependabot updates, in one batch, [#144](https://github.com/yp44/powerj/issues/144))
+- **Six Dependabot pull requests are taken together in one branch and verified at once**, instead of one at a time (each
+  merge makes Dependabot rebase the others and restart their CI): the test libraries (#68), pitest 1.30.2 (#202), the Maven
+  wrapper 3.9.11 → 3.10.1 (#201), and three GitHub Actions: `upload-artifact` 5 → 7.0.2 (#66), `setup-java` 5.7 → 6.3.0 (#200)
+  and `checkout` 5.1 → 7.0.1 (#65, whose branch was 111 commits behind and is replayed on the workflows as they are).
+- **Left out on purpose**: JLine 4.4.7 → 4.7.0 (#70), the only runtime dependency, which wants a session on a real terminal, and
+  JavaFX 25 → 27 (#69), which wants an answer to "does the module move to 27 before the first release". `mvnw.cmd` of #201 is
+  not taken: it differs by line endings alone (the file is CRLF by `.gitattributes`), only `maven-wrapper.properties` changes.
+  The Maven version named by `README.md` and `CONTRIBUTING.md` follows the wrapper.
+
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
   whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes

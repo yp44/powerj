@@ -197,7 +197,7 @@ Messages, help, completion and errors in **English or French**; commands and opt
 
 ### Prerequisites
 
-- **JDK 25** or newer. Maven is not needed: the `mvnw` wrapper downloads Maven 3.9.11.
+- **JDK 25** or newer. Maven is not needed: the `mvnw` wrapper downloads Maven 3.10.1.
 
 ### Build
 

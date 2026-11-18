@@ -6,7 +6,7 @@ Security issues go through [SECURITY.md](SECURITY.md), not through a public issu
 
 ## Build and test
 
-You need **JDK 25 or newer**. Maven is not needed: the `mvnw` wrapper downloads (and checks) Maven 3.9.11.
+You need **JDK 25 or newer**. Maven is not needed: the `mvnw` wrapper downloads (and checks) Maven 3.10.1.
 
 ```bash
 ./mvnw verify                          # compile, tests, every gate below
