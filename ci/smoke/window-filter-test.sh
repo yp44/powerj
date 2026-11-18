@@ -34,6 +34,9 @@ expect() {
 expect "the exception with the stack of the picking" ignored "$npe"$'\n'"$frame_support"$'\n'"$frame_picking"$'\n'"$frame_loop"
 expect "the same exception with no stack at all" ignored "$npe"
 expect "the same exception with no stack, then other output" ignored "$npe"$'\n'"window opened"
+expect "the header of the exception cut by the exit of the JVM" ignored 'Exception in thread "JavaFX Application Thread" '
+expect "a header cut in the middle of the output" reported 'Exception in thread "JavaFX Application Thread" '$'\n'"window opened"
+expect "a header of another thread, cut" reported 'Exception in thread "main" '
 expect "a stack that is not the picking" reported "$npe"$'\n'"$frame_support"$'\n'"$frame_loop"
 expect "a stack with a frame of PowerJ" reported "$npe"$'\n'"$frame_support"$'\n'"$frame_picking"$'\n'"$frame_ours"
 expect "another exception" reported 'Exception in thread "main" java.lang.IllegalStateException: boom'

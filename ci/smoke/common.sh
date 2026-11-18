@@ -39,7 +39,10 @@ expect() {
 # That exception is ignored in two cases: its stack is that of the picking and holds no frame of PowerJ (`io.powerj`); or it
 # has no stack at all, which is what the JVM prints for an exception that it throws very often (it leaves the stack out, a
 # run of the CI on main printed that line alone). The message with another stack, or with a frame of PowerJ, is a real
-# failure and is reported, since the same words from another place are not this noise. Any other exception, a
+# failure and is reported, since the same words from another place are not this noise. The third case is the same race one
+# step earlier: the JVM exits while the thread is printing, and the output ends with the header `Exception in thread
+# "JavaFX Application Thread"` and nothing after it (1 run in 30 with JavaFX 27.0.1). It is ignored only as the very last
+# line of the output, and only with that thread name. Any other exception, a
 # restricted-method warning or a failure to start the toolkit is reported too, and so is this one when the JDK words it
 # differently (the job then fails and somebody looks, which is the safe way to be wrong). ci/smoke/window-filter-test.sh
 # tests every case.
@@ -50,6 +53,7 @@ unexpected_window_messages() {
         END {
             for (i = 1; i <= NR; i++) {
                 if (tolower(line[i]) !~ /restricted method|cannot start|exception/) continue
+                if (i == NR && line[i] ~ /^Exception in thread "JavaFX Application Thread"[ \t]*$/) continue
                 if (index(line[i], known) > 0) {
                     frames = 0; picking = 0; ours = 0
                     for (j = i + 1; j <= NR && line[j] ~ /^[ \t]+at /; j++) {
