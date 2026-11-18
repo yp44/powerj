@@ -3,9 +3,11 @@ package io.powerj.shell;
 import java.util.ArrayDeque;
 import java.util.Deque;
 
+import io.powerj.core.lang.Scanning;
+
 /**
  * Determines whether input is complete or whether the shell must wait for a continuation line
- * (specification FR-02): unclosed string, open brace/parenthesis/bracket, or line ending
+ * (specification FR-02): unclosed string or text block, open brace/parenthesis/bracket, or line ending
  * with {@code |}, {@code &&} or {@code ||}. A backslash at the end of the line does not trigger
  * continuation, so that {@code cd C:\} remains valid.
  */
@@ -33,19 +35,19 @@ final class InputCompleteness {
 
     static Result check(String input) {
         Deque<Character> open = new ArrayDeque<>();
-        boolean inString = false;
         for (int i = 0; i < input.length(); i++) {
             char c = input.charAt(i);
-            if (inString) {
-                if (c == '\\') {
-                    i++; // escaped character, including \"
-                } else if (c == '"') {
-                    inString = false;
-                }
-                continue;
-            }
             switch (c) {
-                case '"' -> inString = true;
+                case '"', '\'' -> {
+                    // One rule for "where does the quoted text end", shared with the Lexer and PreviewCut: strings with
+                    // their interpolations, text blocks and character literals (U-01, C-01).
+                    int end = Scanning.quotedEnd(input, i);
+                    if (end >= 0) {
+                        i = end - 1;
+                    } else if (c == '"') {
+                        return new Result.Incomplete("\"", open.size());
+                    } // a lone ' is an apostrophe, as in "echo it's": not a literal that could ever be closed
+                }
                 case '(' -> open.push(')');
                 case '{' -> open.push('}');
                 case '[' -> open.push(']');
@@ -56,9 +58,6 @@ final class InputCompleteness {
                 }
                 default -> { }
             }
-        }
-        if (inString) {
-            return new Result.Incomplete("\"", open.size());
         }
         if (!open.isEmpty()) {
             return new Result.Incomplete(String.valueOf(open.peek()), open.size());

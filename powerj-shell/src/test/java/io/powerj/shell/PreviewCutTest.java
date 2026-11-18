@@ -28,4 +28,14 @@ class PreviewCutTest {
         assertThat(PreviewCut.upToStage("\"\"\"\na | b\n\"\"\" | x", 0)).isEqualTo("\"\"\"\na | b\n\"\"\" ");
         assertThat(PreviewCut.upToStage("(ls | where { true }).size() | x", 0)).isEqualTo("(ls | where { true }).size() ");
     }
+
+    @Test
+    void anApostropheOfAWordDoesNotHideTheStageSeparator() {
+        assertThat(PreviewCut.upToStage("echo it's | x", 0)).isEqualTo("echo it's ");
+    }
+
+    @Test
+    void anUnclosedStringRunsToTheEndOfTheLine() {
+        assertThat(PreviewCut.upToStage("echo \"a | b", 0)).isEqualTo("echo \"a | b");
+    }
 }

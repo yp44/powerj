@@ -225,6 +225,14 @@ class ReplTest {
     }
 
     @Test
+    void aBraceInACharacterLiteralDoesNotKeepTheContinuationPrompt() throws Exception {
+        session("'{'.length()" + ENTER);
+
+        assertThat(screen).doesNotContain(">> ");
+        assertThat(history).containsExactly("'{'.length()");
+    }
+
+    @Test
     void tabCompletesCommandsOptionsAndProperties() throws Exception {
         java.nio.file.Files.createDirectories(tmp.resolve("dev"));
         java.nio.file.Files.writeString(tmp.resolve("dev").resolve("rapport.txt"), "x");
