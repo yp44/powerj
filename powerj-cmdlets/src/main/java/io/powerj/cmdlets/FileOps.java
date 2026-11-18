@@ -101,9 +101,17 @@ final class FileOps {
         return Files.exists(path, LinkOption.NOFOLLOW_LINKS);
     }
 
-    /** A real folder: a link to a folder is not one (links are never followed). */
+    /** A real folder: a link to a folder is not one (a source and what {@code rm} removes are never followed). */
     static boolean isDirectory(Path path) {
         return Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS);
+    }
+
+    /**
+     * A folder, or a link to one: where a destination or its parent is concerned, a link to a folder is a folder
+     * ({@code cp a.txt alias/}, and on macOS {@code /tmp} is a link), audit v2 R-08.
+     */
+    static boolean isFolderOrLinkToFolder(Path path) {
+        return Files.isDirectory(path);
     }
 
     static boolean isEmptyDirectory(Path path) throws IOException {

@@ -206,6 +206,50 @@ class FileOpsTest {
         assertThat(work.resolve("data/f.txt")).hasContent("x");
     }
 
+    // --- Links: a destination that is a link to a folder is a folder (audit v2, R-08) ---
+
+    @Test
+    void cpIntoALinkToAFolderCopiesIntoTheTarget() throws Exception {
+        Path dir = Files.createDirectories(work.resolve("dir"));
+        file("a.txt", "a");
+        assumeTrue(symbolicLink(work.resolve("alias"), dir), "symbolic links not available");
+
+        cp(false, false, false, false, args("a.txt", "alias"));
+        cp(false, true, false, false, args("a.txt", "alias/"));
+        cp(false, false, false, false, args("a.txt", "alias/b.txt"));
+
+        assertThat(context.errors).isEmpty();
+        assertThat(dir.resolve("a.txt")).hasContent("a");
+        assertThat(dir.resolve("b.txt")).hasContent("a");
+        assertThat(work.resolve("alias")).isSymbolicLink();
+    }
+
+    @Test
+    void mvForceIntoALinkToAFolderKeepsTheLink() throws Exception {
+        Path dir = Files.createDirectories(work.resolve("dir"));
+        file("b.txt", "b");
+        assumeTrue(symbolicLink(work.resolve("alias"), dir), "symbolic links not available");
+
+        mv(true, false, "b.txt", "alias");
+
+        assertThat(context.errors).isEmpty();
+        assertThat(dir.resolve("b.txt")).hasContent("b");
+        assertThat(work.resolve("b.txt")).doesNotExist();
+        assertThat(work.resolve("alias")).isSymbolicLink();
+    }
+
+    @Test
+    void cpOfALinkSourceStillCopiesTheLinkItself() throws Exception {
+        Path dir = Files.createDirectories(work.resolve("dir"));
+        assumeTrue(symbolicLink(work.resolve("alias"), dir), "symbolic links not available");
+        Files.createDirectories(work.resolve("out"));
+
+        cp(false, false, false, false, args("alias", "out"));
+
+        assertThat(context.errors).isEmpty();
+        assertThat(work.resolve("out/alias")).isSymbolicLink();
+    }
+
     // --- mkdir ---
 
     @Test

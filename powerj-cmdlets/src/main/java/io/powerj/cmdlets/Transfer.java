@@ -86,8 +86,9 @@ final class Transfer {
             return;
         }
         boolean folder = destination.endsWith("/") || destination.endsWith("\\"); // cp a.txt backup/
-        boolean into = FileOps.isDirectory(target) || sources.size() > 1 || folder;
-        if (into && !FileOps.isDirectory(target)) {
+        // A destination that is a link to a folder is a folder: links are followed for the destination only.
+        boolean into = FileOps.isFolderOrLinkToFolder(target) || sources.size() > 1 || folder;
+        if (into && !FileOps.isFolderOrLinkToFolder(target)) {
             context.error(Messages.get("fileops.not.directory", target));
             return;
         }
@@ -130,8 +131,8 @@ final class Transfer {
             }
             target = target.toAbsolutePath().normalize();
             Path name = absolute.getFileName();
-            transfer(absolute, FileOps.isDirectory(target) && name != null ? target.resolve(name.toString()) : target,
-                    protectedPaths, context);
+            transfer(absolute, FileOps.isFolderOrLinkToFolder(target) && name != null
+                    ? target.resolve(name.toString()) : target, protectedPaths, context);
         }
     }
 
@@ -167,7 +168,7 @@ final class Transfer {
             return;
         }
         Path parent = target.getParent();
-        if (parent != null && !FileOps.isDirectory(parent)) {
+        if (parent != null && !FileOps.isFolderOrLinkToFolder(parent)) {
             context.error(Messages.get("fileops.parent.missing", target));
             return;
         }

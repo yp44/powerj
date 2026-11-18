@@ -1009,6 +1009,14 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   and logs the failure at `WARNING`; an interruption (the runner interrupts an evaluation that a newer line overtook or
   that passed its deadline) is no failure: it gives the time-out result and logs nothing. Tests: `ShellHygieneTest`, `DiagnosticLogTest`, `ConfigFileTest`.
 
+### Fixed (`cp` and `mv` into a link to a folder, [#155](https://github.com/yp44/powerj/issues/155))
+- **A destination that is a symbolic link to a folder is a folder** (audit v2, R-08). `Transfer` asked `FileOps.isDirectory`,
+  which does not follow links, about the destination too: `cp a.txt alias/` failed with "destination is not a folder",
+  `cp a.txt alias` with "already exists", and `mv -f a.txt alias` **replaced the link** with the file. On macOS `/tmp`, `/var`
+  and `/etc` are links, so `cp x /tmp/` failed there. Links are now followed for the destination and its parent
+  (`FileOps.isFolderOrLinkToFolder`); a source is still never followed and `rm` still removes the link. Tests:
+  `FileOpsTest` (a link as destination for `cp` and `mv -f`, a link as a source still copied as a link).
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.
