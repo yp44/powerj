@@ -786,10 +786,12 @@ structures, functions) can be built on it. The work is organised in phases (revi
   console is still checked to be paused around a program that reads it). The writers named in the issue (`PosixSpawnTest`,
   `BackgroundJobsTest`, `NativeRunnerTest`, `Environment.system()`) were not the ones.
 - **The CI looks for it.** `ci/check-surefire-channel.sh` fails when a `target/surefire-reports/*.dumpstream` file exists,
-  after the build of the Linux, macOS and Windows jobs (also after a failing build, `if: always()`); it fails too when no
+  after the build of the Linux and macOS jobs (also after a failing build, `if: always()`); it fails too when no
   `target/surefire-reports` folder exists, since it would then have examined nothing. It was seen failing on
-  `ConsoleInputTest` before the fix. The Windows step has not been run on Windows by its author: the CI is its first run. Only a
-  test, a script and the workflow changed.
+  `ConsoleInputTest` before the fix. **Not on Windows**: tried there, it reported the `.dumpstream` files of
+  `powerj-architecture` and `powerj-testing`, which hold a message of the forked JVM of Surefire on Windows ("Boot Manifest-JAR
+  contains absolute paths in classpath", hint `-Djdk.net.URLClassPath.disableClassPathURLCheck=true`) and no output of a test.
+  Only a test, a script and the workflow changed.
 
 ### Fixed (the smoke test of the graphical module no longer fails at random, [#190](https://github.com/yp44/powerj/issues/190))
 - **`ci/smoke/fx.sh` failed in about one run out of seven with "window: unexpected message"**, on a commit that had passed
