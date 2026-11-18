@@ -48,8 +48,8 @@ final class InteractiveShell {
         Runnable afterInput = () -> { };
         if (interactive) {
             var previewer = new Previewer(reader, interpreter, completions, terminal::getColumns, colors, modes);
-            previewer.bind(prompt::render);
-            new Perfer(interpreter, modes).bind(reader, prompt::render);
+            previewer.bind(prompt::forJLine);
+            new Perfer(interpreter, modes).bind(reader, prompt::forJLine);
             afterInput = previewer::reset; // stops the evaluation of the line being previewed (FR-66)
         }
         return new Repl(reader::readLine, terminal, supervisor, session, interpreter, prompt, errors, afterInput);

@@ -40,8 +40,10 @@ class ReplTest {
     private String screen;
     private List<String> history;
 
+    private String directoryName = "dev";
+
     private Session session() throws Exception {
-        var cwd = java.nio.file.Files.createDirectories(tmp.resolve("dev"));
+        var cwd = java.nio.file.Files.createDirectories(tmp.resolve(directoryName));
         return new Session(tmp, cwd, System.getenv());
     }
 
@@ -70,6 +72,33 @@ class ReplTest {
     void bannerPromptAndExitCode() throws Exception {
         assertThat(session("exit 3" + ENTER)).isEqualTo(3);
         assertThat(screen).contains("PowerJ 0.1.0 (Java 25)", "PJ " + tmp.resolve("dev") + "> ");
+    }
+
+    /** A name that JLine would read as prompt patterns ({@code %N}, {@code %M}) if the prompt were not escaped (U-13). */
+    private static final String PERCENT_NAME = "100%N-%M-%%x";
+
+    private String promptOf(String marker) {
+        return marker + tmp.resolve(PERCENT_NAME).toAbsolutePath().normalize() + "> ";
+    }
+
+    @Test
+    void aCurrentDirectoryWithPercentSignsIsShownAsTypedInTheNormalPrompt() throws Exception {
+        directoryName = PERCENT_NAME;
+
+        session("exit" + ENTER);
+
+        assertThat(screen).contains(promptOf("PJ "));
+    }
+
+    @Test
+    void aCurrentDirectoryWithPercentSignsIsShownAsTypedInThePreviewAndPerfPrompts() throws Exception {
+        directoryName = PERCENT_NAME;
+
+        session(Previewer.TOGGLE_KEY + "\u0004");
+        assertThat(screen).contains(promptOf("PJ? "));
+
+        session(Perfer.TOGGLE_KEY + "\u0004");
+        assertThat(screen).contains(promptOf("PJ% "));
     }
 
     @Test

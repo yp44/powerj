@@ -93,7 +93,7 @@ final class Previewer {
         return modes.is(ShellMode.PREVIEW);
     }
 
-    /** Binds Alt+V; {@code prompt} gives the prompt to show after the switch. */
+    /** Binds Alt+V; {@code prompt} gives the prompt to show after the switch, already escaped for JLine. */
     void bind(Supplier<String> prompt) {
         reader.getWidgets().put(TOGGLE_WIDGET, () -> {
             toggle();
