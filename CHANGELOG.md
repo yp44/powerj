@@ -802,8 +802,10 @@ structures, functions) can be built on it. The work is organised in phases (revi
   pointer. Nothing of PowerJ or of the JDK is in that message and no check of the smoke test depends on it.
 - **That exception is now ignored, and nothing else.** `unexpected_window_messages` (in `ci/smoke/common.sh`) ignores it only
   when the stack that follows is that of the picking of the scene (`PickResultChooser.processOffer`) and holds no `io.powerj`
-  frame; any other exception, a restricted-method warning, a toolkit that cannot start, or this exception worded differently
-  by another JDK is reported. It was checked on a real failing output (ignored), without the picking frame and with an
+  frame, **or when it has no stack at all** (a run of the CI on `main` printed the line alone, which the JVM does when an
+  exception is thrown very often: the stricter filter of the first version failed the job for noise); any other exception, a
+  restricted-method warning, a toolkit that cannot start, the exception with another stack or with a frame of PowerJ, or
+  worded differently by another JDK is reported. `ci/smoke/window-filter-test.sh` tests nine cases and runs in the Linux job. It was checked on a real failing output (ignored), without the picking frame and with an
   `io.powerj` frame added (reported), with another exception added (reported) and on a clean output. 60 runs in a row of the window step then gave 5
   runs with the line and 0 failures. Tried and dropped: a pause of 2 s after the window opens (3 failures out of 40, the
   race is at the exit), and `Platform.exit()` in a shutdown hook of the JVM (the JVM then does not exit).

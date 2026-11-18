@@ -36,10 +36,13 @@ expect() {
 # (`PickResultChooser.processOffer`). It happened twice in the first runs of the CI that were looked at, and in 6 runs out
 # of 40 under xvfb on a development machine (#190); no check of the smoke test depends on it.
 #
-# That exception is ignored when its stack is that of the picking and holds no frame of PowerJ (`io.powerj`): the message
-# alone is not enough, the same words from another place would be a real failure. Any other exception, a restricted-method
-# warning or a failure to start the toolkit is reported, and so is this one when the JDK words it differently (the job then
-# fails and somebody looks, which is the safe way to be wrong).
+# That exception is ignored in two cases: its stack is that of the picking and holds no frame of PowerJ (`io.powerj`); or it
+# has no stack at all, which is what the JVM prints for an exception that it throws very often (it leaves the stack out, a
+# run of the CI on main printed that line alone). The message with another stack, or with a frame of PowerJ, is a real
+# failure and is reported, since the same words from another place are not this noise. Any other exception, a
+# restricted-method warning or a failure to start the toolkit is reported too, and so is this one when the JDK words it
+# differently (the job then fails and somebody looks, which is the safe way to be wrong). ci/smoke/window-filter-test.sh
+# tests every case.
 unexpected_window_messages() {
     local known='NullPointerException: Cannot invoke "com.sun.prism.GraphicsPipeline.is3DSupported()" because the return value of "com.sun.prism.GraphicsPipeline.getPipeline()" is null'
     awk -v known="$known" '
@@ -48,11 +51,13 @@ unexpected_window_messages() {
             for (i = 1; i <= NR; i++) {
                 if (tolower(line[i]) !~ /restricted method|cannot start|exception/) continue
                 if (index(line[i], known) > 0) {
-                    picking = 0; ours = 0
+                    frames = 0; picking = 0; ours = 0
                     for (j = i + 1; j <= NR && line[j] ~ /^[ \t]+at /; j++) {
+                        frames++
                         if (index(line[j], "PickResultChooser.processOffer") > 0) picking = 1
                         if (index(line[j], "io.powerj") > 0) ours = 1
                     }
+                    if (frames == 0) continue
                     if (picking && !ours) continue
                 }
                 print line[i]

@@ -70,6 +70,10 @@ jobs:
       - name: Smoke test of the properties read across modules
         run: ci/smoke/properties.sh
 
+      # The filter that decides which messages of the window step fail it (#190): no launcher and no display needed.
+      - name: Filter of the window smoke test
+        run: ci/smoke/window-filter-test.sh
+
       - name: Smoke test of the graphical module (powerj-fx)
         run: |
           sudo apt-get update
