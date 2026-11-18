@@ -142,10 +142,55 @@ class ShellBootstrapTest {
     @Test
     void aWrongCommandLineGivesTwoAndTheUsageOnTheMessages() throws Exception {
         assertThat(execute("-c")).isEqualTo(2);
-        assertThat(execute("a.pj", "b.pj")).isEqualTo(2);
-        assertThat(execute("-x")).isEqualTo(2);
+        assertThat(execute("--cd")).isEqualTo(2);
 
         assertThat(text(messages)).contains("usage: powerj");
+    }
+
+    @Test
+    void anUnknownOptionIsNamedBeforeTheUsageAndGivesTwo() throws Exception {
+        assertThat(execute("--foo")).isEqualTo(2);
+        assertThat(execute("-x", "-c", "1 + 1")).isEqualTo(2);
+        assertThat(execute("s.pj", "--bar")).isEqualTo(2);
+
+        assertThat(text(messages)).contains("unknown option: --foo", "unknown option: -x", "unknown option: --bar")
+                .contains("usage: powerj");
+        assertThat(text(stdout)).isEmpty();
+    }
+
+    @Test
+    void anUnknownOptionDoesNotHideHelpOrVersion() throws Exception {
+        assertThat(execute("--foo", "--help")).isZero();
+        assertThat(execute("--foo", "--version")).isZero();
+    }
+
+    @Test
+    void shortHelpPrintsTheUsageWhichNamesIt() throws Exception {
+        assertThat(execute("-h")).isZero();
+
+        assertThat(text(stdout)).contains("usage: powerj").contains("-h");
+    }
+
+    @Test
+    void theOptionsEndAtDoubleDashAndWhatFollowsIsForTheScript() {
+        var options = ShellBootstrap.Options.parse("--no-profile", "s.pj", "a", "--", "--foo", "-c");
+
+        assertThat(options.unknownOption()).isNull();
+        assertThat(options.noProfile()).isTrue();
+        assertThat(options.script()).containsExactly("s.pj", "a", "--foo", "-c");
+    }
+
+    @Test
+    void theLineAfterDashCIsTakenWhateverItStartsWith() {
+        var options = ShellBootstrap.Options.parse("-c", "-1 + 1", "x");
+
+        assertThat(options.unknownOption()).isNull();
+        assertThat(options.script()).containsExactly("-c", "-1 + 1", "x");
+    }
+
+    @Test
+    void aSecondDashCIsAnUnknownOption() {
+        assertThat(ShellBootstrap.Options.parse("s.pj", "-c").unknownOption()).isEqualTo("-c");
     }
 
     // --- The start ---
@@ -220,6 +265,40 @@ class ShellBootstrapTest {
         assertThat(execute("s.pj")).isEqualTo(5);
 
         assertThat(text(stdout)).isEqualTo("first\n");
+    }
+
+    @Test
+    void aScriptWrittenWithAByteOrderMarkRunsItsFirstCommand() throws Exception {
+        Files.createDirectories(tmp.resolve("work"));
+        Files.writeString(tmp.resolve("work").resolve("bom.pj"), "\uFEFF\"first\"\n\"second\"\n");
+
+        assertThat(execute("bom.pj")).isZero();
+
+        assertThat(text(stdout)).isEqualTo("first\nsecond\n");
+    }
+
+    @Test
+    void theArgumentsAfterTheScriptAreTheListArgs() throws Exception {
+        Files.createDirectories(tmp.resolve("work"));
+        Files.writeString(tmp.resolve("work").resolve("args.pj"), "$args[1]\n$args.size()\n");
+
+        assertThat(execute("args.pj", "a", "b")).isZero();
+
+        assertThat(text(stdout)).isEqualTo("b\n2\n");
+    }
+
+    @Test
+    void theArgumentsAfterALineAreTheListArgsAndDoubleDashLetsOneStartWithADash() throws Exception {
+        assertThat(execute("-c", "$args[0] + $args.size()", "--", "-x", "y")).isZero();
+
+        assertThat(text(stdout)).isEqualTo("-x2\n");
+    }
+
+    @Test
+    void withoutArgumentsTheListIsEmpty() throws Exception {
+        assertThat(execute("-c", "$args.size()")).isZero();
+
+        assertThat(text(stdout)).isEqualTo("0\n");
     }
 
     @Test

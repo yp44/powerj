@@ -926,6 +926,19 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   the continuation prompt, `PreviewCut` (its own copy of the rule is gone; an apostrophe in a word no longer hides a `|`
   from it) and `Scanning.matching` (which now skips a text block as a whole). Tests: `InputCompletenessTest`,
   `ScanningTest`, `PreviewCutTest`, and `ReplTest` for the whole road (no `>> ` on the screen). Only the shell and the scanner changed.
+### Fixed and added (the command line: unknown options, a BOM in a script, `$args`, [#149](https://github.com/yp44/powerj/issues/149))
+- **An unknown option is named** (audit v2, U-08). `powerj --foo` used to print the generic usage line and give 2 without saying
+  what was wrong: any word was taken for the script. A word that starts with `-` and is no option of the shell is now
+  refused with `unknown option: --foo`, then the usage, and the code is still 2 (`--help` and `--version` still win). `-h` is
+  now in the usage, which it was accepted without.
+- **A `.pj` script written by Notepad runs its first command** (R-19). `ScriptRun` read the file with `Files.readAllLines`, which
+  keeps the BOM, so the first command was `\uFEFFls`. The script is now read by `Profile.lines`, the function the profile
+  uses (UTF-8, BOM removed): one way to read a file of commands.
+- **A script has arguments** (decision of the issue: yes). `powerj script.pj a b` and `powerj -c "line" a b` set the list `$args`
+  to `["a", "b"]` (empty without arguments). The options of the shell can still stand anywhere, so `--` ends them: what
+  follows is for the script (`powerj script.pj -- -x`). `powerj a.pj b.pj` used to be a usage error and now runs `a.pj` with
+  `$args` = `[b.pj]`. FR-04d, the README table, `step-4.md` (21g to 21i) and `ci/smoke/non-interactive.sh` say so.
+  Left out: named options for scripts.
 
 ## [0.1.0] — never released (baseline)
 

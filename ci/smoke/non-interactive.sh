@@ -20,6 +20,16 @@ cat "$WORK/grep.txt"
 # --cd chooses the directory the session starts in (FR-04d), whatever the directory powerj was started in.
 (cd / && "$PJ" --cd "$WORK" -c pwd < /dev/null > "$WORK/cd.txt")
 expect "$WORK/cd.txt" "$(basename "$WORK")\$"
+# What follows a script is its $args (FR-04d); a file written by Notepad (BOM) runs its first command; an unknown option is named.
+printf '\xef\xbb\xbf$args[1]\n' > "$WORK/args.pj"
+"$PJ" "$WORK/args.pj" a b < /dev/null > "$WORK/args.txt"
+[ "$(cat "$WORK/args.txt")" = "b" ] || { echo "\$args[1] should be b" >&2; exit 1; }
+set +e
+"$PJ" --foo < /dev/null > /dev/null 2> "$WORK/unknown.txt"
+code=$?
+set -e
+[ "$code" -eq 2 ] || { echo "an unknown option should give 2, got $code" >&2; exit 1; }
+expect "$WORK/unknown.txt" "unknown option: --foo" "usage: powerj"
 # --version and --help answer without starting the shell (and without touching the home folder).
 "$PJ" --version > "$WORK/version.txt"
 expect "$WORK/version.txt" "^PowerJ " "(Java "

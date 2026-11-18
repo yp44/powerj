@@ -39,6 +39,9 @@ As in the previous steps: **Actions** tab, latest run of the **CI** workflow, ar
 | 21d | `powerj --cd C:\absent -c pwd` then `echo %ERRORLEVEL%` | `PowerJ: --cd: directory not found: C:\absent` (a file instead of a folder: `not a directory`), then `1`; the shell is not started. |
 | 21e | `powerj --cd`, `powerj --cd C:\a --cd C:\b` and `powerj --cd -c pwd`, each followed by `echo %ERRORLEVEL%` | The usage line (which lists `[--cd <dir>]`), then `2`, each time: one `--cd` only, and its value is a path, not an option. |
 | 21f | Put `cd C:\Users` in `profile.pj`, run `powerj --cd C:\Windows`, then `powerj --no-profile --cd C:\Windows` | First prompt `PJ C:\Users>` (the profile wins), then `PJ C:\Windows>`. |
+| 21g | `powerj --foo`, then `powerj script.pj --bar`, each followed by `echo %ERRORLEVEL%` | `PowerJ: unknown option: --foo` (then `--bar`), the usage line, then `2`. `powerj -h` prints the usage, which names `-h`. |
+| 21h | Save `script.pj` in Notepad (UTF-8 with a BOM) with `"first"` on its first line, then run `powerj script.pj` | `first`: the first command is read like the others (the profile is read the same way). |
+| 21i | Save `args.pj` with `$args[1]` and run `powerj args.pj a b`; then `powerj -c "$args.size()" -- -x y` | `b`, then `2`: what follows the script or the line is `$args`; `--` lets an argument start with `-`. |
 
 Linux / macOS variant (archive `powerj-linux-x64`): replace `ipconfig` with `ip addr`, `^cmd /c …` with `sh -c "…"`, `dir /b` with `ls -1`, and launch `bin/powerj`.
 

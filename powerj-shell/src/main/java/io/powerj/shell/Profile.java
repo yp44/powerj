@@ -32,16 +32,25 @@ final class Profile {
      * @return no command if the file does not exist
      */
     static List<Command> read(Path file) throws IOException {
-        String content;
         try {
-            content = Files.readString(file, StandardCharsets.UTF_8);
+            return commands(lines(file));
         } catch (NoSuchFileException _) {
             return List.of();
         }
+    }
+
+    /**
+     * The lines of a file of commands, in UTF-8, without the BOM that Notepad writes: the one way the profile and a
+     * {@code .pj} script are read (U-08, R-19).
+     *
+     * @throws NoSuchFileException if the file does not exist
+     */
+    static List<String> lines(Path file) throws IOException {
+        String content = Files.readString(file, StandardCharsets.UTF_8);
         if (content.startsWith("﻿")) {
-            content = content.substring(1); // written by Notepad
+            content = content.substring(1);
         }
-        return commands(content.lines().toList());
+        return content.lines().toList();
     }
 
     static List<Command> commands(List<String> lines) {

@@ -219,9 +219,9 @@ Optionally, on Windows, an `.exe` installer (per user, with a Start menu entry a
 | `powerj` | Interactive shell (runs `~/.powerj/profile.pj` first) |
 | `powerj --no-profile` | Interactive shell without the startup profile |
 | `powerj --version` | Prints the version and exits |
-| `powerj --help` | Prints the usage and exits |
+| `powerj --help` (or `-h`) | Prints the usage and exits |
 | `powerj -c "ls -r \| where size > 1mb"` | Runs one line, then exits |
-| `powerj script.pj` | Runs a file, then exits (a command may span several lines, as in the profile) |
+| `powerj script.pj a b` | Runs a file, then exits (a command may span several lines, as in the profile); `a b` are the list `$args` of the script, also with `-c "line" a b` (`--` before an argument that starts with `-`) |
 | `ls /etc \| powerj -c 'where { $_.endsWith(".conf") }'` | Standard input feeds the first stage as `String` lines |
 | `powerj --debug …` | Also prints the detailed diagnostic log to the console |
 | `powerj --cd ~/dev/myproject` | Starts the session in that directory (`--cd=<dir>` works too; absolute or relative to where `powerj` was started, `~` expanded). With `-c`, a `.pj` file or standard input as well; applied before the profile, so a `cd` in `profile.pj` still wins. Given once, with a path as value (not starting with `-`). A directory that does not exist is an error, exit code 1 |
