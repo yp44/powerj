@@ -940,6 +940,19 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   `$args` = `[b.pj]`. FR-04d, the README table, `step-4.md` (21g to 21i) and `ci/smoke/non-interactive.sh` say so.
   Left out: named options for scripts.
 
+### Fixed and changed (an invalid `history.size` is announced; review of the messages of `powerj-shell`, [#152](https://github.com/yp44/powerj/issues/152))
+- **An invalid `history.size` is shown on the terminal, not only logged** (audit v2, U-13). `history.size=abc` (or `-3`, `0`,
+  empty) was written to the log at `WARNING` and the default size applied without a word, while a file that cannot be
+  read at all is announced (`config.unusable`). Both now go to the same `warn` line: *PowerJ: invalid value for
+  history.size: abc (a positive whole number is expected); the default, 10000, applies.* (`config.invalidValue`, en and fr).
+- **French: the command is `history`, in every message.** `history.noMatch` said `historique :` and
+  `history.unknownOption` said `history :`; a command is a name and is not translated. Both say `history :`.
+- **Review of the 35 keys of the bundle** (en and fr, against: tone, terminology, what to do next). Kept as they are, with the
+  reason: the startup messages and `config.unusable` already say what happens next (the default settings apply, a backslash is
+  written twice); `history.unknownOption` names the option that exists; the preview banners are symbols and short words on
+  purpose (a line of the screen); the `[y/N]` / `[o/N]` answer letters are the ones `NativeAccessConsent` accepts (`y`, `yes`, `o`, `oui`). The literal `^C`
+  of `Repl` is the echo every terminal shell prints, not a message. Nothing else needed a change.
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.
