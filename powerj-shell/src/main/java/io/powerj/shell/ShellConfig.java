@@ -37,8 +37,9 @@ public record ShellConfig(int historySize, String language) {
     }
 
     /**
-     * Reads the file; missing or invalid values take their default value. A file that cannot be read at all gives the
-     * default settings, and {@code warn} is told why: the user should know that the file is not being applied.
+     * Reads the file; missing values take their default value, and so do invalid ones, which {@code warn} is told
+     * about. A file that cannot be read at all gives the default settings, and {@code warn} is told why: the user
+     * should know that the file, or a line of it, is not being applied.
      * That is the case of invalid UTF-8 and of a malformed unicode escape, which is what a Windows path written with
      * single backslashes (<code>C:&#92;users</code>) looks like to {@link Properties#load}.
      *
@@ -54,10 +55,11 @@ public record ShellConfig(int historySize, String language) {
             warn.accept(Messages.get("config.unusable", file, e.getMessage()));
             return defaults();
         }
-        return new ShellConfig(positiveInt(props, HISTORY_SIZE_KEY, DEFAULT_HISTORY_SIZE), props.getProperty(LANGUAGE_KEY));
+        return new ShellConfig(positiveInt(props, HISTORY_SIZE_KEY, DEFAULT_HISTORY_SIZE, warn),
+                props.getProperty(LANGUAGE_KEY));
     }
 
-    private static int positiveInt(Properties props, String key, int defaultValue) {
+    private static int positiveInt(Properties props, String key, int defaultValue, Consumer<String> warn) {
         var text = props.getProperty(key);
         if (text == null) {
             return defaultValue;
@@ -71,6 +73,8 @@ public record ShellConfig(int historySize, String language) {
             // invalid value: reported below
         }
         LOG.warning(() -> "Invalid value for " + key + ": '" + text + "', using " + defaultValue);
+        // The user should know that the line is not being applied, as for a file that cannot be read (U-13).
+        warn.accept(Messages.get("config.invalidValue", key, text, defaultValue));
         return defaultValue;
     }
 }

@@ -66,6 +66,30 @@ class ShellConfigTest {
         assertThat(ShellConfig.load(file)).isEqualTo(ShellConfig.defaults());
     }
 
+    @Test
+    void anInvalidHistorySizeIsReportedToTheUserAndTheDefaultApplies() throws Exception {
+        for (String value : List.of("abc", "-3", "0", "")) {
+            var file = Files.writeString(tmp.resolve("config.properties"), "history.size=" + value + "\n");
+            List<String> warnings = new ArrayList<>();
+
+            assertThat(ShellConfig.load(file, warnings::add)).isEqualTo(ShellConfig.defaults());
+
+            assertThat(warnings).as(value).singleElement().asString()
+                    .contains("invalid value for history.size: " + value)
+                    .contains("the default, " + ShellConfig.DEFAULT_HISTORY_SIZE + ", applies");
+        }
+    }
+
+    @Test
+    void aValidOrAbsentHistorySizeSaysNothing() throws Exception {
+        List<String> warnings = new ArrayList<>();
+
+        ShellConfig.load(Files.writeString(tmp.resolve("a.properties"), "history.size=500\n"), warnings::add);
+        ShellConfig.load(Files.writeString(tmp.resolve("b.properties"), "language=fr\n"), warnings::add);
+
+        assertThat(warnings).isEmpty();
+    }
+
     /**
      * Review C-11: {@code Properties.load} throws IllegalArgumentException on a malformed {@code \\uXXXX}, which a Windows path
      * written without doubling its backslashes is. The class promises that invalid values take their default.

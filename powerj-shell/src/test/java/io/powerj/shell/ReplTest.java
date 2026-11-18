@@ -205,7 +205,7 @@ class ReplTest {
             LanguageSetting.set(Locale.ENGLISH);
         }
 
-        assertThat(screen).contains("historique : aucune commande ne correspond à !zzz",
+        assertThat(screen).contains("history : aucune commande ne correspond à !zzz",
                 "history : option inconnue '-x' (option disponible : --clear)");
     }
 
