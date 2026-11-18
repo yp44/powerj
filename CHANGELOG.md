@@ -867,6 +867,9 @@ structures, functions) can be built on it. The work is organised in phases (revi
   `ci/smoke/common.sh` ignores it, only as the very last line of the output, with a test for each side.
 - `mvnw.cmd` of #201 is not taken: it differs by line endings alone (the file is CRLF by `.gitattributes`), only
   `maven-wrapper.properties` changes. The Maven version named by `README.md` and `CONTRIBUTING.md` follows the wrapper.
+- **The Dependabot queue is empty**: #65, #66, #68, #70 and #200 were closed by Dependabot once their changes were on `main`;
+  #69, #201 and #202 were closed by hand, each with its reason (the version is on `main`; for #201, `mvnw.cmd` differs by line
+  endings alone). This is what the first condition of #144 asked for, and the phase 0 of the audit is done.
 
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
