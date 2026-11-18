@@ -7,6 +7,7 @@ import java.io.File;
 import org.junit.jupiter.api.Test;
 
 import io.powerj.fs.GlobArgument;
+import io.powerj.fs.Globs;
 
 /** What a cmdlet receives for a word of the command line: its value, or a {@link GlobArgument} (audit v2, R-09). */
 class WordForCmdletTest {
@@ -24,7 +25,7 @@ class WordForCmdletTest {
         // a File does not check its name, a Path refuses a ? on Windows
         File file = new File("d?" + File.separator + "x");
         assertThat(new Evaluator.Word(file, null).forCmdlet())
-                .isEqualTo(new GlobArgument(file.getPath(), file.getPath().replace("?", "\\?")));
+                .isEqualTo(new GlobArgument(file.getPath(), Globs.escape(file.getPath())));
     }
 
     @Test
