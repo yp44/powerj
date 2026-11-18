@@ -1,5 +1,7 @@
 package io.powerj.shell;
 
+import java.util.List;
+
 import org.jline.utils.AttributedString;
 import org.jline.utils.AttributedStringBuilder;
 import org.jline.utils.AttributedStyle;
@@ -13,19 +15,29 @@ import io.powerj.core.runtime.PreviewSettings;
  */
 final class PreviewControl {
 
-    /** The Alt+arrow keys that act on the control. */
+    /**
+     * The Alt+arrow keys that act on the control. Terminals do not agree on what Alt+arrow sends (U-12): xterm and most
+     * Linux terminals {@code ESC [ 1 ; 3 X}, tmux and many others {@code ESC ESC [ X} (Escape, then the arrow), the
+     * macOS Terminal with "Use Option as Meta key" {@code ESC [ 1 ; 9 X}. Every one of them is bound; the terminfo database
+     * names no capability for a modified arrow, so there is none to read from the terminal.
+     */
     enum Key {
-        LEFT("\033[1;3D"), RIGHT("\033[1;3C"), UP("\033[1;3A"), DOWN("\033[1;3B");
+        LEFT('D'), RIGHT('C'), UP('A'), DOWN('B');
 
-        private final String sequence;
+        private final List<String> sequences;
 
-        Key(String sequence) {
-            this.sequence = sequence;
+        Key(char arrow) {
+            this.sequences = List.of("\033[1;3" + arrow, "\033\033[" + arrow, "\033[1;9" + arrow);
         }
 
-        /** What a terminal sends for Alt and this arrow. */
+        /** What xterm sends for Alt and this arrow. */
         String sequence() {
-            return sequence;
+            return sequences.getFirst();
+        }
+
+        /** Everything the terminals known send for Alt and this arrow, the xterm one first. */
+        List<String> sequences() {
+            return sequences;
         }
     }
 
