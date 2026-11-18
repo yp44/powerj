@@ -773,6 +773,10 @@ structures, functions) can be built on it. The work is organised in phases (revi
   owner of the class. A full `./mvnw verify`, with the graphical module and the application image, is green with Surefire
   3.5.3 and with the plugin versions of #133 (Surefire 3.6.1 among them). Each assertion was seen failing when the code it
   checks was broken on purpose. Only tests changed.
+- **The update of the Maven plugins is applied** (the 13 updates of [#133](https://github.com/yp44/powerj/pull/133), Surefire
+  3.6.1 and the JaCoCo, Spotless, compiler, jar, resources, dependency, antrun, install, deploy, site, enforcer and
+  build-helper plugins), by a commit of the phase 0 branch rather than by the Dependabot pull request, which targets `main`
+  and is then superseded.
 
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
