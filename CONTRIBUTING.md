@@ -103,6 +103,23 @@ What goes where:
   Fixes #123
   ```
 
+## Dependency updates
+
+Dependabot proposes them every week ([.github/dependabot.yml](.github/dependabot.yml)): the Maven plugins come in one pull
+request, the test libraries in one, the GitHub Actions in one; JLine and JavaFX, which ship in the application, come alone.
+
+- **A Dependabot pull request is merged, or closed with its reason, within two weeks**, and the queue never holds more than
+  three of them: a month of waiting turns a patch into a jump of two major versions (audit v2, B-02). The maintainer merges,
+  or says who may.
+- **Before merging**: the CI is green on the three systems. For a **runtime dependency** (JLine, JavaFX, the version of the
+  JDK of the image) the CI already runs `./mvnw -Pdist verify` and the smoke tests of `ci/smoke/` on the image; read the
+  release notes of the library for what a test cannot see.
+- **A red update** is not a verdict on the update: check first whether a test depends on the layout of the test runtime
+  (#143) or at random (a job that passes on a re-run of the same commit is a test to fix, not a dependency to refuse). The
+  same job failing twice is a real break: fix the code in its own pull request, or close the update with the reason.
+- **What is not wanted is closed with the reason** (for example a major version of JavaFX while the module stays on 25), and
+  `@dependabot ignore this major version` keeps it from coming back.
+
 ## Releasing
 
 [docs/RELEASING.md](docs/RELEASING.md): how a version is cut, what the release workflow builds, and what is not done yet

@@ -23,3 +23,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # One pull request a week for all the actions, as for the Maven plugins and the test libraries (issue #144): the queue
+    # was eight pull requests long, two of them major versions of actions. JLine and JavaFX stay alone, because the person who
+    # merges them runs the smoke tests of the image (CONTRIBUTING, "Dependency updates").
+    groups:
+      github-actions:
+        patterns:
+          - "*"

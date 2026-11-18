@@ -830,6 +830,17 @@ structures, functions) can be built on it. The work is organised in phases (revi
   French messages of the launcher) and the same check inline in the Windows job of `ci.yml`. Only the test and two build
   texts changed.
 
+### Changed (Dependabot: one group for the actions, and the rule for the queue, [#144](https://github.com/yp44/powerj/issues/144))
+- **The GitHub Actions come in one pull request a week** (a `github-actions` group in `.github/dependabot.yml`, as the Maven
+  plugins and the test libraries already do), so that two major versions of the actions do not wait a month each (audit v2,
+  B-02). JLine and JavaFX stay alone: they ship in the application.
+- **The rule is in CONTRIBUTING, "Dependency updates"**: a Dependabot pull request is merged, or closed with its reason,
+  within two weeks; the queue never holds more than three; what to check before merging a runtime dependency; what a red
+  update means (a test of the layout, a flaky test, or a real break); what is not wanted is closed with the reason.
+- **Not done here, and left to the maintainer**: merging or closing the eight pull requests that were open
+  (#65, #66, #68, #69, #70, #71, #132, #133). They target `main`; #133 is superseded by the update of the plugins applied in
+  the phase 0 branch (#143).
+
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
   whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes
