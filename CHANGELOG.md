@@ -1029,6 +1029,18 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   (the real cmdlets through the interpreter, on a file called `a?.txt` next to `ab.txt` and `a1.txt`), `OptionBinderTest`,
   `WordForCmdletTest`.
 
+### Fixed (`cp -r` of a read-only folder, and the dates of the folders it copies, [#157](https://github.com/yp44/powerj/issues/157))
+- **`cp -r` copies a tree of read-only folders** (audit v2, R-10). `FileTrees` created a folder with its final permissions
+  before its children, so with `r-x` (a Go module cache, a Nix store, an archive after `chmod -R a-w`) every child failed
+  with `AccessDeniedException`; the children also rewrote the date of their folder, against "the attributes are kept". A
+  folder is now created writable and gets the owner (best effort), group, permissions and dates of its source when its last
+  child is done: after the content in the sequential walk, by the "last child done" counter the parallel removal already uses
+  in the parallel one. A folder that was merged (`-f`) is left as it was. Tests: `FileTreesTest` (a tree of two read-only
+  levels with two dates, at parallelism 1 and 8; a merged folder), `FileOpsTest`; they need a user other than root.
+- **A move across file systems that stops half way says so**: `mv` keeps the source, and now adds `the move is incomplete:
+  <source> is kept, and the copy in <destination> holds only part of it`. It does not remove the copy: with `-f` the
+  destination may be a folder that was there before. Test: `FileOpsTest` on a second file system (`/dev/shm`) when there is one.
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.

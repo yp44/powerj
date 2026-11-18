@@ -195,6 +195,56 @@ class FileTreesTest {
         assertThat(Files.getLastModifiedTime(copy.resolve("a/b/two.txt"))).isEqualTo(time);
     }
 
+    /** A tree of read-only folders (a module cache, an archive after chmod -R a-w), each with its own date. */
+    @ParameterizedTest
+    @ValueSource(ints = {1, 8})
+    void copyOfAReadOnlyTreeCopiesItsContentAndKeepsTheFolders(int parallelism) throws Exception {
+        assumeTrue(!WINDOWS && !"root".equals(System.getProperty("user.name")), "permissions are not enforced");
+        Path source = Files.createDirectories(tmp.resolve("ro"));
+        Files.createDirectories(source.resolve("inner"));
+        Files.writeString(source.resolve("top.txt"), "t");
+        Files.writeString(source.resolve("inner/leaf.txt"), "l");
+        FileTime outer = FileTime.fromMillis(1_500_000_000_000L);
+        FileTime inner = FileTime.fromMillis(1_400_000_000_000L);
+        Files.setLastModifiedTime(source.resolve("inner"), inner);
+        Files.setLastModifiedTime(source, outer);
+        Path copy = tmp.resolve("copy");
+        Files.setPosixFilePermissions(source.resolve("inner"), PosixFilePermissions.fromString("r-xr-xr-x"));
+        Files.setPosixFilePermissions(source, PosixFilePermissions.fromString("r-xr-xr-x"));
+        try {
+            assertThat(FileTrees.copy(source, copy, parallelism, false, this::error)).isTrue();
+
+            assertThat(errors).isEmpty();
+            assertThat(copy.resolve("top.txt")).hasContent("t");
+            assertThat(copy.resolve("inner/leaf.txt")).hasContent("l");
+            assertThat(Files.getPosixFilePermissions(copy)).isEqualTo(PosixFilePermissions.fromString("r-xr-xr-x"));
+            assertThat(Files.getPosixFilePermissions(copy.resolve("inner")))
+                    .isEqualTo(PosixFilePermissions.fromString("r-xr-xr-x"));
+            // the dates are those of the source, not the time the children were created
+            assertThat(Files.getLastModifiedTime(copy)).isEqualTo(outer);
+            assertThat(Files.getLastModifiedTime(copy.resolve("inner"))).isEqualTo(inner);
+        } finally {
+            for (Path folder : List.of(source, source.resolve("inner"), copy, copy.resolve("inner"))) {
+                if (Files.exists(folder)) {
+                    Files.setPosixFilePermissions(folder, PosixFilePermissions.fromString("rwxr-xr-x"));
+                }
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {1, 8})
+    void aMergedFolderKeepsItsOwnAttributes(int parallelism) throws Exception {
+        assumeTrue(!WINDOWS, "POSIX permissions");
+        Path copy = Files.createDirectories(tmp.resolve("copy"));
+        Files.setPosixFilePermissions(copy, PosixFilePermissions.fromString("rwx------"));
+
+        assertThat(FileTrees.copy(tree, copy, parallelism, true, this::error)).isTrue();
+
+        assertThat(Files.getPosixFilePermissions(copy)).isEqualTo(PosixFilePermissions.fromString("rwx------"));
+        assertThat(copy.resolve("a/b/c/three.txt")).hasContent("3");
+    }
+
     @ParameterizedTest
     @ValueSource(ints = {1, 8})
     void copyOfAWideTree(int parallelism) throws Exception {

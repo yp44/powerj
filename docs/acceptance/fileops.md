@@ -43,6 +43,7 @@ Create the empty folder `C:\tmp\ops`, then `cd C:\tmp\ops`.
 | 19 | `mv ~/Documents C:\tmp` | Refused (protected source). |
 | 20 | (Linux/macOS) `ln -s /etc link`, then `rm -r link` | Only `link` is removed; `/etc` is intact. |
 | 20a | (Linux/macOS) `mkdir real`, `ln -s real alias`, `touch f.txt g.txt`, then `cp f.txt alias/`, `mv -f g.txt alias` | `real` holds `f.txt` and `g.txt`; `alias` is still a link (`ls -l alias`). |
+| 20e | (Linux/macOS, not as root) `mkdir -p ro/sub`, `touch ro/sub/f.txt`, `chmod -R a-w ro`, then `cp -r ro copy` and `ls -r copy` | No error: `copy/sub/f.txt` exists; `ls -l` shows `copy` and `copy/sub` read-only, with the dates of `ro` and `ro/sub`. (`chmod -R u+w ro copy` before removing them.) |
 | 20b | `mkdir src2`, `touch src2/a.txt src2/b.txt`, then `ls src2 --files \| touch { $_.name }` | `a.txt` and `b.txt` are created in the current folder; the dates of `src2\a.txt` and `src2\b.txt` do not change. |
 | 20c | `cp src2/*.txt { $_.name + ".bak" } -v`, then `ls --files \| where { $_.name.endsWith(".bak") } \| mv { $_.name.replace(".bak", ".old") } -v` | `a.txt.bak`, `b.txt.bak`; then renamed `a.txt.old`, `b.txt.old`. |
 | 20d | `ls \| rm { $_.ext == "old" ? $_.name : null } -v`, then `touch { $_.name }` | Only the `.old` files are removed; then `touch: the block $_.name gives the path of each pipeline object: use it after a \|, …`. |

@@ -250,6 +250,52 @@ class FileOpsTest {
         assertThat(work.resolve("out/alias")).isSymbolicLink();
     }
 
+    // --- cp -r of a read-only folder, and a move that falls back to a copy (audit v2, R-10) ---
+
+    @Test
+    void cpOfAReadOnlyFolderCopiesItsContentAndKeepsItReadOnly() throws Exception {
+        assumeFalse(Host.windows() || "root".equals(System.getProperty("user.name")), "permissions are not enforced");
+        Path source = Files.createDirectories(work.resolve("ro"));
+        Files.writeString(source.resolve("f.txt"), "x");
+        Files.setPosixFilePermissions(source, java.nio.file.attribute.PosixFilePermissions.fromString("r-xr-xr-x"));
+        try {
+            cp(true, false, false, false, args("ro", "copy"));
+
+            assertThat(context.errors).isEmpty();
+            assertThat(work.resolve("copy/f.txt")).hasContent("x");
+            assertThat(Files.getPosixFilePermissions(work.resolve("copy"))).isEqualTo(
+                    java.nio.file.attribute.PosixFilePermissions.fromString("r-xr-xr-x"));
+        } finally {
+            Files.setPosixFilePermissions(source, java.nio.file.attribute.PosixFilePermissions.fromString("rwxr-xr-x"));
+            if (Files.exists(work.resolve("copy"))) {
+                Files.setPosixFilePermissions(work.resolve("copy"),
+                        java.nio.file.attribute.PosixFilePermissions.fromString("rwxr-xr-x"));
+            }
+        }
+    }
+
+    @Test
+    void aMoveAcrossFileSystemsThatFailsHalfWayNamesTheIncompleteCopyAndKeepsTheSource() throws Exception {
+        assumeFalse(Host.windows() || "root".equals(System.getProperty("user.name")), "permissions are not enforced");
+        Path other = Path.of("/dev/shm");
+        assumeTrue(Files.isDirectory(other) && Files.isWritable(other)
+                && !Files.getFileStore(other).equals(Files.getFileStore(work)), "no second file system to move to");
+        file("src/ok.txt", "ok");
+        Path locked = file("src/locked.txt", "no");
+        Path destination = Files.createTempDirectory(other, "powerj-mv-");
+        Files.setPosixFilePermissions(locked, java.nio.file.attribute.PosixFilePermissions.fromString("---------"));
+        try {
+            mv(false, false, "src", destination.resolve("moved").toString());
+
+            assertThat(context.errors).anyMatch(e -> e.contains("incomplete") && e.contains("moved"));
+            assertThat(work.resolve("src/ok.txt")).exists(); // the source is kept
+            assertThat(destination.resolve("moved/ok.txt")).hasContent("ok");
+        } finally {
+            Files.setPosixFilePermissions(locked, java.nio.file.attribute.PosixFilePermissions.fromString("rw-r--r--"));
+            FileOps.deleteTree(destination, 1, false, false, context, (path, entry) -> { });
+        }
+    }
+
     // --- mkdir ---
 
     @Test

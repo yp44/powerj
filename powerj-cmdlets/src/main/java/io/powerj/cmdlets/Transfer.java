@@ -206,7 +206,10 @@ final class Transfer {
             return true;
         } catch (DirectoryNotEmptyException e) {
             if (!FileOps.copyTree(source, target, 1, options.force(), context)) {
-                return false; // the source is kept
+                // The source is kept. What was copied stays: the destination may have been there (a merge with -f), so
+                // it is not ours to remove; the user is told where it is.
+                context.error(Messages.get("fileops.move.incomplete", source, target));
+                return false;
             }
             return FileOps.deleteTree(source, 1, false, false, context, (path, entry) -> { });
         } catch (FileAlreadyExistsException e) {
