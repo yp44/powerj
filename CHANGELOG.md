@@ -950,8 +950,9 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   nothing completes, suggests built-in commands and cmdlets only.
 - **One rule for options and commands**: `OptionBinder`'s private helpers became `Suggestions.forName`. It keeps the rule
   (the only name that begins with the text; else the nearest within two edits, the case apart) and tightens it where it
-  guessed: **two names equally near give no hint** (the first used to win), and an exchange of two letters counts for one
-  edit, so `grpe` is found. `CommandCatalog.nativeCommands()` lets the interpreter and completion share one cache.
+  guessed: **two names equally near give no hint** (the first used to win), an exchange of two letters counts for one
+  edit, so `grpe` is found, and **the distance allowed grows with the length of the word** (one edit per three letters, at most
+  two: `xyz` or `qq` are not typos of `ls` or `cp`; review of the PR). `CommandCatalog.nativeCommands()` lets the interpreter and completion share one cache.
   Tests: `SuggestionsTest`, `UnknownCommandTest`, and the option tests as they were.
 ### Fixed and changed (an invalid `history.size` is announced; review of the messages of `powerj-shell`, [#152](https://github.com/yp44/powerj/issues/152))
 - **An invalid `history.size` is shown on the terminal, not only logged** (audit v2, U-13). `history.size=abc` (or `-3`, `0`,

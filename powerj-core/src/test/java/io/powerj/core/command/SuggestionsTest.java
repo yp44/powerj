@@ -31,6 +31,23 @@ class SuggestionsTest {
     }
 
     @Test
+    void aShortNameIsNotATypoOfAnotherShortName() {
+        List<String> commands = List.of("ls", "cp", "rm", "mv", "cat", "env", "ps");
+
+        assertThat(Suggestions.forName("xyz", commands)).isEmpty(); // 3 letters: one edit at most
+        assertThat(Suggestions.forName("qq", commands)).isEmpty(); // 2 letters: no near name at all
+        assertThat(Suggestions.forName("lz", commands)).isEmpty();
+        assertThat(Suggestions.forName("cta", commands)).contains("cat"); // one exchange
+        assertThat(Suggestions.forName("evn", commands)).contains("env");
+    }
+
+    @Test
+    void theLimitGrowsWithTheLengthOfTheName() {
+        assertThat(List.of(0, 1, 2, 3, 5, 6, 12).stream().map(n -> Suggestions.limit("x".repeat(n))).toList())
+                .containsExactly(0, 0, 0, 1, 1, 2, 2);
+    }
+
+    @Test
     void aNameBeyondTwoEditsGetsNothing() {
         assertThat(Suggestions.forName("xyzzy", NAMES)).isEqualTo(Optional.empty());
         assertThat(Suggestions.forName("", NAMES)).isEmpty();

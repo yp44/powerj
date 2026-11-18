@@ -22,8 +22,8 @@ public final class Suggestions {
      * <ul>
      * <li>exactly one name begins with {@code text}: it is the beginning of that name;</li>
      * <li>several do: none is suggested, the error does not pick one (Tab shows them);</li>
-     * <li>none does: a typo, so the one name nearest to it within two edits (an exchange of two letters counts for
-     * one), the case apart; none if two names are equally near.</li>
+     * <li>none does: a typo, so the one name nearest to it within {@link #limit(String) a few edits} (an exchange of two
+     * letters counts for one), the case apart; none if two names are equally near.</li>
      * </ul>
      */
     public static Optional<String> forName(String text, Collection<String> names) {
@@ -34,11 +34,11 @@ public final class Suggestions {
         return beginning.stream().distinct().count() == 1 ? Optional.of(beginning.getFirst()) : Optional.empty();
     }
 
-    /** The one name within two edits of {@code name} that is nearer than every other, the case apart. */
+    /** The one name within {@link #limit} edits of {@code name} that is nearer than every other, the case apart. */
     static Optional<String> closest(String name, Collection<String> candidates) {
         String lower = name.toLowerCase(Locale.ROOT);
         String best = null;
-        int bestDistance = MAX_DISTANCE + 1;
+        int bestDistance = limit(name) + 1;
         boolean tie = false;
         for (String candidate : candidates) {
             int d = distance(lower, candidate.toLowerCase(Locale.ROOT));
@@ -51,6 +51,14 @@ public final class Suggestions {
             }
         }
         return tie ? Optional.empty() : Optional.ofNullable(best);
+    }
+
+    /**
+     * How many edits away a name may be: one per three letters, at most two. A fixed two would make {@code xyz} a typo of
+     * {@code ls}, {@code cp} or {@code rm}; a name of one or two letters has no near name at all.
+     */
+    static int limit(String name) {
+        return Math.min(MAX_DISTANCE, name.length() / 3);
     }
 
     /** Edit distance where the exchange of two neighbouring letters is one edit (optimal string alignment). */
