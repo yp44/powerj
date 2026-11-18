@@ -1,6 +1,8 @@
 package io.powerj.shell;
 
 import java.time.Duration;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.IntSupplier;
@@ -19,6 +21,7 @@ import io.powerj.core.assist.Completions;
 import io.powerj.core.runtime.Interpreter;
 import io.powerj.core.runtime.PreviewResult;
 import io.powerj.core.runtime.PreviewSettings;
+import io.powerj.core.runtime.Supervisor;
 
 /**
  * Preview mode (FR-66): Alt+V switches between the normal mode and the preview mode, shown by the {@code PJ?} prompt.
@@ -26,6 +29,8 @@ import io.powerj.core.runtime.PreviewSettings;
  * results are shown below the line, for the stage where the cursor is.
  */
 final class Previewer {
+
+    private static final Logger LOG = Logger.getLogger(Previewer.class.getName());
 
     /** Alt+V ("View"): ESC then {@code v}, as terminals send Alt+letter. */
     static final String TOGGLE_KEY = "\033v";
@@ -82,7 +87,7 @@ final class Previewer {
                     evaluatedWith = interpreter.previewSettings();
                     return interpreter.preview(text, LIMIT, columns(), colors);
                 },
-                failure -> new PreviewResult.Failed(String.valueOf(failure)),
+                Previewer::failed,
                 this::show, Duration.ofMillis(DEBOUNCE_MILLIS),
                 () -> Duration.ofMillis(interpreter.previewSettings().deadlineMillis()), "powerj-preview",
                 STACK_SIZE);
@@ -91,6 +96,16 @@ final class Previewer {
 
     boolean on() {
         return modes.is(ShellMode.PREVIEW);
+    }
+
+    /**
+     * What the preview shows when the evaluation threw something the interpreter did not turn into a result: the text the
+     * shell gives for the same failure of a line that runs ({@code out of memory…}, {@code internal error…}), not
+     * {@code Throwable.toString()} (U-13, R-20). The detail goes to the log, as the message says.
+     */
+    static PreviewResult failed(Throwable failure) {
+        LOG.log(Level.WARNING, "A preview failed", failure);
+        return new PreviewResult.Failed(Supervisor.messageOf(failure));
     }
 
     /** Binds Alt+V; {@code prompt} gives the prompt to show after the switch, already escaped for JLine. */
@@ -109,8 +124,8 @@ final class Previewer {
     }
 
     /**
-     * Binds an Alt+arrow of the control, in each form terminals send it. It acts while values or a timeout are shown; otherwise the key does what it did
-     * before, so that the editor keeps whatever it had on that key.
+     * Binds an Alt+arrow of the control, in each form terminals send it. It acts while values or a timeout are shown;
+     * otherwise the key does what it did before, so that the editor keeps whatever it had on that key.
      */
     private void bindControlKey(KeyMap<Binding> main, PreviewControl.Key key) {
         String name = "powerj-preview-control-" + key.name().toLowerCase(java.util.Locale.ROOT);

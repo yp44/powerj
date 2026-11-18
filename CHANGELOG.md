@@ -982,6 +982,24 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   the preview mode and the perf mode; `Perfer` no longer escapes. `ReplTest` types the three modes in a folder named
   `100%N-%M-%%x` (red before the change); `PromptRendererTest` pins the escaped text.
 
+### Fixed (four failures of the shell that nobody saw, [#154](https://github.com/yp44/powerj/issues/154))
+- **The log works in a folder whose name holds `%`** (audit v2, R-20). The path of the logs folder was handed to
+  `FileHandler` as a pattern, which reads `%t`, `%h`, `%u`, `%g`: a home folder named `100%` or `a%hb` gave a wrong file name or
+  an exception (and no log). The `%` of the folder is now doubled. `DiagnosticLogTest` creates a log in folders named `100%` and `a%hb%g`.
+- **The log no longer resets the logging of the whole JVM** (review C-20, still there). `LogManager.reset()` closed the
+  handlers and reset the levels of every logger, a library's included. `DiagnosticLog.install` now removes the handlers of
+  the root logger only (the console handler of the JDK).
+- **A highlighting failure is in the log.** `ShellCompletion` returned the plain line for any `RuntimeException` and said
+  nothing, so a bug of the highlighting stayed invisible for ever; completion, in the same case, logs at `FINE` (#82). It now
+  logs at `FINE` with `LoggedLine.of(buffer)`, never the line.
+- **Recording a consent keeps the permissions of `config.properties`.** `ConfigFile` wrote through `Files.createTempFile`
+  (mode `600` on POSIX) and moved the file over the user's: the first answer to "load this module?" made the file private.
+  The permissions of the existing file are copied onto the temporary one before the move; a new file stays private.
+- **The preview words an `Error` as the shell does for a running line.** An `OutOfMemoryError` showed as
+  `java.lang.OutOfMemoryError: Java heap space` under the line. `Previewer.failed` uses `Supervisor.messageOf` (new, shared
+  with the supervisor: `out of memory: filter the data earlier…`, `recursion too deep`, `internal error: … (details in the log)`)
+  and logs the failure at `WARNING`. Tests: `ShellHygieneTest`, `DiagnosticLogTest`, `ConfigFileTest`.
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.

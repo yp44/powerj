@@ -68,6 +68,38 @@ class DiagnosticLogTest {
     }
 
     @Test
+    void aLogsFolderWhoseNameHoldsPercentSignsIsAFolderNotAPattern() throws Exception {
+        Path folder = Files.createDirectory(tmp.resolve("100%"));
+        Path directive = Files.createDirectory(tmp.resolve("a%hb%g"));
+
+        for (Path logs : List.of(folder, directive)) {
+            DiagnosticLog.install(logs, false, warning -> org.junit.jupiter.api.Assertions.fail(warning));
+            Logger.getLogger("test").warning("in " + logs.getFileName());
+            Logger.getLogger("").getHandlers()[0].flush();
+
+            assertThat(Files.readString(logs.resolve("powerj.0.log"))).contains("in " + logs.getFileName());
+        }
+    }
+
+    @Test
+    void theHandlersOfOtherLoggersAreLeftAlone() {
+        Logger library = Logger.getLogger("some.library");
+        Handler theirs = new ConsoleHandler();
+        library.addHandler(theirs);
+        library.setLevel(Level.FINEST);
+        try {
+            DiagnosticLog.install(tmp, false, _ -> { });
+
+            assertThat(library.getHandlers()).containsExactly(theirs);
+            assertThat(library.getLevel()).isEqualTo(Level.FINEST);
+            assertThat(Logger.getLogger("").getHandlers()).singleElement().isInstanceOf(FileHandler.class);
+        } finally {
+            library.removeHandler(theirs);
+            library.setLevel(null);
+        }
+    }
+
+    @Test
     void withoutALogsFolderTheShellStaysUsable() throws Exception {
         Path notAFolder = Files.writeString(tmp.resolve("file"), "x");
         List<String> warnings = new ArrayList<>();

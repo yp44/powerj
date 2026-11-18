@@ -50,6 +50,20 @@ class ConfigFileTest {
     }
 
     @Test
+    void recordingAnAnswerKeepsThePermissionsOfTheFile() throws IOException {
+        org.junit.jupiter.api.Assumptions.assumeTrue(
+                tmp.getFileSystem().supportedFileAttributeViews().contains("posix"), "POSIX permissions");
+        Path file = Files.writeString(tmp.resolve("config.properties"), "language=fr\n");
+        var shared = java.nio.file.attribute.PosixFilePermissions.fromString("rw-r--r--");
+        Files.setPosixFilePermissions(file, shared);
+
+        config().set("modules.nativeAccess.org.a", "true");
+
+        assertThat(Files.getPosixFilePermissions(file)).isEqualTo(shared);
+        assertThat(Files.readAllLines(file)).containsExactly("language=fr", "modules.nativeAccess.org.a=true");
+    }
+
+    @Test
     void creatingTheFileCreatesItsFolderToo() throws IOException {
         var file = new ConfigFile(tmp.resolve("home").resolve("config.properties"));
         file.set("a", "1");
