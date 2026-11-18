@@ -65,7 +65,7 @@ class FileOpsTest {
     }
 
     private List<Object> mkdir(boolean parents, boolean dryRun, String... paths) throws Exception {
-        return run(new MakeDirectory(), new MakeDirectory.Params(args(paths), parents, dryRun, null));
+        return run(new MakeDirectory(), new MakeDirectory.Params(args((Object[]) paths), parents, dryRun, null));
     }
 
     private List<Object> cp(boolean recurse, boolean force, boolean verbose, boolean dryRun, List<Object> paths,
@@ -74,7 +74,7 @@ class FileOpsTest {
     }
 
     private List<Object> mv(boolean force, boolean allowProtected, String... paths) throws Exception {
-        return run(new Move(), new Move.Params(args(paths), force, true, false, allowProtected, null));
+        return run(new Move(), new Move.Params(args((Object[]) paths), force, true, false, allowProtected, null));
     }
 
     private List<Object> rm(boolean recurse, boolean force, boolean verbose, boolean dryRun, boolean allowProtected,

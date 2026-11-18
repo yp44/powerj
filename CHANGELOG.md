@@ -805,6 +805,20 @@ structures, functions) can be built on it. The work is organised in phases (revi
   It is recorded in a separate issue, because closing the windows in an orderly way needs a hook at exit that the extension
   API does not have yet.
 
+### Changed (zero javac warnings, and a warning fails the build, [#146](https://github.com/yp44/powerj/issues/146))
+- **The 23 warnings that `docs/quality/javac-warnings.txt` tolerated are fixed** (audit v2, B-05), and `-Xlint:all` is now
+  `-Werror` for the sources and the tests of every module. The issue named raw types and inexact varargs; a clean build also
+  held 7 `[restricted]` (FFM calls) and 4 `[try]` warnings. Raw `Collected` became `Collected<Object>` in `Collect` and its
+  test (the cmdlet declares its output type with the argument, which the registry reads as before); the two `args(String[])`
+  calls of `FileOpsTest` are cast to `Object[]`; the FFM methods carry `@SuppressWarnings("restricted")` as `PosixSpawn` does;
+  `CmdletRunner.Context` and the test states of `CmdletRunnerTest` suppress `[try]` with the reason (the
+  `InterruptedException` of a state is rethrown, not lost).
+- **The check of the number is gone**: `ci/check-javac-warnings.sh`, `docs/quality/javac-warnings.txt` and the step of the CI
+  that ran them are removed; [docs/quality/lint-baseline.md](docs/quality/lint-baseline.md) now says how the rule works.
+  A raw type added on purpose to a main source and to a test source each failed the build with "warnings found and -Werror
+  specified". `-Dpowerj.failOnWarning=false` turns it off on a JDK newer than the CI's, and the `quality` profile (Error
+  Prone) does not fail on its findings.
+
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
   whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes

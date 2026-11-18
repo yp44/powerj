@@ -103,6 +103,11 @@ public final class ModuleLoader {
         }
     }
 
+    /**
+     * The native access that the module is granted ({@code Controller.enableNativeAccess}) is the restricted call of this
+     * method: it is made only for a module that declared it and that the user allowed (see {@code NativeAccessPolicy}).
+     */
+    @SuppressWarnings("restricted")
     private Result define(Path path) {
         ModuleFinder finder = ModuleFinder.of(path);
         ModuleLayer parent = parentLayer();

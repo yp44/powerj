@@ -101,7 +101,7 @@ class PropertiesAndOptionsTest {
         assertThat(typed("--flag=true").flag()).isTrue();
         assertThat(typed("--flag=false").flag()).isFalse();
         assertThat(typed("--timeout", "30s").timeout()).isEqualTo(Duration.ofSeconds(30));
-        assertThat(typed("--raw", "a", "--raw", "b").raw()).containsExactly("a", "b");
+        assertThat(typed("--raw", "a", "--raw", "b").raw().toArray()).containsExactly("a", "b"); // a raw List on purpose
     }
 
     @Test

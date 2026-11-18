@@ -40,6 +40,7 @@ final class WindowsConsole {
         }
     }
 
+    @SuppressWarnings("restricted") // the FFM calls are the point of this method; like those of PosixSpawn
     private static int call(String function) throws Throwable {
         Linker linker = Linker.nativeLinker();
         SymbolLookup kernel32 = SymbolLookup.libraryLookup("kernel32", Arena.global());
