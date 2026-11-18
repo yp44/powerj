@@ -2,7 +2,7 @@ package io.powerj.core.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.nio.file.Path;
+import java.io.File;
 
 import org.junit.jupiter.api.Test;
 
@@ -21,8 +21,10 @@ class WordForCmdletTest {
         assertThat(new Evaluator.Word("a?.txt", null).forCmdlet())
                 .isEqualTo(new GlobArgument("a?.txt", "a\\?.txt"));
         assertThat(new Evaluator.Word("star*", null).forCmdlet()).isEqualTo(new GlobArgument("star*", "star\\*"));
-        assertThat(new Evaluator.Word(Path.of("d?", "x"), null).forCmdlet())
-                .isEqualTo(new GlobArgument(Path.of("d?", "x").toString(), Path.of("d?", "x").toString().replace("?", "\\?")));
+        // a File does not check its name, a Path refuses a ? on Windows
+        File file = new File("d?" + File.separator + "x");
+        assertThat(new Evaluator.Word(file, null).forCmdlet())
+                .isEqualTo(new GlobArgument(file.getPath(), file.getPath().replace("?", "\\?")));
     }
 
     @Test
