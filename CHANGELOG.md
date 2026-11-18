@@ -999,7 +999,8 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   logs at `FINE` with `LoggedLine.of(buffer)`, never the line.
 - **Recording a consent keeps the permissions of `config.properties`.** `ConfigFile` wrote through `Files.createTempFile`
   (mode `600` on POSIX) and moved the file over the user's: the first answer to "load this module?" made the file private.
-  The permissions of the existing file are copied onto the temporary one before the move; a new file stays private.
+  The permissions of the existing file are copied onto the temporary one before the move, best effort (if they cannot be read, the
+  answer is recorded all the same, with private permissions); a new file stays private.
 - **The preview words an `Error` as the shell does for a running line.** An `OutOfMemoryError` showed as
   `java.lang.OutOfMemoryError: Java heap space` under the line. `Previewer.failed` uses `Supervisor.messageOf` (new, shared
   with the supervisor: `out of memory: filter the data earlier…`, `recursion too deep`, `internal error: … (details in the log)`)

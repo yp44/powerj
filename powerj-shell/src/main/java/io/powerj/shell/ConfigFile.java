@@ -7,17 +7,20 @@ import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.nio.file.attribute.PosixFileAttributeView;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * {@code config.properties}, read and changed one setting at a time. A change keeps the comments, the order and the other
  * settings of the user: only the line of the key is replaced, or added at the end.
  */
 final class ConfigFile {
+
+    private static final Logger LOG = Logger.getLogger(ConfigFile.class.getName());
 
     /** One lock for every instance: two of them on the same file are as likely as one. */
     private static final Object WRITE_LOCK = new Object();
@@ -89,7 +92,7 @@ final class ConfigFile {
         Path temp = Files.createTempFile(parent, "config", ".tmp");
         try {
             Files.write(temp, lines, StandardCharsets.UTF_8);
-            keepPermissions(temp);
+            keepPermissions(file, temp);
             Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING);
         } finally {
             Files.deleteIfExists(temp);
@@ -100,12 +103,16 @@ final class ConfigFile {
      * {@code createTempFile} makes a file readable by its owner only; the file it replaces must keep the permissions the user
      * gave it (R-20). A new file keeps the private ones, which suit a file of consents. Where the file system has no POSIX
      * permissions (Windows), the inherited ones are the ones to keep.
+     * <p>
+     * It is a nicety, never a reason to lose the answer being recorded: whatever goes wrong (the file removed meanwhile, a
+     * file system that cannot say, no right to read the permissions), the private permissions stay and the write goes on.
      */
-    private void keepPermissions(Path temp) throws IOException {
-        if (!Files.exists(file) || !Files.getFileStore(file).supportsFileAttributeView(PosixFileAttributeView.class)) {
-            return;
+    static void keepPermissions(Path from, Path temp) {
+        try {
+            Files.setPosixFilePermissions(temp, Files.getPosixFilePermissions(from));
+        } catch (IOException | UnsupportedOperationException | SecurityException e) {
+            LOG.log(Level.FINE, "Permissions of " + from + " not kept", e);
         }
-        Files.setPosixFilePermissions(temp, Files.getPosixFilePermissions(file));
     }
 
     /** Key defined by a line of a properties file, or {@code null} for a blank line or a comment. */
