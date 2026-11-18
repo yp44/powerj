@@ -263,6 +263,29 @@ class PreviewControlKeysTest {
         exit();
     }
 
+    /**
+     * With the preview off, on the real key map of the editor: the editor binds Escape-Escape-[-D and C to the movement by
+     * word, which is still what they do (review of the PR); the forms it binds to nothing do nothing, and insert nothing.
+     */
+    @Test
+    void withThePreviewOffTheNewFormsKeepWhatTheEditorHadOnThem() throws Exception {
+        type("foo bar");
+
+        terminal.type("\033\033[D"); // the editor: backward-word
+        terminal.type("X"); // "foo Xbar"
+        awaitUntil(() -> reader.getBuffer().toString().equals("foo Xbar"));
+        terminal.type("\033\033[C"); // forward-word
+        terminal.type("Y");
+        awaitUntil(() -> reader.getBuffer().toString().equals("foo XbarY"));
+
+        for (String unbound : List.of("\033\033[A", "\033\033[B", "\033[1;9A", "\033[1;9B", "\033[1;9C", "\033[1;9D")) {
+            terminal.type(unbound);
+            terminal.type("z");
+        }
+        awaitUntil(() -> reader.getBuffer().toString().equals("foo XbarYzzzzzz")); // no "[A", no ";9A" inserted
+        exit();
+    }
+
     @Test
     void aKeyShowsTheMenuUnderTheValuesAndChangesNothing() throws Exception {
         terminal.type(ALT_V);
