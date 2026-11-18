@@ -13,8 +13,8 @@ import java.lang.invoke.MethodHandle;
  * {@code SIGTERM} pending until it is continued, so stopping it takes a {@code SIGTERM} <b>then</b> a {@code SIGCONT}.
  * Nothing happens on Windows, which has no such signal.
  * <p>
- * The restricted-method warning of the FFM call is not counted in {@code docs/quality/javac-warnings.txt}: the baseline may
- * not go up, and the call is the point of the class.
+ * The restricted-method warning of the FFM call is suppressed on the class, because the call is the point of the class
+ * (the build fails on any other warning: {@code docs/quality/lint-baseline.md}).
  */
 @SuppressWarnings("restricted")
 public final class ProcessSignals {

@@ -34,8 +34,8 @@ import io.powerj.fs.Host;
  * than the standard ones are kept out of the child ({@code addclosefrom_np} on Linux; {@code POSIX_SPAWN_CLOEXEC_DEFAULT}
  * with {@code addinherit_np} on macOS), and the {@code /proc} that only Linux has (not used here).
  * <p>
- * The restricted-method warnings of the FFM calls are not counted in {@code docs/quality/javac-warnings.txt}: the baseline
- * may not go up, and these calls are the point of the class.
+ * The restricted-method warnings of the FFM calls are suppressed on the class, because the calls are the point of the
+ * class (the build fails on any other warning: {@code docs/quality/lint-baseline.md}).
  */
 @SuppressWarnings("restricted")
 final class PosixSpawn {

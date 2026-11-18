@@ -35,8 +35,8 @@ import java.util.concurrent.CompletableFuture;
  * {@link ProcessBuilder}.
  * <p>
  * The downcalls use {@code invoke}, not {@code invokeExact}: a start costs a few milliseconds, the call is not what takes
- * the time. The restricted-method warnings of the FFM calls are not counted in {@code docs/quality/javac-warnings.txt}:
- * the baseline may not go up.
+ * the time. The restricted-method warnings of the FFM calls are suppressed on the class, because the calls are the point of
+ * it (the build fails on any other warning: {@code docs/quality/lint-baseline.md}).
  */
 @SuppressWarnings("restricted")
 final class WindowsSpawn {
