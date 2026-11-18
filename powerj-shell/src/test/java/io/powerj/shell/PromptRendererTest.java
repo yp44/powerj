@@ -42,4 +42,17 @@ class PromptRendererTest {
         assertThat(render(ShellMode.PERF, true)).contains("\033[").contains("PJ%");
         assertThat(render(ShellMode.NORMAL, true)).doesNotContain("\033[");
     }
+
+    @Test
+    void theTextForJLineDoublesEveryPercentSignAndNothingElse() throws Exception {
+        try (var screen = new TestTerminal("")) {
+            var session = new Session(tmp, tmp.resolve("100%N"), Map.of());
+            var modes = new ModeController();
+            modes.switchTo(ShellMode.PERF);
+            var prompt = new PromptRenderer(session, modes, screen.terminal(), false);
+
+            assertThat(prompt.render()).startsWith("PJ% ").endsWith("100%N> ");
+            assertThat(prompt.forJLine()).startsWith("PJ%% ").endsWith("100%%N> ");
+        }
+    }
 }

@@ -30,6 +30,15 @@ final class PromptRenderer {
         return mode + session.currentDirectory() + "> ";
     }
 
+    /**
+     * The prompt as JLine must receive it: every {@code %} doubled, because JLine reads {@code %N}, {@code %M},
+     * {@code %P}, {@code %{}… in a prompt as patterns, and a current directory is any name (U-13). The one place that
+     * knows the rule: the first prompt, and the prompt reset when the mode changes, all come from here.
+     */
+    String forJLine() {
+        return render().replace("%", "%%");
+    }
+
     private String marker(String text, int color) {
         return colors ? new AttributedString(text, AttributedStyle.DEFAULT.foreground(color)).toAnsi(terminal) + " "
                 : text + " ";

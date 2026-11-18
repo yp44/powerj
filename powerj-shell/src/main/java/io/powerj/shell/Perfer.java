@@ -37,11 +37,11 @@ final class Perfer {
         return modes.is(ShellMode.PERF);
     }
 
-    /** Binds Alt+P; {@code prompt} gives the prompt to show after the switch. */
+    /** Binds Alt+P; {@code prompt} gives the prompt to show after the switch, already escaped for JLine. */
     void bind(LineReaderImpl reader, Supplier<String> prompt) {
         reader.getWidgets().put(TOGGLE_WIDGET, () -> {
             toggle();
-            reader.setPrompt(prompt.get().replace("%", "%%")); // JLine reads "%" as a pattern here
+            reader.setPrompt(prompt.get());
             return true;
         });
         KeyMap<org.jline.reader.Binding> main = reader.getKeyMaps().get(LineReader.MAIN);

@@ -114,7 +114,7 @@ public final class Repl {
             session.jobs().drainFinished().forEach(out::println); // FR-75: background jobs ended meanwhile
             out.flush();
             try {
-                line = editor.readLine(prompt.render());
+                line = editor.readLine(prompt.forJLine());
             } catch (UserInterruptException _) {
                 continue; // Ctrl+C during input: the line is cleared
             } catch (EndOfFileException _) {

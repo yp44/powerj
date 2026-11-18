@@ -940,6 +940,14 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   `$args` = `[b.pj]`. FR-04d, the README table, `step-4.md` (21g to 21i) and `ci/smoke/non-interactive.sh` say so.
   Left out: named options for scripts.
 
+### Fixed (the prompt escapes `%` in one place, [#151](https://github.com/yp44/powerj/issues/151))
+- **A current directory that holds `%` is shown as it is named** (audit v2, U-13). JLine reads `%N`, `%M`, `%P`, `%{`… in a
+  prompt as patterns. Only the prompt of the perf mode doubled the `%` (and only when it was reset after Alt+P); the first
+  prompt of every line and the one reset by Alt+V went through unescaped, so a folder named like `100%N-%M` was
+  rewritten on the screen. `PromptRenderer.forJLine()` is now the one place that knows the rule, used by the read loop,
+  the preview mode and the perf mode; `Perfer` no longer escapes. `ReplTest` types the three modes in a folder named
+  `100%N-%M-%%x` (red before the change); `PromptRendererTest` pins the escaped text.
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.
