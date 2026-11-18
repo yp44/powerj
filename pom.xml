@@ -30,6 +30,9 @@
         <!-- Target Java version. -->
         <java.release>25</java.release>
         <maven.compiler.release>${java.release}</maven.compiler.release>
+        <!-- A javac warning fails the build (-Xlint:all with -Werror, issue #146). Off with -Dpowerj.failOnWarning=false on a JDK
+             newer than the one of the CI, which may add a lint category; off in the quality profile (Error Prone warnings). -->
+        <powerj.failOnWarning>true</powerj.failOnWarning>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <!-- Fixed timestamp of the archives built by the Maven plugins (reproducible builds); set to the release date
@@ -262,6 +265,10 @@
         <!-- Static analysis, as warnings for now (review C-32): ./mvnw -Pquality verify. Needs .mvn/jvm.config. -->
         <profile>
             <id>quality</id>
+            <properties>
+                <!-- Error Prone reports its findings as warnings for now (docs/quality/errorprone-baseline.md). -->
+                <powerj.failOnWarning>false</powerj.failOnWarning>
+            </properties>
             <build>
                 <pluginManagement>
                     <plugins>
@@ -302,10 +309,11 @@
                     <artifactId>maven-compiler-plugin</artifactId>
                     <version>3.16.0</version>
                     <configuration>
-                        <!-- All javac lint categories are reported (review C-32). They are warnings for now: the baseline is
-                             in docs/quality/lint-baseline.md; the build will fail on new ones once it is clean. A module that
-                             sets its own compilerArgs must use combine.children="append". -->
+                        <!-- All javac lint categories are reported (review C-32) and a warning fails the build (-Werror, issue
+                             #146): there is none left, in the sources or in the tests. A module that sets its own compilerArgs
+                             must use combine.children="append". -->
                         <showWarnings>true</showWarnings>
+                        <failOnWarning>${powerj.failOnWarning}</failOnWarning>
                         <compilerArgs>
                             <arg>-Xlint:all</arg>
                         </compilerArgs>

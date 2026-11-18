@@ -33,7 +33,7 @@ packaged launcher. `ci/smoke/fx.sh` needs a display (Xvfb is enough).
 | ArchUnit (`powerj-architecture`) | dependencies between modules and packages, no cycle, only `Main` ends the JVM, every cmdlet declared and registered | see below |
 | API snapshot (`powerj-api`) | the public surface of the extension API does not change by accident | see below |
 | Surefire channel (`ci/check-surefire-channel.sh`) | no test writes to the native stream of the forked JVM (Surefire's "Corrupted channel" warning leaves a `.dumpstream` file) | redirect the output of the child process that is not under test, as `ConsoleInputTest` does |
-| `-Xlint:all` | warnings are reported but not yet fatal; the Linux job of the CI fails when a module has more than [docs/quality/javac-warnings.txt](docs/quality/javac-warnings.txt) allows (`ci/check-javac-warnings.sh`, see [lint-baseline.md](docs/quality/lint-baseline.md)) | fix the warning; lower the line of the file when a count goes down, never raise it |
+| `-Xlint:all` with `-Werror` | a javac warning fails the build, in the sources and in the tests; there is none left ([docs/quality/lint-baseline.md](docs/quality/lint-baseline.md)) | fix the warning; a suppression (`@SuppressWarnings`) says why in a comment; on a JDK newer than the CI's that adds a lint category, `-Dpowerj.failOnWarning=false` |
 
 `./mvnw -Pquality verify` adds Error Prone (warnings only for now, baseline in `docs/quality/`). `./mvnw -Pbench -DskipTests package`
 builds the JMH benchmarks, which are not part of `verify` ([how to run them](docs/quality/performance.md)).

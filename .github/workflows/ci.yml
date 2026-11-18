@@ -34,14 +34,9 @@ jobs:
           java-version: '25'
           cache: maven
 
+      # A javac warning fails the build (-Xlint:all with -Werror, #146): a fresh checkout compiles everything.
       - name: Build, tests and application image
-        run: |
-          set -o pipefail
-          ./mvnw -B -Pdist verify 2>&1 | tee build.log
-
-      # The log of a clean build (a fresh checkout compiles everything): the count may go down, never up (#84).
-      - name: javac warnings do not go up
-        run: ci/check-javac-warnings.sh build.log
+        run: ./mvnw -B -Pdist verify
 
       # No test writes to the native stream of the forked JVM: Surefire keeps what it lost in a .dumpstream file (#145).
       - name: Surefire channel is not corrupted
