@@ -33,7 +33,7 @@ In an empty folder: `touch a.txt b.txt c.log Notes.TXT .hidden.txt`, `mkdir sub 
 | 15 | `env --set POWERJ_GLOB_IGNORE_CASE=true` then `^echo *.txt`, `ls *.txt`, `^echo notes*` | `a.txt b.txt Notes.TXT`, the three files, `Notes.TXT`: case is ignored, from the next command on. |
 | 16 | `env --set POWERJ_GLOB_IGNORE_CASE=maybe` then `^echo plain` and `^echo *.txt` | `plain`; then an error that names the variable and the value `maybe`. `env --set POWERJ_GLOB_IGNORE_CASE=false` restores the default. |
 | 17 | `ps java*` then `ps JAVA*` (with the variable unset) | Linux and macOS: the Java processes for `java*`, none for `JAVA*` (the names of the processes are case-sensitive there). Windows: the Java processes both times (the system ignores case, FR-74). |
-| 18 | `ls "*.txt"` | `a.txt`, `b.txt`: a cmdlet expands its path arguments whatever the quoting (FR-40). |
+| 18 | `ls "*.txt"`, then `touch "a?.txt" ab.txt`, `ls "a?.txt"`, `rm "a?.txt"`, `ls` | The first gives `ls: not found: *.txt`: a cmdlet takes a quoted word as a name, like a native program (FR-40, FR-72). `ls "a?.txt"` lists the one file of that name; `rm "a?.txt"` removes it and leaves `ab.txt` (create it first). |
 | 19 | `^printf "[%s]" "my docs"/*` | `[my docs/a note.txt]`: a quoted text and plain text written without a blank are **one** word (FR-32c), and only the plain part is a wildcard. |
 | 20 | `$d = "my docs"` then `^printf "[%s]" $d/*.txt` | `[my docs/a note.txt]`. |
 | 21 | `^printf "[%s]" --message="hello world"` | `[--message=hello world]`: one argument. |
@@ -41,7 +41,7 @@ In an empty folder: `touch a.txt b.txt c.log Notes.TXT .hidden.txt`, `mkdir sub 
 | 23 | `^echo "nowhere"/*` | `nowhere/*`: the word matches nothing and is passed as written. It never lists the content of `/`. |
 | 24 | `$s = "*.t"` then `^echo $s"xt"` | `*.txt`: what a variable holds is literal, there is no wildcard in the plain pieces. |
 | 25 | `^touch "a*b1" aXb2` then `^printf "[%s]" "a*b"*` | `[a*b1]`: the quoted star is the text `*`, the last one is a wildcard. |
-| 26 | `ls "my docs"/*.txt` | `a note.txt`, and no error about `/*.txt`: the cmdlet receives the one argument `my docs/*.txt`. |
+| 26 | `ls "my docs"/*.txt` | `a note.txt`, and no error about `/*.txt`: the cmdlet receives the one word `my docs/*.txt`, with the quoted part marked as literal. |
 | 27 | `"x" > "my docs"/out.txt` then `ls "my docs"` | `a note.txt`, `out.txt`: the target of a redirection is a compound word too. |
 | 28 | `^echo ~/"x"` and `^echo ~"x"` | `<HOME>/x`; then `~x`: the tilde needs a slash after it to be the home folder. |
 | 29 | `^echo foo$ a$b`, then `$d = "my docs"` and `^echo "a"$d` | `foo$ a$b`: a `$` in the middle of plain text is a plain character. Then `amy docs`: a variable right after a quoted text is a piece of the word. |
@@ -50,7 +50,7 @@ In an empty folder: `touch a.txt b.txt c.log Notes.TXT .hidden.txt`, `mkdir sub 
 
 - There is no escape character in a word (FR-32b): a name with a space is written between quotes, and a wildcard after it is written glued to the quote (`"my docs"/*.txt`, FR-32c). `my\ docs/*` is two words.
 - **Tab completion** does not complete after a text in quotes that is closed (`"my docs"/su<Tab>` proposes nothing); inside the quotes (`"my docs/su<Tab>`) it works, as before.
-- A cmdlet receives the text and not how it was written, so it still expands a `*` that came from a quoted piece (`ls "a*b"/x`).
+- A cmdlet that takes paths (`@Option(path = true)`, typed `Object`) receives how the word was written (`GlobArgument`); the others, and a third-party cmdlet whose path option is typed `String`, receive the text, so a quoted `*` is still a wildcard for them.
 - `$d.txt` and `"x".txt` are the property `txt` of the value (FR-28), not the value followed by `.txt`: write `"$d.txt"`.
 - `{a,b}` cannot be written either: a word ends at `{` and `}`.
 - On **Windows** the matcher of the platform ignores case and the variable has no effect; the native programs expand their own wildcards.

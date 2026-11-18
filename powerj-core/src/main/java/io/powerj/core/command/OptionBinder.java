@@ -24,6 +24,7 @@ import io.powerj.core.error.PjException;
 import io.powerj.core.format.Values;
 import io.powerj.core.i18n.Messages;
 import io.powerj.core.lang.Units;
+import io.powerj.fs.GlobArgument;
 
 /**
  * Builds a cmdlet's parameter record from the arguments entered, Unix style
@@ -276,9 +277,16 @@ public final class OptionBinder {
         return value;
     }
 
-    /** Converts a value to the component's type (FR-20). */
+    /**
+     * Converts a value to the component's type (FR-20). A {@link GlobArgument} (a word whose wildcards the quotes made
+     * literal) reaches only an option that says it takes paths and is typed {@code Object} or a {@code List} of
+     * {@code Object}, as {@code rm}'s are: anywhere else it is the text of the word.
+     */
     private static Object convert(String command, OptionSpec spec, Object value) {
         Class<?> type = spec.component().getType();
+        if (value instanceof GlobArgument word && !(spec.isPath() && takesObjects(spec))) {
+            value = word.text();
+        }
         if (type == List.class) {
             Class<?> element = elementType(spec.component().getGenericType());
             List<Object> values = new ArrayList<>();
@@ -292,6 +300,12 @@ public final class OptionBinder {
             return values;
         }
         return convertScalar(command, spec, type, value);
+    }
+
+    private static boolean takesObjects(OptionSpec spec) {
+        Class<?> type = spec.component().getType();
+        return type == Object.class
+                || type == List.class && elementType(spec.component().getGenericType()) == Object.class;
     }
 
     private static Class<?> elementType(Type type) {

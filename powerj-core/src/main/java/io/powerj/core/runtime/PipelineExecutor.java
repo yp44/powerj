@@ -361,7 +361,8 @@ final class PipelineExecutor {
                 if (!cmdlet.preview()) {
                     PreviewGuard.deny(Messages.get("preview.off.cmdlet", command.name()));
                 }
-                yield new ObjectStep((input, output, errors) -> runCmdlet(cmdlet, args,
+                List<Object> cmdletArgs = words.stream().map(Evaluator.Word::forCmdlet).collect(Collectors.toList());
+                yield new ObjectStep((input, output, errors) -> runCmdlet(cmdlet, cmdletArgs,
                         cmdlet.readsInput() ? input : null, output,
                         stage.errorsToOutput() ? message -> output.accept(message) : errors),
                         label(command.name(), args));

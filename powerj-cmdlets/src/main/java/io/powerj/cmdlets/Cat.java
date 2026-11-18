@@ -50,9 +50,9 @@ public final class Cat implements Cmdlet<Cat.Params, Object, Object> {
 
     /** Parameters of {@code cat}. */
     public record Params(
-            @Option(position = 0, description = "Files to read (wildcards * and ? accepted); "
+            @Option(position = 0, path = true, description = "Files to read (wildcards * and ? accepted); "
                     + "default: the pipeline objects")
-            List<String> paths,
+            List<Object> paths,
             @Option(shortName = 'l', description = "Output: a String per line (default)")
             boolean lines,
             @Option(shortName = 't', description = "Output: one String, the content of all the files")
@@ -75,7 +75,7 @@ public final class Cat implements Cmdlet<Cat.Params, Object, Object> {
     public void begin(Params params, CmdletContext<Object> context) {
         Reading reading = reading(params, context);
         if (!params.paths().isEmpty()) {
-            for (String argument : params.paths()) {
+            for (Object argument : params.paths()) {
                 for (Path file : FileArguments.expand(argument, false, context, error -> FileArguments.report(error, context),
                         "cat.no.match")) {
                     reading.read(file, context);

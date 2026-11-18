@@ -54,7 +54,7 @@ public final class Remove implements Cmdlet<Remove.Params, Object, Object> {
         if (arguments.words().isEmpty() && !context.hasInput()) {
             throw new UsageException(Messages.get("fileops.path.expected", "rm"));
         }
-        for (String argument : arguments.words()) {
+        for (Object argument : arguments.words()) {
             for (Path path : FileOps.expand(argument, context)) {
                 remove(p, state, path.toAbsolutePath().normalize(), context);
             }

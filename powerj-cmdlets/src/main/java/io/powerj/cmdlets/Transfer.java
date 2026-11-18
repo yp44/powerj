@@ -59,7 +59,7 @@ final class Transfer {
         this.destinationBlock = last instanceof ScriptBlock block ? block : null;
         this.destination = destinationBlock == null ? String.valueOf(last) : null;
         for (Object argument : paths.subList(0, paths.size() - 1)) {
-            for (Path path : FileOps.expand(String.valueOf(argument), context)) {
+            for (Path path : FileOps.expand(argument, context)) {
                 sources.add(new Source(path, path));
             }
         }

@@ -1,5 +1,7 @@
 package io.powerj.core.runtime;
 
+import java.io.File;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -31,6 +33,7 @@ import io.powerj.core.lang.ExpressionParser;
 import io.powerj.core.lang.StringPart;
 import io.powerj.core.lang.ParseContext;
 import io.powerj.core.lang.SyntaxException;
+import io.powerj.fs.GlobArgument;
 import io.powerj.fs.Globs;
 
 /**
@@ -98,7 +101,27 @@ public final class Evaluator {
      * character) where a shell expands wildcards (FR-40). The pattern is {@code null} for a quoted text, a variable or
      * a block, which are never wildcards; in a compound word only the unquoted text is.
      */
-    record Word(Object value, String pattern) { }
+    record Word(Object value, String pattern) {
+
+        /**
+         * The word as a cmdlet receives it: the value, or a {@link GlobArgument} when the quotes or a variable made a
+         * {@code *} or a {@code ?} literal, so that a cmdlet that expands wildcards leaves it alone ({@code rm "a?.txt"},
+         * audit v2 R-09). A word that spells its wildcards itself is the value, as it always was.
+         */
+        Object forCmdlet() {
+            if (pattern != null) {
+                return value instanceof String text && Globs.isPattern(text) && !pattern.equals(plainPattern(text))
+                        ? new GlobArgument(text, pattern) : value;
+            }
+            String text = switch (value) {
+                case String s -> s;
+                case Path p -> p.toString();
+                case File f -> f.getPath();
+                case null, default -> null;
+            };
+            return text != null && Globs.isPattern(text) ? new GlobArgument(text, Globs.escape(text)) : value;
+        }
+    }
 
     /** Values of the arguments of a command, in order. */
     List<Object> arguments(List<Ast.Argument> arguments) throws InterruptedException {

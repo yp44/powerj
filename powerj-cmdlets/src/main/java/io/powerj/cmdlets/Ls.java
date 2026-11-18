@@ -18,6 +18,7 @@ import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
 import io.powerj.api.UsageException;
 import io.powerj.fs.FileWalker;
+import io.powerj.fs.GlobArgument;
 import io.powerj.fs.Globs;
 
 /** {@code ls}: lists files as {@link FileEntry} objects (specification FR-35). */
@@ -27,8 +28,8 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
 
     /** Parameters of {@code ls}. */
     public record Params(
-            @Option(position = 0, description = "Directories or files to list (wildcards * and ? accepted); default: current directory")
-            List<String> paths,
+            @Option(position = 0, path = true, description = "Directories or files to list (wildcards * and ? accepted); default: current directory")
+            List<Object> paths,
             @Option(shortName = 'a', description = "Includes hidden files")
             boolean all,
             @Option(shortName = 'r', description = "Walks subdirectories")
@@ -56,38 +57,42 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
         FileOps.parallelism(params.parallel()); // refuses a count below 1 before anything is listed
         Optional<PathMatcher> filter = Optional.ofNullable(params.filter())
                 .map(pattern -> Globs.matcher(pattern, FileArguments.ignoreCase(context)));
-        List<String> paths = params.paths().isEmpty() ? List.of(".") : params.paths();
-        for (String path : paths) {
+        List<Object> paths = params.paths().isEmpty() ? List.of(".") : params.paths();
+        for (Object path : paths) {
             list(path, params, filter, context);
         }
     }
 
-    private void list(String argument, Params params, Optional<PathMatcher> filter, CmdletContext<FileEntry> context) {
+    private void list(Object argument, Params params, Optional<PathMatcher> filter, CmdletContext<FileEntry> context) {
+        String text = FileArguments.text(argument);
         Path path;
         try {
-            path = context.currentDirectory().resolve(argument).normalize();
+            path = context.currentDirectory().resolve(text).normalize();
         } catch (InvalidPathException _) {
-            listWildcard(argument, params, filter, context);
+            if (argument instanceof GlobArgument && !FileArguments.isWildcard(argument)) {
+                context.error(Messages.get("ls.not.found", text)); // a quoted name that this system cannot spell
+            } else {
+                listWildcard(argument, params, filter, context);
+            }
             return;
         }
-        if (Globs.isPattern(argument)) {
+        if (FileArguments.isWildcard(argument)) {
             listWildcard(argument, params, filter, context);
         } else if (Files.isDirectory(path)) {
             listDirectory(path, params, filter, context);
         } else if (Files.exists(path, LinkOption.NOFOLLOW_LINKS)) {
             entry(path).filter(e -> keep(e, params, filter)).ifPresent(context::emit);
         } else {
-            context.error(Messages.get("ls.not.found", argument));
+            context.error(Messages.get("ls.not.found", text));
         }
     }
 
     /** {@code ls *.txt} or {@code ls src/*.java}: wildcard on the last element of the path. */
-    private void listWildcard(String argument, Params params, Optional<PathMatcher> filter,
+    private void listWildcard(Object argument, Params params, Optional<PathMatcher> filter,
                               CmdletContext<FileEntry> context) {
-        int separator = Math.max(argument.lastIndexOf('/'), argument.lastIndexOf('\\'));
-        String dir = separator < 0 ? "." : argument.substring(0, separator + 1);
-        PathMatcher pattern = Globs.matcher(argument.substring(separator + 1), FileArguments.ignoreCase(context));
-        Path base = context.currentDirectory().resolve(dir).normalize();
+        FileArguments.Split split = FileArguments.split(argument);
+        PathMatcher pattern = Globs.matcher(split.namePattern(), FileArguments.ignoreCase(context));
+        Path base = context.currentDirectory().resolve(split.directory()).normalize();
         List<FileEntry> matches = new ArrayList<>();
         walker(params, 1, 1).walk(base,
                 (path, attributes) -> pattern.matches(path.getFileName()) ? entry(path, attributes) : null,
@@ -101,7 +106,7 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
             }
         }
         if (matches.isEmpty()) {
-            context.error(Messages.get("ls.no.match", argument));
+            context.error(Messages.get("ls.no.match", FileArguments.text(argument)));
         }
     }
 
