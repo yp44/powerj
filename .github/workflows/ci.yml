@@ -40,6 +40,7 @@ jobs:
 
       # No test writes to the native stream of the forked JVM: Surefire keeps what it lost in a .dumpstream file (#145).
       - name: Surefire channel is not corrupted
+        if: always()
         run: ci/check-surefire-channel.sh
 
       - name: Test coverage report
@@ -162,6 +163,7 @@ jobs:
         run: ./mvnw -B -fae -Pdist verify
 
       - name: Surefire channel is not corrupted
+        if: always()
         run: ci/check-surefire-channel.sh
 
       # Only by hand (`gh workflow run ci.yml -f repeat-core-tests=20`): the suite has just run once above, and a test that
@@ -220,6 +222,12 @@ jobs:
       - name: Build, tests, powerj.exe and installer
         shell: cmd
         run: mvnw.cmd -B -Pdist,installer verify
+
+      # Git Bash is on the Windows runners; WindowsSpawn and WindowsConsole have their own native tests (#145).
+      - name: Surefire channel is not corrupted
+        if: always()
+        shell: bash
+        run: ci/check-surefire-channel.sh
 
       - name: Smoke test of powerj.exe
         shell: pwsh

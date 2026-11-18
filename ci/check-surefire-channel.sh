@@ -11,6 +11,15 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
+
+# Nothing to look at is not a pass: without a report folder (a build with -DskipTests, a clean after the build, a build that
+# stopped before its tests) the script would say "OK" about files it never saw.
+reports="$(find "$root" -type d -path '*/target/surefire-reports' | sort)"
+if [ -z "$reports" ]; then
+    echo "no target/surefire-reports folder: no test ran, so nothing was examined" >&2
+    exit 2
+fi
+
 files="$(find "$root" -path '*/target/surefire-reports/*.dumpstream' | sort)"
 
 if [ -n "$files" ]; then
@@ -21,4 +30,4 @@ if [ -n "$files" ]; then
     echo "Redirect the output of the child process that is not under test (see ConsoleInputTest), or capture the stream." >&2
     exit 1
 fi
-echo "surefire channel: OK"
+echo "surefire channel: OK ($(printf '%s\n' "$reports" | wc -l | tr -d ' ') report folders examined)"
