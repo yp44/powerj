@@ -789,6 +789,22 @@ structures, functions) can be built on it. The work is organised in phases (revi
   after the build of the Linux and macOS jobs; it was seen failing on `ConsoleInputTest` before the fix. Only a test, a
   script and the workflow changed.
 
+### Fixed (the smoke test of the graphical module no longer fails at random, [#190](https://github.com/yp44/powerj/issues/190))
+- **`ci/smoke/fx.sh` failed in about one run out of seven with "window: unexpected message"**, on a commit that had passed
+  before and passed again on a re-run (twice in the first runs of the CI that were looked at). The output held a
+  `NullPointerException` thrown by JavaFX itself on its own thread, `GraphicsPipeline.getPipeline()` being null in the
+  picking of the scene (a pointer event). It was reproduced on a development machine under xvfb (6 runs out of 40): `-c`
+  ends the shell, and the JVM, as soon as the window is shown, so JavaFX is torn down while it still handles an event of the
+  pointer. Nothing of PowerJ or of the JDK is in that message and no check of the smoke test depends on it.
+- **That one line is now ignored, and nothing else.** `unexpected_window_messages` (in `ci/smoke/common.sh`) still reports
+  any other exception, a restricted-method warning or a toolkit that cannot start; it was checked on a real failing output
+  (ignored), with another exception added (reported) and on a clean output. 60 runs in a row of the window step then gave 5
+  runs with the line and 0 failures. Tried and dropped: a pause of 2 s after the window opens (3 failures out of 40, the
+  race is at the exit), and `Platform.exit()` in a shutdown hook of the JVM (the JVM then does not exit).
+- **What is not fixed**: the same race can print that exception when a user exits the shell while a `grid` window is open.
+  It is recorded in a separate issue, because closing the windows in an orderly way needs a hook at exit that the extension
+  API does not have yet.
+
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
   whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes
