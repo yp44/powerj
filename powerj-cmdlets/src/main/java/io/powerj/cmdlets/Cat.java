@@ -67,8 +67,20 @@ public final class Cat implements Cmdlet<Cat.Params, Object, Object> {
             String property) {
     }
 
-    private static Reading reading(Params params, CmdletContext<Object> context) {
-        return context.state(Reading.class, () -> new Reading(params, context));
+    /** The longest line read as a String ({@link BoundedLines#MAX_LINE}); a longer one is reported and skipped. */
+    private final int maxLine;
+
+    public Cat() {
+        this(BoundedLines.MAX_LINE);
+    }
+
+    /** A {@code cat} with its own bound on the length of a line (the tests use a small one). */
+    Cat(int maxLine) {
+        this.maxLine = maxLine;
+    }
+
+    private Reading reading(Params params, CmdletContext<Object> context) {
+        return context.state(Reading.class, () -> new Reading(params, context, maxLine));
     }
 
     @Override
@@ -109,12 +121,14 @@ public final class Cat implements Cmdlet<Cat.Params, Object, Object> {
         private final Mode mode;
         private final Charset charset;
         private final PipelineFiles files;
+        private final int maxLine;
         /** Number of the last line read: goes on from one file to the next. */
         private int line;
         /** Whole content, with --text or --content; {@code null} while no file is read. */
         private StringBuilder content;
 
-        Reading(Params params, CmdletContext<?> context) {
+        Reading(Params params, CmdletContext<?> context, int maxLine) {
+            this.maxLine = maxLine;
             mode = mode(params);
             charset = FileArguments.charset(params.encoding(), "cat.encoding.unknown");
             files = new PipelineFiles(params.property(), context,
@@ -144,6 +158,11 @@ public final class Cat implements Cmdlet<Cat.Params, Object, Object> {
                 context.error(Messages.get("cat.is.directory", absolute));
                 return;
             }
+            if (Files.exists(absolute) && !Files.isRegularFile(absolute)) {
+                // a device, a FIFO, a socket: /dev/zero has no end, and a FIFO blocks at open (audit v2, S-04)
+                context.error(Messages.get("files.not.regular", absolute));
+                return;
+            }
             try (var reader = new BufferedReader(new InputStreamReader(Files.newInputStream(absolute),
                     charset.newDecoder()))) {
                 if (mode == Mode.TEXT || mode == Mode.CONTENT) {
@@ -160,12 +179,20 @@ public final class Cat implements Cmdlet<Cat.Params, Object, Object> {
                     (content == null ? content = new StringBuilder() : content).append(text);
                     return;
                 }
-                String text;
-                while ((text = reader.readLine()) != null) {
-                    line++;
-                    if ((line & 0xFFF) == 0 && Thread.currentThread().isInterrupted()) {
-                        throw new CancellationException();
+                var lines = new BoundedLines(reader, maxLine);
+                while (true) {
+                    String text;
+                    try {
+                        text = lines.next();
+                    } catch (BoundedLines.TooLong e) {
+                        line++; // the line is skipped but counted: the numbers of the next ones are those of the file
+                        context.error(Messages.get("cat.line.too.long", absolute, line, maxLine));
+                        continue;
                     }
+                    if (text == null) {
+                        break;
+                    }
+                    line++;
                     context.emit(mode == Mode.LINES ? text : new CatLine(absolute, line, text.length(), text));
                 }
             } catch (CharacterCodingException _) {

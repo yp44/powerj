@@ -157,7 +157,16 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
 
         /** Searches the files below the roots; the lines of a file are emitted together, in order. */
         void files(List<Path> roots, CmdletContext<Object> context) {
-            walker.walk(roots, this::search, matches -> matches.forEach(context::emit),
+            List<Path> readable = new ArrayList<>();
+            for (Path root : roots) {
+                if (Files.exists(root) && !Files.isDirectory(root) && !Files.isRegularFile(root)) {
+                    // a named device, FIFO or socket: refused as cat does (audit v2, S-04); inside a walk it is skipped
+                    context.error(Messages.get("files.not.regular", root.toAbsolutePath()));
+                } else {
+                    readable.add(root);
+                }
+            }
+            walker.walk(readable, this::search, matches -> matches.forEach(context::emit),
                     error -> FileArguments.report(error, context));
         }
 
