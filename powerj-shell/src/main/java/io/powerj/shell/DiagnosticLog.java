@@ -30,10 +30,12 @@ final class DiagnosticLog {
     /** @param warn receives the line to show when the log cannot be written; the shell stays usable */
     static void install(Path logsDir, boolean debug, Consumer<String> warn) {
         Logger root = Logger.getLogger("");
-        // The handlers of the root logger only (the console handler of the JDK): LogManager.reset() would also close the
-        // handlers and reset the levels of every logger of the JVM, a library's included (review C-20).
+        // The handlers of the root logger only (the console handler of the JDK, or a log of an earlier install):
+        // LogManager.reset() would also close the handlers and reset the levels of every logger of the JVM, a library's
+        // included (review C-20).
         for (Handler handler : root.getHandlers()) {
             root.removeHandler(handler);
+            handler.close(); // a log file left open cannot be removed on Windows, nor rotated
         }
         root.setLevel(Level.INFO);
         try {
