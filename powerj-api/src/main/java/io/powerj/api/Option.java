@@ -35,6 +35,10 @@ public @interface Option {
      * Tab completion offers file paths for this argument. A component typed {@code Path}, {@code String} or a
      * {@code List} of them is completed as a path anyway; this is for one typed {@code Object}, because it also takes a
      * block ({@code rm { f -> … }}), where the type does not say that a path is expected.
+     * <p>
+     * A path argument typed {@code Object} (or a {@code List} of {@code Object}) may be an {@code io.powerj.fs.GlobArgument}:
+     * a word whose wildcards the quotes made literal ({@code rm "a?.txt"}); its {@code toString()} is the text. One typed
+     * {@code String} always receives the text.
      */
     boolean path() default false;
 

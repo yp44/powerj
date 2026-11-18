@@ -42,9 +42,9 @@ class LsTest {
         return context.emitted.stream().map(FileEntry::name).toList();
     }
 
-    private static Ls.Params params(List<String> paths, boolean all, boolean recurse, String filter,
+    private static Ls.Params params(List<?> paths, boolean all, boolean recurse, String filter,
                                     boolean dirs, boolean files) {
-        return new Ls.Params(paths, all, recurse, filter, dirs, files, null);
+        return new Ls.Params(new java.util.ArrayList<Object>(paths), all, recurse, filter, dirs, files, null);
     }
 
     @Test

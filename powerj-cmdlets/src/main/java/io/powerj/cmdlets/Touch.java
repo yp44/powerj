@@ -14,7 +14,6 @@ import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
 import io.powerj.api.UsageException;
-import io.powerj.fs.Globs;
 
 /**
  * {@code touch}: creates empty files, or sets the modification time of existing ones to now, and emits their
@@ -41,12 +40,12 @@ public final class Touch implements Cmdlet<Touch.Params, Object, Object> {
         if (arguments.words().isEmpty() && !context.hasInput()) {
             throw new UsageException(Messages.get("fileops.path.expected", "touch"));
         }
-        for (String argument : arguments.words()) {
-            if (Globs.isPattern(argument)) {
+        for (Object argument : arguments.words()) {
+            if (FileArguments.isWildcard(argument)) {
                 FileOps.expand(argument, context).forEach(path -> touch(p, path.toAbsolutePath().normalize(), context));
                 continue; // a wildcard updates the existing files it matches
             }
-            Path path = FileOps.path(argument, context);
+            Path path = FileOps.path(FileArguments.text(argument), context);
             if (path != null) {
                 touch(p, path, context);
             }

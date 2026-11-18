@@ -43,7 +43,7 @@ class GrepTest {
     }
 
     private static Grep.Params params(String pattern, String... paths) {
-        return new Grep.Params(pattern, List.of(paths), false, null, null, false, false, false, null, null, false, false);
+        return new Grep.Params(pattern, List.<Object>of((Object[]) paths), false, null, null, false, false, false, null, null, false, false);
     }
 
     private static Grep.Params recursive(String pattern, Integer parallel) {

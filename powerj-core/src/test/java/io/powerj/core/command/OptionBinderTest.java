@@ -9,6 +9,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import io.powerj.api.Option;
+import io.powerj.fs.GlobArgument;
 
 class OptionBinderTest {
 
@@ -160,5 +161,42 @@ class OptionBinderTest {
         assertThat(r).isEqualTo(new Required("n", "un", "deux"));
         assertThatThrownBy(() -> OptionBinder.bind("t", Required.class, List.of("--name", "n", "1", "2", "3")))
                 .hasMessage("t: unexpected argument: 3");
+    }
+
+    // --- A word whose wildcards the quotes made literal (audit v2, R-09) ---
+
+    record Paths(@Option(position = 0, path = true) List<Object> objects, @Option(shortName = 'f') String filter) {
+    }
+
+    record TextPaths(@Option(position = 0, path = true) List<String> paths) {
+    }
+
+    record OtherObjects(@Option(position = 0) List<Object> values) {
+    }
+
+    private static final GlobArgument QUOTED = new GlobArgument("a?.txt", "a\\?.txt");
+
+    @Test
+    void aGlobArgumentReachesAnObjectOptionThatTakesPaths() {
+        Paths params = OptionBinder.bind("t", Paths.class, List.of(QUOTED, "*.log"));
+
+        assertThat(params.objects()).containsExactly(QUOTED, "*.log");
+    }
+
+    @Test
+    void aGlobArgumentIsItsTextForEveryOtherOption() {
+        assertThat(OptionBinder.bind("t", TextPaths.class, List.of(QUOTED)).paths()).containsExactly("a?.txt");
+        assertThat(OptionBinder.bind("t", OtherObjects.class, List.of(QUOTED)).values()).containsExactly("a?.txt");
+        assertThat(OptionBinder.bind("t", Paths.class, List.of("--filter", QUOTED)).filter()).isEqualTo("a?.txt");
+    }
+
+    @Test
+    void aGlobArgumentIsNeverTakenForAnOption() {
+        record Flags(@Option(shortName = 'x') boolean x, @Option(position = 0, path = true) List<Object> objects) { }
+
+        Flags params = OptionBinder.bind("t", Flags.class, List.of(new GlobArgument("-x?", "-x\\?")));
+
+        assertThat(params.x()).isFalse();
+        assertThat(params.objects()).hasSize(1);
     }
 }

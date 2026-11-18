@@ -17,7 +17,9 @@ import java.util.function.Consumer;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.UsageException;
 import io.powerj.fs.FileWalker;
+import io.powerj.fs.GlobArgument;
 import io.powerj.fs.Globs;
+import io.powerj.fs.Host;
 import io.powerj.fs.WalkError;
 
 /** File arguments shared by the cmdlets that read files ({@code grep}, {@code cat}). */
@@ -43,39 +45,79 @@ final class FileArguments {
         }
     }
 
+    /** What a path argument says: the text of a word, whether or not the shell handed it as a {@link GlobArgument}. */
+    static String text(Object argument) {
+        return argument instanceof GlobArgument word ? word.text() : String.valueOf(argument);
+    }
+
+    /**
+     * Does the argument hold a wildcard that expands? A word whose wildcards were quoted ({@link GlobArgument}) does
+     * not: {@code rm "a?.txt"} is the name {@code a?.txt}. A text that is not such a word is a wildcard if it holds
+     * {@code *} or {@code ?}.
+     */
+    static boolean isWildcard(Object argument) {
+        return argument instanceof GlobArgument word ? word.hasWildcard() : Globs.isPattern(String.valueOf(argument));
+    }
+
+    /** A path argument cut after its last separator: the folder, and the pattern of the name. */
+    record Split(String directory, String namePattern) {
+    }
+
+    /**
+     * Cuts an argument whose last element is a wildcard. The pattern of a {@link GlobArgument} escapes what the quotes made
+     * literal, so the folder is read back as text; a backslash is a separator in a plain text, and only on Windows in a
+     * pattern, where it escapes.
+     */
+    static Split split(Object argument) {
+        if (argument instanceof GlobArgument word) {
+            String pattern = word.pattern();
+            int separator = Host.windows() ? Math.max(pattern.lastIndexOf('/'), pattern.lastIndexOf('\\'))
+                    : pattern.lastIndexOf('/');
+            String directory = separator < 0 ? "." : Globs.unescape(pattern.substring(0, separator + 1));
+            return new Split(directory, pattern.substring(separator + 1));
+        }
+        String text = String.valueOf(argument);
+        int separator = Math.max(text.lastIndexOf('/'), text.lastIndexOf('\\'));
+        return new Split(separator < 0 ? "." : text.substring(0, separator + 1), text.substring(separator + 1));
+    }
+
     /**
      * Paths designated by an argument: a path, or the matches of a wildcard on its last element, in name order.
      * A wildcard without match reports the error {@code noMatchKey}. Whether names are matched without regard to case is
      * the rule of the session ({@link #ignoreCase(CmdletContext)}), read only for a wildcard.
      */
-    static List<Path> expand(String argument, boolean includeHidden, CmdletContext<?> context,
+    static List<Path> expand(Object argument, boolean includeHidden, CmdletContext<?> context,
                              Consumer<WalkError> onError, String noMatchKey) {
-        return expand(argument, includeHidden, Globs.isPattern(argument) && ignoreCase(context), context, onError,
+        return expand(argument, includeHidden, isWildcard(argument) && ignoreCase(context), context, onError,
                 noMatchKey);
     }
 
     /**
-     * Like {@link #expand(String, boolean, CmdletContext, Consumer, String)}, with the case rule of the wildcard:
+     * Like {@link #expand(Object, boolean, CmdletContext, Consumer, String)}, with the case rule of the wildcard:
      * {@code ignoreCase} {@code false} matches the names in the case in which they are written.
      */
-    static List<Path> expand(String argument, boolean includeHidden, boolean ignoreCase, CmdletContext<?> context,
+    static List<Path> expand(Object argument, boolean includeHidden, boolean ignoreCase, CmdletContext<?> context,
                              Consumer<WalkError> onError, String noMatchKey) {
-        if (!Globs.isPattern(argument)) {
+        String text = text(argument);
+        boolean quoted = argument instanceof GlobArgument;
+        if (!isWildcard(argument)) {
             try {
-                return List.of(context.currentDirectory().resolve(argument).normalize());
-            } catch (InvalidPathException _) {
+                return List.of(context.currentDirectory().resolve(text).normalize());
+            } catch (InvalidPathException e) {
+                if (quoted) {
+                    throw e; // no wildcard left to expand: a name that this system cannot spell (Windows: * and ?)
+                }
                 // Windows: * and ? are invalid in a path, handled as a wildcard
             }
         }
-        int separator = Math.max(argument.lastIndexOf('/'), argument.lastIndexOf('\\'));
-        String dir = separator < 0 ? "." : argument.substring(0, separator + 1);
-        PathMatcher pattern = Globs.matcher(argument.substring(separator + 1), ignoreCase);
+        Split split = split(argument);
+        PathMatcher pattern = Globs.matcher(split.namePattern(), ignoreCase);
         List<Path> matches = new ArrayList<>();
         FileWalker.builder().maxDepth(1).includeHidden(includeHidden).order(BY_NAME).build()
-                .walk(context.currentDirectory().resolve(dir).normalize(),
+                .walk(context.currentDirectory().resolve(split.directory()).normalize(),
                         (path, _) -> pattern.matches(path.getFileName()) ? path : null, matches::add, onError);
         if (matches.isEmpty()) {
-            context.error(Messages.get(noMatchKey, argument));
+            context.error(Messages.get(noMatchKey, text));
         }
         return matches;
     }

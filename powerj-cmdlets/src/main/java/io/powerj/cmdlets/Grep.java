@@ -57,9 +57,9 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
     public record Params(
             @Option(position = 0, mandatory = true, description = "Regular expression (java.util.regex syntax)")
             String pattern,
-            @Option(position = 1, description = "Files or directories to search (wildcards * and ? accepted); "
+            @Option(position = 1, path = true, description = "Files or directories to search (wildcards * and ? accepted); "
                     + "default: current directory, or the pipeline objects")
-            List<String> paths,
+            List<Object> paths,
             @Option(shortName = 'r', description = "Walks subdirectories")
             boolean recurse,
             @Option(shortName = 'p', description = "Walks the tree with n files read at the same time, in virtual threads "
@@ -96,7 +96,7 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
         Search search = search(params, context);
         if (!params.paths().isEmpty()) {
             List<Path> roots = new ArrayList<>();
-            for (String argument : params.paths()) {
+            for (Object argument : params.paths()) {
                 roots.addAll(FileArguments.expand(argument, params.all(), context, error -> FileArguments.report(error, context),
                         "grep.no.match"));
             }

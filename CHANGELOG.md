@@ -1016,6 +1016,18 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   and `/etc` are links, so `cp x /tmp/` failed there. Links are now followed for the destination and its parent
   (`FileOps.isFolderOrLinkToFolder`); a source is still never followed and `rm` still removes the link. Tests:
   `FileOpsTest` (a link as destination for `cp` and `mv -f`, a link as a source still copied as a link).
+### Fixed (quotes stop wildcards for the file cmdlets, [#156](https://github.com/yp44/powerj/issues/156))
+- **`rm "report?.txt"` removes only the file named `report?.txt`** (audit v2, R-09). Since #73 the evaluator knew which
+  wildcards were quoted, but only native programs read it: the cmdlets received the text and expanded any `*` or `?` in
+  it, so `rm "report?.txt"` also removed `report1.txt`, and a file named with `*` or `?` (legal on Linux and macOS) could not
+  be targeted at all. The shell now hands a path option typed `Object` (or a `List` of `Object`) a `GlobArgument` (module
+  `powerj-fs`: the text and the glob pattern, quoted text escaped) when the quotes or a variable made a wildcard literal;
+  anywhere else, and for a third-party cmdlet whose option is typed `String`, the word is the text, as before. `rm`, `cp`,
+  `mv`, `touch`, `mkdir`, and now `ls`, `cat` and `grep` (their paths are typed `Object` and marked `path = true`) take
+  `"a?.txt"` as a name, a variable never expands, and in `"d?"/*.txt` only the `*` does. **Behaviour change**: `ls "*.txt"`
+  used to list the `.txt` files and now says `not found: *.txt`, as a Unix shell does. Tests: `QuotedWildcardsTest`
+  (the real cmdlets through the interpreter, on a file called `a?.txt` next to `ab.txt` and `a1.txt`), `OptionBinderTest`,
+  `WordForCmdletTest`.
 
 ## [0.1.0] — never released (baseline)
 

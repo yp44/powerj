@@ -40,8 +40,8 @@ class CatTest {
     /** Output option given: none, --lines, --text, --numbered or --content. */
     private enum Out { NONE, LINES, TEXT, NUMBERED, CONTENT }
 
-    private static Cat.Params params(List<String> paths, Out out, String encoding, String property) {
-        return new Cat.Params(paths, out == Out.LINES, out == Out.TEXT, out == Out.NUMBERED, out == Out.CONTENT,
+    private static Cat.Params params(List<?> paths, Out out, String encoding, String property) {
+        return new Cat.Params(new java.util.ArrayList<Object>(paths), out == Out.LINES, out == Out.TEXT, out == Out.NUMBERED, out == Out.CONTENT,
                 encoding, property);
     }
 

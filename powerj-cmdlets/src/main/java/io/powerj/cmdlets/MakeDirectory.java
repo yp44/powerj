@@ -38,8 +38,8 @@ public final class MakeDirectory implements Cmdlet<MakeDirectory.Params, Object,
         if (arguments.words().isEmpty() && !context.hasInput()) {
             throw new UsageException(Messages.get("fileops.path.expected", "mkdir"));
         }
-        for (String argument : arguments.words()) {
-            Path path = FileOps.path(argument, context);
+        for (Object argument : arguments.words()) {
+            Path path = FileOps.path(FileArguments.text(argument), context);
             if (path != null) {
                 make(p, path, context);
             }
