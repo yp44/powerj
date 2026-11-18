@@ -14,8 +14,8 @@
     <packaging>pom</packaging>
     <name>PowerJ Distribution</name>
     <description>
-        Construit l'application autonome (runtime jlink + lanceur jpackage) avec le profil "dist",
-        et l'installeur Windows avec le profil "installer".
+        Builds the standalone application (jlink runtime + jpackage launcher) with the "dist" profile,
+        and the Windows installer with the "installer" profile.
     </description>
 
     <properties>

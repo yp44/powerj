@@ -819,6 +819,17 @@ structures, functions) can be built on it. The work is organised in phases (revi
   specified". `-Dpowerj.failOnWarning=false` turns it off on a JDK newer than the CI's, and the `quality` profile (Error
   Prone) does not fail on its findings.
 
+### Fixed (French left in two poms, and a test for the build files, [#147](https://github.com/yp44/powerj/issues/147))
+- **The two French texts of the build are in English** (audit v2, C-08): the description of `powerj-dist` (printed by Maven)
+  and the name of `examples/greet`, which the reactor summary of every build showed as "PowerJ Exemple : module greet".
+- **`NoHardcodedFrenchTest` now reads the build files too**: every `pom.xml`, the scripts of `ci/` and the workflows, comments
+  included (the repository is in English, CONTRIBUTING "Language"). The two texts above have no accent, so the accents the
+  test looked for in the Java literals were not enough: it also looks for words that are French and not English (`avec`,
+  `lanceur`, `installeur`, `exemple`, `l'application`…), and it was seen failing on the two poms before the translation and
+  nowhere else. The French that is test data stays allowed, by file and by line: `ci/smoke/languages.sh` (it checks the
+  French messages of the launcher) and the same check inline in the Windows job of `ci.yml`. Only the test and two build
+  texts changed.
+
 ### Examined, not changed
 - **Left as they are in step 5.10, with the reason**: a `Platform` that tests can inject (the Windows job of the CI runs the
   whole suite on a real Windows, which tests the Windows branches better than a simulated platform would, and nine classes

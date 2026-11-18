@@ -15,7 +15,7 @@
          Installation: copy target/greet.jar into ~/.powerj/modules/. -->
     <groupId>com.example</groupId>
     <artifactId>powerj-example-greet</artifactId>
-    <name>PowerJ Exemple : module greet</name>
+    <name>PowerJ Example: module greet</name>
 
     <dependencies>
         <!-- The only dependency needed to write a cmdlet. -->
