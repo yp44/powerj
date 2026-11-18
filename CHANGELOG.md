@@ -916,6 +916,17 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   ([#61](https://github.com/yp44/powerj/issues/61)), the status of each requirement
   ([#62](https://github.com/yp44/powerj/issues/62)), small leftovers ([#63](https://github.com/yp44/powerj/issues/63)).
 
+### Fixed (one reading of "where a quoted text ends" for the continuation prompt, [#148](https://github.com/yp44/powerj/issues/148))
+- **A character literal or a text block no longer leaves the user at the `>> ` prompt for ever** (audit v2, U-01, C-01).
+  `InputCompleteness` knew `"…"` and brackets and nothing else, so `where { $_.name.charAt(0) == '{' }` counted two open braces
+  and one closed and waited for a continuation line; a `"""` text block opened a string, closed it and opened it again. It
+  now reads quoted text as the `Lexer` does: strings (with their `$( … )` interpolations), text blocks and character
+  literals. A lone `'` (`echo it's`) is an apostrophe, not a literal that more input could close.
+- **One function, `Scanning.quotedEnd`, for the three readers** (`io.powerj.core.lang`, already exported to the shell):
+  the continuation prompt, `PreviewCut` (its own copy of the rule is gone; an apostrophe in a word no longer hides a `|`
+  from it) and `Scanning.matching` (which now skips a text block as a whole). Tests: `InputCompletenessTest`,
+  `ScanningTest`, `PreviewCutTest`, and `ReplTest` for the whole road (no `>> ` on the screen). Only the shell and the scanner changed.
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.

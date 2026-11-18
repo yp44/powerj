@@ -117,4 +117,27 @@ class ScanningTest {
         assertThat(Scanning.skipBlanks("a  ", 1)).isEqualTo(3);
         assertThat(Scanning.skipBlanks("a b", 1)).isEqualTo(Lexer.isBlank(' ') ? 2 : 1);
     }
+
+    @Test
+    void quotedEndKnowsStringsTextBlocksAndCharacterLiterals() {
+        assertThat(Scanning.quotedEnd("a \"b\" c", 2)).isEqualTo(5);
+        assertThat(Scanning.quotedEnd("x '{' y", 2)).isEqualTo(5);
+        assertThat(Scanning.quotedEnd("'\\'' y", 0)).isEqualTo(4);
+        assertThat(Scanning.quotedEnd("'\\u007b' y", 0)).isEqualTo(8);
+        String block = "\"\"\"\n a } \" ( \n\"\"\" | x";
+        assertThat(Scanning.quotedEnd(block, 0)).isEqualTo(block.indexOf(" | x"));
+    }
+
+    @Test
+    void quotedEndIsMinusOneWhenNothingEndsThere() {
+        assertThat(Scanning.quotedEnd("\"open", 0)).isEqualTo(-1);
+        assertThat(Scanning.quotedEnd("\"\"\"\nopen \\\"\"\"", 0)).isEqualTo(-1); // the closing quotes are escaped
+        assertThat(Scanning.quotedEnd("it's", 2)).isEqualTo(-1); // an apostrophe, not a character literal
+        assertThat(Scanning.quotedEnd("abc", 1)).isEqualTo(-1);
+    }
+
+    @Test
+    void aTextBlockHidesItsBracketsFromMatching() {
+        assertThat(Scanning.matching("f(\"\"\"\n)\n\"\"\")", 1)).isEqualTo(11);
+    }
 }

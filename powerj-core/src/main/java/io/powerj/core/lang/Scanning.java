@@ -48,6 +48,42 @@ public final class Scanning {
     }
 
     /**
+     * Position following the quoted text that starts at {@code start}: a string ({@code "…"}), a text block
+     * ({@code """…"""}, FR-33b) or a character literal ({@code 'a'}, {@code '\n'}); -1 if the character at
+     * {@code start} does not open one that ends. A lone {@code '} (an apostrophe in a word, {@code echo it's}) is not a
+     * literal: the caller treats it as an ordinary character, as the {@link Lexer} does for a word.
+     */
+    public static int quotedEnd(String text, int start) {
+        char quote = text.charAt(start);
+        if (quote == '\'') {
+            return characterEnd(text, start);
+        }
+        if (quote != '"') {
+            return -1;
+        }
+        if (text.startsWith("\"\"\"", start)) {
+            int close = start + 3;
+            while ((close = text.indexOf("\"\"\"", close)) >= 0) {
+                if (!escaped(text, close)) {
+                    return close + 3;
+                }
+                close++;
+            }
+            return -1;
+        }
+        return stringEnd(text, start);
+    }
+
+    /** Is the character at {@code at} preceded by an odd number of backslashes? */
+    private static boolean escaped(String text, int at) {
+        int count = 0;
+        for (int i = at - 1; i >= 0 && text.charAt(i) == '\\'; i--) {
+            count++;
+        }
+        return count % 2 == 1;
+    }
+
+    /**
      * Position of the closing symbol matching the one opened at {@code open} ({@code (}, {@code [} or
      * {@code {}), ignoring the content of strings and characters; -1 if it is missing.
      */
@@ -69,14 +105,14 @@ public final class Scanning {
                     }
                 }
                 case '"' -> {
-                    at = stringEnd(text, at);
+                    at = quotedEnd(text, at);
                     if (at < 0) {
                         return -1;
                     }
                     continue;
                 }
                 case '\'' -> {
-                    int end = characterEnd(text, at);
+                    int end = quotedEnd(text, at);
                     if (end > 0) {
                         at = end;
                         continue;
