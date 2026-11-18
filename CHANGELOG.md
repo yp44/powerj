@@ -958,7 +958,9 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
 - **An invalid `history.size` is shown on the terminal, not only logged** (audit v2, U-13). `history.size=abc` (or `-3`, `0`,
   empty) was written to the log at `WARNING` and the default size applied without a word, while a file that cannot be
   read at all is announced (`config.unusable`). Both now go to the same `warn` line: *PowerJ: invalid value for
-  history.size: abc (a positive whole number is expected); the default, 10000, applies.* (`config.invalidValue`, en and fr).
+  history.size: abc (a positive whole number is expected); the default, 10000, applies.* (`config.invalidValue`, en and fr). The warnings of the settings are worded once the language is known, so `language=fr` and a
+  bad `history.size` in the same file give the warning in French; the log keeps the line at `FINE` only (the console
+  carries it), after the review of the PR.
 - **French: the command is `history`, in every message.** `history.noMatch` said `historique :` and
   `history.unknownOption` said `history :`; a command is a name and is not translated. Both say `history :`.
 - **Review of the 35 keys of the bundle** (en and fr, against: tone, terminology, what to do next). Kept as they are, with the

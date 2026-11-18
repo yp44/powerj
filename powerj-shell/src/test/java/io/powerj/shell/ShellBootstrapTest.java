@@ -264,6 +264,16 @@ class ShellBootstrapTest {
     }
 
     @Test
+    void theWarningsAboutTheSettingsAreInTheLanguageOfTheSettings() throws Exception {
+        Files.createDirectories(tmp.resolve("home"));
+        Files.writeString(tmp.resolve("home").resolve("config.properties"), "language=fr\nhistory.size=abc\n");
+
+        assertThat(execute("-c", "\"ok\"")).isZero();
+
+        assertThat(text(messages)).contains("valeur invalide pour history.size : abc").doesNotContain("invalid value");
+    }
+
+    @Test
     void theLanguageOfTheConfigurationIsApplied() throws Exception {
         Files.createDirectories(tmp.resolve("home"));
         Files.writeString(tmp.resolve("home").resolve("config.properties"), "language=fr\n");

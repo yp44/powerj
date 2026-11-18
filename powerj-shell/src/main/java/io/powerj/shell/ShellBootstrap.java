@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 import org.jline.terminal.Terminal;
 
@@ -155,11 +156,14 @@ final class ShellBootstrap {
             environment.messages().println(Messages.get("home.createFailed", home.dir(), e.getMessage()));
         }
         logs.install(home.logsDir(), options.debug(), environment.messages()::println);
-        ShellConfig config = ShellConfig.load(home.configFile(), environment.messages()::println);
+        // The warnings about the settings are worded once the language is known: it comes from the same file.
+        List<Supplier<String>> configWarnings = new ArrayList<>();
+        ShellConfig config = ShellConfig.loadWarning(home.configFile(), configWarnings::add);
         // Language of the messages (FR-61): -Dpowerj.language, POWERJ_LANG, config.properties, then the system.
         LanguageSetting.set(LanguageSetting.resolve(environment.properties().get(Language.PROPERTY),
                 environment.variables().get(Language.ENVIRONMENT_VARIABLE), config.language(),
                 environment.systemLocale()));
+        configWarnings.forEach(warning -> environment.messages().println(warning.get()));
         if (options.usageError()) {
             environment.messages().println(Messages.get("usage"));
             return 2;
