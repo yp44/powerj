@@ -935,8 +935,10 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   keeps the BOM, so the first command was `\uFEFFls`. The script is now read by `Profile.lines`, the function the profile
   uses (UTF-8, BOM removed): one way to read a file of commands.
 - **A script has arguments** (decision of the issue: yes). `powerj script.pj a b` and `powerj -c "line" a b` set the list `$args`
-  to `["a", "b"]` (empty without arguments). The options of the shell can still stand anywhere, so `--` ends them: what
-  follows is for the script (`powerj script.pj -- -x`). `powerj a.pj b.pj` used to be a usage error and now runs `a.pj` with
+  to `["a", "b"]` (empty without arguments). The options of the shell stop at the script word (or at the line after `-c`),
+  as for `python script.py --help`: `powerj deploy.pj --help` gives the script `--help` and prints no usage; `--` before the script
+  word is for a script whose name starts with `-`. A word that starts with `-` before the script and is no option of the shell
+  is refused before anything is created or read, and before `--help` or `--version` is answered (review of the PR). `powerj a.pj b.pj` used to be a usage error and now runs `a.pj` with
   `$args` = `[b.pj]`. FR-04d, the README table, `step-4.md` (21g to 21i) and `ci/smoke/non-interactive.sh` say so.
   Left out: named options for scripts.
 

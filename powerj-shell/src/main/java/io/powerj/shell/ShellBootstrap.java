@@ -50,8 +50,8 @@ final class ShellBootstrap {
      * @param unknownOption  the first word that starts with {@code -} and is no option of the shell (and comes before
      *                       {@code --}); {@code null} when there is none (U-08)
      * @param script         what remains: {@code -c "line"} or a {@code .pj} file, then the arguments of the script
-     *                       (what follows {@code --} is one, even if it starts with {@code -}); nothing for the
-     *                       interactive shell
+     *                       (the options of the shell stop at the script word, or at {@code --}: {@code script.pj --help}
+     *                       gives the script {@code --help}); nothing for the interactive shell
      */
     record Options(boolean debug, boolean noProfile, boolean version, boolean help, String startDirectory,
                    boolean usageError, String unknownOption, List<String> script) {
@@ -94,17 +94,19 @@ final class ShellBootstrap {
                     case "--version" -> version = true;
                     case "--help", "-h" -> help = true;
                     default -> {
-                        if (arg.equals("-c") && script.isEmpty()) {
+                        if (arg.equals("-c")) {
                             script.add(arg);
                             if (i + 1 < args.length) {
                                 script.add(args[++i]); // the line, whatever it starts with
                             }
+                            optionsEnded = true; // the rest is for the script, as for `python script.py --help`
                         } else if (arg.length() > 1 && arg.startsWith("-")) {
                             if (unknownOption == null) {
                                 unknownOption = arg;
                             }
                         } else {
                             script.add(arg);
+                            optionsEnded = true; // the script word: its arguments may look like options of the shell
                         }
                     }
                 }
@@ -132,6 +134,13 @@ final class ShellBootstrap {
     /** @return the exit code of the process */
     int execute(String... args) {
         Options options = Options.parse(args);
+        if (options.unknownOption() != null) {
+            // Before anything is created or read: a wrong command line has no side effect, and it is refused before
+            // --help or --version are answered. The language is not resolved yet: the system's (as home.createFailed).
+            environment.messages().println(Messages.get("usage.unknownOption", options.unknownOption()));
+            environment.messages().println(Messages.get("usage"));
+            return 2;
+        }
         if (options.help()) {
             return print(Messages.get("usage"));
         }
@@ -151,11 +160,6 @@ final class ShellBootstrap {
         LanguageSetting.set(LanguageSetting.resolve(environment.properties().get(Language.PROPERTY),
                 environment.variables().get(Language.ENVIRONMENT_VARIABLE), config.language(),
                 environment.systemLocale()));
-        if (options.unknownOption() != null) {
-            environment.messages().println(Messages.get("usage.unknownOption", options.unknownOption()));
-            environment.messages().println(Messages.get("usage"));
-            return 2;
-        }
         if (options.usageError()) {
             environment.messages().println(Messages.get("usage"));
             return 2;

@@ -41,7 +41,7 @@ As in the previous steps: **Actions** tab, latest run of the **CI** workflow, ar
 | 21f | Put `cd C:\Users` in `profile.pj`, run `powerj --cd C:\Windows`, then `powerj --no-profile --cd C:\Windows` | First prompt `PJ C:\Users>` (the profile wins), then `PJ C:\Windows>`. |
 | 21g | `powerj --foo`, then `powerj script.pj --bar`, each followed by `echo %ERRORLEVEL%` | `PowerJ: unknown option: --foo` (then `--bar`), the usage line, then `2`. `powerj -h` prints the usage, which names `-h`. |
 | 21h | Save `script.pj` in Notepad (UTF-8 with a BOM) with `"first"` on its first line, then run `powerj script.pj` | `first`: the first command is read like the others (the profile is read the same way). |
-| 21i | Save `args.pj` with `$args[1]` and run `powerj args.pj a b`; then `powerj -c "$args.size()" -- -x y` | `b`, then `2`: what follows the script or the line is `$args`; `--` lets an argument start with `-`. |
+| 21i | Save `args.pj` with `$args[1]` and run `powerj args.pj a b`; then `powerj args.pj --help` | `b`, then `--help` (not the usage): what follows the script or the line is `$args`, whatever it starts with. |
 
 Linux / macOS variant (archive `powerj-linux-x64`): replace `ipconfig` with `ip addr`, `^cmd /c …` with `sh -c "…"`, `dir /b` with `ls -1`, and launch `bin/powerj`.
 

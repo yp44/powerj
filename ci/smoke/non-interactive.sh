@@ -24,6 +24,9 @@ expect "$WORK/cd.txt" "$(basename "$WORK")\$"
 printf '\xef\xbb\xbf$args[1]\n' > "$WORK/args.pj"
 "$PJ" "$WORK/args.pj" a b < /dev/null > "$WORK/args.txt"
 [ "$(cat "$WORK/args.txt")" = "b" ] || { echo "\$args[1] should be b" >&2; exit 1; }
+# The words after the script are its own, even --help: not the usage of the shell.
+"$PJ" "$WORK/args.pj" --help --version < /dev/null > "$WORK/args-flags.txt"
+[ "$(cat "$WORK/args-flags.txt")" = "--version" ] || { echo "script arguments were taken for options" >&2; exit 1; }
 set +e
 "$PJ" --foo < /dev/null > /dev/null 2> "$WORK/unknown.txt"
 code=$?

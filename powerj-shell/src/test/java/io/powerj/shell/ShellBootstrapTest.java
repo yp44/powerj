@@ -70,8 +70,8 @@ class ShellBootstrapTest {
     // --- The command line ---
 
     @Test
-    void optionsAreReadWhereverTheyAre() {
-        var options = ShellBootstrap.Options.parse("--debug", "-c", "ls", "--no-profile");
+    void optionsAreReadUpToTheScript() {
+        var options = ShellBootstrap.Options.parse("--debug", "--no-profile", "-c", "ls");
 
         assertThat(options.debug()).isTrue();
         assertThat(options.noProfile()).isTrue();
@@ -86,7 +86,7 @@ class ShellBootstrapTest {
     @Test
     void theStartDirectoryIsTheNextWordOrWhatFollowsTheEqualSign() {
         var spaced = ShellBootstrap.Options.parse("--cd", "build", "-c", "pwd");
-        var equal = ShellBootstrap.Options.parse("--cd=D:\\dev\\my project", "script.pj", "--no-profile");
+        var equal = ShellBootstrap.Options.parse("--cd=D:\\dev\\my project", "--no-profile", "script.pj");
 
         assertThat(spaced.startDirectory()).isEqualTo("build");
         assertThat(spaced.usageError()).isFalse();
@@ -101,7 +101,7 @@ class ShellBootstrapTest {
     @Test
     void aMissingOrEmptyStartDirectoryIsAUsageError() {
         assertThat(ShellBootstrap.Options.parse("--cd").usageError()).isTrue();
-        assertThat(ShellBootstrap.Options.parse("-c", "pwd", "--cd").usageError()).isTrue();
+        assertThat(ShellBootstrap.Options.parse("--debug", "--cd").usageError()).isTrue();
         assertThat(ShellBootstrap.Options.parse("--cd=").usageError()).isTrue();
         assertThat(ShellBootstrap.Options.parse("--cd", "").usageError()).isTrue();
     }
@@ -151,17 +151,30 @@ class ShellBootstrapTest {
     void anUnknownOptionIsNamedBeforeTheUsageAndGivesTwo() throws Exception {
         assertThat(execute("--foo")).isEqualTo(2);
         assertThat(execute("-x", "-c", "1 + 1")).isEqualTo(2);
-        assertThat(execute("s.pj", "--bar")).isEqualTo(2);
 
-        assertThat(text(messages)).contains("unknown option: --foo", "unknown option: -x", "unknown option: --bar")
-                .contains("usage: powerj");
+        assertThat(text(messages)).contains("unknown option: --foo", "unknown option: -x").contains("usage: powerj");
         assertThat(text(stdout)).isEmpty();
     }
 
     @Test
-    void anUnknownOptionDoesNotHideHelpOrVersion() throws Exception {
-        assertThat(execute("--foo", "--help")).isZero();
-        assertThat(execute("--foo", "--version")).isZero();
+    void anUnknownOptionIsRefusedBeforeAnythingIsCreatedOrAnswered() throws Exception {
+        assertThat(execute("--foo", "--version")).isEqualTo(2);
+        assertThat(execute("--foo", "--help")).isEqualTo(2);
+
+        assertThat(text(messages)).contains("unknown option: --foo");
+        assertThat(text(stdout)).isEmpty();
+        assertThat(tmp.resolve("home")).doesNotExist(); // not even the home folder
+        assertThat(logged).isEmpty();
+    }
+
+    @Test
+    void aScriptReceivesTheWordsThatAreOptionsOfTheShell() throws Exception {
+        Files.createDirectories(tmp.resolve("work"));
+        Files.writeString(tmp.resolve("work").resolve("flags.pj"), "$args[0]\n$args[1]\n");
+
+        assertThat(execute("flags.pj", "--help", "--version")).isZero();
+
+        assertThat(text(stdout)).isEqualTo("--help\n--version\n"); // not the usage, not the version
     }
 
     @Test
@@ -173,11 +186,30 @@ class ShellBootstrapTest {
 
     @Test
     void theOptionsEndAtDoubleDashAndWhatFollowsIsForTheScript() {
-        var options = ShellBootstrap.Options.parse("--no-profile", "s.pj", "a", "--", "--foo", "-c");
+        var options = ShellBootstrap.Options.parse("--no-profile", "--", "--weird.pj", "-c");
 
         assertThat(options.unknownOption()).isNull();
         assertThat(options.noProfile()).isTrue();
-        assertThat(options.script()).containsExactly("s.pj", "a", "--foo", "-c");
+        assertThat(options.script()).containsExactly("--weird.pj", "-c");
+    }
+
+    @Test
+    void whatFollowsTheScriptWordIsForTheScriptEvenIfItLooksLikeAnOptionOfTheShell() {
+        var file = ShellBootstrap.Options.parse("--debug", "deploy.pj", "--help", "--version", "-h", "--cd", "x", "--foo",
+                "--no-profile", "-c");
+        var line = ShellBootstrap.Options.parse("-c", "ls", "--help", "--debug");
+
+        assertThat(file.debug()).isTrue();
+        assertThat(file.help()).isFalse();
+        assertThat(file.version()).isFalse();
+        assertThat(file.noProfile()).isFalse();
+        assertThat(file.startDirectory()).isNull();
+        assertThat(file.unknownOption()).isNull();
+        assertThat(file.script()).containsExactly("deploy.pj", "--help", "--version", "-h", "--cd", "x", "--foo",
+                "--no-profile", "-c");
+        assertThat(line.help()).isFalse();
+        assertThat(line.debug()).isFalse();
+        assertThat(line.script()).containsExactly("-c", "ls", "--help", "--debug");
     }
 
     @Test
@@ -187,13 +219,6 @@ class ShellBootstrapTest {
         assertThat(options.unknownOption()).isNull();
         assertThat(options.script()).containsExactly("-c", "-1 + 1", "x");
     }
-
-    @Test
-    void aSecondDashCIsAnUnknownOption() {
-        assertThat(ShellBootstrap.Options.parse("s.pj", "-c").unknownOption()).isEqualTo("-c");
-    }
-
-    // --- The start ---
 
     @Test
     void theHomeIsCreatedOnceAndTheLogIsInstalledInIt() throws Exception {
@@ -288,8 +313,8 @@ class ShellBootstrapTest {
     }
 
     @Test
-    void theArgumentsAfterALineAreTheListArgsAndDoubleDashLetsOneStartWithADash() throws Exception {
-        assertThat(execute("-c", "$args[0] + $args.size()", "--", "-x", "y")).isZero();
+    void theArgumentsAfterALineAreTheListArgsWhateverTheyStartWith() throws Exception {
+        assertThat(execute("-c", "$args[0] + $args.size()", "-x", "y")).isZero();
 
         assertThat(text(stdout)).isEqualTo("-x2\n");
     }
