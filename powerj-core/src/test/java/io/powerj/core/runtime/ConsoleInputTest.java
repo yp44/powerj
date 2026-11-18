@@ -62,15 +62,20 @@ class ConsoleInputTest {
         assertThat(events).containsExactly("pause", "resume");
     }
 
+    /**
+     * In an interactive shell the last native program writes to the terminal, which is the stdout of the JVM running the
+     * tests: without the redirection {@code cat} would write {@code a} to the stream Surefire talks through, which it
+     * reports as a corrupted channel (#145).
+     */
     @Test
     void pausedForTheFirstProgramOfANativePipeline() throws Exception {
-        interpreter(true).execute("printf \"a\\n\" | cat");
+        interpreter(true).execute("printf \"a\\n\" | cat > " + tmp.resolve("sink"));
         assertThat(events).containsExactly("pause", "resume");
     }
 
     @Test
     void notPausedWhenTheProgramReadsObjects() throws Exception {
-        interpreter(true).execute("\"x\" | cat");
+        interpreter(true).execute("\"x\" | cat > " + tmp.resolve("sink"));
         assertThat(events).isEmpty();
     }
 
