@@ -82,7 +82,8 @@ class InterpreterTest {
         run("sh -c \"exit 3\"");
         assertThat(session.lastSucceeded()).isFalse();
         assertThat(run("$last.exitCode")).isEqualTo("3" + System.lineSeparator());
-        assertThat(run("$last.duration")).endsWith(" s" + System.lineSeparator());
+        // A duration with its unit: which unit depends on how fast the machine ran `sh` (966.7 µs failed a Linux runner).
+        assertThat(run("$last.duration")).matches("\\d+([.,]\\d+)? (ns|µs|ms|s)" + System.lineSeparator());
         assertThat(run("$last")).contains("command", "exitCode", "/sh", "[-c, exit 3]");
     }
 
