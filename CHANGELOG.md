@@ -831,9 +831,10 @@ structures, functions) can be built on it. The work is organised in phases (revi
   texts changed.
 
 ### Changed (Dependabot: one group for the actions, and the rule for the queue, [#144](https://github.com/yp44/powerj/issues/144))
-- **The GitHub Actions come in one pull request a week** (a `github-actions` group in `.github/dependabot.yml`, as the Maven
-  plugins and the test libraries already do), so that two major versions of the actions do not wait a month each (audit v2,
-  B-02). JLine and JavaFX stay alone: they ship in the application.
+- **The minor and patch updates of the GitHub Actions come in one pull request a week** (a `github-actions` group in
+  `.github/dependabot.yml`, as the Maven plugins and the test libraries already do), so that they do not wait a month each
+  (audit v2, B-02). A major version of an action stays a pull request of its own, because it can change the inputs or the
+  Node runtime and one red check must not hold back the others. JLine and JavaFX stay alone: they ship in the application.
 - **The rule is in CONTRIBUTING, "Dependency updates"**: a Dependabot pull request is merged, or closed with its reason,
   within two weeks; the queue never holds more than three; what to check before merging a runtime dependency; what a red
   update means (a test of the layout, a flaky test, or a real break); what is not wanted is closed with the reason.

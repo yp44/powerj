@@ -106,7 +106,8 @@ What goes where:
 ## Dependency updates
 
 Dependabot proposes them every week ([.github/dependabot.yml](.github/dependabot.yml)): the Maven plugins come in one pull
-request, the test libraries in one, the GitHub Actions in one; JLine and JavaFX, which ship in the application, come alone.
+request, the test libraries in one, the minor and patch updates of the GitHub Actions in one; a major version of an action,
+JLine and JavaFX, which ship in the application, come alone.
 
 - **A Dependabot pull request is merged, or closed with its reason, within two weeks**, and the queue never holds more than
   three of them: a month of waiting turns a patch into a jump of two major versions (audit v2, B-02). The maintainer merges,
