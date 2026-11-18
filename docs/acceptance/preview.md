@@ -42,9 +42,11 @@ In a test folder (e.g. `C:\tmp\p`), create with your editor `small.txt` (a few c
 | 24 | Press **Alt+▲** again, then **Alt+►** and **Alt+▼** | The duration goes to the next step, then the limit goes down one step; the values of the line are shown again each time, with the menu under the banner (with `ls -r \| group size`, the banner says `partial · 20 objects max per stage`). |
 | 25 | Type one more character | The menu is gone with the change of the line. **▲** alone, with a line typed, searches the history as before. |
 | 26 | Type `cd ..` (preview off), press **Alt+▲** | Nothing happens: the keys act only on values or a timeout. |
+| 27 | Press **Escape**, release it, press **v**; then again | The prompt becomes `PJ? <dir>> `, then `PJ <dir>> `: the same as Alt+V, on a terminal whose Alt is not sent as Escape. |
+| 28 | With a preview that timed out, press the Alt+arrow of a terminal that sends `ESC ESC [ A` (tmux by default) or `ESC [ 1 ; 9 A` (macOS Terminal, Option as Meta) | The same as row 21: the key is understood in each of the forms. |
 
 ## Notes
 
-- In Windows Terminal, Alt+V reaches PowerJ as is. Under macOS (Terminal, iTerm2), enable "Use Option as Meta key".
+- In Windows Terminal, Alt+V reaches PowerJ as is. Under macOS (Terminal, iTerm2), enable "Use Option as Meta key"; without it, Option+V types `√`. **Escape, then `v`** (and Escape, then `p` for the perf mode) is the same as Alt+V on every terminal (row 27).
 - If your terminal keeps **Alt+arrows** for itself (a multiplexer, some Linux desktops), change the settings with `env --set POWERJ_PREVIEW_DEADLINE_MS=800` and `env --set POWERJ_PREVIEW_STAGE_LIMIT=20`: they are read at the next key.
 - A Java computation that never checks for cancellation (e.g. `LongStream.range(0, Long.MAX_VALUE).sum()`) keeps the preview busy: it no longer refreshes until the computation ends. Input and Enter remain available.

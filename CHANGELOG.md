@@ -963,6 +963,17 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   written twice); `history.unknownOption` names the option that exists; the preview banners are symbols and short words on
   purpose (a line of the screen); the `[y/N]` / `[o/N]` answer letters are the ones `NativeAccessConsent` accepts (`y`, `yes`, `o`, `oui`). The literal `^C`
   of `Repl` is the echo every terminal shell prints, not a message. Nothing else needed a change.
+### Fixed and documented (Alt+arrow in every form terminals send it, Escape then a letter, "Option as Meta", [#153](https://github.com/yp44/powerj/issues/153))
+- **The Alt+arrow keys of the preview control work on more terminals** (audit v2, U-12). They were bound to one escape
+  sequence each, the one of xterm (`ESC [ 1 ; 3 X`); a terminal that sends `ESC ESC [ X` (tmux by default, many others) or
+  `ESC [ 1 ; 9 X` (the macOS Terminal with Option as Meta) could not change the settings of a timed-out preview from the
+  keyboard, though the banner said it could. `PreviewControl.Key` now lists the three forms and `Previewer` binds each of them,
+  keeping what the editor had on that sequence for a line that shows no values. There is no terminfo capability for a
+  modified arrow (JLine reads none), so no form is read from the terminal. `PreviewControlKeysTest` sends each form to a
+  `TestTerminal` and watches the setting change.
+- **The README says that Escape then the letter is Alt+V / Alt+P**, which works on every terminal, and how to turn on
+  "Use Option as Meta key" in macOS Terminal and iTerm2 (Option+V sends `√` without it). `docs/acceptance/preview.md` has rows 27 and 28.
+  Left out, as the issue says: configurable key bindings.
 
 ## [0.1.0] — never released (baseline)
 

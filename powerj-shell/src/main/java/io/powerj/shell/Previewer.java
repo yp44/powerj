@@ -109,14 +109,18 @@ final class Previewer {
     }
 
     /**
-     * Binds an Alt+arrow of the control. It acts while values or a timeout are shown; otherwise the key does what it did
+     * Binds an Alt+arrow of the control, in each form terminals send it. It acts while values or a timeout are shown; otherwise the key does what it did
      * before, so that the editor keeps whatever it had on that key.
      */
     private void bindControlKey(KeyMap<Binding> main, PreviewControl.Key key) {
-        Binding before = main.getBound(key.sequence());
         String name = "powerj-preview-control-" + key.name().toLowerCase(java.util.Locale.ROOT);
-        reader.getWidgets().put(name, () -> controlKey(key, before));
-        main.bind(new Reference(name), key.sequence());
+        for (String sequence : key.sequences()) {
+            Binding before = main.getBound(sequence);
+            String widget = name + "-" + sequence.chars().mapToObj(Integer::toHexString)
+                    .collect(java.util.stream.Collectors.joining());
+            reader.getWidgets().put(widget, () -> controlKey(key, before));
+            main.bind(new Reference(widget), sequence);
+        }
     }
 
     private boolean controlKey(PreviewControl.Key key, Binding before) {

@@ -26,6 +26,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
@@ -182,6 +185,36 @@ class PreviewControlKeysTest {
         awaitUntil(() -> "400".equals(variable(PreviewSettings.DEADLINE_VARIABLE)));
         awaitUntil(() -> shown().contains("timed out after 400 ms · [duration 400 ms]  max/stage 50"));
         assertThat(variable(PreviewSettings.LIMIT_VARIABLE)).isEqualTo("50");
+        exit();
+    }
+
+    /** What terminals other than xterm send for Alt+▲ and Alt+►: Escape then the arrow, and the macOS Option-as-Meta form. */
+    @ParameterizedTest
+    @ValueSource(strings = {"\033\033[A", "\033[1;9A"})
+    void everyKnownFormOfAltUpLengthensTheDeadline(String altUp) throws Exception {
+        timeOut();
+
+        terminal.type(altUp);
+
+        awaitUntil(() -> "400".equals(variable(PreviewSettings.DEADLINE_VARIABLE)));
+        awaitUntil(() -> shown().contains("timed out after 400 ms · [duration 400 ms]  max/stage 50"));
+        exit();
+    }
+
+    @ParameterizedTest
+    @CsvSource({"'\033\033[C', '\033\033[B', '\033\033[D'", "'\033[1;9C', '\033[1;9B', '\033[1;9D'"})
+    void everyKnownFormOfAltRightDownAndLeftChangesTheLimit(String altRight, String altDown, String altLeft)
+            throws Exception {
+        timeOut();
+
+        terminal.type(altRight);
+        awaitUntil(() -> shown().contains("duration 200 ms  [max/stage 50]"));
+        terminal.type(altDown);
+
+        awaitUntil(() -> "20".equals(variable(PreviewSettings.LIMIT_VARIABLE)));
+        awaitUntil(() -> shown().contains("duration 200 ms  [max/stage 20]"));
+        terminal.type(altLeft);
+        awaitUntil(() -> shown().contains("[duration 200 ms]  max/stage 20"));
         exit();
     }
 

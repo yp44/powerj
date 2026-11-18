@@ -132,6 +132,8 @@ Overloads, varargs and argument conversions follow Java rules; `System.exit` and
 
 Persistent history with prefix search on ↑/↓, **Ctrl+R** reverse search, **Tab completion** (commands tagged `[pj]` / `[internal]` / `[native]`, options with descriptions, paths, variables, properties of `$_` and of lambda parameters, Java classes and methods with their signatures), **syntax highlighting** as you type, and a `>>` continuation prompt when a brace, parenthesis or quote is left open or a line ends with `|`, `&&` or `||`.
 
+**Alt+key shortcuts** (Alt+V, Alt+P) are the same as **Escape, then the letter**, which every terminal can send: if Alt does nothing, press Esc, release it, then `v` or `p`. On macOS, Terminal sends `√` and `π` for Option+V and Option+P unless you turn on *Use Option as Meta key* (Terminal: Settings → Profiles → Keyboard; iTerm2: Settings → Profiles → Keys → *Left Option key: Esc+*). Alt+arrows of the preview's banner are understood in the three forms terminals send them (`ESC [ 1 ; 3 X`, `ESC ESC [ X`, `ESC [ 1 ; 9 X`); a terminal or multiplexer that keeps them for itself can still change the settings with `env`.
+
 ### Preview mode
 
 Press **Alt+V**: the prompt becomes `PJ?` and the first results of the line appear **below it while you type**, before Enter, for the pipeline stage under the cursor. Only what changes nothing runs: cmdlets declared `preview = true` and a fixed set of JDK methods; a native command, a built-in command, a Java call that could change something, an assignment or a redirection pauses the preview with the reason. Enter executes the line as usual. Details: FR-66 in the specification, checklist [preview](docs/acceptance/preview.md).
