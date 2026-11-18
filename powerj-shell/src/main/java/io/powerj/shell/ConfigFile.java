@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.PosixFileAttributeView;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -88,10 +89,23 @@ final class ConfigFile {
         Path temp = Files.createTempFile(parent, "config", ".tmp");
         try {
             Files.write(temp, lines, StandardCharsets.UTF_8);
+            keepPermissions(temp);
             Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING);
         } finally {
             Files.deleteIfExists(temp);
         }
+    }
+
+    /**
+     * {@code createTempFile} makes a file readable by its owner only; the file it replaces must keep the permissions the user
+     * gave it (R-20). A new file keeps the private ones, which suit a file of consents. Where the file system has no POSIX
+     * permissions (Windows), the inherited ones are the ones to keep.
+     */
+    private void keepPermissions(Path temp) throws IOException {
+        if (!Files.exists(file) || !Files.getFileStore(file).supportsFileAttributeView(PosixFileAttributeView.class)) {
+            return;
+        }
+        Files.setPosixFilePermissions(temp, Files.getPosixFilePermissions(file));
     }
 
     /** Key defined by a line of a properties file, or {@code null} for a blank line or a comment. */

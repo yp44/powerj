@@ -84,19 +84,32 @@ public final class Supervisor {
         }
     }
 
+    /**
+     * The message for a failure that is not an error of the user, as a line that ran shows it: memory, recursion, an unusable
+     * class, otherwise an internal error whose detail is in the log. The preview shows the same texts.
+     */
+    public static String messageOf(Throwable t) {
+        return switch (t) {
+            case OutOfMemoryError _ -> Messages.get("error.outOfMemory");
+            case StackOverflowError _ -> Messages.get("error.stackOverflow");
+            case LinkageError e -> Messages.get("error.linkage", e.getMessage());
+            default -> Messages.get("error.internal", t);
+        };
+    }
+
     private Outcome failureOf(String commandLine, Throwable t) {
         return switch (t) {
             case InterruptedException _, CancellationException _ -> new Outcome.Cancelled();
             case PjException e -> new Outcome.Failure(e.error());
             case OutOfMemoryError e -> {
                 memoryReserve = null;
-                yield new Outcome.Failure(PjError.of(Messages.get("error.outOfMemory"), e));
+                yield new Outcome.Failure(PjError.of(messageOf(e), e));
             }
-            case StackOverflowError e -> new Outcome.Failure(PjError.of(Messages.get("error.stackOverflow"), e));
-            case LinkageError e -> new Outcome.Failure(PjError.of(Messages.get("error.linkage", e.getMessage()), e));
+            case StackOverflowError e -> new Outcome.Failure(PjError.of(messageOf(e), e));
+            case LinkageError e -> new Outcome.Failure(PjError.of(messageOf(e), e));
             default -> {
                 LOG.log(Level.SEVERE, "Internal error while running: " + LoggedLine.of(commandLine), t);
-                yield new Outcome.Failure(PjError.of(Messages.get("error.internal", t), t));
+                yield new Outcome.Failure(PjError.of(messageOf(t), t));
             }
         };
     }
