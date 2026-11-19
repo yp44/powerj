@@ -34,6 +34,7 @@ As in the previous steps: **Actions** tab, latest run of the **CI** workflow, ar
 | 20 | `System.out.println("bonjour " + Math.max(1, 2))` | `bonjour 2`, without corrupting the input line. |
 | 21 | `System.setOut(null)` | Refused: `System.setOut is refused: it would break the shell display`. |
 | 22 | `System.exit(6)` then, in `cmd.exe`, `echo %ERRORLEVEL%` | PowerJ exits cleanly (history saved); `6`. |
+| 22b | `java.util.stream.IntStream.range(0, 2147483647)`, then Ctrl+C after a second | The display stops within a moment: `^C` and a new prompt; nothing more is written afterwards (#172). |
 
 ## Syntax points to know
 

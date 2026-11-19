@@ -26,6 +26,7 @@ public final class Session {
     private final SessionState state;
     private final Variables variables = new Variables();
     private final ShellStatistics statistics = new ShellStatistics();
+    private final Lines lines = new Lines();
     private final JavaClasses java = new JavaClasses();
     private final Jobs jobs = new Jobs();
     private volatile Integer exitRequest;
@@ -120,7 +121,9 @@ public final class Session {
     }
 
     void recordNative(NativeRun run) {
-        statistics.recordNative(run);
+        if (!lines.stale()) {
+            statistics.recordNative(run);
+        }
     }
 
     public boolean lastSucceeded() {
@@ -128,12 +131,21 @@ public final class Session {
     }
 
     void recordSuccess(boolean succeeded) {
-        statistics.recordSuccess(succeeded);
+        if (!lines.stale()) {
+            statistics.recordSuccess(succeeded);
+        }
     }
 
     /** Keeps the original exception of an error for {@code $errors} (FR-53). */
     public void recordError(Throwable error) {
-        statistics.recordError(error);
+        if (!lines.stale()) {
+            statistics.recordError(error);
+        }
+    }
+
+    /** Which line is the interpreter's: what a line abandoned by Ctrl+C writes when it ends is ignored. */
+    Lines lines() {
+        return lines;
     }
 
     public List<Throwable> recentErrors() {
