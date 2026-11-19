@@ -1350,6 +1350,20 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   Tests: `OptionBinderTest`, `HelpOptionsTest`, `HelpAccessibleMembersTest`, `TypeInferenceTest`, `HighlightKindTest`,
   `CompletionOptionValuesTest`, `ParserTest`.
 
+### Fixed (review of the pull request of phase 3 of the audit v2, [#219](https://github.com/yp44/powerj/pull/219))
+- **The caret of a syntax error** is under the right character for an error inside the pipeline of a group `( … )` (its place
+  and its "(position N)" were those of the group), on an input of several lines (only the line of the error is shown), and
+  after a tab (kept in the padding) (#175).
+- **A module of one segment** (`greet`) whose name is the prefix of another module gets `greet-2:` (#169).
+- **The unroll closes only a `DirectoryStream`**, not a `Scanner` or another iterator the user may still hold (#173).
+- **The type of an option stays free**, as before #166 (the maintainer's decision); the other checks at registration stay.
+- **The group of a background job is signalled even after its leader has ended** (#173).
+- **The ellipsis of a truncated cell is never highlighted**, and a spacing mark (the vowel signs of Devanagari…) takes a column
+  (#174).
+- **Highlighting on Windows knows `git.exe` as well as `git`; completion reads only the JDK lists that hold their elements**,
+  not a wrapper (`Collections.unmodifiableList`) around a list that may be lazy; the lists the shell makes (captures, `[…]`,
+  `*.`) have a type of their own, `ShellLists`, which it reads (#176).
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.
