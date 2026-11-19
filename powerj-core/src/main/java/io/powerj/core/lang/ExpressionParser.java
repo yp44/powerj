@@ -470,7 +470,9 @@ public final class ExpressionParser {
                 && closing < input.length() && input.charAt(closing) == ']') {
             String type = input.substring(start, end);
             int after = Scanning.skipBlanks(input, closing + 1);
-            if (isOperandStart(after) && (PRIMITIVES.contains(type) || Character.isUpperCase(lastPart(type).charAt(0)))) {
+            String simpleName = lastPart(type); // empty for "[a.] x", which is not a type
+            if (isOperandStart(after) && (PRIMITIVES.contains(type)
+                    || !simpleName.isEmpty() && Character.isUpperCase(simpleName.charAt(0)))) {
                 reset(closing + 1);
                 return new Ast.Cast(type, unary());
             }
@@ -677,8 +679,13 @@ public final class ExpressionParser {
         } catch (NumberFormatException _) {
             throw new SyntaxException(Messages.get("syntax.numberTooLarge", digits));
         }
-        Object value = Units.parse(digits + suffix).orElseThrow(() -> new SyntaxException(
-                Messages.get("syntax.invalidNumber", digits + suffix)));
+        Object value;
+        try {
+            value = Units.parse(digits + suffix).orElseThrow(() -> new SyntaxException(
+                    Messages.get("syntax.invalidNumber", digits + suffix)));
+        } catch (ArithmeticException _) {
+            throw new SyntaxException(Messages.get("syntax.numberTooLarge", digits + suffix)); // 200000d does not fit a Duration
+        }
         return new Value(value, start, end);
     }
 
@@ -688,6 +695,9 @@ public final class ExpressionParser {
             throw new SyntaxException(Messages.get("syntax.unclosedCharacter", open + 1));
         }
         char value = input.charAt(at++);
+        if (Character.isHighSurrogate(value) && at < input.length() && Character.isLowSurrogate(input.charAt(at))) {
+            throw new SyntaxException(Messages.get("syntax.characterOutsideBmp", open + 1)); // a char holds half of it
+        }
         if (value == '\\') {
             if (at >= input.length()) {
                 throw new SyntaxException(Messages.get("syntax.unclosedCharacter", open + 1));
@@ -707,13 +717,12 @@ public final class ExpressionParser {
                     if (at + 4 > input.length()) {
                         throw new SyntaxException(Messages.get("syntax.incompleteUnicodeEscape"));
                     }
-                    try {
-                        char u = (char) Integer.parseInt(input.substring(at, at + 4), 16);
-                        at += 4;
-                        yield u;
-                    } catch (NumberFormatException _) {
+                    int u = Lexer.hex4(input.substring(at, at + 4));
+                    if (u < 0) {
                         throw new SyntaxException(Messages.get("syntax.invalidUnicodeEscape", input.substring(at, at + 4)));
                     }
+                    at += 4;
+                    yield (char) u;
                 }
                 default -> throw new SyntaxException(Messages.get("syntax.unknownEscape", e));
             };

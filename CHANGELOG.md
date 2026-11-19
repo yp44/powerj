@@ -1177,6 +1177,26 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   type give one `module.cmdletIgnored` warning that names the component, and the cmdlet is left out
   (`OptionBinder.validate`, called by `CmdletRegistry`). README, "Writing your own cmdlet": the supported types.
   Tests: `OptionBinderTest`, `ParametersValidationTest`.
+### Fixed (a mistake of the user is never an "internal error", [#167](https://github.com/yp44/powerj/issues/167))
+- **Overflowing literals and indexes are syntax errors** (audit v2, R-03). `200000d` and `99999999tb` ended in an
+  `ArithmeticException` from `Units.parse` and `"$a[99999999999]"` in a `NumberFormatException`; both are now
+  `number too large`. A `--size 99999999tb` option is an invalid value, like any other.
+- **A long index is no longer truncated to an `int`** (R-04): `$l[4294967296]` returned `$l[0]`; it is now
+  `index [4294967296] out of bounds`.
+- **A map that refuses a key** (`$m[null]` on `Map.of()`, `$m[1]` on a `TreeMap` of strings) says
+  `this map does not accept the key …` instead of an internal `NullPointerException`/`ClassCastException`.
+- **`NaN` and the infinities with a `BigDecimal`** are an error that says so (`NumberFormatException` before); a
+  redirection to a path the file system refuses (`> a?b` on Windows, a NUL anywhere) is `cannot write to …` as for `cd`.
+- **Decimals compare as in Java** (R-15, FR-33): `0.0 == -0.0` is true, `NaN == NaN` is false, and `NaN` is neither less
+  nor greater than anything (it was `Double.compare`'s total order).
+- **`\u` takes four hexadecimal digits and nothing else** (`"\u+041"` was `A`), and a character outside the Basic
+  Multilingual Plane between single quotes (`'😀'`) has its own message.
+- **The preview** no longer shows a parser failure other than a syntax error as an internal error on each keystroke: it
+  logs it at `FINE` (the line is shortened by `LoggedLine`) and shows the line as incomplete; the "internal error" it still
+  shows for an evaluation failure is logged too.
+- **A fuzz test of the parser** (`ParserFuzzTest`: 60 000 lines made of the pieces of the language, fixed seed, 0.6 s; the seed
+  and the count can be changed with `-Dfuzz.seed` and `-Dfuzz.runs`) states that only a `SyntaxException` comes out. It found,
+  and this ticket fixes, a `StringIndexOutOfBoundsException` for `[null.] 1`. Tests: `UserMistakesTest`, `ParserFuzzTest`.
 
 ## [0.1.0] — never released (baseline)
 
