@@ -1124,6 +1124,21 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
 - **The removal of a folder that could not be listed to the end is reported once** (`FileTrees`, sequential and parallel): the
   folder is kept, instead of being tried and reported a second time as `directory not empty`.
   Tests: `FileOpsTest`, `ProtectedPathsTest`, `FileTreesListingFailureTest`, one or more for each point.
+### Fixed (four small defects of the data cmdlets, [#164](https://github.com/yp44/powerj/issues/164))
+- **`to-csv` says which columns it drops** (audit v2, U-09). The columns come from the first object, and those of a later
+  object that the header does not have were cut without a word (`from-csv` warns of the symmetric case). Each such column is now
+  named once, when it first appears, by a non-blocking error.
+- **`join` skips an object with an accessor that throws** (R-18) instead of ending the whole join with an `Unreadable`, as
+  `to-json` and `to-csv` do (left or right side, `--outer` included).
+- **`measure` and `sort` agree on numbers** (C-07). The two copies of the number helpers had parted: `BigInteger` was integral for
+  one and not the other, an adder holding 1.5 added up as 1 in `measure` and compared as 1.5 in `sort`, and a `NaN` adder was a
+  `NumberFormatException`. `io.powerj.text.Numbers` (`isIntegral`, `fitsLong`, `isFinite`, `decimal`, next to `SizeUnits`) is the
+  one helper; `sort` only takes the `long` shortcut for a number that fits one, so two big integers that differ beyond the
+  range of a long are no longer equal.
+- **`env --append` and `--prepend` do not create a variable from a path** (U-09). `env PATH --append /x` bound `/x` to the
+  option and set a variable called `/x` to `PATH`. An argument that cannot be a variable name (`/`, `\` or `=` in it), or two
+  values, is now a usage error, and an entry that is already in the list is not added again.
+  Tests: `NumbersTest`, `MeasureTest`, `SortTest`, `JoinTest`, `JsonCsvCmdletsTest`, `EnvTest`.
 
 ## [0.1.0] — never released (baseline)
 

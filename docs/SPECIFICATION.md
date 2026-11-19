@@ -674,6 +674,8 @@ env --prepend <NAME> <value>      # same, at the head of the list
 
 Output: stream of `record EnvVar(String name, String value)`, sorted by name (names case-insensitive on Windows).
 
+`--append` and `--prepend` take the name of the variable as their argument, then one value (`env --append PATH /tools`). An argument that cannot be a name (it holds `/`, `\`, `=`, as in `env PATH --append /x`, where `/x` would otherwise become a variable) or two values is a usage error; an entry that is **already in the list** is not added again.
+
 Changes apply to **the PowerJ session environment**: they apply to all native commands launched afterwards, to the lookup of executables in the `PATH` (FR-13) and to the settings read by PowerJ (`POWERJ_NATIVE_ENCODING`…). They are not persisted: to make them permanent, put them in `profile.pj` (§8). Note: `System.getenv()` in a Java expression returns the **initial** environment of the process (a JVM cannot modify its own environment); use `env` for the session environment.
 
 CA:
@@ -944,7 +946,7 @@ No external library: the writers and parsers are part of PowerJ, and tested agai
 - Invalid JSON gives a non-blocking error with its position (`invalid JSON at line 3, column 7: expected ':' after a key`), and reading resumes at the next value.
 
 **`to-csv`** emits CSV (RFC 4180), one `String` per line, as the objects arrive: the header, then one line per object.
-- **Columns**: those of the first object (record components, `Row` or `Map` keys, or `value` for a scalar). A missing column gives an empty field.
+- **Columns**: those of the first object (record components, `Row` or `Map` keys, or `value` for a scalar). A missing column gives an empty field. A later object that has a column the header does not have loses it: each such column is named once, when it first appears, by a non-blocking error (`not in the header, so not written: other (the columns are those of the first object)`), as `from-csv` warns of the symmetric case.
 - **Fields**:
   - they are quoted when they contain the delimiter, a quote or a line break;
   - numbers use `.` and no exponent;
@@ -1105,7 +1107,7 @@ Emits one **`Row`** per pair made of a left object and a right object with the s
 
 - **Algorithm:** hash join. The right side is read in `begin` and indexed by key; the left side is streamed, so `join` emits as soon as a left object arrives. Memory holds the right side only: put the smaller source on the right.
 - **Keys** are compared with `equals`; integral numbers are compared by value (`1` and `1L` match), as for `group` (FR-71). A `null` key matches nothing; with `-o` the left object is still emitted.
-- **Columns:** those of the left object, then those of the right object, as for `to-csv` (FR-73): the components of a record, the entries of a map or a `Row`, otherwise one column `value`. A right column whose name is already taken is renamed `right_<name>`. With `--key <property>`, the key column of the right side is left out (one column `code`). Size columns (a `@Bytes` component, a size column of a `Row`) stay displayed as sizes.
+- **Columns:** those of the left object, then those of the right object, as for `to-csv` (FR-73): the components of a record, the entries of a map or a `Row`, otherwise one column `value`. A right column whose name is already taken is renamed `right_<name>`. With `--key <property>`, the key column of the right side is left out (one column `code`). Size columns (a `@Bytes` component, a size column of a `Row`) stay displayed as sizes. An object with a property that cannot be read (an accessor that throws) is skipped with a non-blocking error, as `to-json` and `to-csv` do, and the join goes on.
 - **Order:** the left objects in their order; for each one, its matches in the order of the right side.
 - **Errors:** blocking without `--right`, without a key, with `--key` and `--left-key`/`--right-key` together, with `--left` after a `|`, without `--left` at the head of a pipeline, for an invalid property name, or if the block of a side fails. An error while evaluating a key is non-blocking: the object is skipped.
 

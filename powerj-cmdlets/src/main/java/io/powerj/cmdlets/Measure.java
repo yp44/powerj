@@ -16,6 +16,7 @@ import io.powerj.api.ColumnProvider;
 import io.powerj.api.Option;
 import io.powerj.api.Row;
 import io.powerj.api.ScriptBlock;
+import io.powerj.text.Numbers;
 
 /**
  * {@code measure}: count, sum, average, minimum and maximum of the objects or of a key (specification FR-70), computed
@@ -83,9 +84,9 @@ public final class Measure implements Cmdlet<Measure.Params, Object, Row>, Colum
             return;
         }
         state.count++;
-        if (state.numeric && value instanceof Number number && isFinite(number)) {
-            state.integral &= isIntegral(number);
-            state.sum = state.sum.add(decimal(number));
+        if (state.numeric && value instanceof Number number && Numbers.isFinite(number)) {
+            state.integral &= Numbers.isIntegral(number);
+            state.sum = state.sum.add(Numbers.decimal(number));
         } else {
             state.numeric = false;
         }
@@ -125,25 +126,5 @@ public final class Measure implements Cmdlet<Measure.Params, Object, Row>, Colum
         }
         BigInteger exact = state.sum.toBigIntegerExact();
         return exact.bitLength() < Long.SIZE ? (Number) exact.longValue() : exact;
-    }
-
-    /** {@code NaN} and infinities have no exact sum: the sum and the average are then left empty. */
-    private static boolean isFinite(Number n) {
-        return !(n instanceof Double || n instanceof Float) || Double.isFinite(n.doubleValue());
-    }
-
-    private static boolean isIntegral(Number n) {
-        return n instanceof Long || n instanceof Integer || n instanceof Short || n instanceof Byte
-                || n instanceof BigInteger;
-    }
-
-    private static BigDecimal decimal(Number n) {
-        return switch (n) {
-            case BigDecimal d -> d;
-            case BigInteger i -> new BigDecimal(i);
-            case Double d -> new BigDecimal(d.toString());
-            case Float f -> new BigDecimal(f.toString());
-            default -> BigDecimal.valueOf(n.longValue());
-        };
     }
 }

@@ -171,4 +171,15 @@ class SortTest {
     void emptyInputEmitsNothing() throws Exception {
         assertThat(sort(params(false, false, "size"))).isEmpty();
     }
+
+    @Test
+    void anAdderIsComparedByItsValueAndTwoBigIntegersByTheirValue() {
+        var adder = new java.util.concurrent.atomic.DoubleAdder();
+        adder.add(1.5);
+
+        assertThat(SortComparator.compareNumbers(adder, 1)).isPositive();
+        assertThat(SortComparator.compareNumbers(adder, 2)).isNegative();
+        assertThat(SortComparator.compareNumbers(new java.math.BigInteger("100000000000000000001"),
+                new java.math.BigInteger("100000000000000000002"))).isNegative(); // longValue() would say they are equal
+    }
 }

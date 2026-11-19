@@ -1,6 +1,8 @@
 package io.powerj.cmdlets;
 
 import java.io.File;
+import java.util.Arrays;
+import java.util.regex.Pattern;
 import java.util.Map;
 
 import io.powerj.fs.Host;
@@ -57,7 +59,15 @@ public final class Env implements Cmdlet<Env.Params, Void, EnvVar>, Previewable<
                 context.error(Messages.get("env.variable.missing", p.unset()));
             }
         } else if (p.append() != null || p.prepend() != null) {
+            String option = p.append() != null ? "--append" : "--prepend";
             String name = p.append() != null ? p.append() : p.prepend();
+            if (!isVariableName(name)) {
+                // "env PATH --append /x" binds /x to the option: it would create a variable called /x
+                throw new UsageException(Messages.get("env.name.invalid", option, name));
+            }
+            if (p.name() != null && p.value() != null) {
+                throw new UsageException(Messages.get("env.value.twice", option, p.name(), p.value()));
+            }
             // "env --append PATH C:\tools": PATH is read as the value of --append, C:\tools at position 0.
             String addition = p.value() != null ? p.value() : p.name();
             if (addition == null) {
@@ -65,6 +75,9 @@ public final class Env implements Cmdlet<Env.Params, Void, EnvVar>, Previewable<
             }
             String current = env.get(name);
             String separator = File.pathSeparator;
+            if (current != null && Arrays.asList(current.split(Pattern.quote(separator), -1)).contains(addition)) {
+                return; // already in the list: a second PATH entry would only slow every lookup down
+            }
             String updated = current == null || current.isEmpty() ? addition
                     : p.append() != null ? current + separator + addition : addition + separator + current;
             context.setEnvironment(name, updated);
@@ -78,6 +91,11 @@ public final class Env implements Cmdlet<Env.Params, Void, EnvVar>, Previewable<
         } else {
             env.forEach((name, value) -> context.emit(new EnvVar(name, value)));
         }
+    }
+
+    /** Could this be the name of a variable? A path or an assignment is not ({@code /x}, {@code C:\\tools}, {@code A=b}). */
+    private static boolean isVariableName(String name) {
+        return !name.isBlank() && name.indexOf('/') < 0 && name.indexOf('\\') < 0 && name.indexOf('=') < 0;
     }
 
     /** Name as stored ({@code Path} on Windows when {@code PATH} is requested). */

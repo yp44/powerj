@@ -132,13 +132,25 @@ public final class Join implements Cmdlet<Join.Params, Object, Row> {
         List<Object> matches = key == null ? List.of() : state.index().getOrDefault(Keys.normalized(key), List.of());
         if (matches.isEmpty()) {
             if (p.outer()) {
-                context.emit(row(state, left, null));
+                emit(state, left, null, context);
             }
             return;
         }
         for (Object right : matches) {
-            context.emit(row(state, left, right));
+            emit(state, left, right, context);
         }
+    }
+
+    /** Emits the row of a pair; an object with a property that cannot be read is skipped, as by {@code to-json}. */
+    private static void emit(State state, Object left, Object right, CmdletContext<Row> context) {
+        Row row;
+        try {
+            row = row(state, left, right);
+        } catch (Properties.Unreadable e) {
+            context.error(Messages.get("pipeline.object.skipped", e.getMessage(), Texts.abbreviate(left)));
+            return;
+        }
+        context.emit(row);
     }
 
     /** Row of the columns of {@code left}, then of {@code right} ({@code null}: empty right columns). */

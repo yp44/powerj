@@ -1,7 +1,9 @@
 package io.powerj.cmdlets;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletContext;
@@ -30,6 +32,8 @@ public final class ToCsv implements Cmdlet<ToCsv.Params, Object, String> {
         final CsvWriter writer;
         final Properties properties;
         List<String> columns;
+        /** Columns of later objects that the header does not have, already reported. */
+        final Set<String> reported = new HashSet<>();
 
         State(CsvWriter writer, Properties properties) {
             this.writer = writer;
@@ -63,6 +67,9 @@ public final class ToCsv implements Cmdlet<ToCsv.Params, Object, String> {
             context.error(Messages.get("pipeline.object.skipped", e.getMessage(), Texts.abbreviate(input)));
             return;
         }
+        if (!first) {
+            reportMissingColumns(state, Properties.columns(input), context);
+        }
         if (first) {
             state.columns = columns;
             if (!p.noHeader()) {
@@ -70,5 +77,21 @@ public final class ToCsv implements Cmdlet<ToCsv.Params, Object, String> {
             }
         }
         context.emit(state.writer.line(values));
+    }
+
+    /**
+     * The columns come from the first object: a later one that has others loses them. Each one is named, once, when it first
+     * appears (from-csv warns in the symmetric case, {@code csv.extra.fields}); a column that is missing is an empty field.
+     */
+    private static void reportMissingColumns(State state, List<String> own, CmdletContext<String> context) {
+        List<String> absent = new ArrayList<>();
+        for (String column : own) {
+            if (!state.columns.contains(column) && state.reported.add(column)) {
+                absent.add(column);
+            }
+        }
+        if (!absent.isEmpty()) {
+            context.error(Messages.get("to-csv.columns.dropped", String.join(", ", absent)));
+        }
     }
 }
