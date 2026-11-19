@@ -105,7 +105,7 @@ class InterpreterTest {
         assertThat(session.lastSucceeded()).isFalse();
         // not "cd": macOS has a /usr/bin/cd (a script that runs the builtin of sh, for POSIX completeness)
         run("^no-such-program-for-powerj");
-        assertThat(errors).containsExactly("native command not found: no-such-program-for-powerj");
+        assertThat(errors).containsExactly("program not found: no-such-program-for-powerj");
     }
 
     @Test

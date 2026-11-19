@@ -34,13 +34,13 @@ class PropertiesAndOptionsTest {
     @Test
     void propertyErrors() {
         assertThatThrownBy(() -> PropertyAccess.property(null, "name"))
-                .isInstanceOf(PjException.class).hasMessage("property 'name' on a null value");
+                .isInstanceOf(PjException.class).hasMessage("property \"name\" on a null value");
         assertThatThrownBy(() -> PropertyAccess.property(Set.of(1), "nope"))
-                .hasMessageStartingWith("Set has no property 'nope'");
+                .hasMessageStartingWith("Set has no property \"nope\"");
         assertThatThrownBy(() -> PropertyAccess.property(new ArrayDeque<>(List.of(1)), "nope"))
-                .hasMessageStartingWith("Collection has no property 'nope'");
+                .hasMessageStartingWith("Collection has no property \"nope\"");
         assertThatThrownBy(() -> PropertyAccess.property(new InvokerFixture(), "broken"))
-                .hasMessage("reading property 'broken': java.lang.IllegalStateException: broken");
+                .hasMessage("reading property \"broken\": java.lang.IllegalStateException: broken");
     }
 
     @Test
@@ -106,10 +106,10 @@ class PropertiesAndOptionsTest {
 
     @Test
     void invalidOptionValues() {
-        assertThatThrownBy(() -> typed("--flag=maybe")).hasMessage("t: --flag expects true or false, not 'maybe'");
+        assertThatThrownBy(() -> typed("--flag=maybe")).hasMessage("t: --flag expects true or false, not \"maybe\"");
         assertThatThrownBy(() -> typed("--timeout", "x"))
-                .hasMessage("t: duration expected for --timeout (e.g. 30s, 5m, 2h, 7d), not 'x'");
-        assertThatThrownBy(() -> typed("--ratio", "x")).hasMessage("t: invalid value for --ratio: 'x'");
+                .hasMessage("t: duration expected for --timeout (e.g. 30s, 5m, 2h, 7d), not \"x\"");
+        assertThatThrownBy(() -> typed("--ratio", "x")).hasMessage("t: invalid value for --ratio: \"x\"");
         assertThatThrownBy(() -> typed("--id", "x")).hasMessage("t: unsupported option type: UUID");
         assertThatThrownBy(() -> typed("-l")).hasMessage("t: value expected after -l");
     }

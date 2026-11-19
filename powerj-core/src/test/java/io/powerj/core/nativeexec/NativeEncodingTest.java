@@ -45,7 +45,7 @@ class NativeEncodingTest {
     @Test
     void invalidCharsetIsReported() {
         assertThatThrownBy(() -> frenchConsole.forProgram(GIT, Map.of("POWERJ_NATIVE_ENCODING_GIT", "klingon")))
-                .hasMessage("unknown encoding 'klingon' (variable POWERJ_NATIVE_ENCODING_GIT)");
+                .hasMessage("unknown encoding \"klingon\" (variable POWERJ_NATIVE_ENCODING_GIT)");
     }
 
     @Test

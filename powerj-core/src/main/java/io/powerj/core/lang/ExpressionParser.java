@@ -99,11 +99,15 @@ public final class ExpressionParser {
         if (parser.atEnd()) {
             throw new SyntaxException(Messages.get("syntax.emptyBlock"));
         }
-        Expression expression = parser.expression();
-        if (!parser.atEnd()) {
-            throw parser.unexpected(parser.peek());
+        try {
+            Expression expression = parser.expression();
+            if (!parser.atEnd()) {
+                throw parser.unexpected(parser.peek());
+            }
+            return expression;
+        } catch (SyntaxException e) {
+            throw e.withoutOffset(); // the positions are those of the block, not of the line
         }
-        return expression;
     }
 
     /** Parsed block {@code { source }}: lambda ({@code f -> …}) or {@code $_} block. */
@@ -437,7 +441,7 @@ public final class ExpressionParser {
         int open = paren.at();
         int close = Scanning.matching(input, open);
         if (close < 0) {
-            throw new SyntaxException(Messages.get("syntax.missingCloseParen", open + 1));
+            throw new SyntaxException(Messages.get("syntax.missingCloseParen", column(open)), open);
         }
         int contentStart = Scanning.skipBlanks(input, open + 1);
         if (contentStart == close) {
@@ -497,7 +501,7 @@ public final class ExpressionParser {
     private Expression block(Tok brace) {
         int close = Scanning.matching(input, brace.at());
         if (close < 0) {
-            throw new SyntaxException(Messages.get("syntax.unclosedBlock", brace.at() + 1));
+            throw new SyntaxException(Messages.get("syntax.unclosedBlock", column(brace.at())), brace.at());
         }
         String source = input.substring(brace.at() + 1, close);
         reset(close + 1);
@@ -542,10 +546,10 @@ public final class ExpressionParser {
 
     private SyntaxException unexpected(Tok token) {
         if (isSymbol(token, "=")) {
-            return new SyntaxException(Messages.get("syntax.equalsInExpression", token.at() + 1));
+            return new SyntaxException(Messages.get("syntax.equalsInExpression", column(token.at())), token.at());
         }
         String text = input.substring(token.at(), token.end());
-        return new SyntaxException(Messages.get("syntax.unexpectedAt", text, token.at() + 1));
+        return new SyntaxException(Messages.get("syntax.unexpectedAt", text, column(token.at())), token.at());
     }
 
     /**
@@ -642,7 +646,7 @@ public final class ExpressionParser {
             end++;
         }
         if (end == start) {
-            throw new SyntaxException(Messages.get("syntax.variableNameExpected", dollar + 1));
+            throw new SyntaxException(Messages.get("syntax.variableNameExpected", column(dollar)), dollar);
         }
         return new Variable(input.substring(start, end), dollar, end);
     }
@@ -692,15 +696,15 @@ public final class ExpressionParser {
     private Lexer.Scanned<Character> character(int open) {
         int at = open + 1;
         if (at >= input.length()) {
-            throw new SyntaxException(Messages.get("syntax.unclosedCharacter", open + 1));
+            throw new SyntaxException(Messages.get("syntax.unclosedCharacter", column(open)), open);
         }
         char value = input.charAt(at++);
         if (Character.isHighSurrogate(value) && at < input.length() && Character.isLowSurrogate(input.charAt(at))) {
-            throw new SyntaxException(Messages.get("syntax.characterOutsideBmp", open + 1)); // a char holds half of it
+            throw new SyntaxException(Messages.get("syntax.characterOutsideBmp", column(open)), open); // a char holds half of it
         }
         if (value == '\\') {
             if (at >= input.length()) {
-                throw new SyntaxException(Messages.get("syntax.unclosedCharacter", open + 1));
+                throw new SyntaxException(Messages.get("syntax.unclosedCharacter", column(open)), open);
             }
             char e = input.charAt(at++);
             value = switch (e) {
@@ -727,11 +731,16 @@ public final class ExpressionParser {
                 default -> throw new SyntaxException(Messages.get("syntax.unknownEscape", e));
             };
         } else if (value == '\'') {
-            throw new SyntaxException(Messages.get("syntax.emptyCharacter", open + 1));
+            throw new SyntaxException(Messages.get("syntax.emptyCharacter", column(open)), open);
         }
         if (at >= input.length() || input.charAt(at) != '\'') {
-            throw new SyntaxException(Messages.get("syntax.characterQuotes", open + 1));
+            throw new SyntaxException(Messages.get("syntax.characterQuotes", column(open)), open);
         }
         return new Lexer.Scanned<>(value, at + 1);
+    }
+
+    /** The position that a message gives: the column in characters, not in UTF-16 units (an emoji is one). */
+    private int column(int index) {
+        return input.codePointCount(0, Math.min(index, input.length())) + 1;
     }
 }

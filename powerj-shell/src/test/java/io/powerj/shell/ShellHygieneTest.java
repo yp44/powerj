@@ -97,6 +97,6 @@ class ShellHygieneTest {
         assertThat(Previewer.failed(new StackOverflowError()))
                 .isEqualTo(new PreviewResult.Failed("recursion too deep"));
         assertThat(Previewer.failed(new IllegalStateException("boom")))
-                .isEqualTo(new PreviewResult.Failed("internal error: java.lang.IllegalStateException: boom (details in the log)"));
+                .isEqualTo(new PreviewResult.Failed("internal error: java.lang.IllegalStateException: boom (details in the log: ~/.powerj/logs by default)"));
     }
 }

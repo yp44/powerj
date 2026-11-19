@@ -162,6 +162,13 @@ the sources. Tests force
 English so that they do not depend on the machine. French strings used as *test data* (the expected translation of a
 message) are fine.
 
+**The style of the messages** (the bundles of `core.i18n`, `core.lang`, and the new ones; audit v2, C-04): quote what the user
+typed with double quotes (`"{0}"`), not with `'…'` or bare; say **program** for a native command and **built-in command** for
+one of the shell; give a position as `(position N)`, counted in characters, at the end of the sentence; say what to do next
+when there is something to do (`… use new java.math.BigInteger("…")`); one wording for one failure (`cannot convert {0} to {1}`).
+The few short tags that are not sentences (`[internal]` in the completion menu) are the exception. Both languages follow the same
+rule.
+
 Two documents are deliberately French: [docs/REVUE-ARCHITECTURE.md](docs/REVUE-ARCHITECTURE.md), the architecture review
 and its refactoring plan, and [docs/AUDIT-v2-2026-11-14.md](docs/AUDIT-v2-2026-11-14.md), the audit that followed it; both
 are kept in the language in which they were commissioned. The issues they gave rise to are in English, like the rest.

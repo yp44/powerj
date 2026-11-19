@@ -77,8 +77,8 @@ class OptionBinderTest {
     @Test
     void theValueOfAnEnumeratedOptionIsSpelledInLowerCase() {
         assertThat(bind("--mode", "fast").mode()).isEqualTo(Mode.FAST);
-        assertThatThrownBy(() -> bind("--mode", "FAST")).hasMessageContaining("--mode accepts [fast, safe], not 'FAST'");
-        assertThatThrownBy(() -> bind("--mode", "Safe")).hasMessageContaining("not 'Safe'");
+        assertThatThrownBy(() -> bind("--mode", "FAST")).hasMessageContaining("--mode accepts [fast, safe], not \"FAST\"");
+        assertThatThrownBy(() -> bind("--mode", "Safe")).hasMessageContaining("not \"Safe\"");
     }
 
     @Test
@@ -88,7 +88,7 @@ class OptionBinderTest {
         for (String other : List.of("yes", "no", "oui", "non", "1", "0", "TRUE", "True", "FALSE", "No", "")) {
             assertThatThrownBy(() -> bind("--recurse=" + other))
                     .as("--recurse=%s", other)
-                    .hasMessage("t: --recurse expects true or false, not '" + other + "'");
+                    .hasMessage("t: --recurse expects true or false, not \"" + other + "\"");
         }
     }
 
@@ -149,7 +149,7 @@ class OptionBinderTest {
         assertThatThrownBy(() -> bind("-z")).hasMessage("t: unknown option -z");
         assertThatThrownBy(() -> bind("--filter")).hasMessage("t: value expected after --filter");
         assertThatThrownBy(() -> bind("--max-depth", "trois"))
-                .hasMessage("t: invalid value for --max-depth: 'trois'");
+                .hasMessage("t: invalid value for --max-depth: \"trois\"");
         assertThatThrownBy(() -> bind("--mode", "slow")).hasMessageContaining("--mode accepts [fast, safe]");
     }
 

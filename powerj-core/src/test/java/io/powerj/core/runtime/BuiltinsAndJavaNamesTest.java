@@ -77,7 +77,7 @@ class BuiltinsAndJavaNamesTest {
         assertThatThrownBy(() -> Builtins.cd(List.of("a", "b"), session)).hasMessage("cd: only one argument expected");
         assertThatThrownBy(() -> Builtins.cd(List.of("a\0b"), session)).hasMessage("cd: invalid path: a\0b");
         assertThatThrownBy(() -> Builtins.pwd(List.of("x"), session)).hasMessage("pwd: no arguments expected");
-        assertThatThrownBy(() -> Builtins.exit(List.of("x"), session)).hasMessage("exit: invalid exit code 'x'");
+        assertThatThrownBy(() -> Builtins.exit(List.of("x"), session)).hasMessage("exit: invalid exit code \"x\"");
         assertThatThrownBy(() -> Builtins.exit(List.of(1, 2), session)).hasMessage("exit: only one argument expected");
         Builtins.exit(List.of(), session);
         assertThat(session.exitRequest()).hasValue(0);

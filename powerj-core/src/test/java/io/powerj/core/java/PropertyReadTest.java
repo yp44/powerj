@@ -61,10 +61,10 @@ class PropertyReadTest {
     @Test
     void aNameInAnotherCaseIsSuggested() {
         assertThatThrownBy(() -> PropertyAccess.property(new Process(42, "sleep"), "PID"))
-                .hasMessageContaining("'pid'");
+                .hasMessageContaining("\"pid\"");
         assertThatThrownBy(() -> PropertyAccess.property(new Process(42, "sleep"), "name"))
-                .hasMessageContaining("'Name'");
-        assertThatThrownBy(() -> PropertyAccess.property(new Bean(), "LABEL")).hasMessageContaining("'label'");
+                .hasMessageContaining("\"Name\"");
+        assertThatThrownBy(() -> PropertyAccess.property(new Bean(), "LABEL")).hasMessageContaining("\"label\"");
     }
 
     @Test
@@ -97,10 +97,10 @@ class PropertyReadTest {
         assertThat(PropertyAccess.property(bean, "URL")).as("two capitals at the start: kept, as for a JavaBean")
                 .isEqualTo("http://x");
         assertThatThrownBy(() -> PropertyAccess.property(bean, "Name")).as("getName() is name, not Name")
-                .isInstanceOf(PjException.class).hasMessageContaining("'name'");
+                .isInstanceOf(PjException.class).hasMessageContaining("\"name\"");
         assertThatThrownBy(() -> PropertyAccess.property(bean, "nAME")).isInstanceOf(PjException.class);
         assertThatThrownBy(() -> PropertyAccess.property(bean, "uRL")).isInstanceOf(PjException.class)
-                .hasMessageContaining("'URL'");
+                .hasMessageContaining("\"URL\"");
         assertThatThrownBy(() -> PropertyAccess.property(bean, "url")).isInstanceOf(PjException.class);
     }
 

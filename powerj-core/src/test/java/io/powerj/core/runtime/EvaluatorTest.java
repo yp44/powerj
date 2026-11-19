@@ -97,7 +97,7 @@ class EvaluatorTest {
         assertThat(value("[long] 'a'")).isEqualTo(97L);
         assertThat(value("[Path] \"x\"")).isEqualTo(Path.of("x"));
         assertThat(value("[CharSequence] \"x\"")).isEqualTo("x");
-        assertThat(error("$r = [Integer] \"x\"")).isEqualTo("cannot convert: String \"x\" is not a Integer");
+        assertThat(error("$r = [Integer] \"x\"")).isEqualTo("cannot convert String \"x\" to Integer");
     }
 
     @Test

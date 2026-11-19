@@ -16,11 +16,16 @@ public final class Parser {
 
     private final List<Token> tokens;
     private final ParseContext context;
+    /** Where each token starts in the line, or {@code null} when the text is a part of the line (a group). */
+    private final int[] starts;
+    private final int length;
     private int pos;
 
-    private Parser(List<Token> tokens, ParseContext context) {
+    private Parser(List<Token> tokens, ParseContext context, int[] starts, int length) {
         this.tokens = tokens;
         this.context = context;
+        this.starts = starts;
+        this.length = length;
     }
 
     public static Ast.Script parse(String line) {
@@ -37,12 +42,13 @@ public final class Parser {
 
     /** The line, read with what the context knows (Java names, short-form commands). */
     public static Ast.Script parse(String line, ParseContext context) {
-        return new Parser(Lexer.tokenize(line, context), context).script();
+        Lexer.Tokens lexed = Lexer.tokenizeWithStarts(line, context);
+        return new Parser(lexed.tokens(), context, lexed.starts(), lexed.length()).script();
     }
 
     /** Pipeline alone (content of a group {@code ( … )}). */
     static Ast.Pipeline pipeline(String text, ParseContext context) {
-        var parser = new Parser(Lexer.tokenize(text, context), context);
+        var parser = new Parser(Lexer.tokenize(text, context), context, null, text.length());
         if (parser.atEnd()) {
             throw new SyntaxException(Messages.get("syntax.emptyParentheses"));
         }
@@ -62,10 +68,10 @@ public final class Parser {
                     pos++; // superfluous ";"
                     continue;
                 }
-                throw new SyntaxException(Messages.get("syntax.noCommandBefore", symbol(c)));
+                throw error(Messages.get("syntax.noCommandBefore", symbol(c)));
             }
             if (peek() instanceof Token.Background) {
-                throw new SyntaxException(Messages.get("syntax.noCommandBefore", "&"));
+                throw error(Messages.get("syntax.noCommandBefore", "&"));
             }
             steps.add(new Step(connector, statement()));
             if (atEnd()) {
@@ -81,7 +87,7 @@ public final class Parser {
             }
             connector = c;
             if (atEnd() && c != Connector.ALWAYS) {
-                throw new SyntaxException(Messages.get("syntax.commandExpectedAfter", symbol(c)));
+                throw error(Messages.get("syntax.commandExpectedAfter", symbol(c)));
             }
         }
         return new Ast.Script(steps);
@@ -93,13 +99,13 @@ public final class Parser {
             pos++;
             assignTo = Optional.of(name);
             if (atEnd() || peek() instanceof Token.Separator || peek() instanceof Token.Background) {
-                throw new SyntaxException(Messages.get("syntax.valueExpectedAfterAssignment", name));
+                throw error(Messages.get("syntax.valueExpectedAfterAssignment", name));
             }
         }
         Ast.Pipeline pipeline = pipeline();
         boolean background = !atEnd() && peek() instanceof Token.Background;
         if (background && assignTo.isPresent()) {
-            throw new SyntaxException(Messages.get("syntax.backgroundAssignment", assignTo.get()));
+            throw error(Messages.get("syntax.backgroundAssignment", assignTo.get()));
         }
         if (!atEnd() && !(peek() instanceof Token.Separator) && !background) {
             throw unexpected(peek());
@@ -114,16 +120,16 @@ public final class Parser {
         while (true) {
             if (atEnd() || peek() instanceof Token.Separator || peek() instanceof Token.Pipe
                     || peek() instanceof Token.Background) {
-                throw new SyntaxException(stages.isEmpty() ? Messages.get("syntax.commandExpected")
+                throw error(stages.isEmpty() ? Messages.get("syntax.commandExpected")
                         : Messages.get("syntax.commandExpectedAfter", "|"));
             }
             Body body = body();
             if (!stages.isEmpty() && body instanceof Ast.ExpressionBody(var expression)) {
                 if (expression instanceof Ast.BlockExpression || expression instanceof Ast.Lambda
                         || expression instanceof Ast.MethodRef) {
-                    throw new SyntaxException(Messages.get("syntax.blockAsStage"));
+                    throw error(Messages.get("syntax.blockAsStage"));
                 }
-                throw new SyntaxException(Messages.get("syntax.valueNotFirstStage"));
+                throw error(Messages.get("syntax.valueNotFirstStage"));
             }
             boolean errorsToOutput = false;
             while (!atEnd() && peek() instanceof Token.Redirection(var stream, var append)) {
@@ -133,10 +139,10 @@ public final class Parser {
                     continue;
                 }
                 if (atEnd() || !isArgument(peek())) {
-                    throw new SyntaxException(Messages.get("syntax.redirectionFileExpected"));
+                    throw error(Messages.get("syntax.redirectionFileExpected"));
                 }
                 if (stream == RedirectedStream.OUT && peekAt(1) instanceof Token.Pipe) {
-                    throw new SyntaxException(Messages.get("syntax.redirectionNotLast"));
+                    throw error(Messages.get("syntax.redirectionNotLast"));
                 }
                 redirects.add(new Redirect(stream, append, argument(next())));
             }
@@ -156,7 +162,7 @@ public final class Parser {
                 boolean forceNative = text.startsWith("^");
                 String name = forceNative ? text.substring(1) : text;
                 if (name.isEmpty()) {
-                    throw new SyntaxException(Messages.get("syntax.commandNameExpected"));
+                    throw error(Messages.get("syntax.commandNameExpected"));
                 }
                 List<Argument> arguments = new ArrayList<>();
                 while (!atEnd()) {
@@ -209,7 +215,7 @@ public final class Parser {
     }
 
     private SyntaxException unexpected(Token token) {
-        return new SyntaxException(token instanceof Token.Expr ? Messages.get("syntax.unexpectedExpression")
+        return error(token instanceof Token.Expr ? Messages.get("syntax.unexpectedExpression")
                 : Messages.get("syntax.unexpected", describe(token)));
     }
 
@@ -240,6 +246,15 @@ public final class Parser {
 
     private Token peek() {
         return tokens.get(pos);
+    }
+
+    /** Where the current token starts in the line (the end of the line after the last one), or -1 in a group. */
+    private int here() {
+        return starts == null ? -1 : atEnd() ? length : starts[pos];
+    }
+
+    private SyntaxException error(String message) {
+        return new SyntaxException(message, here());
     }
 
     private Token peekAt(int offset) {
