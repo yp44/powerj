@@ -2,8 +2,6 @@ package io.powerj.cmdlets;
 
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
 import java.nio.file.AccessDeniedException;
@@ -67,12 +65,6 @@ public final class Cat implements Cmdlet<Cat.Params, Object, Object> {
             String encoding,
             @Option(description = "Property of the pipeline objects that gives the file (String, Path or File)")
             String property) {
-    }
-
-    /** Opens a file to read it; {@code Files::newInputStream}, or a test's own stream. */
-    @FunctionalInterface
-    interface Opener {
-        InputStream open(Path path) throws IOException;
     }
 
     /** The longest line read as a String ({@link BoundedLines#MAX_LINE}); a longer one is reported and skipped. */
@@ -179,8 +171,7 @@ public final class Cat implements Cmdlet<Cat.Params, Object, Object> {
                 context.error(Messages.get("files.not.regular", absolute));
                 return;
             }
-            try (var reader = new BufferedReader(new InputStreamReader(opener.open(absolute),
-                    charset.newDecoder()))) {
+            try (var reader = new BufferedReader(new DecodingReader(opener.open(absolute), charset))) {
                 if (mode == Mode.TEXT || mode == Mode.CONTENT) {
                     // gathered aside: a file that cannot be decoded adds nothing
                     var text = new StringBuilder();

@@ -1,10 +1,8 @@
 package io.powerj.cmdlets;
 
-import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.SequenceInputStream;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
@@ -16,7 +14,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CancellationException;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -86,9 +84,22 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
 
     /** Bytes read to recognize a binary file (one containing a NUL byte), skipped. */
     private static final int BINARY_PROBE = 8192;
+    /** Matches of one file handed over together by a parallel walk: the lines of a file stay together up to this many. */
+    private static final int PARALLEL_CHUNK = 1000;
 
-    private static Search search(Params params, CmdletContext<Object> context) {
-        return context.state(Search.class, () -> new Search(params, context));
+    private final Opener opener;
+
+    public Grep() {
+        this(Files::newInputStream);
+    }
+
+    /** A {@code grep} with its own way to open a file (the tests count what is read). */
+    Grep(Opener opener) {
+        this.opener = opener;
+    }
+
+    private Search search(Params params, CmdletContext<Object> context) {
+        return context.state(Search.class, () -> new Search(params, context, opener));
     }
 
     @Override
@@ -130,8 +141,12 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
         /** --single-match: stop reading a file at its first match. */
         private final boolean singleMatch;
         private final FileWalker walker;
+        private final Opener opener;
+        /** Matches handed over together: one by one when the walk is sequential, so nothing waits for the end of the file. */
+        private final int chunk;
 
-        Search(Params params, CmdletContext<?> context) {
+        Search(Params params, CmdletContext<?> context, Opener opener) {
+            this.opener = opener;
             int parallelism = FileOps.parallelism(params.parallel());
             if (params.maxDepth() != null && params.maxDepth() < 1) {
                 throw new UsageException(Messages.get("grep.maxDepth.invalid", params.maxDepth()));
@@ -151,11 +166,16 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
             singleMatch = params.singleMatch();
             int maxDepth = params.maxDepth() != null ? params.maxDepth()
                     : params.recurse() ? Integer.MAX_VALUE : 1;
+            chunk = parallelism == 1 ? 1 : PARALLEL_CHUNK;
             walker = FileWalker.builder().maxDepth(maxDepth).includeHidden(params.all()).order(FileArguments.BY_NAME)
                     .parallelism(parallelism).build();
         }
 
-        /** Searches the files below the roots; the lines of a file are emitted together, in order. */
+        /**
+         * Searches the files below the roots. A sequential walk emits each match as the line is read, so that nothing
+         * is kept and a consumer that stops ({@code | first 1}) stops the reading; a parallel one hands over the matches of
+         * a file by chunks of {@link #PARALLEL_CHUNK}, in order.
+         */
         void files(List<Path> roots, CmdletContext<Object> context) {
             List<Path> readable = new ArrayList<>();
             for (Path root : roots) {
@@ -166,7 +186,7 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
                     readable.add(root);
                 }
             }
-            walker.walk(readable, this::search, matches -> matches.forEach(context::emit),
+            walker.walkStreaming(readable, this::search, matches -> matches.forEach(context::emit),
                     error -> FileArguments.report(error, context));
         }
 
@@ -187,49 +207,69 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
             }
         }
 
-        /** Matching lines of a file; called in a virtual thread when the walk is parallel. */
-        private List<GrepMatch> search(Path file, BasicFileAttributes attributes) throws IOException {
+        /**
+         * Gives the matching lines of a file to {@code sink}, a few at a time (see {@link #chunk}); called in a virtual
+         * thread when the walk is parallel. What was found before a failure (bytes the charset cannot decode, a line that
+         * is too long) is given before the failure is reported.
+         */
+        private void search(Path file, BasicFileAttributes attributes, Consumer<List<GrepMatch>> sink)
+                throws IOException {
             if (!attributes.isRegularFile()) {
-                return null;
+                return;
             }
             Path absolute = file.toAbsolutePath();
-            List<GrepMatch> matches = new ArrayList<>();
-            try (InputStream in = Files.newInputStream(file)) {
+            List<GrepMatch> pending = new ArrayList<>();
+            int number = 0;
+            try (InputStream in = opener.open(file)) {
                 byte[] head = in.readNBytes(BINARY_PROBE);
                 if (detectBinary && binary(head)) {
-                    return null;
+                    return;
                 }
-                var reader = new BufferedReader(new InputStreamReader(
-                        new SequenceInputStream(new ByteArrayInputStream(head), in), charset.newDecoder()));
-                String text;
-                int number = 0;
-                while ((text = reader.readLine()) != null) {
-                    number++;
-                    if ((number & 0xFFF) == 0 && Thread.currentThread().isInterrupted()) {
-                        throw new CancellationException();
+                var lines = new BoundedLines(new DecodingReader(
+                        new SequenceInputStream(new ByteArrayInputStream(head), in), charset), BoundedLines.MAX_LINE);
+                while (true) {
+                    String text = lines.next();
+                    if (text == null) {
+                        break;
                     }
+                    number++;
                     if (singleMatch && invert) {
                         if (pattern.matcher(GuardedText.interruptible(text)).find()) {
-                            return null; // the file matches: excluded, not read further
+                            return; // the file matches: excluded, not read further
                         }
                         continue;
                     }
                     GrepMatch match = match(absolute, number, text);
                     if (match != null) {
+                        pending.add(match);
                         if (singleMatch) {
-                            return List.of(match); // first match: the rest of the file is not read
+                            break; // first match: the rest of the file is not read
                         }
-                        matches.add(match);
+                        if (pending.size() >= chunk) {
+                            sink.accept(List.copyOf(pending));
+                            pending.clear();
+                        }
                     }
                 }
                 if (singleMatch && invert) {
-                    return List.of(new GrepMatch(absolute, 0, "", List.of(), List.of(), Map.of()));
+                    pending.add(new GrepMatch(absolute, 0, "", List.of(), List.of(), Map.of()));
                 }
             } catch (CharacterCodingException _) {
-                // no fallback: the user chooses the charset with --encoding
-                throw new IOException(Messages.get("grep.decode.failed", charset.name()));
+                // no fallback: the user chooses the charset with --encoding. The matches of the lines before it are kept.
+                flush(pending, sink);
+                throw new IOException(Messages.get("grep.decode.failed", charset.name(), number + 1));
+            } catch (BoundedLines.TooLong _) {
+                flush(pending, sink);
+                throw new IOException(Messages.get("grep.line.too.long", number + 1, BoundedLines.MAX_LINE));
             }
-            return matches.isEmpty() ? null : matches;
+            flush(pending, sink);
+        }
+
+        private static void flush(List<GrepMatch> pending, Consumer<List<GrepMatch>> sink) {
+            if (!pending.isEmpty()) {
+                sink.accept(List.copyOf(pending));
+                pending.clear();
+            }
         }
 
         private static boolean binary(byte[] head) {

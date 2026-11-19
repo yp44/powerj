@@ -502,12 +502,12 @@ grep <pattern> [path...] [-r|--recurse] [-p|--parallel <n>] [--max-depth <n>] [-
 | `pattern` (positional, mandatory) | `String` | Regular expression, **`java.util.regex.Pattern`** syntax (`\w`, `(?<name>…)`, `(?i)`…). Unquoted, the argument is taken as is (`grep class\s+\w+`, FR-32b); in quotes, backslashes are doubled as in Java source (`grep "class (\\w+)"`). |
 | `path` (positional, multiple) | `String` | File(s) or folder(s) to search; wildcards on the last element (`*.log`, `src/*.java`). Default: the current directory, unless `grep` receives objects from the pipeline. A folder without `-r` is searched one level deep (its files). |
 | `-r`, `--recurse` | boolean | Walks subfolders. Symbolic links to folders are not followed. |
-| `-p`, `--parallel` | `int` ≥ 1 | Walks the tree and reads up to `n` files at the same time, in **virtual threads**. The order of the files is then free; the lines of a file stay grouped and in order. `1` (default): sequential, files in alphabetical order. |
+| `-p`, `--parallel` | `int` ≥ 1 | Walks the tree and reads up to `n` files at the same time, in **virtual threads**. The order of the files is then free; the lines of a file stay in order, and stay grouped up to 1 000 matches (a file with more is handed over in chunks of 1 000). `1` (default): sequential, files in alphabetical order. |
 | `--max-depth` | `int` ≥ 1 | Maximum depth (`1`: only the files of the folder); implies `-r`. |
 | `-i`, `--ignore-case` | boolean | Ignores case (Unicode). |
 | `-v`, `--invert` | boolean | Keeps the lines (or the objects) that do **not** match. |
 | `-a`, `--all` | boolean | Includes hidden files and folders. |
-| `--encoding` | charset | Charset of the files; default **UTF-8**, without fallback: a file that is not valid in this charset produces the non-blocking error `cannot read <file>: not readable as UTF-8 text (choose the charset with --encoding)`. |
+| `--encoding` | charset | Charset of the files; default **UTF-8**, without fallback: a file that is not valid in this charset produces the non-blocking error `cannot read <file>: not readable as UTF-8 text from line <n> (choose the charset with --encoding)`, after the matches of the lines before the bad bytes, which are kept. |
 | `--property` | name | Searches this property of the pipeline objects (`ls \| grep --property name ^a`). |
 | `--binary` | boolean | Also searches binary files: disables the NUL-byte check below. Combine with `--encoding ISO-8859-1` to read any bytes without a decoding error. |
 | `-s`, `--single-match` | boolean | Only the **first** matching line of each file searched (`GrepMatch`), and the file is not read further: finds quickly the files that match at least once (`grep TODO -r -s \| map { m -> m.path }`). With `-v`: the files that **never** match, one `GrepMatch` each with `line` 0, empty `text` and empty `matches` (reading stops at the first match, which excludes the file). No effect on the pipeline objects filtered like `where`. |
@@ -533,6 +533,8 @@ The table displays `path line text`; on a terminal that accepts colors, the matc
 - any other object is **filtered** like `where`: it is emitted unchanged if its text (`toString`, or the value of `--property`) matches (`git log --oneline | grep -i fix`).
 
 With objects in input and no `path`, the current directory is not searched. The `path` given are searched in any case. In non-interactive mode, a redirected standard input is such an input (FR-04d): `powerj -c "grep TODO . -r"` names the folder explicitly.
+
+**Emission.** A match is emitted **as the line is read** when the walk is sequential: nothing is kept, so `grep -v DEBUG app.log` on a multi-gigabyte log runs in constant memory, the first line appears at once, and `grep x big.log | first 1` stops reading the file at the first match (the consumer that has had enough stops the reading). A parallel walk (`-p`) hands over the matches of a file in chunks of 1 000. A line is read up to 64 Mi characters (`BoundedLines.MAX_LINE`); a longer one ends the search of that file with `cannot read <file>: line <n> is longer than … characters: the rest of the file is not searched`, after the matches before it.
 
 **Walk library.** The walk lives in the module **`powerj-fs`** (`io.powerj.fs.FileWalker`), reusable by any cmdlet (`ls -r` uses it; a third-party module can `requires io.powerj.fs`): depth, hidden files, order, parallelism in virtual threads with a bounded number of files open at once, cancellation by Ctrl+C, non-blocking errors. The visitor runs in the worker threads; results and errors are handed over to the cmdlet's thread, which alone calls `emit` / `error`.
 

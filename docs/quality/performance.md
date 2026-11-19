@@ -102,6 +102,19 @@ the toolkit thread for 100 000 rows, as before: a pause, not a freeze, and each 
 typing delay. Moving them to another thread would need a filtered list that is not bound to the toolkit thread.
 `GridScaleTest` keeps the budgets: under 250 bytes a row, and each step within seconds.
 
+## `grep` without keeping a file in memory (S-05, #160)
+
+`grep -v zzz big.log` on a file of 3.5 million lines (308 MB, every line kept), run with a heap of 128 MB, a `Grep` called
+directly with a context that counts what it receives:
+
+| | Before | After |
+|---|---|---|
+| result | `OutOfMemoryError` after emitting 0 lines (every kept line became a `GrepMatch` before anything was emitted) | 3 500 000 lines emitted in 0.87 s |
+| `grep x big.log \| first 1` | read the file to the end | stops at the first match (`GrepTest.aConsumerThatHasHadEnoughStopsTheReadingOfTheFile`: under 1 MB read of 40) |
+
+The memory no longer grows with the size of the file: a sequential walk hands over each match as the line is read, a parallel
+one by chunks of 1 000.
+
 ## The machine
 
 Linux container, 4 virtual CPUs of an Intel Xeon at 2.8 GHz (shared), OpenJDK 25, G1. Absolute numbers will differ on
