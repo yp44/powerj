@@ -23,7 +23,7 @@ public final class Move implements Cmdlet<Move.Params, Object, Object> {
             boolean force,
             @Option(shortName = 'v', description = "Emits each destination")
             boolean verbose,
-            @Option(shortName = 'n', description = "Changes nothing: shows what would be done")
+            @Option(shortName = 'n', description = "Changes nothing: shows each source that would be moved (a folder once, not its content)")
             boolean dryRun,
             @Option(description = "Also moves protected paths (list in the protected-paths file of the configuration folder)")
             boolean allowProtected,

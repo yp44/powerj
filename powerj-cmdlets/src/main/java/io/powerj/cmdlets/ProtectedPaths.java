@@ -36,9 +36,20 @@ public final class ProtectedPaths {
     /** The current folder as written and with its links resolved (being in a link to a folder is being in it). */
     private final List<Path> currentDirectories;
 
+    /** The lines of the file that were not read as a path of their own (relative ones), as written. */
+    private final List<String> ignoredLines;
+
+    /** Lines already reported in this session (the file is read at each command, so the same line would come back). */
+    private static final java.util.Set<String> REPORTED = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
     ProtectedPaths(List<Path> paths, Path currentDirectory) {
+        this(paths, currentDirectory, List.of());
+    }
+
+    ProtectedPaths(List<Path> paths, Path currentDirectory, List<String> ignoredLines) {
         this.paths = paths.stream().flatMap(path -> keys(path).stream()).distinct().toList();
         this.currentDirectories = keys(currentDirectory);
+        this.ignoredLines = List.copyOf(ignoredLines);
     }
 
     /**
@@ -98,20 +109,47 @@ public final class ProtectedPaths {
             entries = defaultEntries(configDirectory.orElse(home.resolve(".powerj")));
         }
         List<Path> paths = new ArrayList<>();
+        List<String> ignored = new ArrayList<>();
         for (String entry : entries) {
             String line = entry.strip();
             if (line.isEmpty() || line.startsWith("#")) {
                 continue;
             }
             try {
-                paths.add(line.equals("~") ? home
+                Path path = line.equals("~") ? home
                         : line.startsWith("~/") || line.startsWith("~\\") ? home.resolve(line.substring(2))
-                        : Path.of(line));
+                        : Path.of(line);
+                if (path.isAbsolute()) {
+                    paths.add(path);
+                } else {
+                    // Resolved against the folder PowerJ was started in it would protect a different folder in each
+                    // session, silently: it protects nothing, and the user is told (audit v2, R-18).
+                    ignored.add(line);
+                }
             } catch (InvalidPathException _) {
                 // a line that is not a path protects nothing
             }
         }
-        return new ProtectedPaths(paths, currentDirectory);
+        return new ProtectedPaths(paths, currentDirectory, ignored);
+    }
+
+    /** The relative lines of the file, which protect nothing. */
+    List<String> ignoredLines() {
+        return ignoredLines;
+    }
+
+    /** Reports each ignored line once per session, as a non-blocking error. */
+    void reportIgnored(io.powerj.api.CmdletContext<?> context) {
+        for (String line : ignoredLines) {
+            if (REPORTED.add(line)) {
+                context.error(Messages.get("fileops.protected.relative", FILE_NAME, line));
+            }
+        }
+    }
+
+    /** Forgets what was reported (the tests). */
+    static void forgetReported() {
+        REPORTED.clear();
     }
 
     /** Why {@code target} must not be removed: a message, or empty if it may be removed. */

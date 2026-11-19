@@ -25,7 +25,7 @@ public final class MakeDirectory implements Cmdlet<MakeDirectory.Params, Object,
             List<Object> paths,
             @Option(shortName = 'p', description = "Creates the missing parent folders; an existing folder is not an error")
             boolean parents,
-            @Option(shortName = 'n', description = "Changes nothing: shows what would be done")
+            @Option(shortName = 'n', description = "Changes nothing: makes the checks of the real run and shows each folder that would be created")
             boolean dryRun,
             @Option(description = "Property of the pipeline objects that gives the path (String, Path or File)")
             String property) {
@@ -56,6 +56,16 @@ public final class MakeDirectory implements Cmdlet<MakeDirectory.Params, Object,
 
     private static void make(Params p, Path path, CmdletContext<Object> context) {
         if (p.dryRun()) {
+            // the checks of the real run, so that "would succeed" is true (audit v2, U-09)
+            if (FileOps.exists(path)) {
+                if (!p.parents() || !FileOps.isDirectory(path)) {
+                    context.error(Messages.get(FileOps.isDirectory(path) ? "mkdir.exists" : "fileops.exists.file", path));
+                    return;
+                }
+            } else if (!p.parents() && path.getParent() != null && !FileOps.isFolderOrLinkToFolder(path.getParent())) {
+                context.error(Messages.get("fileops.parent.missing", path));
+                return;
+            }
             context.emit(new FileOperation("mkdir", path, null));
             return;
         }
