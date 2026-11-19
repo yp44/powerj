@@ -64,6 +64,8 @@ class ReplLoopTest {
         });
     }
 
+    private Supervisor supervisor = new Supervisor();
+
     private Repl repl(TestTerminal screen) {
         Terminal terminal = screen.terminal();
         var out = terminal.writer();
@@ -76,7 +78,7 @@ class ReplLoopTest {
             prompts.add(text);
             return events.removeFirst().apply(text);
         };
-        return new Repl(editor, terminal, new Supervisor(), session, interpreter, prompt, errors, () -> afterInput++);
+        return new Repl(editor, terminal, supervisor, session, interpreter, prompt, errors, () -> afterInput++);
     }
 
     private int run() throws Exception {
@@ -117,6 +119,33 @@ class ReplLoopTest {
         line("exit 5");
 
         assertThat(run()).isEqualTo(5);
+    }
+
+    /** A command abandoned by a second Ctrl+C keeps its thread: the prompt says so while it runs (FR-57, #173). */
+    @Test
+    void thePromptSaysHowManyAbandonedCommandsAreStillRunning() throws Exception {
+        var started = new java.util.concurrent.CountDownLatch(1);
+        var stop = new java.util.concurrent.atomic.AtomicBoolean();
+        var caller = Thread.ofVirtual().start(() -> supervisor.run("spin", () -> {
+            started.countDown();
+            while (!stop.get()) {
+                Thread.onSpinWait();
+            }
+            return List.of();
+        }));
+        started.await();
+        supervisor.cancel();
+        supervisor.cancel();
+        caller.join(10_000);
+        line("exit 0");
+
+        try {
+            run();
+
+            assertThat(lastScreen).contains("1 abandoned command(s) still running");
+        } finally {
+            stop.set(true);
+        }
     }
 
     @Test

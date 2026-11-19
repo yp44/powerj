@@ -136,4 +136,62 @@ class ValueUnrollerTest {
     void elementsAreDeliveredInOrderAndNullsAreElements() {
         assertThat(unrolled(Arrays.asList(1, null, 3), DISPLAY)).containsExactly(1, null, 3);
     }
+
+    // --- what holds a resource is closed once it was read (#173, audit v2 S-06, C-06) ---
+
+    private static final class CloseableIterator implements java.util.Iterator<String>, AutoCloseable {
+        private final java.util.Iterator<String> inner = List.of("a", "b").iterator();
+        boolean closed;
+
+        @Override
+        public boolean hasNext() {
+            return inner.hasNext();
+        }
+
+        @Override
+        public String next() {
+            return inner.next();
+        }
+
+        @Override
+        public void close() {
+            closed = true;
+        }
+    }
+
+    private static final class CloseableIterable implements Iterable<String>, AutoCloseable {
+        boolean closed;
+
+        @Override
+        public java.util.Iterator<String> iterator() {
+            return List.of("x", "y").iterator();
+        }
+
+        @Override
+        public void close() {
+            closed = true;
+        }
+    }
+
+    @Test
+    void anAutoCloseableIteratorIsClosedOnceRead() {
+        var iterator = new CloseableIterator();
+        var seen = new java.util.ArrayList<Object>();
+
+        assertThat(ValueUnroller.unroll(iterator, ValueUnroller.Mode.DISPLAY, seen::add)).isTrue();
+
+        assertThat(seen).containsExactly("a", "b");
+        assertThat(iterator.closed).isTrue();
+    }
+
+    @Test
+    void anAutoCloseableIterableIsClosedOnceReadAndEvenWhenTheConsumerFails() {
+        var iterable = new CloseableIterable();
+
+        assertThatThrownBy(() -> ValueUnroller.unroll(iterable, ValueUnroller.Mode.DISPLAY, value -> {
+            throw new IllegalStateException("stop");
+        })).isInstanceOf(IllegalStateException.class);
+
+        assertThat(iterable.closed).isTrue();
+    }
 }

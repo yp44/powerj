@@ -1,6 +1,7 @@
 package io.powerj.core.nativeexec;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -479,6 +480,35 @@ class PosixSpawnTest {
                     java.nio.file.StandardOpenOption.APPEND);
         } catch (IOException e) {
             throw new IllegalStateException(e);
+        }
+    }
+
+    // --- what the audit v2 found (#173) ---
+
+    /** {@code allocateFrom} cuts a string at the first NUL: the program would receive another argument than the user wrote. */
+    @Test
+    void aNulInAnArgumentOrTheEnvironmentIsRefusedInsteadOfCutTheArgument() {
+        Path sh = Path.of("/bin/sh");
+
+        assertThatThrownBy(() -> PosixSpawn.spawnUnreaped(Spec.of(sh, "-c", "true", "a\0b")))
+                .isInstanceOf(IOException.class).hasMessageContaining("null character");
+        assertThatThrownBy(() -> PosixSpawn.spawnUnreaped(Spec.of(sh, "-c", "true").env(Map.of("NAME", "va\0lue"))))
+                .isInstanceOf(IOException.class).hasMessageContaining("null character");
+    }
+
+    /** {@code pipe}, {@code sigemptyset}, {@code sigfillset} return -1 and set errno: the error is errno, not the -1. */
+    @Test
+    void theErrorOfACallThatSetsErrnoIsNamedByItsErrno() {
+        assertThat(PosixSpawn.describe("pipe", 24)).isEqualTo("pipe: error=24, " + strerror(24));
+        assertThat(PosixSpawn.describe("posix_spawn", 2)).isEqualTo("posix_spawn: error=2, " + strerror(2));
+        assertThat(strerror(24)).doesNotContain("Unknown error");
+    }
+
+    private static String strerror(int errno) {
+        try {
+            return PosixSpawn.strerror(errno);
+        } catch (Throwable t) {
+            throw new AssertionError(t);
         }
     }
 }

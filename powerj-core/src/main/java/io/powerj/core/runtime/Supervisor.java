@@ -1,6 +1,8 @@
 package io.powerj.core.runtime;
 
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -35,6 +37,8 @@ public final class Supervisor {
     /** Running command: its thread, its result, and the number of Ctrl+C received. */
     private record Running(Thread worker, CompletableFuture<Outcome> outcome, String commandLine, AtomicInteger cancels) { }
 
+    /** The threads of the commands that a second Ctrl+C abandoned: they run on until they end by themselves. */
+    private final Set<Thread> abandoned = ConcurrentHashMap.newKeySet();
     private byte[] memoryReserve = new byte[MEMORY_RESERVE_BYTES];
     private volatile Running running;
 
@@ -80,8 +84,18 @@ public final class Supervisor {
             current.worker().interrupt();
         } else {
             LOG.warning(() -> "Command abandoned: " + LoggedLine.of(current.commandLine()));
+            abandoned.add(current.worker());
             current.outcome().complete(new Outcome.Abandoned(current.commandLine()));
         }
+    }
+
+    /**
+     * How many abandoned commands are still running (FR-57). Each holds a thread with a stack of 16 MB and, if it spins, a
+     * processor core, and nothing else shows it: the prompt tells the user (audit v2, S-06).
+     */
+    public int abandonedRunning() {
+        abandoned.removeIf(thread -> !thread.isAlive());
+        return abandoned.size();
     }
 
     /**

@@ -17,7 +17,8 @@ import io.powerj.api.Collected;
  * One place for the rule that used to be written four times, with drifts (review C-07), among them a stream that was
  * left open when {@code *.} unrolled it.
  * <p>
- * A stream is always closed once it was read, even when {@code each} throws. A {@link Path} (which is an
+ * A stream is always closed once it was read, even when {@code each} throws, and so is an iterable or an iterator that is
+ * {@code AutoCloseable} ({@code DirectoryStream}, {@code Scanner}). A {@link Path} (which is an
  * {@code Iterable<Path>}), a {@code String}, a {@code Map}, a record are never unrolled.
  */
 public final class ValueUnroller {
@@ -43,6 +44,19 @@ public final class ValueUnroller {
     private ValueUnroller() {
     }
 
+    /** Closes {@code value} if it holds a resource: what it unrolled is consumed, and nobody else would close it. */
+    private static void closeIfCloseable(Object value) {
+        if (value instanceof AutoCloseable resource) {
+            try {
+                resource.close();
+            } catch (RuntimeException e) {
+                throw e;
+            } catch (Exception _) {
+                // the values were read; a failure to close them is not the user's line
+            }
+        }
+    }
+
     /**
      * Passes each element of {@code value} to {@code each}.
      *
@@ -60,13 +74,25 @@ public final class ValueUnroller {
             case Collected<?> list when mode.keepCollected -> {
                 return false;
             }
-            case Iterable<?> items -> items.forEach(each);
+            case Iterable<?> items -> {
+                try {
+                    items.forEach(each);
+                } finally {
+                    closeIfCloseable(items); // a DirectoryStream holds a directory open
+                }
+            }
             case BaseStream<?, ?> stream -> { // Stream, and IntStream, LongStream, DoubleStream (boxed elements)
                 try (stream) {
                     stream.iterator().forEachRemaining(each);
                 }
             }
-            case Iterator<?> iterator -> iterator.forEachRemaining(each);
+            case Iterator<?> iterator -> {
+                try {
+                    iterator.forEachRemaining(each);
+                } finally {
+                    closeIfCloseable(iterator); // a Scanner holds its file open
+                }
+            }
             case Optional<?> optional when mode.optionals -> optional.ifPresent(each);
             case OptionalInt optional when mode.optionals -> optional.ifPresent(each::accept);
             case OptionalLong optional when mode.optionals -> optional.ifPresent(each::accept);
