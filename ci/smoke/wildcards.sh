@@ -24,7 +24,7 @@ expect "$WORK/env-set.txt" '^Notes.TXT$'
 # A value that is not a rule is an error where a wildcard is expanded, and nowhere else.
 POWERJ_GLOB_IGNORE_CASE=maybe "$PJ" -c '^echo plain ; ^echo *.txt' > "$WORK/wrong.txt" 2>&1 || true
 cat "$WORK/wrong.txt"
-expect "$WORK/wrong.txt" '^plain$' "POWERJ_GLOB_IGNORE_CASE.*'maybe'"
+expect "$WORK/wrong.txt" '^plain$' 'POWERJ_GLOB_IGNORE_CASE.*"maybe"'
 # Compound words (FR-32c): a quoted text glued to a wildcard is one word, and never reaches the root folder.
 mkdir -p "$WORK/glob/my docs"
 echo x > "$WORK/glob/my docs/n.md"
