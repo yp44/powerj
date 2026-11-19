@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CancellationException;
 import java.util.function.Function;
 
 import io.powerj.api.Bytes;
@@ -111,6 +112,10 @@ public final class OutputFormatter implements AutoCloseable {
     }
 
     public void accept(Object value) {
+        if (Thread.currentThread().isInterrupted()) {
+            // Ctrl+C: a value that never ends (IntStream.range(0, MAX), an endless iterator) would be displayed to its end.
+            throw new CancellationException();
+        }
         if (value instanceof Path path) {
             line(path.toString()); // a Path is also an Iterable<Path>
             return;

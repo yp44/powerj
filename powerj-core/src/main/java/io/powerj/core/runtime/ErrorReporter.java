@@ -39,7 +39,9 @@ final class ErrorReporter {
 
     /** The line hit a blocking error (an error, not just a failed command). */
     void blocking() {
-        blocking = true;
+        if (!session.lines().stale()) { // a line that Ctrl+C abandoned does not mark the one that runs now
+            blocking = true;
+        }
     }
 
     /** {@code true} if the last executed line hit a blocking error. */

@@ -191,6 +191,14 @@ public final class Interpreter implements CommandCatalog {
      * @throws InterruptedException if the line was cancelled by Ctrl+C
      */
     public void execute(String line) throws InterruptedException {
+        long number = session.lines().begin(); // the line that Ctrl+C abandoned before this one is stale from now on
+        session.lines().run(number, () -> {
+            run(line, number);
+            return null;
+        });
+    }
+
+    private void run(String line, long number) throws InterruptedException {
         reporter.reset();
         long begin = System.nanoTime();
         Ast.Script script;
@@ -226,7 +234,9 @@ public final class Interpreter implements CommandCatalog {
             cancelled = true;
             throw e;
         } finally {
-            observer = ExecutionObserver.NONE;
+            if (session.lines().isLatest(number)) {
+                observer = ExecutionObserver.NONE; // not the one of the line that runs now, if this line was abandoned
+            }
             measurement.finish(cancelled);
         }
     }

@@ -161,31 +161,41 @@ final class PipelineExecutor {
             stages.add(observed.stage(i + 1, label(segment), segment instanceof NativeSegment));
         }
         // The last stage hands its objects to the display, or to the variable that captures them.
-        sink = stages.getLast().sink(sink, !capture);
+        Consumer<Object> display = stages.getLast().sink(sink, !capture);
         if (n == 1 && segments.getFirst() instanceof NativeSegment(var commands) && commands.size() == 1) {
-            NativeRunner.Command command = commands.getFirst();
-            StageObserver stage = stages.getFirst();
-            long start = System.nanoTime();
-            NativeRunner.Result result;
-            try {
-                result = nativeRunner.run(command, new ExecutionContext(session, io, sink, capture, redirections,
-                        errorSink, inheritsInput()));
-            } finally {
-                stage.measured(System.nanoTime() - start);
-            }
-            stage.natives(List.of(result.run()));
-            session.recordNative(result.run());
-            result.capturedLines().forEach(sink);
-            return result.run().succeeded();
+            return runSingleNative(commands.getFirst(), stages.getFirst(), new ExecutionContext(session, io, display,
+                    capture, redirections, errorSink, inheritsInput()));
         }
         // The last stage's surroundings; the others write the errors file too but have no destination for values.
-        var last = new ExecutionContext(session, io, sink, capture, redirections.withSharedErrors(), errorSink,
+        var last = new ExecutionContext(session, io, display, capture, redirections.withSharedErrors(), errorSink,
                 inheritsInput());
         if (n == 1) {
             return segment(segments.getFirst(), standardInput, null, last, stages.getFirst());
         }
-        var intermediate = last.forIntermediateStage();
+        return runPipeline(segments, stages, observed, last, errorSink);
+    }
 
+    /** A pipeline of one native command: the fast path, which runs it in the calling thread and reads its lines back. */
+    private boolean runSingleNative(NativeRunner.Command command, StageObserver stage, ExecutionContext context)
+            throws InterruptedException {
+        long start = System.nanoTime();
+        NativeRunner.Result result;
+        try {
+            result = nativeRunner.run(command, context);
+        } finally {
+            stage.measured(System.nanoTime() - start);
+        }
+        stage.natives(List.of(result.run()));
+        session.recordNative(result.run());
+        result.capturedLines().forEach(context.sink());
+        return result.run().succeeded();
+    }
+
+    /** Several stages: all but the last in threads of their own, joined by bounded queues; the last in the caller's. */
+    private boolean runPipeline(List<Segment> segments, List<StageObserver> stages, PipelineObserver observed,
+                                ExecutionContext last, Consumer<String> errorSink) throws InterruptedException {
+        int n = segments.size();
+        var intermediate = last.forIntermediateStage();
         List<Pipe> pipes = new ArrayList<>(n - 1);
         for (int i = 0; i < n - 1; i++) {
             pipes.add(observed.pipe(stages.get(i), stages.get(i + 1)));
@@ -193,33 +203,9 @@ final class PipelineExecutor {
         var blockingErrors = new AtomicBoolean();
         List<Thread> threads = new ArrayList<>(n - 1);
         for (int i = 0; i < n - 1; i++) {
-            Segment segment = segments.get(i);
             Source input = i == 0 ? standardInput : pipes.get(i - 1);
-            Pipe output = pipes.get(i);
-            StageObserver stage = stages.get(i);
-            threads.add(Thread.ofVirtual().name(stage.threadName()).unstarted(PreviewGuard.propagate(() -> {
-                output.onAbort(Thread.currentThread()::interrupt);
-                try {
-                    segment(segment, input, output, intermediate, stage);
-                    output.close();
-                } catch (InterruptedException | CancellationException e) {
-                    closeQuietly(output);
-                } catch (PjException e) {
-                    blockingErrors.set(true);
-                    errorSink.accept(reporter.describe(e.error()));
-                    closeQuietly(output);
-                } catch (Throwable t) {
-                    blockingErrors.set(true);
-                    Logger.getLogger(PipelineExecutor.class.getName())
-                            .log(Level.SEVERE, "Internal error in a pipeline stage", t);
-                    errorSink.accept(Messages.get("error.internal", t));
-                    closeQuietly(output);
-                } finally {
-                    if (input instanceof Pipe pipe) {
-                        pipe.abort();
-                    }
-                }
-            })));
+            threads.add(stageThread(segments.get(i), input, pipes.get(i), intermediate, stages.get(i), errorSink,
+                    blockingErrors));
         }
         threads.forEach(Thread::start);
         Pipe lastInput = pipes.getLast();
@@ -234,6 +220,35 @@ final class PipelineExecutor {
             reporter.blocking();
         }
         return succeeded && !blockingErrors.get();
+    }
+
+    /** The thread of a stage that is not the last one: it runs the segment, then closes its output, however it ends. */
+    private Thread stageThread(Segment segment, Source input, Pipe output, ExecutionContext context, StageObserver stage,
+                               Consumer<String> errorSink, AtomicBoolean blockingErrors) {
+        Runnable body = () -> {
+            output.onAbort(Thread.currentThread()::interrupt);
+            try {
+                segment(segment, input, output, context, stage);
+                output.close();
+            } catch (InterruptedException | CancellationException e) {
+                closeQuietly(output);
+            } catch (PjException e) {
+                blockingErrors.set(true);
+                errorSink.accept(reporter.describe(e.error()));
+                closeQuietly(output);
+            } catch (Throwable t) {
+                blockingErrors.set(true);
+                Logger.getLogger(PipelineExecutor.class.getName()).log(Level.SEVERE, "Internal error in a pipeline stage",
+                        t);
+                errorSink.accept(Messages.get("error.internal", t));
+                closeQuietly(output);
+            } finally {
+                if (input instanceof Pipe pipe) {
+                    pipe.abort();
+                }
+            }
+        };
+        return Thread.ofVirtual().name(stage.threadName()).unstarted(session.lines().propagate(PreviewGuard.propagate(body)));
     }
 
     /** Runs a segment; {@code output} is the queue to the next stage, or {@code null} at the end of the pipeline. */
@@ -322,51 +337,14 @@ final class PipelineExecutor {
      */
     private Prepared prepare(Ast.Stage stage, int index, boolean followed) throws InterruptedException {
         if (stage.body() instanceof Ast.ExpressionBody(var expression)) {
-            return new ObjectStep((_, output, _) -> {
-                Object value = evaluator.evaluate(expression);
-                if (followed && value instanceof Collected<?> list) {
-                    // $l | map { … }: a value at the head of a pipeline is always unrolled, like any list;
-                    // only a list passed from one command to the next stays whole (FR-36d).
-                    list.forEach(output);
-                } else {
-                    output.accept(value);
-                }
-                return !(value instanceof Boolean b) || b;
-            }, "expression");
+            return expressionStep(expression, followed);
         }
         var command = (Ast.Command) stage.body();
         List<Evaluator.Word> words = evaluator.words(command.arguments());
         List<Object> args = words.stream().map(Evaluator.Word::value).collect(Collectors.toList());
         return switch (resolution.resolve(command.name(), command.forceNative(), session)) {
-            case Resolved.BuiltinCall(var name, var builtin) -> {
-                PreviewGuard.deny(Messages.get("preview.off.builtin", name));
-                if (index > 0) {
-                    throw new PjException(Messages.get("pipeline.noInput", name));
-                }
-                yield new ObjectStep((_, output, _) -> {
-                    invokeBuiltin(name, builtin, args).forEach(output);
-                    return true;
-                }, label(name, args));
-            }
-            case Resolved.CmdletCall(var cmdlet) -> {
-                if (args.contains("--help")) {
-                    yield new ObjectStep((_, output, _) -> {
-                        Help.cmdlet(cmdlet).forEach(output);
-                        return true;
-                    }, label(command.name(), args));
-                }
-                if (index > 0 && !cmdlet.readsInput()) {
-                    throw new PjException(Messages.get("pipeline.noInput", command.name()));
-                }
-                if (!cmdlet.preview()) {
-                    PreviewGuard.deny(Messages.get("preview.off.cmdlet", command.name()));
-                }
-                List<Object> cmdletArgs = words.stream().map(Evaluator.Word::forCmdlet).collect(Collectors.toList());
-                yield new ObjectStep((input, output, errors) -> runCmdlet(cmdlet, cmdletArgs,
-                        cmdlet.readsInput() ? input : null, output,
-                        stage.errorsToOutput() ? message -> output.accept(message) : errors),
-                        label(command.name(), args));
-            }
+            case Resolved.BuiltinCall(var name, var builtin) -> builtinStep(name, builtin, args, index);
+            case Resolved.CmdletCall(var cmdlet) -> cmdletStep(cmdlet, stage, command, words, args, index);
             case Resolved.NativeCall(var executable) -> {
                 PreviewGuard.deny(Messages.get("preview.off.native", command.name()));
                 List<String> textArgs = NativeArguments.of(words, session);
@@ -374,6 +352,53 @@ final class PipelineExecutor {
             }
             case Resolved.Unknown _ -> throw unknownCommand(command);
         };
+    }
+
+    /** An expression at the head of a pipeline: its value is the first object. */
+    private Prepared expressionStep(Ast.Expression expression, boolean followed) {
+        return new ObjectStep((_, output, _) -> {
+            Object value = evaluator.evaluate(expression);
+            if (followed && value instanceof Collected<?> list) {
+                // $l | map { … }: a value at the head of a pipeline is always unrolled, like any list;
+                // only a list passed from one command to the next stays whole (FR-36d).
+                list.forEach(output);
+            } else {
+                output.accept(value);
+            }
+            return !(value instanceof Boolean b) || b;
+        }, "expression");
+    }
+
+    private Prepared builtinStep(String name, Builtin builtin, List<Object> args, int index) {
+        PreviewGuard.deny(Messages.get("preview.off.builtin", name));
+        if (index > 0) {
+            throw new PjException(Messages.get("pipeline.noInput", name));
+        }
+        return new ObjectStep((_, output, _) -> {
+            invokeBuiltin(name, builtin, args).forEach(output);
+            return true;
+        }, label(name, args));
+    }
+
+    private Prepared cmdletStep(CmdletRegistry.Registered cmdlet, Ast.Stage stage, Ast.Command command,
+                                List<Evaluator.Word> words, List<Object> args, int index) {
+        if (args.contains("--help")) {
+            return new ObjectStep((_, output, _) -> {
+                Help.cmdlet(cmdlet).forEach(output);
+                return true;
+            }, label(command.name(), args));
+        }
+        if (index > 0 && !cmdlet.readsInput()) {
+            throw new PjException(Messages.get("pipeline.noInput", command.name()));
+        }
+        if (!cmdlet.preview()) {
+            PreviewGuard.deny(Messages.get("preview.off.cmdlet", command.name()));
+        }
+        List<Object> cmdletArgs = words.stream().map(Evaluator.Word::forCmdlet).collect(Collectors.toList());
+        return new ObjectStep((input, output, errors) -> runCmdlet(cmdlet, cmdletArgs,
+                cmdlet.readsInput() ? input : null, output,
+                stage.errorsToOutput() ? message -> output.accept(message) : errors),
+                label(command.name(), args));
     }
 
     /** Command not found; {@code Math.NOPE}: the static field is missing rather than the command. */
