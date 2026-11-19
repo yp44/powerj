@@ -38,7 +38,7 @@ A jar placed in `~/.powerj/modules` is loaded at start-up and **runs with the ri
 user starts. PowerJ gives it its own `ModuleLayer`, which isolates its *dependencies* from the shell's, not its behavior.
 It also opens the module's packages to PowerJ, which reads the annotations of its cmdlets by reflection.
 
-A module that uses native code (JNI, FFM) is not loaded until the user agrees: the question is asked with `[y/N]` (the
+A module that uses native code (JNI, FFM) is not loaded until the user agrees, and a module that did not ask cannot use it: the launcher passes `--illegal-native-access=deny`, so loading a library or calling the FFM API from a module that has no consent ends in an `IllegalCallerException` (the packaged launcher only: a JVM started by hand is in the JDK default mode, which warns). The question is asked with `[y/N]` (the
 default is no), never when there is no terminal, and the answer is kept in `config.properties` as
 `modules.nativeAccess.<module>`. A yes is tied to the **content**: it holds the SHA-256 of every module that would be loaded
 together (the jar of the module and of its dependencies), so a jar that is replaced, or a dependency that changes, asks

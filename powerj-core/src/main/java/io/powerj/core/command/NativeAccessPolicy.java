@@ -8,6 +8,12 @@ import java.util.Optional;
  * attribute {@code Enable-Native-Access: true}; {@link ModuleLoader} then asks this policy, and only loads the module
  * (with native access enabled for the modules of its layer) if the answer is yes.
  * <p>
+ * This is a gate where the JVM is started with {@code --illegal-native-access=deny}, as the packaged launcher does: a
+ * module of a layer defined at run time has native access only through {@code Controller.enableNativeAccess}, which the
+ * loader calls after the consent, so a module that did not declare the attribute is refused by the JVM when it calls a
+ * restricted method. Under the JDK default ({@code warn}), for example in a JVM started by hand, it only silences the
+ * warning for the module that asked (ADR 0006, amendment of #170).
+ * <p>
  * The answer is given for the <em>content</em> of what is loaded, not for a name: the loader hands the policy a
  * fingerprint of every module of the layer, so that a jar replaced by another one does not inherit the consent given
  * to the first (review C-24).
