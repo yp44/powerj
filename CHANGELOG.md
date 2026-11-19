@@ -1205,6 +1205,21 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   the statement (`Redirections.truncatedOnce`) and everything it writes, a blocking error included, appends. Test:
   `BlockingErrorRedirectionTest`; acceptance sheet `step-3.md`, row 21b.
 
+### Decided (the consent to native access is a gate, [#170](https://github.com/yp44/powerj/issues/170))
+- **Decision: option 1, a gate** (audit v2, B-01; the recommendation of the ticket). The launcher now passes
+  `--illegal-native-access=deny` (`powerj-dist/pom.xml`). Only the modules that declare `Enable-Native-Access` were asked
+  for their consent, and with the JDK 25 default (`warn`) a module that left the attribute out could still load a
+  library or call the FFM API: the JVM printed a warning and nothing stopped it. A module of a layer loaded at run time has
+  native access only through `Controller.enableNativeAccess`, which `ModuleLoader` calls after the consent, so any other
+  call of a restricted method is an `IllegalCallerException` (`Illegal native access from module …`).
+  **Consequence:** a library that uses native access without declaring it breaks until its author adds the attribute
+  (`powerj-fx` declares it). The gate is the packaged launcher's: a JVM started by hand is in the `warn` mode.
+  ADR 0006 is amended, and the Javadoc of `NativeAccessPolicy`, FR-77 (§4.4) and `SECURITY.md` say the same thing.
+- **A smoke test of both roads** (`ci/smoke/native-access.sh`, in the CI on Linux and macOS): a jar without the attribute that
+  calls `System.loadLibrary` is refused; the same jar with `Enable-Native-Access: true` is refused until the line that the
+  refusal prints is in `config.properties`, and then reaches the loader. Checked by hand: with `--illegal-native-access=warn`
+  the first jar goes through. It is not in the Windows job, whose smoke tests are inline PowerShell (#183).
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.

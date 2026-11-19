@@ -197,6 +197,12 @@
                                             <!-- JLine accesses the native console (FFM / native library). -->
                                             <arg value="--java-options"/>
                                             <arg value="--enable-native-access=org.jline.terminal.ffm,org.jline.nativ,io.powerj.core,io.powerj.fs"/>
+                                            <!-- The consent to native access is a gate (ADR 0006, audit v2 B-01, #170): a module that did not
+                                                 declare Enable-Native-Access, or that the user did not allow, cannot load a library or
+                                                 call the FFM API; without this option the JDK 25 default only prints a warning
+                                                 (ci/smoke/native-access.sh). -->
+                                            <arg value="--java-options"/>
+                                            <arg value="--illegal-native-access=deny"/>
                                             <!-- The profiler is an optional dependency of powerj-core: it is only resolved when asked.
                                                  jdk.unsupported is in the image but nothing requires it: the third-party modules
                                                  that do (javafx.graphics of powerj-fx) need it in the boot layer. -->

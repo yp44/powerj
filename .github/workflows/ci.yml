@@ -67,6 +67,9 @@ jobs:
       - name: Smoke test of the third-party modules
         run: ci/smoke/third-party-modules.sh
 
+      - name: Smoke test of the consent to native access
+        run: ci/smoke/native-access.sh
+
       - name: Smoke test of the properties read across modules
         run: ci/smoke/properties.sh
 
@@ -192,6 +195,7 @@ jobs:
           ci/smoke/modules.sh
           ci/smoke/non-interactive.sh
           ci/smoke/third-party-modules.sh
+          ci/smoke/native-access.sh
           ci/smoke/properties.sh
           ci/smoke/languages.sh
           ci/smoke/tilde.sh
