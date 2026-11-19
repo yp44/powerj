@@ -62,6 +62,25 @@ public final class FileWalker {
         R visit(Path path, BasicFileAttributes attributes) throws IOException;
     }
 
+    /**
+     * Like {@link Visitor}, but the work gives its results one by one, as it goes, instead of all at the end: a
+     * {@code grep} hands over each match as it reads the line, not when the file is done (audit v2, S-05).
+     *
+     * @param <R> type of the results
+     */
+    @FunctionalInterface
+    public interface StreamingVisitor<R> {
+
+        /**
+         * Visits an entry.
+         *
+         * @param results receives each result: in the calling thread, at once, for a sequential walk; for a parallel one
+         *                it is called in the worker, which waits when the calling thread is behind (bounded queue)
+         * @throws IOException non-blocking error, reported to the error consumer
+         */
+        void visit(Path path, BasicFileAttributes attributes, Consumer<R> results) throws IOException;
+    }
+
     /** Results waiting for the calling thread (backpressure: a slow consumer slows down the walk). */
     private static final int QUEUE_CAPACITY = 256;
 
@@ -98,6 +117,22 @@ public final class FileWalker {
     public <R> void walk(Collection<Path> roots, Visitor<? extends R> visitor, Consumer<? super R> results,
                          Consumer<? super WalkError> errors) {
         Objects.requireNonNull(visitor, "visitor");
+        walkStreaming(roots, (path, attributes, sink) -> {
+            R result = visitor.visit(path, attributes);
+            if (result != null) {
+                sink.accept(result);
+            }
+        }, results, errors);
+    }
+
+    /**
+     * Walks the roots with a visitor that gives its results as it goes, and returns when every entry has been visited
+     * and every result consumed. Same rules as {@link #walk(Collection, Visitor, Consumer, Consumer)}; a sequential walk
+     * calls {@code results} before the visitor goes on, so that a consumer that stops (an exception) stops the reading.
+     */
+    public <R> void walkStreaming(Collection<Path> roots, StreamingVisitor<R> visitor,
+                                  Consumer<? super R> results, Consumer<? super WalkError> errors) {
+        Objects.requireNonNull(visitor, "visitor");
         Objects.requireNonNull(results, "results");
         Objects.requireNonNull(errors, "errors");
         if (parallelism == 1) {
@@ -111,7 +146,7 @@ public final class FileWalker {
 
     // --- Sequential walk ---
 
-    private <R> void sequentialRoot(Path root, Visitor<? extends R> visitor, Consumer<? super R> results,
+    private <R> void sequentialRoot(Path root, StreamingVisitor<R> visitor, Consumer<? super R> results,
                                     Consumer<? super WalkError> errors) {
         checkCancelled();
         BasicFileAttributes attributes;
@@ -128,7 +163,7 @@ public final class FileWalker {
         }
     }
 
-    private <R> void sequentialDirectory(Path dir, int depth, Visitor<? extends R> visitor,
+    private <R> void sequentialDirectory(Path dir, int depth, StreamingVisitor<R> visitor,
                                          Consumer<? super R> results, Consumer<? super WalkError> errors) {
         List<Entry> children;
         try {
@@ -149,18 +184,14 @@ public final class FileWalker {
         }
     }
 
-    private static <R> void sequentialVisit(Path path, BasicFileAttributes attributes, Visitor<? extends R> visitor,
-                                            Consumer<? super R> results, Consumer<? super WalkError> errors) {
-        R result;
+    private static <R> void sequentialVisit(Path path, BasicFileAttributes attributes,
+                                            StreamingVisitor<R> visitor, Consumer<? super R> results,
+                                            Consumer<? super WalkError> errors) {
         try {
-            result = visitor.visit(path, attributes);
+            visitor.visit(path, attributes, results::accept);
         } catch (IOException e) {
             Interruption.rethrow(e); // Ctrl+C is not an error of the file
             errors.accept(WalkError.of(path, e));
-            return;
-        }
-        if (result != null) {
-            results.accept(result);
         }
     }
 
@@ -246,7 +277,7 @@ public final class FileWalker {
             void run() throws Exception;
         }
 
-        private final Visitor<? extends R> visitor;
+        private final StreamingVisitor<R> visitor;
         private final BlockingQueue<Object> queue = new ArrayBlockingQueue<>(QUEUE_CAPACITY);
         /** Directory listings and visits in progress: bounds the open files. */
         private final Semaphore permits = new Semaphore(parallelism);
@@ -255,7 +286,7 @@ public final class FileWalker {
         private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
         private volatile boolean stopped;
 
-        ParallelWalk(Visitor<? extends R> visitor) {
+        ParallelWalk(StreamingVisitor<R> visitor) {
             this.visitor = visitor;
         }
 
@@ -323,6 +354,16 @@ public final class FileWalker {
             }
         }
 
+        /** Hands a result to the calling thread; waits while the queue is full. */
+        private void hand(R result) {
+            try {
+                queue.put(result);
+            } catch (InterruptedException _) {
+                Thread.currentThread().interrupt(); // the walk was stopped under the visitor
+                throw new CancellationException();
+            }
+        }
+
         /** Visits an entry in its own virtual thread, as soon as a permit is free. */
         private void visit(Path path, BasicFileAttributes attributes) throws InterruptedException {
             permits.acquire();
@@ -330,10 +371,7 @@ public final class FileWalker {
             try {
                 submitted = submit(() -> {
                     try {
-                        R result = visitor.visit(path, attributes);
-                        if (result != null) {
-                            queue.put(result);
-                        }
+                        visitor.visit(path, attributes, this::hand);
                     } catch (IOException e) {
                         if (Interruption.is(e)) {
                             // The work was stopped under the visitor (the flag of this thread is set already, and a

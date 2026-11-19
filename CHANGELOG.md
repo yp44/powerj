@@ -1062,6 +1062,23 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   Tests: `InterruptionTest`, `FileWalkerTest` (sequential and parallel, and an `IOException("disk on fire")` still an
   error), `CatTest` (a stream that throws it, in lines and text modes; the test fails when the line of `Cat` is removed).
 
+### Fixed and changed (`grep` emits as it reads and keeps the matches before a decoding error, [#160](https://github.com/yp44/powerj/issues/160))
+- **`grep -v DEBUG app.log` on a multi-gigabyte log no longer holds the file in memory** (audit v2, S-05). `grep` gathered the
+  `GrepMatch` of a whole file before emitting any, so the memory grew with the file, nothing appeared before the end, and
+  `grep x big.log | first 1` read everything. With a heap of 128 MB, `grep -v zzz` on a 308 MB file used to end in an
+  `OutOfMemoryError` and now emits its 3.5 million lines in under a second
+  ([docs/quality/performance.md](docs/quality/performance.md)). `FileWalker.walkStreaming` (new, `powerj-fs`) takes a visitor
+  that gives its results one by one: a sequential walk calls the consumer before the visitor goes on, a parallel one hands
+  results over by the bounded queue. `grep` emits each match as the line is read (sequential) or by chunks of 1 000 (`-p`: the
+  lines of a file stay in order, and together up to a chunk), and a consumer that stops stops the reading.
+- **The matches before a decoding error are kept** (R-12). `InputStreamReader` throws at once and loses what it decoded in the
+  same call, so every match of the last buffer of text was lost with the bad bytes; and `grep` used to drop the whole list.
+  `DecodingReader` (new) returns what it decoded and throws on the next call; the error is now
+  `not readable as UTF-8 text from line <n>`, and `cat` uses the reader too. A line longer than 64 Mi characters ends the
+  search of its file (reported, with the matches before it) instead of filling the memory, as for `cat` (#158).
+  Tests: `GrepTest` (a counting stream, a consumer that stops, 5 000 matches before a bad byte at line 5001 in both walks,
+  2 500 matches in order across chunks), `DecodingReaderTest`, `FileWalkerTest`; each seen failing when the code was broken.
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.
