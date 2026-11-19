@@ -155,6 +155,17 @@ class OutputFormatterTest {
         assertThat(rendered).contains("xxxxxxxxxx\u001b[1;31mxxx\u001b[0m…").doesNotContain("MATCH");
     }
 
+    /** A wide character cut for the ellipsis: same UTF-16 length, the ellipsis must still not be highlighted (review). */
+    @Test
+    void theEllipsisIsNeverHighlightedEvenWhenTheCutKeepsTheLength() {
+        String text = "x".repeat(12) + "中"; // 14 columns, 13 UTF-16 units
+        var found = new Found(1, text, List.of(new Span(0, text.length())));
+
+        String rendered = renderColors(19, found); // a text column of 13: 中 makes way for "…", the length stays 13
+
+        assertThat(rendered).contains("\u001b[0m…").doesNotContain("…\u001b[0m");
+    }
+
     @Test
     void highlightIgnoresSpansOutsideTheText() {
         assertThat(OutputFormatter.highlight("abc", List.of(new Span(1, 2), new Span(5, 9)), 3))

@@ -278,7 +278,7 @@ public final class OutputFormatter implements AutoCloseable {
             String padding = " ".repeat(Math.max(0, widths[i] - DisplayWidth.of(text)));
             // the ellipsis of a truncated cell is never highlighted
             String shown = highlight(text, row.highlights().get(i),
-                    text.length() < cells[i].length() ? text.length() - 1 : text.length());
+                    !text.equals(cells[i]) ? text.length() - 1 : text.length());
             boolean last = i == cells.length - 1;
             if (rightAligned[i]) {
                 line.append(padding).append(shown);
