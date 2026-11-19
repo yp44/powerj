@@ -30,12 +30,23 @@ final class SpawnedProcess extends Process {
      * process had already ended.
      */
     private final ProcessHandle handle;
+    /** The process leads a process group that is signalled as a whole: see {@link #destroy()}. */
+    private final boolean groupLeader;
 
     /**
      * @param terminate asks the process to stop ({@code SIGTERM}; on Windows there is no such thing and it is a kill)
      * @param kill      stops it for good ({@code SIGKILL}, {@code TerminateProcess})
      */
     SpawnedProcess(int pid, CompletableFuture<Integer> exit, Runnable terminate, Runnable kill) {
+        this(pid, exit, terminate, kill, false);
+    }
+
+    /**
+     * @param groupLeader {@code true} if {@code terminate} and {@code kill} signal the process group that this process leads:
+     *                    they are then sent even after it has ended, since the processes it started may still be in the group
+     */
+    SpawnedProcess(int pid, CompletableFuture<Integer> exit, Runnable terminate, Runnable kill, boolean groupLeader) {
+        this.groupLeader = groupLeader;
         this.pid = pid;
         this.exit = exit;
         this.terminate = terminate;
@@ -103,17 +114,24 @@ final class SpawnedProcess extends Process {
         return onExit;
     }
 
-    /** Nothing is sent once the process has been reaped: its pid may belong to another by now. */
+    /**
+     * Nothing is sent to a single process once it has been reaped: its pid may belong to another by now. The leader of a job's
+     * group is the exception: a script that forks and returns (`sh -c 'sleep 1000 & exit' &`) leaves its children in the group,
+     * and the group is signalled as long as it may have members. The number of a group is not given to another process while
+     * the group has a member; once it is empty the signal finds nothing ({@code ESRCH}, ignored), unless in the meantime the
+     * number was given to a new process that leads a group of its own, which the system does only after the pids have wrapped
+     * around (review of #173).
+     */
     @Override
     public void destroy() {
-        if (isAlive()) {
+        if (isAlive() || groupLeader) {
             terminate.run();
         }
     }
 
     @Override
     public Process destroyForcibly() {
-        if (isAlive()) {
+        if (isAlive() || groupLeader) {
             kill.run();
         }
         return this;

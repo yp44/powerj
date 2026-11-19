@@ -66,7 +66,7 @@ final class PosixJobs {
             return new SpawnedProcess(s.pid(), s.exit(), () -> {
                 PosixSpawn.kill(target, PosixSpawn.SIGTERM);
                 PosixSpawn.kill(target, PosixSpawn.SIGCONT); // a job stopped by the terminal keeps SIGTERM pending
-            }, () -> PosixSpawn.kill(target, PosixSpawn.SIGKILL));
+            }, () -> PosixSpawn.kill(target, PosixSpawn.SIGKILL), s.pid() == leader);
         }).toList();
     }
 

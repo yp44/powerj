@@ -1285,7 +1285,9 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   (review of #219). Test: `ValueUnrollerTest`.
 - **Stopping a background job stops its whole process group** (S-07): `PosixJobs` sent `SIGTERM`, `SIGCONT` and `SIGKILL` to the
   pid of the leader, so the processes it had started (the grandchildren of `make &`) survived. The first stage, the leader of
-  the group, is signalled as `-pid`. Test: `PosixJobsTest`.
+  the group, is signalled as `-pid`, and still after it has ended (a script that forks and returns leaves its children in the
+  group; review of #219). This is what `Process.destroy()` of a job does; the `kill` cmdlet, which stops a pid through
+  `ProcessHandle`, still signals that pid only. Test: `PosixJobsTest`.
 - **`pipe`, `sigemptyset` and `sigfillset` report their `errno`** (R-16): they return -1 and set `errno`, which was read as an error
   number ("pipe: error=-1, Unknown error -1" instead of `EMFILE`); they capture `errno` as `waitpid` does
   (`PosixSpawn.describe`). **A NUL in an argument or an environment entry is refused** on Linux and macOS, as `ProcessBuilder`

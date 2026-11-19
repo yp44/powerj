@@ -66,6 +66,25 @@ class PosixJobsTest {
         Waits.until("the grandchild to stop", () -> !running(grandchild));
     }
 
+    /** A script that forks and returns: the leader has ended, its child is still in the group (review of #219). */
+    @Test
+    void stoppingAJobWhoseLeaderHasEndedStillStopsTheGroup() throws Exception {
+        assumeTrue(BackgroundLauncher.available());
+        Path pidFile = tmp.resolve("orphan.pid");
+
+        List<Process> job = BackgroundLauncher.start(
+                List.of(new Stage(Path.of("/bin/sh"), List.of("-c", "sleep 100 & echo $! > " + pidFile + "; exit 0"), false)),
+                tmp, Map.of("PATH", "/usr/bin:/bin"), Output.discard(), Output.discard());
+        Waits.until("the leader has ended", () -> !job.getFirst().isAlive());
+        Waits.until("the pid of its child is written", () -> !readPid(pidFile).isBlank());
+        String orphan = readPid(pidFile);
+        assertThat(running(orphan)).isTrue();
+
+        job.getFirst().destroy();
+
+        Waits.until("the child of the ended leader to stop", () -> !running(orphan));
+    }
+
     private static String readPid(Path file) {
         try {
             return Files.readString(file).strip();
