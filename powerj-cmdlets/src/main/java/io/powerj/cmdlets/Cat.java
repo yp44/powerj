@@ -2,6 +2,7 @@ package io.powerj.cmdlets;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
@@ -17,6 +18,7 @@ import io.powerj.api.CmdletContext;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
 import io.powerj.api.UsageException;
+import io.powerj.fs.Interruption;
 
 /**
  * {@code cat}: reads files, as lines or as a whole content (specification FR-65).
@@ -67,20 +69,32 @@ public final class Cat implements Cmdlet<Cat.Params, Object, Object> {
             String property) {
     }
 
-    /** The longest line read as a String ({@link BoundedLines#MAX_LINE}); a longer one is reported and skipped. */
-    private final int maxLine;
-
-    public Cat() {
-        this(BoundedLines.MAX_LINE);
+    /** Opens a file to read it; {@code Files::newInputStream}, or a test's own stream. */
+    @FunctionalInterface
+    interface Opener {
+        InputStream open(Path path) throws IOException;
     }
 
-    /** A {@code cat} with its own bound on the length of a line (the tests use a small one). */
-    Cat(int maxLine) {
+    /** The longest line read as a String ({@link BoundedLines#MAX_LINE}); a longer one is reported and skipped. */
+    private final int maxLine;
+    private final Opener opener;
+
+    public Cat() {
+        this(BoundedLines.MAX_LINE, Files::newInputStream);
+    }
+
+    /** A {@code cat} with its own bound on the length of a line and its own way to open a file (the tests). */
+    Cat(int maxLine, Opener opener) {
         this.maxLine = maxLine;
+        this.opener = opener;
+    }
+
+    Cat(int maxLine) {
+        this(maxLine, Files::newInputStream);
     }
 
     private Reading reading(Params params, CmdletContext<Object> context) {
-        return context.state(Reading.class, () -> new Reading(params, context, maxLine));
+        return context.state(Reading.class, () -> new Reading(params, context, maxLine, opener));
     }
 
     @Override
@@ -122,13 +136,15 @@ public final class Cat implements Cmdlet<Cat.Params, Object, Object> {
         private final Charset charset;
         private final PipelineFiles files;
         private final int maxLine;
+        private final Opener opener;
         /** Number of the last line read: goes on from one file to the next. */
         private int line;
         /** Whole content, with --text or --content; {@code null} while no file is read. */
         private StringBuilder content;
 
-        Reading(Params params, CmdletContext<?> context, int maxLine) {
+        Reading(Params params, CmdletContext<?> context, int maxLine, Opener opener) {
             this.maxLine = maxLine;
+            this.opener = opener;
             mode = mode(params);
             charset = FileArguments.charset(params.encoding(), "cat.encoding.unknown");
             files = new PipelineFiles(params.property(), context,
@@ -163,7 +179,7 @@ public final class Cat implements Cmdlet<Cat.Params, Object, Object> {
                 context.error(Messages.get("files.not.regular", absolute));
                 return;
             }
-            try (var reader = new BufferedReader(new InputStreamReader(Files.newInputStream(absolute),
+            try (var reader = new BufferedReader(new InputStreamReader(opener.open(absolute),
                     charset.newDecoder()))) {
                 if (mode == Mode.TEXT || mode == Mode.CONTENT) {
                     // gathered aside: a file that cannot be decoded adds nothing
@@ -204,6 +220,7 @@ public final class Cat implements Cmdlet<Cat.Params, Object, Object> {
             } catch (AccessDeniedException _) {
                 context.error(Messages.get("cat.access.denied", absolute));
             } catch (IOException e) {
+                Interruption.rethrow(e); // Ctrl+C inside a read: a cancellation, not "cannot read …: null" (R-11)
                 context.error(Messages.get("cat.read.failed", absolute, e.getMessage()));
             }
         }

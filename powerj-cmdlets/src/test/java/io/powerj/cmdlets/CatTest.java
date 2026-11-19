@@ -320,4 +320,33 @@ class CatTest {
         assertThat(out).isEmpty();
         assertThat(context.errors).singleElement().asString().contains("minified.json");
     }
+
+    // --- Ctrl+C during a read (audit v2, R-11) ---
+
+    /**
+     * A file is read through an interruptible channel: an interrupt that lands inside a read makes it throw
+     * {@code ClosedByInterruptException}, an {@code IOException} with no message. It is a cancellation, not
+     * "cannot read …: null" followed by the next file.
+     */
+    @Test
+    void ctrlCInsideAReadIsACancellationNotAReadError() throws Exception {
+        var cat = new Cat(BoundedLines.MAX_LINE, path -> new java.io.InputStream() {
+            @Override
+            public int read() throws java.io.IOException {
+                throw new java.nio.channels.ClosedByInterruptException();
+            }
+        });
+        for (Out out : List.of(Out.LINES, Out.TEXT)) {
+            context = new TestContext<>(tmp);
+            try {
+                assertThatThrownBy(() -> CmdletDriver.run(cat, params(List.of("a.txt", "b.txt"), out, null, null), context))
+                        .as(out.name()).isInstanceOf(java.util.concurrent.CancellationException.class);
+
+                assertThat(context.errors).as(out.name()).isEmpty();
+                assertThat(Thread.currentThread().isInterrupted()).as("the flag is set again").isTrue();
+            } finally {
+                Thread.interrupted();
+            }
+        }
+    }
 }

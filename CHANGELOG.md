@@ -1051,6 +1051,17 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   `BoundedLines` is the reader `grep` will use too (#160). Tests: `BoundedLinesTest` (terminators across buffers, the bound,
   the flag, each seen failing when the code was broken on purpose), `CatTest`, `GrepTest`.
 
+### Fixed (Ctrl+C during a file read is a cancellation, not "cannot read x: null", [#159](https://github.com/yp44/powerj/issues/159))
+- **Ctrl+C inside a read stops `cat`, `grep` and the walk** (audit v2, R-11). `Files.newInputStream` is backed by an
+  interruptible channel: an interrupt that lands inside a read makes it throw `ClosedByInterruptException`, an
+  `IOException` with no message, which `cat`, `grep` (through the `WalkError` of `FileWalker`) reported as `cannot read
+  /x: null` before going on with the next file. `Interruption.rethrow` (module `powerj-fs`) turns it, and
+  `InterruptedIOException`, into a `CancellationException` with the flag of the thread set again; `Cat` and both modes of
+  `FileWalker` use it, so a `ClosedByInterruptException` is never a `WalkError`. In the parallel walk the worker only stops
+  (it must still signal its end, which a thread with its flag set cannot). An ordinary read failure is still reported.
+  Tests: `InterruptionTest`, `FileWalkerTest` (sequential and parallel, and an `IOException("disk on fire")` still an
+  error), `CatTest` (a stream that throws it, in lines and text modes; the test fails when the line of `Cat` is removed).
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.

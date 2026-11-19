@@ -215,6 +215,51 @@ class FileWalkerTest {
         }, results::add, errors::add)).isInstanceOf(StackOverflowError.class).hasMessage("deep");
     }
 
+    /** An interrupted read of an interruptible channel throws this, with no message (audit v2, R-11). */
+    @Test
+    void aReadInterruptedByCtrlCIsACancellationInTheSequentialWalk() {
+        var walker = FileWalker.builder().build();
+        try {
+            assertThatThrownBy(() -> walker.<String>walk(tmp, (path, attributes) -> {
+                if (attributes.isDirectory()) {
+                    return null;
+                }
+                throw new java.nio.channels.ClosedByInterruptException();
+            }, results::add, errors::add)).isInstanceOf(CancellationException.class);
+
+            assertThat(errors).isEmpty();
+            assertThat(Thread.currentThread().isInterrupted()).as("the flag is set again").isTrue();
+        } finally {
+            Thread.interrupted(); // leave the thread of the test as it was
+        }
+    }
+
+    @Test
+    void aReadInterruptedByCtrlCIsNotAnErrorOfTheFileInTheParallelWalk() {
+        var walker = FileWalker.builder().parallelism(4).build();
+
+        walker.<String>walk(tmp, (path, attributes) -> {
+            if (attributes.isDirectory()) {
+                return null;
+            }
+            throw new java.nio.channels.ClosedByInterruptException(); // the work was stopped under the visitor
+        }, results::add, errors::add);
+
+        assertThat(errors).isEmpty(); // it would read "cannot read x: null"
+    }
+
+    @Test
+    void anOrdinaryReadFailureIsStillAnError() {
+        FileWalker.builder().build().<String>walk(tmp, (path, attributes) -> {
+            if (attributes.isDirectory()) {
+                return null;
+            }
+            throw new IOException("disk on fire");
+        }, results::add, errors::add);
+
+        assertThat(errors).hasSize(4).allSatisfy(e -> assertThat(e.message()).isEqualTo("disk on fire"));
+    }
+
     @Test
     void errorsAreClassified() {
         Path path = tmp.resolve("x");

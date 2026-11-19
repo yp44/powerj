@@ -155,6 +155,7 @@ public final class FileWalker {
         try {
             result = visitor.visit(path, attributes);
         } catch (IOException e) {
+            Interruption.rethrow(e); // Ctrl+C is not an error of the file
             errors.accept(WalkError.of(path, e));
             return;
         }
@@ -334,6 +335,11 @@ public final class FileWalker {
                             queue.put(result);
                         }
                     } catch (IOException e) {
+                        if (Interruption.is(e)) {
+                            // The work was stopped under the visitor (the flag of this thread is set already, and a
+                            // worker never sets it again: it still has to signal its end): not an error of the file.
+                            throw new CancellationException();
+                        }
                         queue.put(WalkError.of(path, e));
                     } finally {
                         permits.release();
