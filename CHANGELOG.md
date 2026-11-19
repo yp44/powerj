@@ -1167,6 +1167,13 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   (`java.Cancellation`). `Interpreter.execute` also tests the flag before each statement, so a line abandoned by a second
   Ctrl+C stops at its next statement instead of running the rest. Tests: `JavaCallCancellationTest`, `PropertyReadTest`.
 
+### Fixed (a blocking error of the last stage no longer truncates the `2>` file, [#168](https://github.com/yp44/powerj/issues/168))
+- **`items --fail | boom 2> e.txt` keeps both lines** (audit v2, R-05). `PipelineExecutor` truncated the file once and every
+  stage then appended, but `Interpreter.statement` reported a blocking error of the last stage with the original target,
+  which is not in append mode: the file was truncated again and only the last line stayed. `2>` is now truncated once by
+  the statement (`Redirections.truncatedOnce`) and everything it writes, a blocking error included, appends. Test:
+  `BlockingErrorRedirectionTest`; acceptance sheet `step-3.md`, row 21b.
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.

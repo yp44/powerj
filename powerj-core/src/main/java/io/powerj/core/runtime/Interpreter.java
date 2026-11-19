@@ -248,7 +248,10 @@ public final class Interpreter implements CommandCatalog {
     private boolean statement(Statement statement) throws InterruptedException {
         Optional<NativeRunner.FileTarget> errTarget = Optional.empty();
         try {
-            errTarget = Redirections.target(statement.pipeline(), RedirectedStream.ERR, evaluator, session);
+            // `2>` is truncated here, once for the whole statement: a blocking error reported at the end appends to the file
+            // instead of erasing the errors of the stages before it (R-05).
+            errTarget = Redirections.truncatedOnce(
+                    Redirections.target(statement.pipeline(), RedirectedStream.ERR, evaluator, session));
             Optional<NativeRunner.FileTarget> outTarget =
                     Redirections.target(statement.pipeline(), RedirectedStream.OUT, evaluator, session);
             var redirections = new Redirections(outTarget, errTarget);
