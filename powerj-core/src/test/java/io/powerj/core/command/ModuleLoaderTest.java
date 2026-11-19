@@ -141,6 +141,34 @@ class ModuleLoaderTest {
     }
 
     @Test
+    void twoModulesWhoseNamesEndTheSameAreQualifiedByTheirFullNames() throws Exception {
+        hello(tmp.resolve("a.jar"), "com.a.greet", "greet");
+        hello(tmp.resolve("b.jar"), "org.b.greet", "greet");
+
+        run("mod-load a.jar");
+        assertThat(errors).isEmpty();
+        run("mod-load b.jar");
+
+        assertThat(errors).singleElement().asString().contains("\"greet\"", "org.b.greet", "available as org.b.greet:greet");
+        assertThat(registry.find("greet").orElseThrow().module()).isEqualTo("com.a.greet");
+        assertThat(registry.find("greet:greet").orElseThrow().module()).isEqualTo("com.a.greet");
+        assertThat(registry.find("org.b.greet:greet").orElseThrow().module()).isEqualTo("org.b.greet");
+        assertThat(run("mod-list")).contains("[org.b.greet:greet]");
+        assertThat(run("org.b.greet:greet -n Q")).contains("Hello Q");
+    }
+
+    @Test
+    void loadingAModuleCreatesItsProviderOnce() throws Exception {
+        hello(tmp.resolve("counted.jar"), "org.test.counted", "counted", Map.of(),
+                "public static int created; { created++; }");
+
+        run("mod-load counted.jar");
+
+        var provider = registry.find("counted").orElseThrow().provider();
+        assertThat(provider.getClass().getField("created").getInt(null)).isEqualTo(1);
+    }
+
+    @Test
     void builtinNamesAreReserved() throws Exception {
         hello(tmp.resolve("bad.jar"), "org.test.bad", "cd");
         run("mod-load bad.jar");

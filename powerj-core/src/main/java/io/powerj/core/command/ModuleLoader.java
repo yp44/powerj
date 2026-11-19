@@ -172,11 +172,12 @@ public final class ModuleLoader {
         List<String> cmdlets = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
         boolean found = false;
-        for (CmdletProvider provider : ServiceLoader.load(layer, CmdletProvider.class)) {
+        // Only the providers of this layer are created: iterating the loader would instantiate the built-in ones again.
+        List<CmdletProvider> providers = ServiceLoader.load(layer, CmdletProvider.class).stream()
+                .filter(candidate -> candidate.type().getModule().getLayer() == layer)
+                .map(ServiceLoader.Provider::get).toList();
+        for (CmdletProvider provider : providers) {
             Module module = provider.getClass().getModule();
-            if (module.getLayer() != layer) {
-                continue; // provider from a parent module (built-in cmdlets)
-            }
             found = true;
             List<Cmdlet<?, ?, ?>> provided = new ArrayList<>();
             for (Cmdlet<?, ?, ?> cmdlet : provider.cmdlets()) {
