@@ -148,6 +148,30 @@ class SupervisorTest {
     }
 
     @Test
+    void anAbandonedCommandIsCountedWhileItRunsAndNotAfter() throws Exception {
+        var started = new CountDownLatch(1);
+        var stop = new java.util.concurrent.atomic.AtomicBoolean();
+        var caller = Thread.ofVirtual().start(() -> supervisor.run("boucle", () -> {
+            started.countDown();
+            while (!stop.get()) {
+                Thread.onSpinWait();
+            }
+            return List.of();
+        }));
+        started.await();
+        assertThat(supervisor.abandonedRunning()).isZero();
+        supervisor.cancel();
+        assertThat(supervisor.abandonedRunning()).as("interrupted, not abandoned").isZero();
+        supervisor.cancel();
+        caller.join(TimeUnit.SECONDS.toMillis(10));
+
+        assertThat(supervisor.abandonedRunning()).isEqualTo(1);
+
+        stop.set(true);
+        io.powerj.core.support.Waits.until("the abandoned command to end", () -> supervisor.abandonedRunning() == 0);
+    }
+
+    @Test
     void cancelWithoutRunningCommandIsHarmless() {
         supervisor.cancel();
 

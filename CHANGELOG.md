@@ -1271,6 +1271,35 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   positions); a text shown whole keeps its line breaks. The characters whose width depends on the terminal (East Asian
   Ambiguous) count 1. The grid and the exports are not concerned. Tests: `DisplayWidthTest`, `OutputFormatterTest`.
 
+### Fixed (what a long session accumulates: processes, descriptors, threads, [#173](https://github.com/yp44/powerj/issues/173))
+- **An unusable `POWERJ_NATIVE_ENCODING` no longer leaves processes behind** (audit v2, R-13). `startGroup` resolved the charsets
+  after `ProcessBuilder.startPipeline`: with `bogus`, `sleep 30 | cat` started both programs, then failed, and they were stopped
+  only if the output was a pipe. The charsets are resolved first, and whatever fails after the start stops the processes.
+  Test: `NativeCleanupTest`.
+- **An `AutoCloseable` iterable or iterator is closed once read** (S-06, C-06): `ValueUnroller` closed a stream but not a
+  `DirectoryStream` or a `Scanner` that was displayed or piped; its Javadoc promised it. Test: `ValueUnrollerTest`.
+- **Stopping a background job stops its whole process group** (S-07): `PosixJobs` sent `SIGTERM`, `SIGCONT` and `SIGKILL` to the
+  pid of the leader, so the processes it had started (the grandchildren of `make &`) survived. The first stage, the leader of
+  the group, is signalled as `-pid`. Test: `PosixJobsTest`.
+- **`pipe`, `sigemptyset` and `sigfillset` report their `errno`** (R-16): they return -1 and set `errno`, which was read as an error
+  number ("pipe: error=-1, Unknown error -1" instead of `EMFILE`); they capture `errno` as `waitpid` does
+  (`PosixSpawn.describe`). **A NUL in an argument or an environment entry is refused** on Linux and macOS, as `ProcessBuilder`
+  and the Windows launcher do, instead of cutting the argument at the NUL. Test: `PosixSpawnTest`.
+- **The abandoned commands are counted** (S-06): a command abandoned by a second Ctrl+C keeps a 16 MB thread and, if it spins, a
+  core, and nothing showed it. `Supervisor.abandonedRunning()` counts those still alive and the prompt says so
+  (`n abandoned command(s) still running in the background`) until they end. Tests: `SupervisorTest`, `ReplLoopTest`.
+- **Not fixed, and why.** (2) A captured command whose program leaves a process in the background keeps the pipe open, and
+  the reader thread and its descriptor live until that process ends. On the CI of Linux and macOS the line then waits for the
+  end of the pipe (as the command substitution of a Unix shell does) and **Ctrl+C ends the line but not the reader**; in the
+  container where it was tried the JDK closes the pipe at the exit of the program and nothing is left, so the behaviour
+  depends on the system. Closing the streams of the process was tried and checked: **it does not wake a read that is
+  blocked** (Linux, platform and virtual threads), so it is not done; the only reliable way would be to start foreground programs
+  in a process group of their own and signal the group, which changes how the terminal's Ctrl+C reaches them and is left for a
+  decision. The test pins what holds everywhere: Ctrl+C ends the line (`NativeCleanupTest`). (4, Windows) The handles of the pipes
+  of a background job are created inheritable for the whole process, which a concurrent `ProcessBuilder.start()` could inherit;
+  the ticket marks it "to confirm on each system", it could not be reproduced or tested here (Linux only), and it is left as it
+  is rather than changed blind.
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.

@@ -85,8 +85,8 @@ final class PosixSpawn {
             FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS));
     private static final MethodHandle ATTR_SIGDEF = handle("posix_spawnattr_setsigdefault",
             FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS));
-    private static final MethodHandle SIGEMPTYSET = handle("sigemptyset", FunctionDescriptor.of(JAVA_INT, ADDRESS));
-    private static final MethodHandle SIGFILLSET = handle("sigfillset", FunctionDescriptor.of(JAVA_INT, ADDRESS));
+    private static final MethodHandle SIGEMPTYSET = capturing("sigemptyset", FunctionDescriptor.of(JAVA_INT, ADDRESS));
+    private static final MethodHandle SIGFILLSET = capturing("sigfillset", FunctionDescriptor.of(JAVA_INT, ADDRESS));
     private static final MethodHandle FA_INIT = handle("posix_spawn_file_actions_init",
             FunctionDescriptor.of(JAVA_INT, ADDRESS));
     private static final MethodHandle FA_DESTROY = handle("posix_spawn_file_actions_destroy",
@@ -103,7 +103,7 @@ final class PosixSpawn {
     /** macOS: keep a descriptor open in the child although {@code POSIX_SPAWN_CLOEXEC_DEFAULT} closes the others. */
     private static final MethodHandle FA_INHERIT = MAC ? handle("posix_spawn_file_actions_addinherit_np",
             FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT)) : null;
-    private static final MethodHandle PIPE = handle("pipe", FunctionDescriptor.of(JAVA_INT, ADDRESS));
+    private static final MethodHandle PIPE = capturing("pipe", FunctionDescriptor.of(JAVA_INT, ADDRESS));
     private static final MethodHandle CLOSE = handle("close", FunctionDescriptor.of(JAVA_INT, JAVA_INT));
     private static final MethodHandle KILL = handle("kill", FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT));
     private static final MethodHandle STRERROR = handle("strerror", FunctionDescriptor.of(ADDRESS, JAVA_INT));
@@ -193,8 +193,9 @@ final class PosixSpawn {
             MemorySegment defaults = arena.allocate(256, 8);
             ok("posix_spawnattr_init", (int) ATTR_INIT.invokeExact(attr));
             try {
-                ok("sigemptyset", (int) SIGEMPTYSET.invokeExact(mask));
-                ok("sigfillset", (int) SIGFILLSET.invokeExact(defaults));
+                MemorySegment capture = arena.allocate(CAPTURE);
+                failed("sigemptyset", (int) SIGEMPTYSET.invokeExact(capture, mask), capture);
+                failed("sigfillset", (int) SIGFILLSET.invokeExact(capture, defaults), capture);
                 ok("setsigmask", (int) ATTR_SIGMASK.invokeExact(attr, mask));
                 ok("setsigdefault", (int) ATTR_SIGDEF.invokeExact(attr, defaults));
                 short flags = (short) (POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF);
@@ -209,7 +210,7 @@ final class PosixSpawn {
                 ok("file_actions_init", (int) FA_INIT.invokeExact(actions));
                 try {
                     fileActions(actions, spec, arena);
-                    MemorySegment path = arena.allocateFrom(spec.executable().toString(), NAMES);
+                    MemorySegment path = cString(arena, spec.executable().toString());
                     MemorySegment argv = strings(arena, prepend(spec.executable().toString(), spec.args()));
                     List<String> environment = new ArrayList<>();
                     spec.env().forEach((name, value) -> environment.add(name + "=" + value));
@@ -244,7 +245,7 @@ final class PosixSpawn {
 
     private static void fileActions(MemorySegment actions, Spec spec, Arena arena) throws Throwable {
         if (spec.directory() != null) {
-            ok("addchdir_np", (int) FA_CHDIR.invokeExact(actions, arena.allocateFrom(spec.directory().toString(), NAMES)));
+            ok("addchdir_np", (int) FA_CHDIR.invokeExact(actions, cString(arena, spec.directory().toString())));
         }
         stdio(actions, arena, 0, spec.in(), spec.closeFds());
         stdio(actions, arena, 1, spec.out(), spec.closeFds());
@@ -272,7 +273,7 @@ final class PosixSpawn {
     }
 
     private static void open(MemorySegment actions, Arena arena, int fd, String path, int flags) throws Throwable {
-        ok("addopen", (int) FA_OPEN.invokeExact(actions, fd, arena.allocateFrom(path, NAMES), flags, 0666));
+        ok("addopen", (int) FA_OPEN.invokeExact(actions, fd, cString(arena, path), flags, 0666));
     }
 
     private static List<String> prepend(String first, List<String> rest) {
@@ -282,10 +283,21 @@ final class PosixSpawn {
         return all;
     }
 
-    private static MemorySegment strings(Arena arena, List<String> values) {
+    /**
+     * A C string. A NUL inside would end it there and the program would receive something else than what was written: it is
+     * refused, as {@code ProcessBuilder} and the Windows launcher do (audit v2, R-16).
+     */
+    private static MemorySegment cString(Arena arena, String value) throws IOException {
+        if (value.indexOf('\0') >= 0) {
+            throw new IOException("invalid null character in a command, an argument or an environment entry");
+        }
+        return arena.allocateFrom(value, NAMES);
+    }
+
+    private static MemorySegment strings(Arena arena, List<String> values) throws IOException {
         MemorySegment array = arena.allocate(8L * (values.size() + 1), 8);
         for (int i = 0; i < values.size(); i++) {
-            array.setAtIndex(ADDRESS, i, arena.allocateFrom(values.get(i), NAMES));
+            array.setAtIndex(ADDRESS, i, cString(arena, values.get(i)));
         }
         array.setAtIndex(ADDRESS, values.size(), MemorySegment.NULL);
         return array;
@@ -340,7 +352,8 @@ final class PosixSpawn {
     static int[] pipe() throws IOException {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment fds = arena.allocate(8, 4);
-            ok("pipe", (int) PIPE.invokeExact(fds));
+            MemorySegment capture = arena.allocate(CAPTURE);
+            failed("pipe", (int) PIPE.invokeExact(capture, fds), capture);
             return new int[] {fds.getAtIndex(JAVA_INT, 0), fds.getAtIndex(JAVA_INT, 1)};
         } catch (IOException e) {
             throw e;
@@ -373,14 +386,36 @@ final class PosixSpawn {
 
     private static void ok(String what, int rc) throws IOException {
         if (rc != 0) {
-            String message;
-            try {
-                message = strerror(rc);
-            } catch (Throwable t) {
-                message = t.toString();
-            }
-            throw new IOException(what + ": error=" + rc + ", " + message);
+            throw new IOException(describe(what, rc));
         }
+    }
+
+    /**
+     * For the calls that return -1 and set {@code errno} ({@code pipe}, {@code sigemptyset}, {@code sigfillset}): the error
+     * is the errno that the call captured, not the -1 that it returned (audit v2, R-16).
+     */
+    private static void failed(String what, int rc, MemorySegment capture) throws IOException {
+        if (rc != 0) {
+            throw new IOException(describe(what, (int) ERRNO.get(capture, 0L)));
+        }
+    }
+
+    /** {@code pipe: error=24, Too many open files}: the name of the call, the error number and its text. */
+    static String describe(String what, int errno) {
+        String message;
+        try {
+            message = strerror(errno);
+        } catch (Throwable t) {
+            message = t.toString();
+        }
+        return what + ": error=" + errno + ", " + message;
+    }
+
+    /** A call whose first argument is the segment that receives {@code errno}. */
+    private static MethodHandle capturing(String name, FunctionDescriptor descriptor) {
+        return LINKER.downcallHandle(LINKER.defaultLookup().find(name)
+                .orElseThrow(() -> new IllegalStateException("not in libc: " + name)), descriptor,
+                Linker.Option.captureCallState("errno"));
     }
 
     private static MethodHandle handle(String name, FunctionDescriptor descriptor) {

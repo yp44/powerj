@@ -112,6 +112,10 @@ public final class Repl {
                 terminal.resume(); // a command abandoned with a second Ctrl+C may still hold the console
             }
             session.jobs().drainFinished().forEach(out::println); // FR-75: background jobs ended meanwhile
+            int stale = supervisor.abandonedRunning();
+            if (stale > 0) {
+                out.println(Messages.get("command.abandoned.running", stale)); // FR-57: they hold a thread, maybe a core
+            }
             out.flush();
             try {
                 line = editor.readLine(prompt.forJLine());

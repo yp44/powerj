@@ -58,12 +58,16 @@ final class PosixJobs {
         // Only now, with every stage started and in its group, may an ended stage be reaped: a stage that joins the group of
         // the first one fails with EPERM once the first has ended and been reaped.
         started.forEach(PosixSpawn::reap);
-        return started.stream().<Process>map(s -> new SpawnedProcess(s.pid(), s.exit(),
-                () -> {
-                    PosixSpawn.kill(s.pid(), PosixSpawn.SIGTERM);
-                    PosixSpawn.kill(s.pid(), PosixSpawn.SIGCONT); // a job stopped by the terminal keeps SIGTERM pending
-                }, () -> PosixSpawn.kill(s.pid(), PosixSpawn.SIGKILL)))
-                .toList();
+        int leader = started.getFirst().pid();
+        return started.stream().<Process>map(s -> {
+            // The first stage leads the group: stopping it stops the group, the processes that the stage started included
+            // (the grandchildren of `make &`); a pid alone would leave them running (audit v2, S-07).
+            int target = s.pid() == leader ? -leader : s.pid();
+            return new SpawnedProcess(s.pid(), s.exit(), () -> {
+                PosixSpawn.kill(target, PosixSpawn.SIGTERM);
+                PosixSpawn.kill(target, PosixSpawn.SIGCONT); // a job stopped by the terminal keeps SIGTERM pending
+            }, () -> PosixSpawn.kill(target, PosixSpawn.SIGKILL));
+        }).toList();
     }
 
     /**
