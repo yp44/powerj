@@ -969,7 +969,7 @@ CA:
 
 ```text
 ps [name...] [-u|--user <user>]
-kill [pid...] [-f|--force] [-w|--wait] [-v|--verbose] [-n|--dry-run]
+kill [pid...] [-f|--force] [-w|--wait [--timeout <duration>]] [-v|--verbose] [-n|--dry-run] [--allow-protected]
 ```
 
 Both cmdlets use the JDK (`ProcessHandle`), without native calls, and behave the same on every platform. The native programs remain available with `^ps` and `^kill` (FR-14).
@@ -992,13 +992,15 @@ public record ProcessEntry(long pid, Long parent, String name, String command, S
 **`kill`** stops the processes given by pid, or received from the pipeline: `ProcessEntry`, `ProcessHandle`, `Process`, or an integer (`ps notepad | kill`).
 - **Stop mode**: without `-f`, a normal stop (`SIGTERM` on Unix); with `-f`, a forcible one (`SIGKILL`). On Windows, every stop is forcible. Other signals (`HUP`, `STOP`…) are not available: use the native program (`^kill -HUP 1234`).
 - **Output**:
-  - `kill` returns without waiting, and `-w` waits for each end;
+  - `kill` returns without waiting, and `-w` waits for each end, for `--timeout` at most (default 10 s, a duration above zero): a process still running then is reported (`process 1234 (java) is still running after 10s: use -f to force it`), is not emitted with `-v`, and the other targets go on;
   - it emits nothing, except with `-v` (the processes stopped) or `-n` (the processes that would be stopped, without stopping them).
 - **Errors** (non-blocking, the other targets are processed):
   - a pid that does not exist;
   - a process that cannot be stopped;
+  - a process that is **protected**, like `rm` has its protected paths: a parent of PowerJ (the terminal, the IDE, the shell it was started from) or the init process (pid 1 on Unix, the System and Idle processes on Windows): `refusing to stop 4242 (terminal): PowerJ runs inside it (stop it anyway with --allow-protected)`. The check comes before `-n`, so a dry run does not list what the real run would refuse. A `where` that is too wide in `ps | where … | kill` no longer ends the session that typed it;
+  - a `ProcessEntry` whose process is not the one it described: when the entry carries a start time and the process now at that pid started at another time, the pid was reused and the error is `no process <pid>`;
   - PowerJ itself: the JDK forbids it, `cannot stop PowerJ itself (use exit)`.
-- The parents of PowerJ (the terminal) are stopped like any other process.
+- `--allow-protected` lifts the refusal of the parents and of init (never the one of PowerJ itself).
 - `kill` never runs in preview.
 
 CA:
