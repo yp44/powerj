@@ -240,7 +240,8 @@ public final class FileWalker {
                 return new Entry(path, own, own.isDirectory());
             }
             try {
-                return new Entry(path, Files.readAttributes(path, BasicFileAttributes.class), false);
+                // the target is listed, and the entry still knows it is a link
+                return new Entry(path, FollowedLink.of(Files.readAttributes(path, BasicFileAttributes.class)), false);
             } catch (IOException _) {
                 return new Entry(path, own, false); // broken link: described by itself
             }

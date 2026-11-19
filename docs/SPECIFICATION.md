@@ -477,10 +477,12 @@ public record FileEntry(
         Instant modified,  // last modification
         Path path,         // absolute path
         boolean dir,       // true if folder
-        String ext) { }    // extension without the dot, "" if none
+        String ext,        // extension without the dot, "" if none
+        boolean link,      // true for a symbolic link (not displayed)
+        boolean hidden) { } // true for a hidden entry (not displayed)
 ```
 
-Columns displayed by default: `name size modified dir`. The absolute path is the `path` property, not displayed but usable: `(ls)*.path`, `ls | map { f -> f.path }`. Folders are listed before files, in alphabetical order (except with `--parallel`). The walk is **lazy** (streaming): `ls -r C:\ | where …` displays the first results immediately and Ctrl+C interrupts it. An inaccessible folder produces a non-blocking error and the walk continues.
+Columns displayed by default: `name size modified dir`; `link` and `hidden` are properties like `path`: `(ls)*.link`, `ls | where { $_.link }`. A **symbolic link** is listed with the attributes of its target (a link to a folder has `dir` true, as before) and `link` true, so a link can be told from the folder before `rm -r`; a link that is **broken** is listed with its own attributes (and named by itself, `ls broken` lists it instead of saying nothing). A link is not followed by `-r`. The absolute path is the `path` property, not displayed but usable: `(ls)*.path`, `ls | map { f -> f.path }`. Folders are listed before files, in alphabetical order (except with `--parallel`). The walk is **lazy** (streaming): `ls -r C:\ | where …` displays the first results immediately and Ctrl+C interrupts it. An inaccessible folder produces a non-blocking error and the walk continues.
 
 CA:
 - `ls` displays the contents of the current directory as a table;

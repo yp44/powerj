@@ -131,7 +131,8 @@ class JoinTest {
         var file = new FileEntry("a.txt", 2048, Instant.EPOCH, Path.of("/tmp/a.txt"), false, "txt");
         var right = new Object[] {row("name", "a.txt", "owner", "me")};
         List<Row> rows = join(byKey(right, "name"), file);
-        assertThat(rows.getFirst().keySet()).containsExactly("name", "size", "modified", "path", "dir", "ext", "owner");
+        assertThat(rows.getFirst().keySet()).containsExactly("name", "size", "modified", "path", "dir", "ext", "link", "hidden",
+                "owner");
         assertThat(rows.getFirst().get("owner")).isEqualTo("me");
         assertThat(rows.getFirst().sizeColumns()).containsExactly("size");
 

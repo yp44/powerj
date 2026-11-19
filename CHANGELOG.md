@@ -1093,6 +1093,16 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   process is not reported as stopped and the other targets go on. A timeout that is not above zero is a usage error.
   Tests: `PsKillTest` (the parents and init with `-n`, so that a failing test stops nothing; a stale entry on a real child; a
   child whose shutdown hook never returns), seen failing before the change.
+### Fixed and added (`ls` of a broken link, and `FileEntry.link` and `hidden`, [#162](https://github.com/yp44/powerj/issues/162))
+- **`ls broken` lists the broken link instead of printing nothing** (audit v2, U-06). `FileEntries.of` followed the link,
+  swallowed the failure (`vanished`) and returned nothing, while listing the parent showed the link. It now falls back to the
+  link's own attributes, as `FileWalker` does.
+- **`FileEntry` tells a link from a folder.** It gains `link` (a symbolic link: its other attributes are its target's, so a
+  link to a folder is still `dir`) and `hidden` (a leading dot, or the hidden attribute on Windows), outside the default
+  columns, so the table is unchanged and `(ls)*.link`, `ls | where { $_.link }`, `to-json` and `to-csv` have them. The
+  six-argument constructor stays. `FileWalker` hands the visitor the target's attributes through `FollowedLink`, which still
+  answers `isSymbolicLink()` with `true`: no system call is added per entry. Tests: `LsTest` (a broken link named and listed in
+  its parent, a link to a folder, a wildcard, hidden entries, the default columns).
 
 ## [0.1.0] — never released (baseline)
 
