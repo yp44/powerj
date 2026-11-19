@@ -11,17 +11,21 @@ import io.powerj.core.i18n.Messages;
  * The Java calls that would act on the shell itself rather than on the command (FR-58): ending the JVM, or taking the
  * standard streams away from the terminal. One policy per session.
  * <p>
- * Every call to Java code, whatever way it was written, goes through {@link JavaInvoker}, which asks the policy first:
+ * Every call of a Java <em>method</em>, whatever way it was written, goes through {@link JavaInvoker}, which asks the
+ * policy first. Constructors are not asked: none of the Java library's ends the JVM or replaces a standard stream, and
+ * {@code PreviewGuard} still sees them.
  * {@code System.exit(1)}, the method reference {@code System::exit} (also when a stream calls it), a lambda that calls
  * it, or {@code Method.invoke} on the {@code exit} method. Review finding C-12: the interception used to be written
  * for the direct call only.
  * <ul>
  *   <li>{@code System.exit}, {@code Runtime.exit}, {@code Runtime.halt}: the same as the {@code exit} command, that is
  *       an exit request of the session, honoured when the line ends (clean shutdown, history saved);</li>
- *   <li>{@code System.setOut}, {@code setErr}, {@code setIn}: refused, they would break the display.</li>
+ *   <li>{@code System.setOut}, {@code setErr}, {@code setIn}: refused, they would break the display; so is
+ *       {@code close()} on {@code System.out}, {@code System.err} and {@code System.in}.</li>
  * </ul>
- * This guards against accidents. It is not a sandbox: code that goes through a {@code MethodHandle} or native code is
- * not seen, and a third-party module runs with the rights of the shell.
+ * This guards against accidents. It is not a sandbox: code that goes through a {@code MethodHandle} (for example
+ * {@code MethodHandles.publicLookup().findStatic(System.class, "exit", …)}) or through native code is not seen, and a
+ * third-party module runs with the rights of the shell.
  */
 public final class CallPolicy {
 
@@ -58,12 +62,23 @@ public final class CallPolicy {
         if (owner == System.class && REFUSED_SYSTEM_METHODS.contains(name)) {
             throw new PjException(Messages.get("java.systemRefused", name));
         }
+        if (name.equals("close") && args.length == 0 && isSystemStream(target) != null) {
+            throw new PjException(Messages.get("java.systemCloseRefused", isSystemStream(target)));
+        }
         if (owner == Method.class && name.equals("invoke") && target instanceof Method inner) {
             // Reflection: the call that matters is the one of the method being invoked.
             Object[] innerArgs = args.length > 1 && args[1] instanceof Object[] values ? values : new Object[0];
             return intercept(inner, args.length > 0 ? args[0] : null, innerArgs);
         }
         return false;
+    }
+
+    /** {@code "out"}, {@code "err"} or {@code "in"} if {@code target} is that standard stream as it is now, else {@code null}. */
+    private static String isSystemStream(Object target) {
+        if (target == null) {
+            return null;
+        }
+        return target == System.out ? "out" : target == System.err ? "err" : target == System.in ? "in" : null;
     }
 
     /** Equivalent to the command {@code exit code}. */

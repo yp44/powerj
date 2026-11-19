@@ -200,4 +200,42 @@ class JavaInvokerTest {
         var cancelled = new CancellationException();
         assertThat(JavaInvoker.javaException(cancelled)).isSameAs(cancelled);
     }
+
+    // --- the table of instance methods (#171, audit v2 R-22) ---
+
+    /** Two types with the same simple name, as {@code java.util.Date} and {@code java.sql.Date} are. */
+    public static final class First {
+        public static final class Same { }
+    }
+
+    public static final class Second {
+        public static final class Same { }
+    }
+
+    public static final class Overloads {
+        public String foo(First.Same value) {
+            return "first";
+        }
+
+        public String foo(Second.Same value) {
+            return "second";
+        }
+    }
+
+    @Test
+    void theTableOfInstanceMethodsCannotBeChangedByItsReaders() {
+        Map<String, List<java.lang.reflect.Method>> methods = JavaInvoker.instanceMethods(String.class);
+
+        assertThatThrownBy(methods::clear).isInstanceOf(UnsupportedOperationException.class);
+        assertThatThrownBy(() -> methods.get("length").clear()).isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test
+    void twoOverloadsThatDifferByThePackageOfAParameterAreBothReachable() {
+        assertThat(JavaInvoker.instanceMethods(Overloads.class).get("foo")).hasSize(2);
+        assertThat(JavaInvoker.invokeVirtual(POLICY, new Overloads(), "foo", List.of(new Second.Same())))
+                .isEqualTo("second");
+        assertThat(JavaInvoker.invokeVirtual(POLICY, new Overloads(), "foo", List.of(new First.Same())))
+                .isEqualTo("first");
+    }
 }

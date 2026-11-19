@@ -62,6 +62,27 @@ class CallPolicyTest {
                 new Object[] {null})).hasMessage("System.setErr is refused: it would break the shell display");
     }
 
+    /** The class promises to keep the streams: closing one is as bad as replacing it (#171, audit v2 R-14). */
+    @Test
+    void theStandardStreamsCannotBeClosed() throws Exception {
+        Method closeOut = method(java.io.PrintStream.class, "close");
+        Method closeIn = method(java.io.InputStream.class, "close");
+
+        assertThatThrownBy(() -> policy.intercept(closeOut, System.out, new Object[0])).isInstanceOf(PjException.class)
+                .hasMessage("closing System.out is refused: it would break the shell display");
+        assertThatThrownBy(() -> policy.intercept(closeOut, System.err, new Object[0]))
+                .hasMessage("closing System.err is refused: it would break the shell display");
+        assertThatThrownBy(() -> policy.intercept(closeIn, System.in, new Object[0]))
+                .hasMessage("closing System.in is refused: it would break the shell display");
+    }
+
+    @Test
+    void otherStreamsCanBeClosed() throws Exception {
+        var mine = new java.io.PrintStream(java.io.OutputStream.nullOutputStream());
+
+        assertThat(policy.intercept(method(java.io.PrintStream.class, "close"), mine, new Object[0])).isFalse();
+    }
+
     @Test
     void otherCallsGoOn() throws Exception {
         assertThat(policy.intercept(method(Math.class, "abs", int.class), null, new Object[] {-1})).isFalse();

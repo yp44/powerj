@@ -32,4 +32,22 @@ class JavaClassesNamesTest {
     void aClassNameIsStillFound(String text) {
         assertThat(classes.find(text)).isPresent();
     }
+
+    /** {@code Class.forName} wants the binary name {@code java.util.Map$Entry}: the import used to fail (#171, audit v2 R-07). */
+    @ParameterizedTest
+    @ValueSource(strings = {"java.util.Map.Entry", "java.net.http.HttpResponse.BodyHandlers"})
+    void aNestedClassCanBeImportedByItsSourceName(String name) {
+        classes.addImport(name);
+
+        String simple = name.substring(name.lastIndexOf('.') + 1);
+        assertThat(classes.simpleClass(simple)).hasValueSatisfying(type -> assertThat(type.getName())
+                .isEqualTo(name.substring(0, name.lastIndexOf('.')) + "$" + simple));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"java.util.Map.Nothing", "java.util.Nothing.Entry"})
+    void aNestedClassThatDoesNotExistIsStillAnImportError(String name) {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> classes.addImport(name))
+                .isInstanceOf(io.powerj.core.error.PjException.class);
+    }
 }

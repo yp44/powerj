@@ -1,7 +1,6 @@
 package io.powerj.core.java;
 
 import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.List;
 
@@ -62,10 +61,10 @@ public sealed interface MethodReference extends Applicable {
                     : Messages.get("methodref.notApplicable", this, describe(args)));
         }
 
+        /** The static methods are those {@link JavaInvoker#invokeStatic} chooses among, found once per class. */
         private boolean hasStatic(int arity) {
-            for (Method m : type.getMethods()) {
-                if (m.getName().equals(method) && Modifier.isStatic(m.getModifiers())
-                        && (m.getParameterCount() == arity || m.isVarArgs() && arity >= m.getParameterCount() - 1)) {
+            for (Method m : JavaInvoker.staticMethods(type, method)) {
+                if (m.getParameterCount() == arity || m.isVarArgs() && arity >= m.getParameterCount() - 1) {
                     return true;
                 }
             }
