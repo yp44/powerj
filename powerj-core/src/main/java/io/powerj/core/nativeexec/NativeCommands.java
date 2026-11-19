@@ -67,8 +67,13 @@ public final class NativeCommands {
             lowered = copy;
             loweredFrom = names;
         }
-        return lowered.contains(name.toLowerCase(Locale.ROOT));
+        String lower = name.toLowerCase(Locale.ROOT);
+        // git, or git.exe: Windows finds a program both ways (review of #219)
+        return lowered.contains(lower) || fileNames.contains(lower);
     }
+
+    /** On Windows, the file names of the last scan with their extension, in lower case. */
+    private Set<String> fileNames = Set.of();
 
     private Set<String> lowered;
     private Set<String> loweredFrom;
@@ -84,6 +89,7 @@ public final class NativeCommands {
     private Set<String> scan(String path, String pathext) {
         List<String> extensions = List.of(pathext.toLowerCase(Locale.ROOT).split(";"));
         Set<String> names = new TreeSet<>();
+        Set<String> withExtensions = new java.util.HashSet<>();
         for (String entry : path.split(Pattern.quote(windows ? ";" : ":"))) {
             if (entry.isBlank()) {
                 continue;
@@ -104,6 +110,7 @@ public final class NativeCommands {
                         int dot = name.lastIndexOf('.');
                         if (dot > 0 && extensions.contains(name.substring(dot).toLowerCase(Locale.ROOT))) {
                             names.add(name.substring(0, dot));
+                            withExtensions.add(name.toLowerCase(Locale.ROOT));
                         }
                     } else if (Files.isRegularFile(file) && Files.isExecutable(file)) {
                         names.add(name);
@@ -113,6 +120,7 @@ public final class NativeCommands {
                 // unreadable directory: ignored
             }
         }
+        fileNames = withExtensions;
         return Collections.unmodifiableSortedSet((TreeSet<String>) names);
     }
 }
