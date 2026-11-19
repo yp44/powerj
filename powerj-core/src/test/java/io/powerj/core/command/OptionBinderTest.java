@@ -236,7 +236,18 @@ class OptionBinderTest {
 
     record ListNotLast(@Option(position = 0) List<String> many, @Option(position = 1) String last) { }
 
-    record Unsupported(Thread thread) { }
+    /** Any type: given an instance of it, as a block or an expression gives one (the rule before #166, kept). */
+    record AnyType(java.util.regex.Pattern pattern, List<Thread> threads) { }
+
+    @Test
+    void anOptionOfAnyTypeIsAcceptedAndReceivesAnInstanceOfIt() {
+        OptionBinder.validate(AnyType.class);
+        var pattern = java.util.regex.Pattern.compile("a.*");
+
+        assertThat(OptionBinder.bind("t", AnyType.class, List.of("--pattern", pattern)).pattern()).isSameAs(pattern);
+        assertThatThrownBy(() -> OptionBinder.bind("t", AnyType.class, List.of("--pattern", "a.*")))
+                .isInstanceOf(io.powerj.core.error.PjException.class).hasMessage("t: unsupported option type: Pattern");
+    }
 
     @Test
     void aValidRecordHasNoProblem() {
@@ -255,8 +266,6 @@ class OptionBinderTest {
                 .hasMessageContaining("second").hasMessageContaining("position 0");
         assertThatThrownBy(() -> OptionBinder.validate(ListNotLast.class)).isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("many");
-        assertThatThrownBy(() -> OptionBinder.validate(Unsupported.class)).isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("thread").hasMessageContaining("Thread");
     }
 
     // --- what the help and the errors tell about the type of an option (audit v2, U-05, #176) ---

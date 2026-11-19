@@ -349,7 +349,7 @@ Each stage runs in a **virtual thread**; stages are connected by bounded queues 
 
 ## Writing your own cmdlet
 
-A cmdlet is a Java class implementing `Cmdlet<P extends Record, I, O>`: `P` is a record of options annotated with `@Option`, `I` the type received from the pipeline (`Void` if none), `O` the type produced (a record is recommended). The shell calls `begin`, then `process` for each input object, then `end`. An option can be a `String`, any primitive or its box (`boolean`, `int`, `long`, `double`, `float`, `short`, `byte`, `char`), a `Path`, a `Duration`, an enum, a `ScriptBlock`, an `Object` or a `List` of these; a record that declares a short or long name or a position twice, a positional `List` that is not the last positional, or another type is refused when the module is loaded, with one warning that names the component.
+A cmdlet is a Java class implementing `Cmdlet<P extends Record, I, O>`: `P` is a record of options annotated with `@Option`, `I` the type received from the pipeline (`Void` if none), `O` the type produced (a record is recommended). The shell calls `begin`, then `process` for each input object, then `end`. An option is converted from text when it is a `String`, any primitive or its box (`boolean`, `int`, `long`, `double`, `float`, `short`, `byte`, `char`), a `Path`, a `Duration`, an enum or a `List` of these; an option of another type (an `Object`, a `ScriptBlock`, a `Pattern`…) receives a value that already is of that type. A record that declares a short or long name or a position twice, or a positional `List` that is not the last positional, is refused when the module is loaded, with one warning that names the component.
 
 ```java
 public record GreetParams(

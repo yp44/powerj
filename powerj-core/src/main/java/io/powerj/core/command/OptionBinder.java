@@ -20,7 +20,6 @@ import java.util.regex.Pattern;
 import java.util.stream.IntStream;
 
 import io.powerj.api.Option;
-import io.powerj.api.ScriptBlock;
 import io.powerj.core.error.PjError;
 import io.powerj.core.error.PjException;
 import io.powerj.core.format.Values;
@@ -457,21 +456,13 @@ public final class OptionBinder {
         }
     }
 
-    /** The scalar types an option can have; an enum is accepted too. A {@link ScriptBlock} comes from a {@code { }} block. */
-    private static final java.util.Set<Class<?>> SUPPORTED = java.util.Set.of(String.class, Duration.class, Path.class,
-            int.class, Integer.class, long.class, Long.class, double.class, Double.class, float.class, Float.class,
-            short.class, Short.class, byte.class, Byte.class, char.class, Character.class, boolean.class,
-            Boolean.class, Object.class, ScriptBlock.class);
-
-    private static boolean supported(Class<?> type) {
-        return SUPPORTED.contains(type) || type.isEnum();
-    }
-
     /**
      * Checks that a parameter record can be bound, the first time it is used or when its cmdlet is registered: a short
-     * or long name or a position given twice, a positional list that is not the last positional, a type that
-     * {@link #bind} cannot convert. Each is a mistake of the cmdlet's author, which would otherwise cost one failed call
-     * per user (audit v2, R-02).
+     * or long name or a position given twice, a positional list that is not the last positional. Each is a mistake of the
+     * cmdlet's author, which would otherwise cost one failed call per user (audit v2, R-02). The type of an option is free:
+     * the types {@link #bind} converts from text (numbers, text, paths, durations, enums…) are converted, any other type
+     * receives a value that already is an instance of it ({@code --pattern ([java.util.regex.Pattern]::compile("a.*"))}),
+     * and is refused at the call otherwise ({@code option.unsupportedType}).
      *
      * @throws IllegalArgumentException with a message that names the component
      */
@@ -480,12 +471,6 @@ public final class OptionBinder {
         java.util.Map<String, String> seen = new java.util.HashMap<>();
         for (OptionSpec spec : specs) {
             String name = spec.component().getName();
-            Class<?> component = spec.component().getType();
-            Class<?> element = component == List.class ? elementType(spec.component().getGenericType()) : component;
-            if (!supported(element)) {
-                throw new IllegalArgumentException(Messages.get("option.declaration.unsupportedType", type.getSimpleName(),
-                        name, element.getSimpleName()));
-            }
             claim(seen, "--" + spec.longName(), name, type);
             if (spec.shortName() != '\0') {
                 claim(seen, "-" + spec.shortName(), name, type);

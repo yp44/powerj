@@ -1173,9 +1173,11 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   (`Array.get(Array.newInstance(type, 1), 0)`); `float`, `short`, `byte` and `char` (exactly one character) are converted like
   the other numbers, and a value out of range is an "invalid value" error. `construct` also catches `IllegalArgumentException`.
 - **A faulty parameter record is reported when its cmdlet is registered**, not one failed call at a time: two components
-  with the same short name, long name or position, a positional `List` that is not the last positional, or an unsupported
-  type give one `module.cmdletIgnored` warning that names the component, and the cmdlet is left out
-  (`OptionBinder.validate`, called by `CmdletRegistry`). README, "Writing your own cmdlet": the supported types.
+  with the same short name, long name or position, or a positional `List` that is not the last positional, give one
+  `module.cmdletIgnored` warning that names the component, and the cmdlet is left out. The type of an option stays free (the
+  maintainer's decision in the review of #219): any type that is not converted from text receives a value that already is an
+  instance of it, as before (`OptionBinder.validate`, called by `CmdletRegistry`). README, "Writing your own cmdlet": the
+  types converted from text.
   Tests: `OptionBinderTest`, `ParametersValidationTest`.
 ### Fixed (a mistake of the user is never an "internal error", [#167](https://github.com/yp44/powerj/issues/167))
 - **Overflowing literals and indexes are syntax errors** (audit v2, R-03). `200000d` and `99999999tb` ended in an
