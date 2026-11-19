@@ -85,7 +85,7 @@ public final class JavaClasses {
             }
             packages.add(pkg);
         } else {
-            Class<?> type = qualified(target).orElseThrow(() ->
+            Class<?> type = sourceName(target).orElseThrow(() ->
                     new PjException(Messages.get("import.classNotFound", target)));
             classes.put(type.getSimpleName(), target);
         }
@@ -209,7 +209,7 @@ public final class JavaClasses {
     private Lookup lookupSimple(Imports current, String name) {
         String imported = current.classes().get(name);
         if (imported != null) {
-            return qualified(imported).<Lookup>map(Lookup.Found::new).orElse(new Lookup.Missing());
+            return sourceName(imported).<Lookup>map(Lookup.Found::new).orElse(new Lookup.Missing());
         }
         List<Class<?>> found = new ArrayList<>();
         for (String pkg : current.packages()) {
@@ -220,6 +220,26 @@ public final class JavaClasses {
             case 1 -> new Lookup.Found(found.getFirst());
             default -> new Lookup.Ambiguous(found.stream().map(Class::getName).toList());
         };
+    }
+
+    /**
+     * A class written as in the source, nested ones included: {@code java.util.Map.Entry} is the class
+     * {@code java.util.Map$Entry}, which {@code Class.forName} wants under that binary name (audit v2, R-07).
+     */
+    private Optional<Class<?>> sourceName(String name) {
+        String[] parts = name.split("\\.");
+        var prefix = new StringBuilder();
+        Optional<Class<?>> type = Optional.empty();
+        int next = 0;
+        for (int i = 0; i < parts.length && type.isEmpty(); i++) {
+            prefix.append(i == 0 ? "" : ".").append(parts[i]);
+            type = qualified(prefix.toString());
+            next = i + 1;
+        }
+        for (int i = next; i < parts.length && type.isPresent(); i++) {
+            type = nested(type.get(), parts[i]);
+        }
+        return type;
     }
 
     private Optional<Class<?>> qualified(String name) {

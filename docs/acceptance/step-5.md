@@ -33,6 +33,8 @@ As in the previous steps: **Actions** tab, latest run of the **CI** workflow, ar
 | 19 | `BigInteger.valueOf(3).pow(300000000).bitLength()` then Ctrl+C, then Ctrl+C again | The JDK computation ignores the first request; the second one returns control with `command abandoned, it keeps running in the background: …`. |
 | 20 | `System.out.println("bonjour " + Math.max(1, 2))` | `bonjour 2`, without corrupting the input line. |
 | 21 | `System.setOut(null)` | Refused: `System.setOut is refused: it would break the shell display`. |
+| 21b | `System.out.close()` | Refused: `closing System.out is refused: it would break the shell display`; the shell still prints afterwards (#171). |
+| 5b | `import java.util.Map.Entry`, then `Entry.comparingByKey()` | The import is accepted (a nested class is written as in the source, not with the `$` of its binary name) and the call answers a comparator (#171). |
 | 22 | `System.exit(6)` then, in `cmd.exe`, `echo %ERRORLEVEL%` | PowerJ exits cleanly (history saved); `6`. |
 
 ## Syntax points to know

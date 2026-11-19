@@ -1230,6 +1230,23 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   refusal prints is in `config.properties`, and then reaches the loader. Checked by hand: with `--illegal-native-access=warn`
   the first jar goes through. It is not in the Windows job, whose smoke tests are inline PowerShell (#183).
 
+### Fixed (Java interop, five small defects of `core.java`, [#171](https://github.com/yp44/powerj/issues/171))
+- **`import java.util.Map.Entry` works** (audit v2, R-07). `addImport` asked `Class.forName("java.util.Map.Entry")`, which
+  wants the binary name `Map$Entry`, while `find` already resolved nested classes: the import always ended in
+  `import.classNotFound`, `java.net.http.HttpResponse.BodyHandlers` too. Both now go through the same reading of a name as
+  written in the source (`JavaClasses.sourceName`).
+- **`Integer::parseInt` no longer copies every public method of `Integer` for each object** (R-22): `MethodReference.OfClass`
+  scanned `getMethods()` per call, with a rule of its own; it now asks `JavaInvoker.staticMethods`, found once per class,
+  the table that `invokeStatic` chooses from, so "there is a static method" and "it can be called" cannot disagree.
+- **The table of instance methods is immutable and tells overloads apart by their full types** (R-22):
+  `JavaInvoker.instanceMethods` handed out a mutable `LinkedHashMap` and de-duplicated on the *simple* names of the
+  parameters, so `foo(java.util.Date)` and `foo(java.sql.Date)` collapsed into one.
+- **`System.out.close()`, `System.err.close()` and `System.in.close()` are refused** like `System.setOut` (R-14): `CallPolicy`
+  promised to keep the streams and did not. Its Javadoc now says what it does not see (a `MethodHandle`, for example
+  `MethodHandles.publicLookup().findStatic(System.class, "exit", …)`) and that constructors are not asked: none of the Java
+  library's ends the JVM or replaces a stream, and `PreviewGuard` still sees them (the alternative of the ticket, narrowing the
+  Javadoc, was taken). Tests: `JavaClassesNamesTest`, `JavaInvokerTest`, `CallPolicyTest`.
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.

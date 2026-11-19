@@ -11,7 +11,9 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -44,13 +46,16 @@ public final class JavaInvoker {
             Map<String, Boolean> seen = new LinkedHashMap<>();
             for (Class<?> t : Members.accessibleTypes(type)) {
                 for (Method m : t.getMethods()) {
+                    // The name and the full types of the parameters: foo(java.util.Date) and foo(java.sql.Date) are two methods.
+                    String identity = m.getName() + Arrays.toString(m.getParameterTypes());
                     if (!Modifier.isStatic(m.getModifiers()) && Members.isAccessible(m.getDeclaringClass())
-                            && seen.putIfAbsent(signature(m), true) == null) {
+                            && seen.putIfAbsent(identity, true) == null) {
                         byName.computeIfAbsent(m.getName(), _ -> new ArrayList<>()).add(m);
                     }
                 }
             }
-            return byName;
+            byName.replaceAll((_, methods) -> List.copyOf(methods));
+            return Collections.unmodifiableMap(byName); // shared by every caller, the completion's included
         }
     };
 
