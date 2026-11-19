@@ -82,7 +82,7 @@ Out of scope for v1: control structures (`if`, `foreach`, functions — planned 
 
 | Cmdlet | What it does | Acceptance checklist |
 |---|---|---|
-| `ls` | Lists files as `FileEntry` records (`-r` recursive, `-a` hidden, `--filter *.java`, `-d` dirs, `-p 16` parallel walk) | [step-3](docs/acceptance/step-3.md) |
+| `ls` | Lists files as `FileEntry` records (`-r` recursive, `-a` hidden, `--filter *.java`, `-d` dirs, `-p 16` parallel walk; `link` and `hidden` are properties) | [step-3](docs/acceptance/step-3.md) |
 | `grep` | Java regex search in files and folders, or in the pipeline objects; `GrepMatch` records with highlighted matches and capture groups | [grep](docs/acceptance/grep.md) |
 | `cat` | Reads files as lines (`-l`), one text (`-t`), numbered `CatLine` records (`-n`) or a `CatContent` (`-c`) | [cat](docs/acceptance/cat.md) |
 | `where` | Filters objects: `where { $_.size > 1mb }`, `where { f -> f.dir }`, short form `where name == usr` | [step-4](docs/acceptance/step-4.md) |

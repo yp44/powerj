@@ -33,6 +33,7 @@ As in the previous steps: **Actions** tab, latest run of the **CI** workflow, ar
 | 19 | `env --append PATH C:\outils` then `which monoutil` (a tool placed in `C:\outils`) | The tool becomes executable in the session and `which` finds it. |
 | 20 | `env --set POWERJ_NATIVE_ENCODING=windows-1252`, then `$l = ipconfig` and `$l`; `env --unset POWERJ_NATIVE_ENCODING` | `ipconfig`'s accented characters are wrong (setting applied immediately), then restored. |
 | 21 | `ls > liste.txt` then `^cmd /c type liste.txt` | The table is written to the file, without truncation. |
+| 22b | (Linux/macOS) `mkdir real`, `ln -s real alias`, `ln -s nowhere broken`, then `ls`, `(ls)*.link`, `ls broken`, `ls -a \| where { $_.hidden }` | `alias` is listed as a folder, `broken` is listed too; `(ls)*.link` gives `False` for `real` and `True` for `alias` and `broken`; `ls broken` lists the one entry (it said nothing before); the last one lists the dot files. |
 | 22 | Reduce the window width, then `ls` in a folder with long names | Columns shrink and overly long texts end with `…`. |
 
 ## Known limitations of step 3

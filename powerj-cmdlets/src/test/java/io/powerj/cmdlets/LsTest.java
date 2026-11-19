@@ -148,4 +148,84 @@ class LsTest {
         assertThat(names(params(List.of("absent", "b.txt"), false, false, null, false, false))).containsExactly("b.txt");
         assertThat(context.errors).containsExactly("not found: absent");
     }
+
+    // --- Links and hidden entries (audit v2, U-06) ---
+
+    private boolean link(String name, Path target) {
+        try {
+            Files.createSymbolicLink(tmp.resolve(name), target);
+            return true;
+        } catch (UnsupportedOperationException | java.io.IOException e) {
+            return false;
+        }
+    }
+
+    @Test
+    void aBrokenLinkNamedByItselfIsListedWithItsOwnAttributes() {
+        org.junit.jupiter.api.Assumptions.assumeTrue(link("broken", tmp.resolve("nowhere")), "no symbolic links");
+
+        names(params(List.of("broken"), false, false, null, false, false));
+
+        assertThat(context.errors).isEmpty();
+        assertThat(context.emitted).singleElement().satisfies(e -> {
+            assertThat(e.name()).isEqualTo("broken");
+            assertThat(e.link()).isTrue();
+            assertThat(e.dir()).isFalse();
+        });
+    }
+
+    @Test
+    void aLinkToAFolderIsAFolderAndALinkWhenListedInItsParent() {
+        org.junit.jupiter.api.Assumptions.assumeTrue(link("alias", tmp.resolve("src")), "no symbolic links");
+
+        names(params(List.of(), false, false, null, false, false));
+
+        FileEntry alias = context.emitted.stream().filter(e -> e.name().equals("alias")).findFirst().orElseThrow();
+        assertThat(alias.link()).isTrue();
+        assertThat(alias.dir()).isTrue(); // it shows its target, as before
+        assertThat(context.emitted.stream().filter(e -> e.name().equals("src")).findFirst().orElseThrow().link())
+                .isFalse();
+        assertThat(context.emitted.stream().filter(e -> e.name().equals("b.txt")).findFirst().orElseThrow().link())
+                .isFalse();
+    }
+
+    @Test
+    void aBrokenLinkIsListedInItsParentWithTheLinkFlag() {
+        org.junit.jupiter.api.Assumptions.assumeTrue(link("broken", tmp.resolve("nowhere")), "no symbolic links");
+
+        names(params(List.of(), false, false, null, false, false));
+
+        assertThat(context.emitted).filteredOn(e -> e.name().equals("broken")).singleElement()
+                .satisfies(e -> assertThat(e.link()).isTrue());
+    }
+
+    @Test
+    void aWildcardFindsALinkToo() {
+        org.junit.jupiter.api.Assumptions.assumeTrue(link("alias.txt", tmp.resolve("b.txt")), "no symbolic links");
+
+        names(params(List.of("alias*"), false, false, null, false, false));
+
+        assertThat(context.emitted).singleElement().satisfies(e -> {
+            assertThat(e.link()).isTrue();
+            assertThat(e.size()).isEqualTo(5); // the size of its target
+        });
+    }
+
+    @Test
+    void theHiddenFlagIsSetOnHiddenEntriesOnly() {
+        names(params(List.of(), true, false, null, false, false));
+
+        assertThat(context.emitted).filteredOn(FileEntry::hidden).extracting(FileEntry::name).containsExactly(".cache");
+        assertThat(context.emitted).filteredOn(e -> !e.hidden()).extracting(FileEntry::name)
+                .containsExactlyInAnyOrder("src", "A.java", "b.txt");
+    }
+
+    @Test
+    void theLinkAndHiddenFlagsAreNotDisplayedByDefaultButAreProperties() {
+        var display = FileEntry.class.getAnnotation(io.powerj.api.Display.class);
+
+        assertThat(display.columns()).containsExactly("name", "size", "modified", "dir");
+        assertThat(java.util.Arrays.stream(FileEntry.class.getRecordComponents()).map(c -> c.getName()))
+                .contains("link", "hidden");
+    }
 }
