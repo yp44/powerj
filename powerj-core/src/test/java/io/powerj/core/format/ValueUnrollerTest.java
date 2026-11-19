@@ -137,20 +137,15 @@ class ValueUnrollerTest {
         assertThat(unrolled(Arrays.asList(1, null, 3), DISPLAY)).containsExactly(1, null, 3);
     }
 
-    // --- what holds a resource is closed once it was read (#173, audit v2 S-06, C-06) ---
+    // --- what holds a resource: a DirectoryStream is closed once read, what the user may still hold is not (#173, review) ---
 
-    private static final class CloseableIterator implements java.util.Iterator<String>, AutoCloseable {
-        private final java.util.Iterator<String> inner = List.of("a", "b").iterator();
+    /** A directory stream: its iterator can be asked for once, so nobody can read it again after the unroll. */
+    private static final class FakeDirectoryStream implements java.nio.file.DirectoryStream<Path> {
         boolean closed;
 
         @Override
-        public boolean hasNext() {
-            return inner.hasNext();
-        }
-
-        @Override
-        public String next() {
-            return inner.next();
+        public Iterator<Path> iterator() {
+            return List.of(Path.of("a"), Path.of("b")).iterator();
         }
 
         @Override
@@ -159,12 +154,12 @@ class ValueUnrollerTest {
         }
     }
 
-    private static final class CloseableIterable implements Iterable<String>, AutoCloseable {
+    /** A stream that says when it is closed, under a Scanner the user keeps in a variable. */
+    private static final class TrackedInput extends java.io.ByteArrayInputStream {
         boolean closed;
 
-        @Override
-        public java.util.Iterator<String> iterator() {
-            return List.of("x", "y").iterator();
+        TrackedInput() {
+            super("one\ntwo\n".getBytes(java.nio.charset.StandardCharsets.UTF_8));
         }
 
         @Override
@@ -174,24 +169,26 @@ class ValueUnrollerTest {
     }
 
     @Test
-    void anAutoCloseableIteratorIsClosedOnceRead() {
-        var iterator = new CloseableIterator();
-        var seen = new java.util.ArrayList<Object>();
+    void aDirectoryStreamIsClosedOnceReadAndEvenWhenTheConsumerFails() {
+        var listing = new FakeDirectoryStream();
+        assertThat(ValueUnroller.unroll(listing, DISPLAY, _ -> { })).isTrue();
+        assertThat(listing.closed).isTrue();
 
-        assertThat(ValueUnroller.unroll(iterator, ValueUnroller.Mode.DISPLAY, seen::add)).isTrue();
-
-        assertThat(seen).containsExactly("a", "b");
-        assertThat(iterator.closed).isTrue();
-    }
-
-    @Test
-    void anAutoCloseableIterableIsClosedOnceReadAndEvenWhenTheConsumerFails() {
-        var iterable = new CloseableIterable();
-
-        assertThatThrownBy(() -> ValueUnroller.unroll(iterable, ValueUnroller.Mode.DISPLAY, value -> {
+        var failing = new FakeDirectoryStream();
+        assertThatThrownBy(() -> ValueUnroller.unroll(failing, DISPLAY, value -> {
             throw new IllegalStateException("stop");
         })).isInstanceOf(IllegalStateException.class);
+        assertThat(failing.closed).isTrue();
+    }
 
-        assertThat(iterable.closed).isTrue();
+    /** {@code $sc | first 1}, then {@code $sc.nextLine()}: closing the Scanner would close what it reads, System.in maybe. */
+    @Test
+    void anIteratorTheUserMayStillHoldIsNotClosed() {
+        var input = new TrackedInput();
+        var scanner = new java.util.Scanner(input);
+
+        assertThat(ValueUnroller.unroll(scanner, DISPLAY, _ -> { })).isTrue();
+
+        assertThat(input.closed).isFalse();
     }
 }

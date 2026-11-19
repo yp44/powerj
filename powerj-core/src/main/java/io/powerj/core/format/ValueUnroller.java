@@ -17,8 +17,8 @@ import io.powerj.api.Collected;
  * One place for the rule that used to be written four times, with drifts (review C-07), among them a stream that was
  * left open when {@code *.} unrolled it.
  * <p>
- * A stream is always closed once it was read, even when {@code each} throws, and so is an iterable or an iterator that is
- * {@code AutoCloseable} ({@code DirectoryStream}, {@code Scanner}). A {@link Path} (which is an
+ * A stream is always closed once it was read, even when {@code each} throws, and so is a {@code DirectoryStream}, which can be
+ * read only once; another {@code AutoCloseable} iterable or iterator ({@code Scanner}) is left to whoever holds it. A {@link Path} (which is an
  * {@code Iterable<Path>}), a {@code String}, a {@code Map}, a record are never unrolled.
  */
 public final class ValueUnroller {
@@ -44,9 +44,14 @@ public final class ValueUnroller {
     private ValueUnroller() {
     }
 
-    /** Closes {@code value} if it holds a resource: what it unrolled is consumed, and nobody else would close it. */
-    private static void closeIfCloseable(Object value) {
-        if (value instanceof AutoCloseable resource) {
+    /**
+     * Closes a {@link java.nio.file.DirectoryStream} once it was read: its iterator can be asked for once, so nobody can read
+     * it again, and it holds a directory open. Another {@code AutoCloseable} iterable or iterator is left open: the user may
+     * hold it in a variable and read it again ({@code $sc | first 1}, then {@code $sc.nextLine()}), and closing a
+     * {@code Scanner} closes what it reads, {@code System.in} maybe (review of #173).
+     */
+    private static void closeIfSingleUse(Object value) {
+        if (value instanceof java.nio.file.DirectoryStream<?> resource) {
             try {
                 resource.close();
             } catch (RuntimeException e) {
@@ -78,7 +83,7 @@ public final class ValueUnroller {
                 try {
                     items.forEach(each);
                 } finally {
-                    closeIfCloseable(items); // a DirectoryStream holds a directory open
+                    closeIfSingleUse(items); // a DirectoryStream holds a directory open
                 }
             }
             case BaseStream<?, ?> stream -> { // Stream, and IntStream, LongStream, DoubleStream (boxed elements)
@@ -86,13 +91,7 @@ public final class ValueUnroller {
                     stream.iterator().forEachRemaining(each);
                 }
             }
-            case Iterator<?> iterator -> {
-                try {
-                    iterator.forEachRemaining(each);
-                } finally {
-                    closeIfCloseable(iterator); // a Scanner holds its file open
-                }
-            }
+            case Iterator<?> iterator -> iterator.forEachRemaining(each);
             case Optional<?> optional when mode.optionals -> optional.ifPresent(each);
             case OptionalInt optional when mode.optionals -> optional.ifPresent(each::accept);
             case OptionalLong optional when mode.optionals -> optional.ifPresent(each::accept);

@@ -1276,8 +1276,11 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   after `ProcessBuilder.startPipeline`: with `bogus`, `sleep 30 | cat` started both programs, then failed, and they were stopped
   only if the output was a pipe. The charsets are resolved first, and whatever fails after the start stops the processes.
   Test: `NativeCleanupTest`.
-- **An `AutoCloseable` iterable or iterator is closed once read** (S-06, C-06): `ValueUnroller` closed a stream but not a
-  `DirectoryStream` or a `Scanner` that was displayed or piped; its Javadoc promised it. Test: `ValueUnrollerTest`.
+- **A `DirectoryStream` is closed once read** (S-06, C-06): `ValueUnroller` closed a stream but not a `DirectoryStream` that was
+  displayed or piped, which kept a directory open; its Javadoc promised it. A `DirectoryStream` can be read only once, so closing
+  it takes nothing from anyone. Another `AutoCloseable` iterable or iterator is **not** closed: the user may hold it in a variable
+  and read it again (`$sc | first 1`, then `$sc.nextLine()`), and closing a `Scanner` closes what it reads, `System.in` maybe
+  (review of #219). Test: `ValueUnrollerTest`.
 - **Stopping a background job stops its whole process group** (S-07): `PosixJobs` sent `SIGTERM`, `SIGCONT` and `SIGKILL` to the
   pid of the leader, so the processes it had started (the grandchildren of `make &`) survived. The first stage, the leader of
   the group, is signalled as `-pid`. Test: `PosixJobsTest`.
