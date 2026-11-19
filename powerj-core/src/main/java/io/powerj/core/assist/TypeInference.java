@@ -257,11 +257,21 @@ final class TypeInference {
     }
 
     /**
-     * The value, if completion may call methods on it ({@code isEmpty}, {@code getFirst}, {@code get}): a list of the JDK or a
-     * {@code Collected}. A lazy or third-party list could run code while the user types (review C-23); it counts as unknown.
+     * The lists of the JDK that hold their elements: reading them runs no other code. A wrapper of {@code java.base}
+     * ({@code Collections.unmodifiableList}, {@code synchronizedList}, a {@code subList} view) delegates to the list it wraps,
+     * which may be lazy or a third party's, so it is not on the list (review of #219).
+     */
+    private static final java.util.Set<String> MATERIALISED = java.util.Set.of("java.util.ArrayList", "java.util.LinkedList",
+            "java.util.Vector", "java.util.Stack", "java.util.Arrays$ArrayList", "java.util.ImmutableCollections$ListN",
+            "java.util.ImmutableCollections$List12", "java.util.concurrent.CopyOnWriteArrayList");
+
+    /**
+     * The value, if completion may call methods on it ({@code isEmpty}, {@code getFirst}, {@code get}): a list of the JDK that
+     * holds its elements, or a {@code Collected}. Another list could run code while the user types (review C-23); it counts
+     * as unknown.
      */
     private static Object readable(Object value) {
-        return value instanceof Collected<?> || value != null && value.getClass().getModule() == Object.class.getModule()
+        return value instanceof Collected<?> || value != null && MATERIALISED.contains(value.getClass().getName())
                 ? value : null;
     }
 

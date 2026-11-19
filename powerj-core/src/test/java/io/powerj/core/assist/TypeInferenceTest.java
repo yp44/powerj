@@ -279,10 +279,23 @@ class TypeInferenceTest {
     }
 
     @Test
+    void aWrapperOfTheJdkAroundAListThatIsNotTheJdksIsNotReadEither() {
+        var list = new CountingList();
+        var wrapped = java.util.Collections.unmodifiableList(list);
+
+        TypeInfo element = TypeInference.elementOf(new TypeInfo.Instance(wrapped.getClass(), wrapped));
+
+        assertThat(element).isInstanceOf(TypeInfo.Unknown.class);
+        assertThat(list.calls).isZero();
+    }
+
+    @Test
     void aListOfTheJdkIsStillRead() {
         TypeInfo element = TypeInference.elementOf(new TypeInfo.Instance(java.util.ArrayList.class,
                 new java.util.ArrayList<>(List.of("a"))));
+        TypeInfo fromListOf = TypeInference.elementOf(new TypeInfo.Instance(List.class, List.of("a", "b", "c")));
 
         assertThat(element).isInstanceOf(TypeInfo.Instance.class);
+        assertThat(fromListOf).isInstanceOf(TypeInfo.Instance.class);
     }
 }
