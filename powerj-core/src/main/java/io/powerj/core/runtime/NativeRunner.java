@@ -186,7 +186,6 @@ public final class NativeRunner {
             }
         } catch (InterruptedException e) {
             destroyTree(process);
-            closeStreams(List.of(process));
             throw e;
         }
         var run = new NativeRun(executable, args, process.pid(), exitCode, elapsed(start));
@@ -298,7 +297,6 @@ public final class NativeRunner {
             }
         } catch (InterruptedException e) {
             stop.run();
-            closeStreams(processes); // a reader that waits for a descendant's end of the pipe must not outlive the command
             if (writer != null) {
                 input.abort();
                 writer.interrupt();
@@ -306,13 +304,6 @@ public final class NativeRunner {
             throw e;
         }
         return runs;
-    }
-
-    private static void closeStreams(List<Process> processes) {
-        for (Process process : processes) {
-            closeQuietly(process.getInputStream());
-            closeQuietly(process.getErrorStream());
-        }
     }
 
     /** Feeds the first process with the objects of the previous stage; without input, closes its standard input. */

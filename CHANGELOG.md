@@ -1266,7 +1266,7 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
 - **An unusable `POWERJ_NATIVE_ENCODING` no longer leaves processes behind** (audit v2, R-13). `startGroup` resolved the charsets
   after `ProcessBuilder.startPipeline`: with `bogus`, `sleep 30 | cat` started both programs, then failed, and they were stopped
   only if the output was a pipe. The charsets are resolved first, and whatever fails after the start stops the processes.
-  `Ctrl+C` also closes the streams of the processes. Test: `NativeCleanupTest`.
+  Test: `NativeCleanupTest`.
 - **An `AutoCloseable` iterable or iterator is closed once read** (S-06, C-06): `ValueUnroller` closed a stream but not a
   `DirectoryStream` or a `Scanner` that was displayed or piped; its Javadoc promised it. Test: `ValueUnrollerTest`.
 - **Stopping a background job stops its whole process group** (S-07): `PosixJobs` sent `SIGTERM`, `SIGCONT` and `SIGKILL` to the
@@ -1279,12 +1279,17 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
 - **The abandoned commands are counted** (S-06): a command abandoned by a second Ctrl+C keeps a 16 MB thread and, if it spins, a
   core, and nothing showed it. `Supervisor.abandonedRunning()` counts those still alive and the prompt says so
   (`n abandoned command(s) still running in the background`) until they end. Tests: `SupervisorTest`, `ReplLoopTest`.
-- **Checked and not changed.** (2) A reader thread that outlives a command because a process left in the background keeps the
-  pipe open does not happen on Linux: the JDK drains and closes the pipe of a process that has exited, so
-  `$x = sh -c "sleep 600 &"` returns at once; the test pins it (`NativeCleanupTest`). (4, Windows) The handles of the pipes of a
-  background job are created inheritable for the whole process, which a concurrent `ProcessBuilder.start()` could inherit; the
-  ticket marks it "to confirm on each system", it could not be reproduced or tested here (Linux only), and it is left as it is,
-  open in the ticket's discussion rather than changed blind.
+- **Not fixed, and why.** (2) A captured command whose program leaves a process in the background keeps the pipe open, and
+  the reader thread and its descriptor live until that process ends. On the CI of Linux and macOS the line then waits for the
+  end of the pipe (as the command substitution of a Unix shell does) and **Ctrl+C ends the line but not the reader**; in the
+  container where it was tried the JDK closes the pipe at the exit of the program and nothing is left, so the behaviour
+  depends on the system. Closing the streams of the process was tried and checked: **it does not wake a read that is
+  blocked** (Linux, platform and virtual threads), so it is not done; the only reliable way would be to start foreground programs
+  in a process group of their own and signal the group, which changes how the terminal's Ctrl+C reaches them and is left for a
+  decision. The test pins what holds everywhere: Ctrl+C ends the line (`NativeCleanupTest`). (4, Windows) The handles of the pipes
+  of a background job are created inheritable for the whole process, which a concurrent `ProcessBuilder.start()` could inherit;
+  the ticket marks it "to confirm on each system", it could not be reproduced or tested here (Linux only), and it is left as it
+  is rather than changed blind.
 
 ## [0.1.0] — never released (baseline)
 

@@ -53,6 +53,10 @@ class NativeCleanupTest {
         ProcessHandle.current().descendants().filter(NativeCleanupTest::isSleep).forEach(ProcessHandle::destroyForcibly);
     }
 
+    private static boolean isShell(ProcessHandle process) {
+        return process.info().command().map(command -> command.endsWith("/sh")).orElse(false);
+    }
+
     private static boolean isSleep(ProcessHandle process) {
         return process.info().command().map(command -> command.endsWith("/sleep")).orElse(false);
     }
@@ -69,14 +73,31 @@ class NativeCleanupTest {
                 .noneMatch(NativeCleanupTest::isSleep));
     }
 
-    /** The JDK closes the pipe of a process that has exited: a process that it left in the background cannot hold a reader. */
+    /**
+     * A program that leaves a process in the background keeps the pipe of a captured command open: the reader waits for its end,
+     * as the command substitution of a Unix shell does, and Ctrl+C must still end the line (audit v2, S-06, #173). Whether
+     * the JDK closes the pipe when the program exits depends on the system, so the line may also end by itself.
+     */
     @Test
-    void aReaderThreadDoesNotWaitForTheBackgroundProcessesOfACapturedCommand() throws Exception {
+    void ctrlCEndsACapturedCommandWhoseBackgroundProcessKeepsThePipeOpen() throws Exception {
         start();
+        var supervisor = new Supervisor();
+        var outcome = new java.util.concurrent.atomic.AtomicReference<Outcome>();
+        Thread line = Thread.ofVirtual().start(() -> outcome.set(supervisor.run("capture", () -> {
+            interpreter.execute("$x = sh -c \"sleep 600 &\"");
+            return List.of();
+        })));
+        var seenShell = new java.util.concurrent.atomic.AtomicBoolean();
+        Waits.until("the program ended, or the line did", () -> {
+            boolean running = ProcessHandle.current().descendants().anyMatch(NativeCleanupTest::isShell);
+            seenShell.compareAndSet(false, running);
+            return !line.isAlive() || seenShell.get() && !running;
+        });
 
-        interpreter.execute("$x = sh -c \"sleep 600 &\"");
+        supervisor.cancel();
+        line.join(10_000);
 
-        Waits.until("no reader thread is left", () -> Thread.getAllStackTraces().keySet().stream()
-                .noneMatch(thread -> thread.getName().equals("powerj-pump") && thread.isAlive()));
+        assertThat(line.isAlive()).as("the line ended").isFalse();
+        assertThat(outcome.get()).isIn(new Outcome.Cancelled(), new Outcome.Success(List.of()));
     }
 }
