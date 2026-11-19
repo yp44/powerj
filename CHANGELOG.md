@@ -1103,6 +1103,27 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   six-argument constructor stays. `FileWalker` hands the visitor the target's attributes through `FollowedLink`, which still
   answers `isSymbolicLink()` with `true`: no system call is added per entry. Tests: `LsTest` (a broken link named and listed in
   its parent, a link to a folder, a wildcard, hidden entries, the default columns).
+### Fixed (six gaps of the file operations, [#163](https://github.com/yp44/powerj/issues/163))
+- **`rm -f *.tmp` is quiet when nothing matches**, like POSIX `rm -f`: scripts and `--on-error stop` no longer break on it
+  (`FileOps.expand` takes `quiet`; `FileArguments.expand` says nothing for a `null` key). Without `-f` it still says
+  `no file matches`.
+- **`--dry-run` makes the checks of the real run** (U-09). `mkdir -n existing` said it would succeed and the real run failed;
+  now it gives the same `already exists` / `parent folder missing`. `touch -n` checks the parent and says `create` or `update`
+  (`FileOperation` action). The granularity of `-n` per command is written in the help and FR-72: `rm -r -n` lists every entry,
+  `cp -r -n` and `mv -n` each source once.
+- **`touch` and links** (R-18). It tested existence without following links, then `setLastModifiedTime` followed them, and a
+  broken link got "parent folder missing". It now follows a link as POSIX `touch` does (the target is updated, the link stays,
+  the entry emitted is the link's), reports a broken link as `broken link: …`, and says "parent folder missing" only when the
+  parent is missing.
+- **`cp -f` and `mv -f` do not replace a protected path.** Only the source was checked, and `cp` never loaded the list: replacing a
+  protected file the user had added (`~/.ssh/id_ed25519`) is removing it. The existing target is now checked for both; `cp` gets
+  `--allow-protected` (its source is not removed, so it is never checked).
+- **A relative line of `protected-paths` protects nothing and is reported once per session** (R-18): it was resolved against the
+  folder PowerJ was started in, so it protected a different folder each time, silently (`ProtectedPaths.ignoredLines`,
+  reported by `rm`, `cp` and `mv`).
+- **The removal of a folder that could not be listed to the end is reported once** (`FileTrees`, sequential and parallel): the
+  folder is kept, instead of being tried and reported a second time as `directory not empty`.
+  Tests: `FileOpsTest`, `ProtectedPathsTest`, `FileTreesListingFailureTest`, one or more for each point.
 
 ## [0.1.0] — never released (baseline)
 

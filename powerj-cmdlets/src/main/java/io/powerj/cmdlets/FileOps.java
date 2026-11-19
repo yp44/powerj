@@ -69,14 +69,26 @@ final class FileOps {
      * (review C-22) until the variable asks for it, and {@code rm -n} shows the list first.
      */
     static List<Path> expand(Object argument, CmdletContext<?> context) {
-        return expand(argument, FileArguments.isWildcard(argument) && FileArguments.ignoreCase(context), context);
+        return expand(argument, context, false);
+    }
+
+    /**
+     * Paths of an argument; with {@code quiet}, a wildcard that matches nothing is not an error ({@code rm -f *.tmp} in a
+     * folder without a {@code .tmp}, as for POSIX {@code rm -f}).
+     */
+    static List<Path> expand(Object argument, CmdletContext<?> context, boolean quiet) {
+        return expand(argument, FileArguments.isWildcard(argument) && FileArguments.ignoreCase(context), quiet, context);
     }
 
     /** Paths of an argument, with the given case rule for the wildcard. */
     static List<Path> expand(Object argument, boolean ignoreCase, CmdletContext<?> context) {
+        return expand(argument, ignoreCase, false, context);
+    }
+
+    private static List<Path> expand(Object argument, boolean ignoreCase, boolean quiet, CmdletContext<?> context) {
         try {
             return FileArguments.expand(argument, false, ignoreCase, context, error -> report(error, context),
-                    "fileops.no.match");
+                    quiet ? null : "fileops.no.match");
         } catch (InvalidPathException e) {
             context.error(Messages.get("fileops.invalid.path", FileArguments.text(argument), e.getMessage()));
             return List.of();

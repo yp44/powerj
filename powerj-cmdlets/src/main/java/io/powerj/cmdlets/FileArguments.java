@@ -116,7 +116,7 @@ final class FileArguments {
         FileWalker.builder().maxDepth(1).includeHidden(includeHidden).order(BY_NAME).build()
                 .walk(context.currentDirectory().resolve(split.directory()).normalize(),
                         (path, _) -> pattern.matches(path.getFileName()) ? path : null, matches::add, onError);
-        if (matches.isEmpty()) {
+        if (matches.isEmpty() && noMatchKey != null) { // null: the caller does not want it said (rm -f)
             context.error(Messages.get(noMatchKey, text));
         }
         return matches;

@@ -74,9 +74,13 @@ final class Transfer {
 
     /** Copies or moves each source into the destination folder, or to the destination name for a single source. */
     void run(CmdletContext<Object> context) {
-        ProtectedPaths protectedPaths = options.move() && !options.allowProtected()
+        // The list guards what is removed (the source of a move) and what is replaced (an existing target with -f).
+        ProtectedPaths protectedPaths = !options.allowProtected()
                 ? ProtectedPaths.load(context.configDirectory(), context.environment(), context.currentDirectory())
                 : null;
+        if (protectedPaths != null) {
+            protectedPaths.reportIgnored(context);
+        }
         if (destinationBlock != null) {
             runEach(protectedPaths, context);
             return;
@@ -141,7 +145,7 @@ final class Transfer {
             context.error(Messages.get("fileops.not.found", source));
             return;
         }
-        if (protectedPaths != null) {
+        if (options.move() && protectedPaths != null) {
             var refusal = protectedPaths.refusal(source);
             if (refusal.isPresent()) {
                 context.error(refusal.get());
@@ -166,6 +170,14 @@ final class Transfer {
         if (FileOps.exists(target) && !options.force()) {
             context.error(Messages.get("fileops.exists", target));
             return;
+        }
+        if (FileOps.exists(target) && protectedPaths != null) {
+            // -f replaces it: replacing ~/.ssh/id_ed25519 is removing it
+            var refusal = protectedPaths.refusal(target);
+            if (refusal.isPresent()) {
+                context.error(refusal.get());
+                return;
+            }
         }
         Path parent = target.getParent();
         if (parent != null && !FileOps.isFolderOrLinkToFolder(parent)) {

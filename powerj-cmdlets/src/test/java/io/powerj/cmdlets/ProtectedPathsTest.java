@@ -162,4 +162,35 @@ class ProtectedPathsTest {
         assertThat(lines.getFirst()).startsWith("#");
         assertThat(lines).contains("~", tmp.resolve("config").toString(), tmp.getRoot().toString());
     }
+
+    // --- A relative line (audit v2, R-18) ---
+
+    @Test
+    void aRelativeLineIsIgnoredAndReportedNotResolvedAgainstTheFolderPowerJStartedIn() throws IOException {
+        ProtectedPaths paths = load("relative/dir", "  ./also  ", tmp.resolve("keep").toString());
+
+        assertThat(paths.ignoredLines()).containsExactly("relative/dir", "./also");
+        assertThat(paths.refusal(tmp.resolve("work/relative/dir"))).isEmpty(); // it was the folder it was started in
+        assertThat(paths.refusal(tmp.resolve("keep"))).isPresent(); // the absolute lines still count
+    }
+
+    @Test
+    void theIgnoredLinesAreReportedOncePerSession() throws IOException {
+        ProtectedPaths.forgetReported();
+        ProtectedPaths paths = load("relative/dir");
+        var context = new io.powerj.testing.TestContext<Object>(tmp);
+
+        paths.reportIgnored(context);
+        paths.reportIgnored(context);
+        load("relative/dir").reportIgnored(context); // the file is read at each command
+
+        assertThat(context.errors).singleElement().asString().contains("relative/dir").contains("absolute");
+    }
+
+    @Test
+    void homeRelativeLinesAndAbsoluteLinesAreNotIgnored() throws IOException {
+        ProtectedPaths paths = load("~", "~/docs", tmp.resolve("keep").toString(), "# comment");
+
+        assertThat(paths.ignoredLines()).isEmpty();
+    }
 }

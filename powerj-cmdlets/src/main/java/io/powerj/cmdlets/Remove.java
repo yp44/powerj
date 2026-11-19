@@ -32,7 +32,7 @@ public final class Remove implements Cmdlet<Remove.Params, Object, Object> {
             boolean force,
             @Option(shortName = 'v', description = "Emits each entry removed")
             boolean verbose,
-            @Option(shortName = 'n', description = "Changes nothing: shows what would be removed")
+            @Option(shortName = 'n', description = "Changes nothing: shows every entry that would be removed, the content of a folder first")
             boolean dryRun,
             @Option(description = "Also removes protected paths (list in the protected-paths file of the configuration folder)")
             boolean allowProtected,
@@ -54,8 +54,11 @@ public final class Remove implements Cmdlet<Remove.Params, Object, Object> {
         if (arguments.words().isEmpty() && !context.hasInput()) {
             throw new UsageException(Messages.get("fileops.path.expected", "rm"));
         }
+        if (state.protectedPaths() != null) {
+            state.protectedPaths().reportIgnored(context);
+        }
         for (Object argument : arguments.words()) {
-            for (Path path : FileOps.expand(argument, context)) {
+            for (Path path : FileOps.expand(argument, context, p.force())) {
                 remove(p, state, path.toAbsolutePath().normalize(), context);
             }
         }

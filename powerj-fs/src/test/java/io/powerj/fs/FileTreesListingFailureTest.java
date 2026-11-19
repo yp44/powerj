@@ -52,6 +52,8 @@ class FileTreesListingFailureTest {
         assertThat(removed.stream().filter(name -> name.startsWith("bad/"))).hasSize(2);
         assertThat(removed).doesNotContain("bad", ""); // bad still holds entries, so neither it nor the root goes
         assertThat(errors).anyMatch(error -> error.startsWith("bad: ") && error.contains("injected failure"));
+        // one report for the folder, not a second one ("directory not empty") for the removal that was then tried
+        assertThat(errors).filteredOn(error -> error.startsWith("bad: ")).hasSize(1);
         assertThat(tmp.resolve("bad")).isDirectory();
         assertThat(tmp.resolve("ok")).doesNotExist();
     }

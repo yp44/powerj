@@ -174,10 +174,14 @@ public final class FileTrees {
 
                 @Override
                 public FileVisitResult postVisitDirectory(Path dir, IOException e) {
+                    BasicFileAttributes attributes = directories.pop();
                     if (e != null) {
+                        // It could not be listed to the end: it is kept, as in the parallel walk. Trying to remove it
+                        // would only report the same folder a second time ("directory not empty").
                         errors.accept(dir, e);
+                    } else {
+                        delete(dir, attributes);
                     }
-                    delete(dir, directories.pop());
                     return FileVisitResult.CONTINUE;
                 }
 
@@ -314,10 +318,12 @@ public final class FileTrees {
      * A directory being removed: it is removed when its last child is done; then it counts as done for its parent.
      * {@code remaining} starts at 1 while the children are submitted, so that the directory is not removed early.
      */
-    private record Directory(Path path, BasicFileAttributes attributes, Directory parent, AtomicInteger remaining) {
+    private record Directory(Path path, BasicFileAttributes attributes, Directory parent, AtomicInteger remaining,
+                             boolean listed) {
 
-        Directory(Path path, BasicFileAttributes attributes, Directory parent) {
-            this(path, attributes, parent, new AtomicInteger(1));
+        /** {@code listed} is {@code false} when the listing failed half way: the folder is then kept, not removed. */
+        Directory(Path path, BasicFileAttributes attributes, Directory parent, boolean listed) {
+            this(path, attributes, parent, new AtomicInteger(1), listed);
         }
     }
 
@@ -402,28 +408,34 @@ public final class FileTrees {
                 return;
             }
             if (attributes.isDirectory()) {
-                deleteDirectory(new Directory(root, attributes, null), dryRun);
+                deleteDirectory(root, attributes, null, dryRun);
             } else {
                 remove(root, attributes, dryRun);
             }
         }
 
-        /** Lists a directory and submits its children; the directory itself is removed by its last child. */
-        private void deleteDirectory(Directory dir, boolean dryRun) throws InterruptedException {
-            List<Entry> children = children(dir.path());
+        /**
+         * Lists a directory and submits its children; the directory itself is removed by its last child, unless its
+         * listing failed half way: it still holds entries that were not read, and removing it would only report it twice.
+         */
+        private void deleteDirectory(Path path, BasicFileAttributes attributes, Directory parent, boolean dryRun)
+                throws InterruptedException {
+            boolean[] complete = {true};
+            List<Entry> children = children(path, complete);
             if (children == null) { // not listed: kept, as in a sequential walk; done for its parent
-                if (dir.parent() != null) {
-                    done(dir.parent(), dryRun);
+                if (parent != null) {
+                    done(parent, dryRun);
                 }
                 return;
             }
+            Directory dir = new Directory(path, attributes, parent, complete[0]);
             for (Entry child : children) {
                 if (stopped) {
                     return;
                 }
                 dir.remaining().incrementAndGet();
                 if (child.attributes().isDirectory()) {
-                    submit(() -> deleteDirectory(new Directory(child.path(), child.attributes(), dir), dryRun));
+                    submit(() -> deleteDirectory(child.path(), child.attributes(), dir, dryRun));
                 } else {
                     permits.acquire(); // bounds the waiting tasks too: the listing waits for a free permit
                     boolean submitted = false;
@@ -450,7 +462,9 @@ public final class FileTrees {
         private void done(Directory dir, boolean dryRun) throws InterruptedException {
             for (Directory current = dir; current != null && current.remaining().decrementAndGet() == 0;
                  current = current.parent()) {
-                remove(current.path(), current.attributes(), dryRun);
+                if (current.listed()) {
+                    remove(current.path(), current.attributes(), dryRun);
+                }
             }
         }
 
@@ -567,6 +581,11 @@ public final class FileTrees {
          * an entry that vanished meanwhile is skipped.
          */
         private List<Entry> children(Path dir) throws InterruptedException {
+            return children(dir, new boolean[1]);
+        }
+
+        /** As {@link #children(Path)}; {@code complete[0]} is set to {@code false} if the listing failed half way. */
+        private List<Entry> children(Path dir, boolean[] complete) throws InterruptedException {
             List<Entry> children = new ArrayList<>();
             permits.acquire();
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
@@ -581,6 +600,7 @@ public final class FileTrees {
                     }
                 }
             } catch (DirectoryIteratorException e) {
+                complete[0] = false;
                 queue.put(new EntryError(dir, e.getCause())); // failed while listing: the entries read are kept
             } catch (IOException e) {
                 queue.put(new EntryError(dir, e));
