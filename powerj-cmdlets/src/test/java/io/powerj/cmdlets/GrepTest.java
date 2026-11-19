@@ -352,4 +352,14 @@ class GrepTest {
                 null, false, false);
         assertThat(found(params)).containsExactly("wide.txt:1");
     }
+
+    @Test
+    void aNamedDeviceIsRefusedLikeCatDoes() throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeTrue(java.nio.file.Files.exists(Path.of("/dev/zero")), "no /dev/zero");
+
+        run(params(".", "/dev/zero"));
+
+        assertThat(context.errors).singleElement().asString().startsWith("not a regular file: ")
+                .contains("/dev/zero");
+    }
 }

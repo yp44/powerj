@@ -585,6 +585,8 @@ public record CatContent(
 { }
 ```
 
+**What is read.** Only regular files (a link to one is followed): a device (`/dev/zero`), a FIFO or a socket gives the non-blocking error `not a regular file: <path> (a device, a pipe or a socket is not read)` without being opened (`/dev/zero` has no end, and a FIFO blocks at open); `grep` gives the same answer for a file it is given by name. A **line** is read as a `String` up to 64 Mi characters (`BoundedLines.MAX_LINE`, as for a JSON value): a longer line is reported (`line <n> of <file> is longer than <max> characters: skipped`), dropped without being kept, and the reading goes on with the next one (its number counts the skipped line), so a file with no line break (minified JSON) cannot fill the memory. The interrupt flag is read at every refill of the read buffer, so Ctrl+C is seen inside a long line.
+
 **Several files.** They are read one after the other. The line numbers go on: if the first file has 3 lines, the first line of the second file is line 4. With `--text` and `--content`, a single object holds the content of all the files (`CatContent` has no `path`: it can mix several files).
 
 **Pipeline input.** After a `|`, each object received is read **as if it had been given as a `path`**, after the `path` arguments (numbering and content go on):

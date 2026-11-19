@@ -2,6 +2,7 @@ package io.powerj.cmdlets;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -244,5 +245,79 @@ class CatTest {
     void invalidPropertyNameIsBlocking() {
         assertThatThrownBy(() -> run(params(List.of(), Out.LINES, null, "a b"), "a.txt"))
                 .isInstanceOf(IllegalArgumentException.class).hasMessage("invalid property name: a b");
+    }
+
+    // --- Devices, pipes and a line without end (audit v2, S-04) ---
+
+    private static boolean posix() {
+        return !System.getProperty("os.name").startsWith("Windows");
+    }
+
+    @Test
+    void aDeviceIsRefusedAtOnce() throws Exception {
+        assumeTrue(posix() && Files.exists(Path.of("/dev/zero")), "no /dev/zero");
+
+        List<Object> out = run(params(Out.LINES, "/dev/zero"));
+
+        assertThat(out).isEmpty();
+        assertThat(context.errors).singleElement().asString().startsWith("not a regular file: ")
+                .contains("/dev/zero");
+    }
+
+    @Test
+    void aFifoIsRefusedWithoutBeingOpened() throws Exception {
+        assumeTrue(posix(), "no mkfifo");
+        Path fifo = tmp.resolve("pipe");
+        Process made = new ProcessBuilder("mkfifo", fifo.toString()).redirectErrorStream(true).start();
+        assumeTrue(made.waitFor() == 0, "mkfifo not available");
+
+        List<Object> out = run(params(Out.LINES, "pipe")); // opening it would block for ever
+
+        assertThat(out).isEmpty();
+        assertThat(context.errors).singleElement().asString().startsWith("not a regular file: ");
+    }
+
+    @Test
+    void aLinkToARegularFileIsStillRead() throws Exception {
+        Path link = tmp.resolve("alias.txt");
+        try {
+            Files.createSymbolicLink(link, tmp.resolve("a.txt"));
+        } catch (UnsupportedOperationException | java.io.IOException e) {
+            assumeTrue(false, "symbolic links not available");
+        }
+
+        assertThat(run(params(Out.LINES, "alias.txt"))).containsExactly("first", "second", "third");
+    }
+
+    @Test
+    void aLineLongerThanTheBoundIsReportedAndSkippedAndTheNextLinesAreRead() throws Exception {
+        Files.writeString(tmp.resolve("long.txt"), "short\n" + "x".repeat(10_000) + "\nafter\n");
+        var cat = new Cat(1_000);
+        context.hasInput = false;
+
+        List<Object> out = CmdletDriver.run(cat, params(Out.NUMBERED, "long.txt"), context);
+
+        assertThat(out).extracting(o -> ((CatLine) o).text()).containsExactly("short", "after");
+        assertThat(out).extracting(o -> ((CatLine) o).line()).containsExactly(1, 3); // line 2 was counted
+        assertThat(context.errors).singleElement().asString().contains("long.txt").contains("line 2")
+                .contains("1000");
+    }
+
+    @Test
+    void aFileWithoutAnyLineBreakDoesNotFillTheMemory() throws Exception {
+        // 5 million characters in one line, a bound of 100 thousand: the line is dropped, not kept
+        Path big = tmp.resolve("minified.json");
+        try (var out = Files.newBufferedWriter(big)) {
+            for (int i = 0; i < 500; i++) {
+                out.write("y".repeat(10_000));
+            }
+        }
+        var cat = new Cat(100_000);
+        context.hasInput = false;
+
+        List<Object> out = CmdletDriver.run(cat, params(Out.LINES, "minified.json"), context);
+
+        assertThat(out).isEmpty();
+        assertThat(context.errors).singleElement().asString().contains("minified.json");
     }
 }

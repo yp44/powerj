@@ -1040,6 +1040,16 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
 - **A move across file systems that stops half way says so**: `mv` keeps the source, and now adds `the move is incomplete:
   <source> is kept, and the copy in <destination> holds only part of it`. It does not remove the copy: with `-f` the
   destination may be a folder that was there before. Test: `FileOpsTest` on a second file system (`/dev/shm`) when there is one.
+### Fixed (`cat` no longer ends the session on a device or a line without end, [#158](https://github.com/yp44/powerj/issues/158))
+- **`cat /dev/zero`, or a 2 GB minified file, no longer ends the session with an `OutOfMemoryError`** (audit v2, S-04).
+  `cat` refused a folder and nothing else, then `BufferedReader.readLine` grew one `StringBuilder` until the line ended.
+  Now `cat` reads regular files only (a link to one is followed): a device, a FIFO or a socket is refused at once with
+  `not a regular file: …` and is not opened (a FIFO blocked at `open`); `grep` gives the same answer for a file it is given by
+  name (inside a walk it still skips them silently). Lines come from `BoundedLines`: a line is read up to 64 Mi characters, a
+  longer one is reported, dropped without being kept and the next one is read (its number counts the skipped line), and the
+  interrupt flag is read at every refill of the buffer instead of every 4 096 lines, so Ctrl+C is seen inside a long line.
+  `BoundedLines` is the reader `grep` will use too (#160). Tests: `BoundedLinesTest` (terminators across buffers, the bound,
+  the flag, each seen failing when the code was broken on purpose), `CatTest`, `GrepTest`.
 
 ## [0.1.0] — never released (baseline)
 
