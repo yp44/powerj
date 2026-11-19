@@ -1247,6 +1247,21 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   library's ends the JVM or replaces a stream, and `PreviewGuard` still sees them (the alternative of the ticket, narrowing the
   Javadoc, was taken). Tests: `JavaClassesNamesTest`, `JavaInvokerTest`, `CallPolicyTest`.
 
+### Fixed (an abandoned line, an endless display, and the longest methods of the runtime, [#172](https://github.com/yp44/powerj/issues/172))
+- **A line abandoned by a second Ctrl+C no longer writes the state of the line that follows** (audit v2, S-02; FR-03). Its
+  thread goes on, and when it ended it reset the observer of the perf mode (cutting the measure of the line in progress),
+  set the blocking-error flag that `ScriptMode` reads, and overwrote `$?`, `$last` and `$errors`. Each line now runs in a scope
+  that holds its number (`Lines`, kept by the `Session`, passed on to the stage threads): the writes of a thread whose line
+  has been overtaken are ignored. Test: `StaleLineTest` (red with the guards off).
+- **Ctrl+C stops the display of a value that never ends** (S-03): `IntStream.range(0, Integer.MAX_VALUE)` typed at the prompt
+  was displayed to its end, and after an abandon the old thread kept writing on the terminal. `OutputFormatter.accept`
+  now throws a `CancellationException` when its thread is interrupted (the preview formats its values with the flag set
+  aside, since they are in memory already).
+- **No method of `core.runtime` is longer than 50 lines** (C-02): `PipelineExecutor.run` (84 lines) is `run`,
+  `runSingleNative`, `runPipeline` and `stageThread`; `PreviewMode.preview` (89) is `check`, `evaluate`, `format` and the
+  few lines that join them; `prepare` (55) and `NativeRunner.startGroup` (67) are split as well. The longest is now 48
+  lines. No change of behaviour: the characterization test and the tests of the pipeline and the preview are the guard.
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.

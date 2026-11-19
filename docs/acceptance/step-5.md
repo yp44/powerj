@@ -36,6 +36,7 @@ As in the previous steps: **Actions** tab, latest run of the **CI** workflow, ar
 | 21b | `System.out.close()` | Refused: `closing System.out is refused: it would break the shell display`; the shell still prints afterwards (#171). |
 | 5b | `import java.util.Map.Entry`, then `Entry.comparingByKey()` | The import is accepted (a nested class is written as in the source, not with the `$` of its binary name) and the call answers a comparator (#171). |
 | 22 | `System.exit(6)` then, in `cmd.exe`, `echo %ERRORLEVEL%` | PowerJ exits cleanly (history saved); `6`. |
+| 22b | `java.util.stream.IntStream.range(0, 2147483647)`, then Ctrl+C after a second | The display stops within a moment: `^C` and a new prompt; nothing more is written afterwards (#172). |
 
 ## Syntax points to know
 

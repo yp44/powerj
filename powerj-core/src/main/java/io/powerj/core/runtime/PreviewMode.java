@@ -63,36 +63,79 @@ final class PreviewMode {
      * @param colors {@code true} if the lines may contain ANSI colors
      */
     PreviewResult preview(String line, int limit, int width, boolean colors) {
+        Checked checked = check(line);
+        if (checked.result() != null) {
+            return checked.result();
+        }
+        var guard = new PreviewGuard(settings.get().stageLimit());
+        Evaluation evaluation = evaluate(checked.statement(), guard, limit, line);
+        if (evaluation.early() != null) {
+            return evaluation.early();
+        }
+        boolean more = evaluation.more();
+        List<Object> shown;
+        synchronized (evaluation.values()) {
+            shown = new ArrayList<>(evaluation.values().subList(0, Math.min(limit, evaluation.values().size())));
+            more |= evaluation.values().size() > limit;
+        }
+        if (evaluation.interrupted() && shown.isEmpty()) {
+            return new PreviewResult.TimedOut(guard.errors(), guard.readsFiles()); // not "no result": the line was cut off, not empty
+        }
+        return format(shown, more, guard, width, colors);
+    }
+
+    /** What the line is before anything runs: the statement to preview, or the result that says why there is none. */
+    private record Checked(Statement statement, PreviewResult result) {
+    }
+
+    private Checked check(String line) {
         if (line.isBlank()) {
-            return new PreviewResult.Empty();
+            return new Checked(null, new PreviewResult.Empty());
         }
         Ast.Script script;
         try {
             script = Parser.parse(line, parseContext.get());
         } catch (SyntaxException e) {
-            return new PreviewResult.Incomplete(e.getMessage());
+            return new Checked(null, new PreviewResult.Incomplete(e.getMessage()));
         } catch (RuntimeException e) {
             // The parser throws SyntaxException only (ParserFuzzTest); if it ever fails otherwise, a keystroke must not show it.
             LOG.log(Level.FINE, e, () -> "The preview could not read the line " + LoggedLine.of(line));
-            return new PreviewResult.Incomplete(Messages.get("error.internal", e.getClass().getSimpleName()));
+            return new Checked(null, new PreviewResult.Incomplete(Messages.get("error.internal", e.getClass().getSimpleName())));
         }
         if (script.steps().isEmpty()) {
-            return new PreviewResult.Empty();
+            return new Checked(null, new PreviewResult.Empty());
         }
         if (script.steps().size() > 1) {
-            return new PreviewResult.Off(Messages.get("preview.off.several"));
+            return refused("preview.off.several");
         }
         Statement statement = script.steps().getFirst().statement();
         if (statement.background()) {
-            return new PreviewResult.Off(Messages.get("preview.off.background"));
+            return refused("preview.off.background");
         }
         if (statement.assignTo().isPresent()) {
-            return new PreviewResult.Off(Messages.get("preview.off.assignment"));
+            return refused("preview.off.assignment");
         }
         if (!statement.pipeline().redirects().isEmpty()) {
-            return new PreviewResult.Off(Messages.get("preview.off.redirection"));
+            return refused("preview.off.redirection");
         }
-        var guard = new PreviewGuard(settings.get().stageLimit());
+        return new Checked(statement, null);
+    }
+
+    private static Checked refused(String key) {
+        return new Checked(null, new PreviewResult.Off(Messages.get(key)));
+    }
+
+    /**
+     * What the pipeline produced while it was allowed to run.
+     *
+     * @param early       the result to return as it is (the line was refused or failed), or {@code null}
+     * @param more        {@code true} if the values are not all there (the limit, or the time, stopped the evaluation)
+     * @param interrupted {@code true} if the time limit cut the evaluation off
+     */
+    private record Evaluation(List<Object> values, boolean more, boolean interrupted, PreviewResult early) {
+    }
+
+    private Evaluation evaluate(Statement statement, PreviewGuard guard, int limit, String line) {
         List<Object> values = Collections.synchronizedList(new ArrayList<>());
         boolean more = false;
         boolean interrupted = false;
@@ -108,16 +151,16 @@ final class PreviewMode {
             }
         } catch (PjException e) {
             if (guard.reason() == null) {
-                return new PreviewResult.Failed(e.error().message());
+                return new Evaluation(values, false, false, new PreviewResult.Failed(e.error().message()));
             }
         } catch (RuntimeException | StackOverflowError e) {
             if (guard.reason() == null) {
                 LOG.log(Level.FINE, e, () -> "The preview failed on the line " + LoggedLine.of(line));
-                return new PreviewResult.Failed(Messages.get("error.internal", e));
+                return new Evaluation(values, false, false, new PreviewResult.Failed(Messages.get("error.internal", e)));
             }
         }
         if (guard.reason() != null) {
-            return new PreviewResult.Off(guard.reason());
+            return new Evaluation(values, false, false, new PreviewResult.Off(guard.reason()));
         }
         if (Thread.currentThread().isInterrupted()) {
             // The pipeline waits for its stages without letting itself be interrupted, then gives the interruption back
@@ -125,15 +168,14 @@ final class PreviewMode {
             more = true;
             interrupted = true;
         }
-        List<Object> shown;
-        synchronized (values) {
-            shown = new ArrayList<>(values.subList(0, Math.min(limit, values.size())));
-            more |= values.size() > limit;
-        }
-        if (interrupted && shown.isEmpty()) {
-            return new PreviewResult.TimedOut(guard.errors(), guard.readsFiles()); // not "no result": the line was cut off, not empty
-        }
+        return new Evaluation(values, more, interrupted, null);
+    }
+
+    /** The values shown, as the display writes them. */
+    private static PreviewResult format(List<Object> shown, boolean more, PreviewGuard guard, int width, boolean colors) {
         var text = new StringWriter();
+        // The time limit may have interrupted this thread already: the values are in memory, formatting them is not cut off.
+        boolean wasInterrupted = Thread.interrupted();
         try {
             guard.call(() -> {
                 var formatter = new OutputFormatter(new PrintWriter(text), width, colors, PropertyAccess::property);
@@ -146,6 +188,10 @@ final class PreviewMode {
                 return new PreviewResult.Off(guard.reason());
             }
             more = true; // a lazy value could not be displayed in time: what was formatted is shown
+        } finally {
+            if (wasInterrupted) {
+                Thread.currentThread().interrupt();
+            }
         }
         String formatted = text.toString().stripTrailing();
         List<String> lines = formatted.isEmpty() ? List.of() : List.of(formatted.split("\\R"));
