@@ -25,6 +25,7 @@ import io.powerj.core.lang.Ast;
 import io.powerj.core.lang.ExpressionParser;
 import io.powerj.core.runtime.CommandCatalog;
 import io.powerj.core.runtime.Resolved;
+import io.powerj.core.runtime.ShellLists;
 
 /**
  * What an expression denotes, found without running it (FR-24): the type of a variable, of a property by its
@@ -267,12 +268,12 @@ final class TypeInference {
 
     /**
      * The value, if completion may call methods on it ({@code isEmpty}, {@code getFirst}, {@code get}): a list of the JDK that
-     * holds its elements, or a {@code Collected}. Another list could run code while the user types (review C-23); it counts
-     * as unknown.
+     * holds its elements, a list that the shell made ({@link ShellLists}), or a {@code Collected}. Another list could run code
+     * while the user types (review C-23); it counts as unknown.
      */
     private static Object readable(Object value) {
-        return value instanceof Collected<?> || value != null && MATERIALISED.contains(value.getClass().getName())
-                ? value : null;
+        return value instanceof Collected<?> || ShellLists.isOne(value)
+                || value != null && MATERIALISED.contains(value.getClass().getName()) ? value : null;
     }
 
     /** The element that {@code *.} applies to: of a list, of an array, or the value itself. */
