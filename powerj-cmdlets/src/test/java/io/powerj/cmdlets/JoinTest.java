@@ -180,4 +180,36 @@ class JoinTest {
         assertThatThrownBy(() -> join.begin(new Join.Params(side(List.of()), null, "id", null, null, false), context))
                 .hasMessageStartingWith("left side expected");
     }
+
+    /** A record whose accessor fails for one of its objects (a throwing getter: {@code Properties.Unreadable}). */
+    public record Fragile(String id, String detail) {
+        @Override
+        public String detail() {
+            if (id.equals("bad")) {
+                throw new IllegalStateException("no luck");
+            }
+            return detail;
+        }
+    }
+
+    @Test
+    void anObjectWithAnAccessorThatThrowsIsSkippedAndTheJoinGoesOn() throws Exception {
+        var right = List.of(row("id", "1", "owner", "me"), row("id", "bad", "owner", "you"));
+
+        List<Row> rows = join(byKey(right, "id"), new Fragile("1", "x"), new Fragile("bad", "y"),
+                new Fragile("1", "z"));
+
+        assertThat(rows).extracting(r -> r.get("detail")).containsExactly("x", "z");
+        assertThat(context.errors).singleElement().asString().contains("no luck");
+    }
+
+    @Test
+    void aRightObjectWithAnAccessorThatThrowsIsSkippedToo() throws Exception {
+        var right = List.of(new Fragile("1", "kept"), new Fragile("bad", "lost"));
+
+        List<Row> rows = join(byKey(right, "id"), row("id", "1"), row("id", "bad"), row("id", "2"));
+
+        assertThat(rows).extracting(r -> r.get("detail")).containsExactly("kept");
+        assertThat(context.errors).isNotEmpty();
+    }
 }

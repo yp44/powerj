@@ -46,6 +46,7 @@ Then `cd C:\tmp\j`.
 | 24 | `"{\"a\": 1, \"a\": 2}" \| from-json` | One row, `a` is `2` (the last of a repeated key). |
 | 25 | `[0] \| map { x -> Float.parseFloat("0.1") } \| to-json -c` | `[0.1]`, not `[0.10000000149011612]`. |
 | 26 | `"" \| to-csv --no-header \| from-csv --no-header \| to-json -c` | `""` is written for a record of one empty field, and `[{"c1":""}]` comes back: the row is not lost as an empty line. |
+| 27 | `$m = [Map.of("a", 1), Map.of("b", 2)]`, then `$m \| to-csv` (the maps are unrolled) | `a`, `1`, then an empty field, and one error: `to-csv: not in the header, so not written: b (the columns are those of the first object)`; the same error is not repeated for the next objects that have `b`. |
 
 ## Known limitations
 

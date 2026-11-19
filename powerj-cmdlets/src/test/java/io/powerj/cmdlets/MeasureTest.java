@@ -176,4 +176,23 @@ class MeasureTest {
         assertThat(row.get("max")).isEqualTo(new java.math.BigInteger("3"));
         assertThat(((Number) row.get("sum")).doubleValue()).isCloseTo(5.3, org.assertj.core.data.Offset.offset(1e-9));
     }
+
+    @Test
+    void anAdderKeepsItsFractionInTheSum() throws Exception {
+        var adder = new java.util.concurrent.atomic.DoubleAdder();
+        adder.add(1.5);
+
+        Row row = measure(null, adder, 2);
+
+        assertThat(row).containsEntry("sum", 3.5); // 1 + 2 = 3 when the 1.5 was cut to a long
+    }
+
+    @Test
+    void aBigIntegerIsIntegralForTheSumAsForTheSort() throws Exception {
+        var big = new java.math.BigInteger("100000000000000000000");
+
+        Row row = measure(null, big, 1L);
+
+        assertThat(row.get("sum")).isEqualTo(new java.math.BigInteger("100000000000000000001"));
+    }
 }

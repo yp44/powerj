@@ -35,6 +35,7 @@ Then `cd C:\tmp\j`.
 | 12 | Alt+V, then type line 1 | The preview shows the joined rows. |
 | 13 | `help join` | Help with `-r, --right`, `-l, --left`, `-k, --key`, `--left-key`, `--right-key`, `-o, --outer` and the examples. |
 | 14 | `POWERJ_LANG=fr`, then `ls \| join -k name` | `join : côté droit attendu : …`. |
+| 15 | (automated only: `JoinTest`) a left or right object whose property getter throws | The object is skipped with a non-blocking error naming the property, and the join goes on with the others. |
 
 ## Known limitations
 

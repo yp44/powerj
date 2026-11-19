@@ -11,6 +11,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import io.powerj.api.UsageException;
 import io.powerj.api.internal.LanguageSetting;
 import io.powerj.testing.TestContext;
 
@@ -110,5 +111,43 @@ class EnvTest {
     void onlyReadingIsPreviewed() {
         assertThat(new Env().canPreview(new Env.Params("PATH", null, null, null, null, null))).isTrue();
         assertThat(new Env().canPreview(new Env.Params(null, "A=1", null, null, null, null))).isFalse();
+    }
+
+    // --- audit v2, U-09 ---
+
+    @Test
+    void aNameBeforeTheActionWithAPathAsItsArgumentIsAUsageErrorNotAVariableCalledSlashX() {
+        // "env PATH --append /x" binds PATH to the positional name and /x to --append: /x is no variable
+        assertThatThrownBy(() -> env("PATH", null, null, "/x", null, null)).isInstanceOf(UsageException.class)
+                .hasMessageContaining("/x").hasMessageContaining("env --append NAME value");
+
+        assertThat(context.environment).doesNotContainKey("/x");
+        assertThat(context.environment.get("PATH")).isEqualTo("/bin");
+    }
+
+    @Test
+    void twoValuesAfterTheNameAreAUsageErrorNotOneOfThemSilentlyDropped() {
+        assertThatThrownBy(() -> env("/a", null, null, "PATH", null, "/b")).isInstanceOf(UsageException.class)
+                .hasMessageContaining("/a").hasMessageContaining("/b");
+
+        assertThat(context.environment.get("PATH")).isEqualTo("/bin");
+    }
+
+    @Test
+    void anEntryThatIsAlreadyInTheListIsNotAddedAgain() {
+        env("/tools", null, null, "PATH", null, null);
+        env("/tools", null, null, "PATH", null, null);
+        env("/bin", null, null, null, "PATH", null);
+
+        assertThat(context.environment.get("PATH")).isEqualTo("/bin" + File.pathSeparator + "/tools");
+    }
+
+    @Test
+    void aVariableNameMayHaveParenthesesAsOnWindows() {
+        context.environment.put("ProgramFiles(x86)", "C:\\pf");
+
+        env("D:\\more", null, null, "ProgramFiles(x86)", null, null);
+
+        assertThat(context.environment.get("ProgramFiles(x86)")).isEqualTo("C:\\pf" + File.pathSeparator + "D:\\more");
     }
 }

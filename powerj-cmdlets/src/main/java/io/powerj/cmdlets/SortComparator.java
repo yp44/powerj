@@ -1,9 +1,10 @@
 package io.powerj.cmdlets;
 
 import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.util.Comparator;
 import java.util.function.Consumer;
+
+import io.powerj.text.Numbers;
 
 /**
  * Order of {@code sort} (specification FR-67). It is a total order, so that {@code List.sort} never sees an
@@ -103,7 +104,7 @@ final class SortComparator implements Comparator<Object> {
      * number has one place, whatever the classes it is compared with.
      */
     static int compareNumbers(Number a, Number b) {
-        if (isIntegral(a) && isIntegral(b)) {
+        if (Numbers.fitsLong(a) && Numbers.fitsLong(b)) {
             return Long.compare(a.longValue(), b.longValue());
         }
         int aSpecial = special(a);
@@ -111,12 +112,12 @@ final class SortComparator implements Comparator<Object> {
         if (aSpecial != 0 || bSpecial != 0) {
             return Integer.compare(aSpecial, bSpecial);
         }
-        return decimal(a).compareTo(decimal(b));
+        return Numbers.decimal(a).compareTo(Numbers.decimal(b));
     }
 
     /** {@code -1} for -Infinity, {@code 1} for +Infinity, {@code 2} for NaN, {@code 0} for a number with a value. */
     private static int special(Number n) {
-        if (!(n instanceof Double || n instanceof Float)) {
+        if (Numbers.isIntegral(n) || n instanceof BigDecimal) {
             return 0;
         }
         double value = n.doubleValue();
@@ -124,19 +125,5 @@ final class SortComparator implements Comparator<Object> {
             return 2;
         }
         return Double.isInfinite(value) ? (value < 0 ? -1 : 1) : 0;
-    }
-
-    private static boolean isIntegral(Number n) {
-        return n instanceof Long || n instanceof Integer || n instanceof Short || n instanceof Byte;
-    }
-
-    private static BigDecimal decimal(Number n) {
-        return switch (n) {
-            case BigDecimal d -> d;
-            case BigInteger i -> new BigDecimal(i);
-            case Double d -> BigDecimal.valueOf(d);
-            case Float f -> new BigDecimal(f.toString());
-            default -> isIntegral(n) ? BigDecimal.valueOf(n.longValue()) : new BigDecimal(n.toString());
-        };
     }
 }
