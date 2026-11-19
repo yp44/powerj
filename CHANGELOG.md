@@ -1261,6 +1261,15 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   `runSingleNative`, `runPipeline` and `stageThread`; `PreviewMode.preview` (89) is `check`, `evaluate`, `format` and the
   few lines that join them; `prepare` (55) and `NativeRunner.startGroup` (67) are split as well. The longest is now 48
   lines. No change of behaviour: the characterization test and the tests of the pipeline and the preview are the guard.
+### Fixed (the table counts terminal columns, not UTF-16 units, [#174](https://github.com/yp44/powerj/issues/174))
+- **CJK names and emoji align in the table** (audit v2, U-04). `OutputFormatter` sized the columns with `String.length()`, so a
+  column of `日本語` (two terminal columns per character) or of emoji (two columns, two UTF-16 units) was misaligned and could
+  overflow the window, a truncation could cut a surrogate pair, and a cell with a line break or a tab broke the row. A new
+  `io.powerj.text.DisplayWidth` counts columns (East Asian Wide and Fullwidth and emoji count 2, combining marks, joiners and
+  controls 0), cuts on whole characters (`truncate`) and pads (`padEnd`); the table, the record list and the map use it. In a
+  table cell `\n` is shown as `⏎` and `\r`, `\t` as a space (character for character, so the highlights keep their
+  positions); a text shown whole keeps its line breaks. The characters whose width depends on the terminal (East Asian
+  Ambiguous) count 1. The grid and the exports are not concerned. Tests: `DisplayWidthTest`, `OutputFormatterTest`.
 
 ## [0.1.0] — never released (baseline)
 

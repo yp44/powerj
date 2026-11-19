@@ -33,6 +33,7 @@ As in the previous steps: **Actions** tab, latest run of the **CI** workflow, ar
 | 19 | `$nom = "Yves"` then `"Bonjour $nom"` | Displays `Bonjour Yves`. |
 | 20 | Forced encoding: set the Windows environment variable `POWERJ_NATIVE_ENCODING=windows-1252`, relaunch PowerJ, then `$l = ipconfig` and `$l`. | `ipconfig`'s accented characters are now wrong (deliberately unsuitable encoding): proof that the setting is taken into account. Delete the variable to return to the automatic setting. `POWERJ_NATIVE_ENCODING_GIT=UTF-8` would only affect git. |
 | 21 | `exit 7`, then in `cmd.exe`: `echo %ERRORLEVEL%` | Displays `7`. |
+| 21b | `mkdir 日本語`, `touch abc`, then `ls`; also `ls` in a folder with files named with emoji | The `name` column is aligned on the terminal: a Japanese character takes two columns, so `日本語` is padded less than `abc`; a name that is too wide ends with `…` after a whole character, never half of an emoji; the lines of the table do not overflow the window (#174). |
 
 ## Known limitations of step 2
 

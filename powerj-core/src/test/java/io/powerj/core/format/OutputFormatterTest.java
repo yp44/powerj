@@ -220,4 +220,48 @@ class OutputFormatterTest {
         }
         assertThat(render(80, rows).lines()).hasSize(122);
     }
+
+    // --- display width, not UTF-16 length (audit v2, U-04, #174) ---
+
+    record Named(String name, int size) { }
+
+    /** The second column starts at the same terminal column on every line, whatever the width of the characters. */
+    private static void assertAligned(String table, String... firstColumn) {
+        List<String> lines = table.lines().toList();
+        int expected = -1;
+        for (String text : firstColumn) {
+            String line = lines.stream().filter(l -> l.startsWith(text)).findFirst().orElseThrow();
+            int column = io.powerj.text.DisplayWidth.of(line.substring(0, line.lastIndexOf(' ') + 1));
+            assertThat(expected == -1 || column == expected).as(table).isTrue();
+            expected = column;
+        }
+    }
+
+    @Test
+    void wideCharactersAlignTheColumns() {
+        String table = render(80, new Named("日本語", 1), new Named("abc", 2));
+
+        assertAligned(table, "日本語", "abc");
+        assertThat(table.lines().toList().get(3)).isEqualTo("abc        2"); // 日本語 takes 6 columns (abc + 3), the gap is 2, "size" is 4 wide and right-aligned
+    }
+
+    @Test
+    void aCellWithALineBreakOrATabStaysOnOneLine() {
+        String table = render(80, new Named("a\nb\tc", 1), new Named("d\r\ne", 2));
+
+        assertThat(table.lines().count()).isEqualTo(4); // header, rule, two rows
+        assertThat(table).contains("a⏎b c").contains("d ⏎e");
+    }
+
+    @Test
+    void aTruncationInTheMiddleOfEmojiKeepsWholeCharacters() {
+        String table = render(14, new Named("😀".repeat(10), 1));
+
+        for (String line : table.lines().toList()) {
+            assertThat(line.codePoints().noneMatch(cp -> cp == 0xFFFD)).isTrue();
+            assertThat(io.powerj.text.DisplayWidth.of(line)).isLessThanOrEqualTo(14);
+            assertThat(line.chars().filter(c -> Character.isSurrogate((char) c)).count() % 2).as("no half pair: " + line).isZero();
+        }
+        assertThat(table).contains("…");
+    }
 }
