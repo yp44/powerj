@@ -28,6 +28,7 @@ To start from an empty history, delete the file `%USERPROFILE%\.powerj\history` 
 | 12 | Editing: type some text, use ←/→, Home/End, Ctrl+←/→ (word by word), Ctrl+W, Ctrl+K, Ctrl+U. | Usual Emacs behavior. |
 | 13 | On a non-empty line, Ctrl+D. | Deletes the character under the cursor. |
 | 14 | On an empty line, Ctrl+D. | The shell closes. |
+| 14b | Type `Thread.sleep(30000); echo after`, then Ctrl+C after a second. | `^C`, a new prompt, and `after` is **not** displayed: the statement that follows a cancelled Java call does not run (#165). |
 | 15 | Relaunch PowerJ, press ↑. | The history of the previous session is restored. |
 | 16 | `history --clear`, then ↑. | Nothing left in the history. |
 | 17 | Configuration: create `%USERPROFILE%\.powerj\config.properties` containing `history.size=3`, relaunch, type 5 commands, `history`. | Only the last 3 entries are kept. |

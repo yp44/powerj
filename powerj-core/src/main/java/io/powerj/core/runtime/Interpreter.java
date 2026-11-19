@@ -209,6 +209,9 @@ public final class Interpreter implements CommandCatalog {
                 if (session.exitRequest().isPresent()) {
                     return;
                 }
+                if (Thread.currentThread().isInterrupted()) {
+                    throw new CancellationException(); // Ctrl+C, or a line abandoned by a second Ctrl+C (#165)
+                }
                 boolean run = switch (step.connector()) {
                     case ALWAYS -> true;
                     case IF_SUCCESS -> succeeded;

@@ -141,6 +141,26 @@ class PropertyReadTest {
         }
     }
 
+    /** The JDK clears the interrupt flag when a blocking call throws {@link InterruptedException} (#165). */
+    public static final class Sleeper {
+        public String getSlept() throws InterruptedException {
+            Thread.sleep(30_000);
+            return "never";
+        }
+    }
+
+    @Test
+    void aGetterThatThrowsInterruptedExceptionIsACancellationAndTheFlagIsSetAgain() {
+        Thread.currentThread().interrupt();
+        try {
+            assertThatThrownBy(() -> PropertyAccess.property(new Sleeper(), "slept"))
+                    .isInstanceOf(CancellationException.class);
+            assertThat(Thread.currentThread().isInterrupted()).isTrue();
+        } finally {
+            Thread.interrupted();
+        }
+    }
+
     @Test
     void aGetterThatIsInterruptedEndsTheCommandInsteadOfBeingAnErrorOfTheObject() {
         assertThatThrownBy(() -> PropertyAccess.property(new Interrupted(), "value")).isInstanceOf(CancellationException.class);

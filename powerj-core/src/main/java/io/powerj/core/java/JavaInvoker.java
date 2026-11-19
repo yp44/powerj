@@ -143,6 +143,9 @@ public final class JavaInvoker {
         if (cause instanceof PjException || cause instanceof CancellationException) {
             return (RuntimeException) cause; // thrown by a { } block called from Java
         }
+        if (Cancellation.isInterruption(cause)) {
+            return Cancellation.cancelled(); // Ctrl+C reached a blocking call: the command is being stopped (#165)
+        }
         String message = cause.getMessage();
         return new PjException(PjError.of(message == null ? cause.getClass().getName()
                 : Messages.get("java.exception", cause.getClass().getName(), message), cause));
