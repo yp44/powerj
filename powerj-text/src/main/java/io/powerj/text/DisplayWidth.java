@@ -5,7 +5,7 @@ package io.powerj.text;
  * table of names shows: a Japanese or Korean character, a fullwidth letter and an emoji take two columns (and an emoji is
  * two units), a combining mark takes none (audit v2, U-04).
  * <p>
- * East Asian Wide and Fullwidth ranges and the emoji count 2, combining marks, format characters (the zero width joiner)
+ * East Asian Wide and Fullwidth ranges and the emoji count 2, non-spacing and enclosing marks, format characters (the zero width joiner)
  * and controls 0, the rest 1. The characters whose width depends on the terminal (East Asian Ambiguous) count 1.
  */
 public final class DisplayWidth {
@@ -29,8 +29,8 @@ public final class DisplayWidth {
     /** The columns of one character: 0, 1 or 2. */
     public static int of(int codePoint) {
         switch (Character.getType(codePoint)) {
-            case Character.NON_SPACING_MARK, Character.ENCLOSING_MARK, Character.FORMAT, Character.CONTROL,
-                    Character.COMBINING_SPACING_MARK -> {
+            // a spacing mark (the vowel signs of Devanagari, Tamil…) takes a column, as wcwidth says
+            case Character.NON_SPACING_MARK, Character.ENCLOSING_MARK, Character.FORMAT, Character.CONTROL -> {
                 return 0;
             }
             default -> {

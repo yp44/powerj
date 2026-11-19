@@ -33,6 +33,13 @@ class DisplayWidthTest {
         assertThat(DisplayWidth.of("a‍b")).isEqualTo(2); // zero width joiner
     }
 
+    /** हि is ह and the vowel sign ि, a spacing mark: two columns, as a terminal shows it (review of #219). */
+    @Test
+    void aSpacingMarkTakesAColumn() {
+        assertThat(DisplayWidth.of("हि")).isEqualTo(2);
+        assertThat(DisplayWidth.of("\u093F")).isEqualTo(1);
+    }
+
     @Test
     void truncationKeepsWholeCharactersAndEndsWithAnEllipsisThatFits() {
         assertThat(DisplayWidth.truncate("abc", 3)).isEqualTo("abc");
