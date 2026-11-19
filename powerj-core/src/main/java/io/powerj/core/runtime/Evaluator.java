@@ -372,10 +372,10 @@ public final class Evaluator {
     /** {@code x[i]}: integer index on a list, array or string; key on a {@code Map}. */
     private static Object at(Object target, Object index) {
         if (target instanceof Map<?, ?> map) {
-            return map.get(index);
+            return PropertyAccess.get(map, index);
         }
         if (index instanceof Integer || index instanceof Long || index instanceof Short || index instanceof Byte) {
-            return PropertyAccess.index(target, ((Number) index).intValue());
+            return PropertyAccess.index(target, ((Number) index).longValue());
         }
         throw new PjException(Messages.get("index.integerExpected", Values.describe(index)));
     }

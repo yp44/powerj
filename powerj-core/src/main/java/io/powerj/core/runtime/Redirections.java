@@ -3,6 +3,7 @@ package io.powerj.core.runtime;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.Optional;
 
@@ -40,7 +41,13 @@ public record Redirections(Optional<NativeRunner.FileTarget> out, Optional<Nativ
         if (last == null) {
             return Optional.empty();
         }
-        Path file = session.currentDirectory().resolve(Values.text(evaluator.argument(last.target())));
+        String name = Values.text(evaluator.argument(last.target()));
+        Path file;
+        try {
+            file = session.currentDirectory().resolve(name);
+        } catch (InvalidPathException e) {
+            throw new PjException(PjError.of(Messages.get("file.writeFailed", name, e.getReason()), e)); // `> a?b` on Windows
+        }
         return Optional.of(new NativeRunner.FileTarget(file, last.append()));
     }
 

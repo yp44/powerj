@@ -27,10 +27,10 @@ public final class Operators {
         return switch (op) {
             case EQ -> equal(left, right);
             case NE -> !equal(left, right);
-            case LT -> compare(op, left, right) < 0;
-            case LE -> compare(op, left, right) <= 0;
-            case GT -> compare(op, left, right) > 0;
-            case GE -> compare(op, left, right) >= 0;
+            case LT -> !unordered(left, right) && compare(op, left, right) < 0;
+            case LE -> !unordered(left, right) && compare(op, left, right) <= 0;
+            case GT -> !unordered(left, right) && compare(op, left, right) > 0;
+            case GE -> !unordered(left, right) && compare(op, left, right) >= 0;
             case ADD -> add(left, right);
             case SUB -> subtract(left, right);
             case MUL, DIV, REM -> arithmetic(op, left, right);
@@ -60,6 +60,9 @@ public final class Operators {
 
     /** Value equality ({@code Objects.equals}); numbers compared by value ({@code 1 == 1L}). */
     static boolean equal(Object left, Object right) {
+        if (unordered(left, right)) {
+            return false; // NaN is not equal to anything, itself included, as in Java
+        }
         if (left instanceof Number && right instanceof Number) {
             return numericCompare(left, right) == 0;
         }
@@ -70,6 +73,15 @@ public final class Operators {
             return numericCompare(left, (int) c) == 0;
         }
         return Objects.equals(left, right);
+    }
+
+    /** {@code true} if one side is a {@code NaN}: it is neither equal to, less than nor greater than anything (Java, FR-33). */
+    private static boolean unordered(Object left, Object right) {
+        return isNaN(left) || isNaN(right);
+    }
+
+    private static boolean isNaN(Object value) {
+        return value instanceof Double d && d.isNaN() || value instanceof Float f && f.isNaN();
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
@@ -215,7 +227,9 @@ public final class Operators {
             return decimal(a).compareTo(decimal(b));
         }
         if (isFloating(a) || isFloating(b)) {
-            return Double.compare(a.doubleValue(), b.doubleValue());
+            double x = a.doubleValue();
+            double y = b.doubleValue();
+            return x < y ? -1 : x > y ? 1 : 0; // not Double.compare: 0.0 and -0.0 are equal in Java
         }
         return Long.compare(a.longValue(), b.longValue());
     }
@@ -241,10 +255,18 @@ public final class Operators {
         return switch (n) {
             case BigDecimal d -> d;
             case BigInteger i -> new BigDecimal(i);
-            case Double d -> BigDecimal.valueOf(d);
-            case Float f -> BigDecimal.valueOf(f);
+            case Double d -> finite(d);
+            case Float f -> finite(f.doubleValue());
             default -> BigDecimal.valueOf(n.longValue());
         };
+    }
+
+    /** A double as a decimal; {@code NaN} and the infinities have none. */
+    private static BigDecimal finite(double value) {
+        if (Double.isNaN(value) || Double.isInfinite(value)) {
+            throw new PjException(Messages.get("operator.notFinite", value));
+        }
+        return BigDecimal.valueOf(value);
     }
 
     private static PjException unsupported(Operator op, Object operand) {

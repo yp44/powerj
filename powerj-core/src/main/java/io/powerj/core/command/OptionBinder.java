@@ -355,7 +355,7 @@ public final class OptionBinder {
                 throw new PjException(Messages.get("option.enumExpected", command, spec.longName(),
                         Arrays.toString(type.getEnumConstants()).toLowerCase(Locale.ROOT), text));
             }
-        } catch (NumberFormatException | InvalidPathException e) {
+        } catch (NumberFormatException | ArithmeticException | InvalidPathException e) {
             throw new PjException(Messages.get("option.invalidValue", command, spec.longName(), text));
         }
         throw new PjException(Messages.get("option.unsupportedType", command, type.getSimpleName()));

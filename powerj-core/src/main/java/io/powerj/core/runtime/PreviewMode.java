@@ -7,7 +7,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.function.Supplier;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
+import io.powerj.core.error.LoggedLine;
 import io.powerj.core.error.PjException;
 import io.powerj.core.format.OutputFormatter;
 import io.powerj.core.format.ValueUnroller;
@@ -26,6 +29,9 @@ import io.powerj.core.lang.SyntaxException;
  * the first thing that would have an effect.
  */
 final class PreviewMode {
+
+    private static final Logger LOG = Logger.getLogger(PreviewMode.class.getName());
+
 
     /** Stops a preview that has received enough values. */
     private static final class PreviewFull extends CancellationException {
@@ -65,6 +71,10 @@ final class PreviewMode {
             script = Parser.parse(line, parseContext.get());
         } catch (SyntaxException e) {
             return new PreviewResult.Incomplete(e.getMessage());
+        } catch (RuntimeException e) {
+            // The parser throws SyntaxException only (ParserFuzzTest); if it ever fails otherwise, a keystroke must not show it.
+            LOG.log(Level.FINE, e, () -> "The preview could not read the line " + LoggedLine.of(line));
+            return new PreviewResult.Incomplete(Messages.get("error.internal", e.getClass().getSimpleName()));
         }
         if (script.steps().isEmpty()) {
             return new PreviewResult.Empty();
@@ -102,6 +112,7 @@ final class PreviewMode {
             }
         } catch (RuntimeException | StackOverflowError e) {
             if (guard.reason() == null) {
+                LOG.log(Level.FINE, e, () -> "The preview failed on the line " + LoggedLine.of(line));
                 return new PreviewResult.Failed(Messages.get("error.internal", e));
             }
         }

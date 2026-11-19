@@ -15,6 +15,7 @@ import java.util.concurrent.CancellationException;
 import io.powerj.api.Row;
 import io.powerj.core.error.PjError;
 import io.powerj.core.error.PjException;
+import io.powerj.core.format.Values;
 import io.powerj.core.i18n.Messages;
 import io.powerj.core.lang.Accessor;
 
@@ -56,7 +57,7 @@ public final class PropertyAccess {
             throw new PjException(Messages.get("property.onNull", name));
         }
         if (target instanceof Map<?, ?> map) {
-            return map.get(name);
+            return get(map, name);
         }
         var direct = directProperty(target, name, false);
         if (direct.found()) {
@@ -178,7 +179,21 @@ public final class PropertyAccess {
         return Lookup.MISSING;
     }
 
-    public static Object index(Object target, int index) {
+    /**
+     * {@code map.get(key)}. A map that cannot hold the key (a {@code null} for {@code Map.of()}, an {@code Integer} for a
+     * {@code TreeMap<String, …>}) throws from {@code get}: that is a mistake of the user, told as such, not an internal
+     * error (audit v2, R-03).
+     */
+    public static Object get(Map<?, ?> map, Object key) {
+        try {
+            return map.get(key);
+        } catch (NullPointerException | ClassCastException e) {
+            throw new PjException(PjError.of(Messages.get("index.keyRefused", Values.describe(key)), e));
+        }
+    }
+
+    /** {@code target[index]}; a {@code long} is compared as it is, not truncated to an {@code int} (audit v2, R-04). */
+    public static Object index(Object target, long index) {
         return switch (target) {
             case null -> throw new PjException(Messages.get("index.onNull", index));
             case List<?> list -> list.get(position(index, list.size()));
@@ -188,11 +203,11 @@ public final class PropertyAccess {
         };
     }
 
-    private static int position(int index, int size) {
-        int position = index < 0 ? size + index : index;
+    private static int position(long index, int size) {
+        long position = index < 0 ? size + index : index;
         if (position < 0 || position >= size) {
             throw new PjException(Messages.get("index.outOfBounds", index, size));
         }
-        return position;
+        return (int) position;
     }
 }

@@ -336,7 +336,12 @@ public final class Lexer {
         if (atEnd() || peek() != ']' || pos == start || input.substring(start, pos).equals("-")) {
             throw new SyntaxException(Messages.get("syntax.invalidIndex", open + 1));
         }
-        int value = Integer.parseInt(input.substring(start, pos));
+        int value;
+        try {
+            value = Integer.parseInt(input.substring(start, pos));
+        } catch (NumberFormatException _) {
+            throw new SyntaxException(Messages.get("syntax.numberTooLarge", input.substring(start, pos)));
+        }
         pos++; // ]
         return value;
     }
@@ -498,12 +503,26 @@ public final class Lexer {
             throw new SyntaxException(Messages.get("syntax.incompleteUnicodeEscape"));
         }
         String hex = input.substring(pos, pos + 4);
-        try {
-            pos += 4;
-            return String.valueOf((char) Integer.parseInt(hex, 16));
-        } catch (NumberFormatException _) {
+        int value = hex4(hex);
+        if (value < 0) {
             throw new SyntaxException(Messages.get("syntax.invalidUnicodeEscape", hex));
         }
+        pos += 4;
+        return String.valueOf((char) value);
+    }
+
+    /** The value of four hexadecimal digits, and nothing else ({@code Integer.parseInt} accepts a sign); -1 if it is not. */
+    static int hex4(String hex) {
+        int value = 0;
+        for (int i = 0; i < hex.length(); i++) {
+            char c = hex.charAt(i);
+            int digit = c < 128 ? Character.digit(c, 16) : -1;
+            if (digit < 0) {
+                return -1;
+            }
+            value = value * 16 + digit;
+        }
+        return hex.length() == 4 ? value : -1;
     }
 
     private void skipWhitespace() {
