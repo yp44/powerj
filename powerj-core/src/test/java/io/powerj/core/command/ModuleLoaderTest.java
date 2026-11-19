@@ -157,6 +157,20 @@ class ModuleLoaderTest {
         assertThat(run("org.b.greet:greet -n Q")).contains("Hello Q");
     }
 
+    /** A module of one segment has no longer name to fall back on: its prefix is made unique (review of #219). */
+    @Test
+    void aModuleOfOneSegmentWhoseNameIsTakenGetsAPrefixOfItsOwn() throws Exception {
+        hello(tmp.resolve("a.jar"), "com.a.greet", "greet");
+        hello(tmp.resolve("b.jar"), "greet", "greet");
+
+        run("mod-load a.jar");
+        run("mod-load b.jar");
+
+        assertThat(errors).singleElement().asString().contains("available as greet-2:greet");
+        assertThat(registry.find("greet:greet").orElseThrow().module()).isEqualTo("com.a.greet");
+        assertThat(registry.find("greet-2:greet").orElseThrow().module()).isEqualTo("greet");
+    }
+
     @Test
     void loadingAModuleCreatesItsProviderOnce() throws Exception {
         hello(tmp.resolve("counted.jar"), "org.test.counted", "counted", Map.of(),

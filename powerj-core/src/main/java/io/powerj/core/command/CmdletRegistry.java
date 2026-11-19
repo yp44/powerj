@@ -110,7 +110,8 @@ public final class CmdletRegistry {
         /**
          * Qualified name, always usable: {@code greet:greet} (FR-17). The prefix is the last segment of the module name
          * ({@code com.example.greet} gives {@code greet}), or the whole name when another module already has that segment
-         * ({@code org.other.greet:greet}): two modules never share a qualified name (audit v2, R-06).
+         * ({@code org.other.greet:greet}), and if that is taken too (a module named {@code greet}), the name followed by
+         * {@code -2}, {@code -3}…: two modules never share a qualified name (audit v2, R-06).
          */
         public String qualifiedName() {
             return prefix + ":" + name();
@@ -204,6 +205,10 @@ public final class CmdletRegistry {
         if (prefix == null) {
             String alias = alias(registered.module());
             prefix = prefixes.containsValue(alias) ? registered.module() : alias;
+            // a module of one segment (greet) has no longer name: its full name is the alias that is taken
+            for (int n = 2; prefixes.containsValue(prefix); n++) {
+                prefix = registered.module() + "-" + n;
+            }
             prefixes.put(registered.module(), prefix);
         }
         return registered.withPrefix(prefix);
