@@ -1079,6 +1079,21 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   Tests: `GrepTest` (a counting stream, a consumer that stops, 5 000 matches before a bad byte at line 5001 in both walks,
   2 500 matches in order across chunks), `DecodingReaderTest`, `FileWalkerTest`; each seen failing when the code was broken.
 
+### Added and fixed (`kill` has a safety net, [#161](https://github.com/yp44/powerj/issues/161))
+- **`ps | where … | kill` can no longer stop the terminal and the shell that typed it** (audit v2, U-07). `rm` has its
+  protected paths and `--allow-protected`; `kill` refused the current process only. It now refuses the **parents of PowerJ**
+  (the terminal, the IDE, the shell it was started from) and the **init process** (pid 1; the System and Idle processes on
+  Windows) with `refusing to stop <pid> (<name>): … (stop it anyway with --allow-protected)`, before `-n` too, so a dry run
+  shows what the real one would do. `--allow-protected` lifts it; stopping PowerJ itself is still the JDK's refusal.
+- **A stored `ProcessEntry` stops the process it described, or none** (R-18, kill part). `$p = ps java`, then `$p | kill`
+  used the pid alone, and a reused pid stopped another process; when the entry carries a start time that is not the one of the
+  process now at that pid, the error is `no process <pid>`.
+- **`kill -w` has an end** (S-09, kill part). It waited without limit for a process that ignores a normal stop. `--timeout
+  <duration>` (default 10 s) ends the wait: `process <pid> (<name>) is still running after 10s: use -f to force it`; the
+  process is not reported as stopped and the other targets go on. A timeout that is not above zero is a usage error.
+  Tests: `PsKillTest` (the parents and init with `-n`, so that a failing test stops nothing; a stale entry on a real child; a
+  child whose shutdown hook never returns), seen failing before the change.
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.

@@ -34,6 +34,9 @@ Open two Notepad windows (`notepad`, twice). On Linux or macOS, run `sleep 600` 
 | 16 | Alt+V, then type `ps note` | The preview shows the processes; Alt+V, then type `kill 1` shows no result (`kill` never runs in preview). |
 | 17 | `help ps`, `help kill` | Their help, with the options and the examples. |
 | 18 | `POWERJ_LANG=fr`, then `kill 999999999` | `kill : aucun processus 999999999`. |
+| 17b | `$p = ProcessHandle.current().parent().get().pid()`, then `kill -n $p`, then `kill -n --allow-protected $p` | The first gives `kill: refusing to stop <pid> (<name>): PowerJ runs inside it (stop it anyway with --allow-protected)` and lists nothing; the second lists the parent without stopping it. `kill -n 1` (Linux/macOS) is refused too (init). |
+| 17c | Linux or macOS: `^sh -c "trap '' TERM; sleep 600" &`, then `kill -w --timeout 2s <pid of the sh>` | After 2 s: `kill: process <pid> (sh) is still running after 2s: use -f to force it`; `kill -f <pid>` ends it. |
+| 17d | `$e = ps java \| first 1`, wait for it to exit, start another process (the pid may be reused), then `$e \| kill` | `kill: no process <pid>` and nothing else is stopped: the entry remembers when its process started. |
 | 19 | Linux or macOS: `^kill -STOP <pid>`, then `^kill -CONT <pid>` | Other signals go through the native program. |
 
 ## Known limitations
