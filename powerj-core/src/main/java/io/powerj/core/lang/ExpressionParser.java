@@ -457,7 +457,12 @@ public final class ExpressionParser {
             }
             // value followed by a pipeline: ($l | where { … })
         }
-        Ast.Pipeline pipeline = Parser.pipeline(input.substring(open + 1, close), context);
+        Ast.Pipeline pipeline;
+        try {
+            pipeline = Parser.pipeline(input.substring(open + 1, close), context);
+        } catch (SyntaxException e) {
+            throw e.within(input, open + 1); // its positions are those of the group: move them into the line
+        }
         reset(close + 1);
         return new Ast.SubExpression(pipeline);
     }

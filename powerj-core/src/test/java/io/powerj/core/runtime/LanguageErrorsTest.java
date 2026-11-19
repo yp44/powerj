@@ -137,4 +137,26 @@ class LanguageErrorsTest {
 
         assertThat(errors).singleElement().asString().contains("does not fit in a long").contains("BigInteger");
     }
+
+    // --- review of the pull request: the place of an error inside a group, on a multi-line input, after a tab ---
+
+    @Test
+    void theErrorOfAPipelineInParenthesesIsPlacedInTheLineNotInTheGroup() {
+        SyntaxException error = syntaxError("$x = 1; (ls = 3)");
+
+        assertThat(error.offset()).isEqualTo(12); // the "=" inside the group
+        assertThat(error.getMessage()).contains("position 13");
+    }
+
+    @Test
+    void onAMultiLineInputOnlyTheLineOfTheErrorIsShown() {
+        String input = "ls |\n  where { $_.x } =";
+
+        assertThat(ErrorLocation.show(input, input.length() - 1)).containsExactly("  where { $_.x } =", "                 ^");
+    }
+
+    @Test
+    void aTabBeforeTheErrorIsKeptInThePaddingOfTheCaret() {
+        assertThat(ErrorLocation.show("\tls )", 4)).containsExactly("\tls )", "\t   ^");
+    }
 }

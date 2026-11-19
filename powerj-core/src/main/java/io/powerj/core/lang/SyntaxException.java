@@ -34,6 +34,27 @@ public final class SyntaxException extends RuntimeException {
         return offset < 0 ? this : new SyntaxException(getMessage(), -1, true);
     }
 
+    /** The number of a "(position N)" in a message: the column of the error, counted in characters. */
+    private static final java.util.regex.Pattern POSITION = java.util.regex.Pattern.compile("(position )(\\d+)");
+
+    /**
+     * The same error, for a text that was parsed alone but starts at {@code start} of {@code line} (the pipeline of a group
+     * {@code ( … )}): the place, and the "(position N)" of the message, are moved into the line (review of #175).
+     */
+    SyntaxException within(String line, int start) {
+        if (offset < 0) {
+            return this;
+        }
+        int columns = line.codePointCount(0, Math.min(start, line.length()));
+        var matcher = POSITION.matcher(getMessage());
+        var message = new StringBuilder();
+        while (matcher.find()) {
+            matcher.appendReplacement(message, matcher.group(1) + (Integer.parseInt(matcher.group(2)) + columns));
+        }
+        matcher.appendTail(message);
+        return new SyntaxException(message.toString(), offset + start, true);
+    }
+
     /** Index in the line (UTF-16 units) of what is wrong, or -1. */
     public int offset() {
         return offset;
