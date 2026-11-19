@@ -51,10 +51,13 @@ class NativeCleanupTest {
     @AfterEach
     void killWhatIsLeft() {
         ProcessHandle.current().descendants().filter(NativeCleanupTest::isSleep).forEach(ProcessHandle::destroyForcibly);
+        sleeping600().forEach(ProcessHandle::destroyForcibly); // reparented: not a descendant any more
     }
 
-    private static boolean isShell(ProcessHandle process) {
-        return process.info().command().map(command -> command.endsWith("/sh")).orElse(false);
+    /** The {@code sleep 600} that the tests start, wherever they are in the process tree. */
+    private static java.util.stream.Stream<ProcessHandle> sleeping600() {
+        return ProcessHandle.allProcesses().filter(NativeCleanupTest::isSleep).filter(process -> process.info().arguments()
+                .map(arguments -> java.util.Arrays.asList(arguments).contains("600")).orElse(false));
     }
 
     private static boolean isSleep(ProcessHandle process) {
@@ -87,12 +90,8 @@ class NativeCleanupTest {
             interpreter.execute("$x = sh -c \"sleep 600 &\"");
             return List.of();
         })));
-        var seenShell = new java.util.concurrent.atomic.AtomicBoolean();
-        Waits.until("the program ended, or the line did", () -> {
-            boolean running = ProcessHandle.current().descendants().anyMatch(NativeCleanupTest::isShell);
-            seenShell.compareAndSet(false, running);
-            return !line.isAlive() || seenShell.get() && !running;
-        });
+        // the program has started its background process (it is no longer a child of ours once its parent has exited)
+        Waits.until("the background process is running", () -> !line.isAlive() || sleeping600().findAny().isPresent());
 
         supervisor.cancel();
         line.join(10_000);
