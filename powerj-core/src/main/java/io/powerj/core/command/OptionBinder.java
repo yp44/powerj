@@ -1,5 +1,6 @@
 package io.powerj.core.command;
 
+import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.ParameterizedType;
@@ -19,6 +20,7 @@ import java.util.regex.Pattern;
 import java.util.stream.IntStream;
 
 import io.powerj.api.Option;
+import io.powerj.api.ScriptBlock;
 import io.powerj.core.error.PjError;
 import io.powerj.core.error.PjException;
 import io.powerj.core.format.Values;
@@ -342,6 +344,21 @@ public final class OptionBinder {
             if (type == double.class || type == Double.class) {
                 return Double.valueOf(text);
             }
+            if (type == float.class || type == Float.class) {
+                return Float.valueOf(text);
+            }
+            if (type == short.class || type == Short.class) {
+                return Short.valueOf(text);
+            }
+            if (type == byte.class || type == Byte.class) {
+                return Byte.valueOf(text);
+            }
+            if (type == char.class || type == Character.class) {
+                if (text.length() != 1) {
+                    throw new NumberFormatException(text); // one character, not zero or two
+                }
+                return text.charAt(0);
+            }
             if (type == boolean.class || type == Boolean.class) {
                 return parseBoolean(command, spec, text);
             }
@@ -361,23 +378,12 @@ public final class OptionBinder {
         throw new PjException(Messages.get("option.unsupportedType", command, type.getSimpleName()));
     }
 
+    /** What a component holds when its option is not given: {@code 0}, {@code false} or {@code '\0'} for every primitive. */
     private static Object defaultValue(Class<?> type) {
-        if (type == boolean.class) {
-            return false;
+        if (type.isPrimitive()) {
+            return Array.get(Array.newInstance(type, 1), 0);
         }
-        if (type == int.class) {
-            return 0;
-        }
-        if (type == long.class) {
-            return 0L;
-        }
-        if (type == double.class) {
-            return 0.0;
-        }
-        if (type == List.class) {
-            return List.of();
-        }
-        return null;
+        return type == List.class ? List.of() : null;
     }
 
     private static <P extends Record> P construct(String command, Class<P> type, List<OptionSpec> specs, Object[] values) {
@@ -394,8 +400,63 @@ public final class OptionBinder {
         } catch (InvocationTargetException e) {
             Throwable cause = e.getCause();
             throw new PjException(PjError.of(Messages.get("command.error", command, cause.getMessage()), cause));
-        } catch (ReflectiveOperationException e) {
+        } catch (ReflectiveOperationException | IllegalArgumentException e) {
             throw new PjException(PjError.of(Messages.get("option.unusableParameters", command, e), e));
+        }
+    }
+
+    /** The scalar types an option can have; an enum is accepted too. A {@link ScriptBlock} comes from a {@code { }} block. */
+    private static final java.util.Set<Class<?>> SUPPORTED = java.util.Set.of(String.class, Duration.class, Path.class,
+            int.class, Integer.class, long.class, Long.class, double.class, Double.class, float.class, Float.class,
+            short.class, Short.class, byte.class, Byte.class, char.class, Character.class, boolean.class,
+            Boolean.class, Object.class, ScriptBlock.class);
+
+    private static boolean supported(Class<?> type) {
+        return SUPPORTED.contains(type) || type.isEnum();
+    }
+
+    /**
+     * Checks that a parameter record can be bound, the first time it is used or when its cmdlet is registered: a short
+     * or long name or a position given twice, a positional list that is not the last positional, a type that
+     * {@link #bind} cannot convert. Each is a mistake of the cmdlet's author, which would otherwise cost one failed call
+     * per user (audit v2, R-02).
+     *
+     * @throws IllegalArgumentException with a message that names the component
+     */
+    public static void validate(Class<? extends Record> type) {
+        List<OptionSpec> specs = specs(type);
+        java.util.Map<String, String> seen = new java.util.HashMap<>();
+        for (OptionSpec spec : specs) {
+            String name = spec.component().getName();
+            Class<?> component = spec.component().getType();
+            Class<?> element = component == List.class ? elementType(spec.component().getGenericType()) : component;
+            if (!supported(element)) {
+                throw new IllegalArgumentException(Messages.get("option.declaration.unsupportedType", type.getSimpleName(),
+                        name, element.getSimpleName()));
+            }
+            claim(seen, "--" + spec.longName(), name, type);
+            if (spec.shortName() != '\0') {
+                claim(seen, "-" + spec.shortName(), name, type);
+            }
+            if (spec.isPositional()) {
+                claim(seen, "position " + spec.position(), name, type);
+            }
+        }
+        int[] positionals = DECLARED.get(type).positionals();
+        for (int i = 0; i < positionals.length - 1; i++) {
+            OptionSpec spec = specs.get(positionals[i]);
+            if (spec.isList()) {
+                throw new IllegalArgumentException(Messages.get("option.declaration.listNotLast", type.getSimpleName(),
+                        spec.component().getName()));
+            }
+        }
+    }
+
+    private static void claim(java.util.Map<String, String> seen, String key, String component, Class<?> type) {
+        String owner = seen.putIfAbsent(key, component);
+        if (owner != null) {
+            throw new IllegalArgumentException(Messages.get("option.declaration.duplicate", type.getSimpleName(),
+                    component, owner, key));
         }
     }
 
