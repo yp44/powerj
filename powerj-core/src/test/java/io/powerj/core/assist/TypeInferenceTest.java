@@ -244,4 +244,45 @@ class TypeInferenceTest {
         assertThat(scopeAt("nosuch | map { $_.").current()).isNull();
         assertThat(scopeAt("map { $_.").current()).isNull();
     }
+
+    /** A list that counts the calls: completion runs nothing, so a list that is not the JDK's is left alone (#176, B-08). */
+    private static final class CountingList extends java.util.AbstractList<Object> {
+        int calls;
+
+        @Override
+        public Object get(int index) {
+            calls++;
+            return "x";
+        }
+
+        @Override
+        public int size() {
+            calls++;
+            return 1;
+        }
+
+        @Override
+        public boolean isEmpty() {
+            calls++;
+            return false;
+        }
+    }
+
+    @Test
+    void aListThatIsNotTheJdksIsNotReadWhileTheUserTypes() {
+        var list = new CountingList();
+
+        TypeInfo element = TypeInference.elementOf(new TypeInfo.Instance(CountingList.class, list));
+
+        assertThat(element).isInstanceOf(TypeInfo.Unknown.class);
+        assertThat(list.calls).isZero();
+    }
+
+    @Test
+    void aListOfTheJdkIsStillRead() {
+        TypeInfo element = TypeInference.elementOf(new TypeInfo.Instance(java.util.ArrayList.class,
+                new java.util.ArrayList<>(List.of("a"))));
+
+        assertThat(element).isInstanceOf(TypeInfo.Instance.class);
+    }
 }

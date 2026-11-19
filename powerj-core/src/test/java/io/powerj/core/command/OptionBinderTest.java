@@ -71,7 +71,7 @@ class OptionBinderTest {
         assertThatThrownBy(() -> bind("--RECURSE")).hasMessage("t: unknown option --RECURSE, did you mean --recurse?");
         assertThatThrownBy(() -> bind("--Recurse")).hasMessageContaining("did you mean --recurse");
         assertThatThrownBy(() -> bind("--REC")).as("an abbreviation is exact too").hasMessageContaining("unknown option --REC");
-        assertThatThrownBy(() -> bind("-R")).as("a short name is exact").hasMessage("t: unknown option -R");
+        assertThatThrownBy(() -> bind("-R")).as("a short name is exact").hasMessage("t: unknown option -R (short options: -a, -r, -f)");
     }
 
     @Test
@@ -146,10 +146,11 @@ class OptionBinderTest {
     void errorsAreExplicit() {
         assertThatThrownBy(() -> bind("--recurce"))
                 .hasMessage("t: unknown option --recurce, did you mean --recurse?");
-        assertThatThrownBy(() -> bind("-z")).hasMessage("t: unknown option -z");
+        assertThatThrownBy(() -> bind("-z")).hasMessage("t: unknown option -z (short options: -a, -r, -f)");
+        assertThatThrownBy(() -> bind("-o")).hasMessage("t: unknown option -o, did you mean --output?");
         assertThatThrownBy(() -> bind("--filter")).hasMessage("t: value expected after --filter");
         assertThatThrownBy(() -> bind("--max-depth", "trois"))
-                .hasMessage("t: invalid value for --max-depth: \"trois\"");
+                .hasMessage("t: invalid value for --max-depth: \"trois\" (an integer expected)");
         assertThatThrownBy(() -> bind("--mode", "slow")).hasMessageContaining("--mode accepts [fast, safe]");
     }
 
@@ -256,5 +257,37 @@ class OptionBinderTest {
                 .hasMessageContaining("many");
         assertThatThrownBy(() -> OptionBinder.validate(Unsupported.class)).isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("thread").hasMessageContaining("Thread");
+    }
+
+    // --- what the help and the errors tell about the type of an option (audit v2, U-05, #176) ---
+
+    record Typed(@Option(position = 0, mandatory = true) String target, @Option(mandatory = true) int count,
+                 long size, java.time.Duration since, Path out, Mode mode, double ratio, @Option(shortName = 'c') char letter,
+                 boolean all) { }
+
+    @Test
+    void anOptionHasALabelThatSaysWhatItTakes() {
+        var labels = OptionBinder.specs(Typed.class).stream()
+                .collect(java.util.stream.Collectors.toMap(OptionBinder.OptionSpec::longName, OptionBinder.OptionSpec::valueLabel));
+
+        assertThat(labels).containsEntry("count", "<n>").containsEntry("size", "<size>").containsEntry("since", "<duration>")
+                .containsEntry("out", "<path>").containsEntry("mode", "{fast|safe}").containsEntry("ratio", "<number>")
+                .containsEntry("letter", "<char>").containsEntry("target", "<text>");
+    }
+
+    @Test
+    void aMissingPositionalIsNotCalledAnOptionWithDashes() {
+        assertThatThrownBy(() -> OptionBinder.bind("t", Typed.class, List.of("--count", "1")))
+                .hasMessage("t: missing required argument: <target>");
+        assertThatThrownBy(() -> OptionBinder.bind("t", Typed.class, List.of("x")))
+                .hasMessage("t: missing required option: --count");
+    }
+
+    @Test
+    void anInvalidValueSaysWhatWasExpected() {
+        assertThatThrownBy(() -> OptionBinder.bind("t", Typed.class, List.of("x", "--count", "1", "--size", "big")))
+                .hasMessage("t: invalid value for --size: \"big\" (an integer or a size such as 10kb expected)");
+        assertThatThrownBy(() -> OptionBinder.bind("t", Typed.class, List.of("x", "--count", "1", "--ratio", "?")))
+                .hasMessage("t: invalid value for --ratio: \"?\" (a number expected)");
     }
 }

@@ -169,12 +169,7 @@ public final class Interpreter implements CommandCatalog {
     /** Resolves a command name as execution would (FR-13), without launching anything. */
     @Override
     public CommandKind commandKind(String name) {
-        return switch (resolution.resolve(name, session)) {
-            case Resolved.BuiltinCall _ -> CommandKind.BUILTIN;
-            case Resolved.CmdletCall _ -> CommandKind.CMDLET;
-            case Resolved.NativeCall _ -> CommandKind.NATIVE;
-            case Resolved.Unknown _ -> CommandKind.UNKNOWN;
-        };
+        return resolution.kind(name, session);
     }
 
     /**

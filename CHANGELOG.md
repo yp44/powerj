@@ -1275,6 +1275,32 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   (`program not found: x`), `(position N)` always at the end, one wording for `cast.failed` and `java.conversionFailed`. The
   completion tag `[internal]` stays: it is a label, not a sentence. Tests updated for the new words. Tests: `LanguageErrorsTest`.
 
+### Changed (help and assistance, [#176](https://github.com/yp44/powerj/issues/176))
+- **`help <cmdlet>` shows what each option takes** (audit v2, U-05): `--parallel <n>`, `--size <size>`, `--since <duration>`,
+  `--out <path>`, `--mode {fast|safe}`, `--name <text>` instead of `<value>` for all (`OptionSpec.valueLabel`), and the usage line
+  lists the named options the command cannot run without, with their type (`probe [files...] --name <text> [options]`). The
+  optional `@Option(defaultValue)` of the ticket is **not** added: it changes the API and the ticket makes it optional; it waits for
+  the API window.
+- **Option errors say what was expected** (U-05): `invalid value for --size: "big" (an integer or a size such as 10kb expected)`;
+  an unknown short option names the long one that starts with the letter (`did you mean --output?`) or the short options that
+  exist; a missing positional is `missing required argument: <target>`, not "option --target".
+- **`help` and completion offer only what the shell can call** (B-08, R-22): the fields of a class were listed without the
+  accessibility filter that the methods had, and `MemberCompleter` filtered nothing for static members. `JavaClasses.callable` is
+  the one rule, shared by `Help`, `MemberCompleter` and `JavaInvoker` (its tables of static and instance methods).
+- **Completion calls no method on a list that is not the JDK's** (B-08): `TypeInference` called `isEmpty`, `getFirst` and `get` on
+  any `List` a variable held, so a lazy or third-party list ran while the user typed. Only a list of `java.base` or a
+  `Collected` is read.
+- **Highlighting does not look at the file system at each keystroke** (S-08): `Interpreter.commandKind` resolved every unknown
+  word on the whole `PATH` (on Windows, every entry times every `PATHEXT`). A bare word is now answered from the names found by
+  one scan of the `PATH`, kept 30 s (`CommandResolution.kind`, `NativeCommands.has`; the case of a name does not matter on Windows);
+  what runs is still decided on the file system. A word with a directory part is resolved as before.
+- **A short option named `?` or `.` no longer silences completion** (R-22): `ArgumentCompleter` built a regular expression from the letter.
+- **Groups nested in groups are parsed in linear time** (S-08, *confirmed by timing*): `((($x | a) | a) | a)` was parsed as an
+  expression, then again as a pipeline, at each level, so the work doubled with the depth (24 levels did not end in 10 s). A text
+  with a pipe at its top level (`Scanning.hasTopLevelPipe`) is a pipeline and goes straight to the pipeline parser.
+  Tests: `OptionBinderTest`, `HelpOptionsTest`, `HelpAccessibleMembersTest`, `TypeInferenceTest`, `HighlightKindTest`,
+  `CompletionOptionValuesTest`, `ParserTest`.
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.

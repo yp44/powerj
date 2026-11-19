@@ -279,4 +279,26 @@ class ParserTest {
         assertThat(only("echo \"a\"").body()).isEqualTo(new Command("echo", false, List.of(
                 new Ast.ExpressionArgument(new Ast.StringExpression(List.of(new StringPart.Text("a")))))));
     }
+
+    /** Each level was parsed as an expression and again as a pipeline: the work doubled at each level (audit v2, S-08, #176). */
+    @Test
+    void nestedGroupsOfPipelinesAreParsedInTimeThatDoesNotDoubleWithTheDepth() {
+        String line = "$x";
+        for (int level = 0; level < 24; level++) {
+            line = "(" + line + " | a)";
+        }
+        String nested = line;
+
+        org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(java.time.Duration.ofSeconds(10),
+                () -> Parser.parse(nested));
+    }
+
+    @Test
+    void aTopLevelPipeIsNotTheLogicalOrNorOneInAStringOrAGroup() {
+        assertThat(Scanning.hasTopLevelPipe("$x | a", 0, 6)).isTrue();
+        assertThat(Scanning.hasTopLevelPipe("a || b", 0, 6)).isFalse();
+        assertThat(Scanning.hasTopLevelPipe("\"a | b\"", 0, 7)).isFalse();
+        assertThat(Scanning.hasTopLevelPipe("f(a | b)", 0, 8)).isFalse();
+        assertThat(Scanning.hasTopLevelPipe("{ $_ | x }", 0, 10)).isFalse();
+    }
 }

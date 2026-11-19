@@ -14,6 +14,7 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import io.powerj.api.Collected;
 import io.powerj.api.Row;
 import io.powerj.core.error.PjException;
 import io.powerj.core.java.JavaClasses;
@@ -255,6 +256,15 @@ final class TypeInference {
                 .orElse(new TypeInfo.Unknown());
     }
 
+    /**
+     * The value, if completion may call methods on it ({@code isEmpty}, {@code getFirst}, {@code get}): a list of the JDK or a
+     * {@code Collected}. A lazy or third-party list could run code while the user types (review C-23); it counts as unknown.
+     */
+    private static Object readable(Object value) {
+        return value instanceof Collected<?> || value != null && value.getClass().getModule() == Object.class.getModule()
+                ? value : null;
+    }
+
     /** The element that {@code *.} applies to: of a list, of an array, or the value itself. */
     static TypeInfo elementOf(TypeInfo target) {
         return elementOf(target, null);
@@ -264,7 +274,7 @@ final class TypeInference {
     private static TypeInfo elementOf(TypeInfo target, Ast.Expression index) {
         return switch (target) {
             case TypeInfo.ListOf(var element) -> TypeInfo.instance(element);
-            case TypeInfo.Instance(var type, var value) when value instanceof List<?> list && !list.isEmpty() -> {
+            case TypeInfo.Instance(var type, var value) when readable(value) instanceof List<?> list && !list.isEmpty() -> {
                 Object element = list.getFirst();
                 if (index instanceof Ast.Literal(var position) && position instanceof Integer i) {
                     int at = i < 0 ? list.size() + i : i;

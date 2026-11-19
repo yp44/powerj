@@ -58,6 +58,48 @@ public final class OptionBinder {
             return option != null && option.path();
         }
 
+        /** The type of one value of the option: the element of a list, the component itself otherwise. */
+        public Class<?> valueType() {
+            return isList() ? elementType(component.getGenericType()) : component.getType();
+        }
+
+        /**
+         * What the help puts after the name of the option: {@code <n>}, {@code <size>}, {@code <duration>}, {@code <path>},
+         * {@code {fast|safe}} for an enum, {@code <text>}, {@code <value>} for what is not one of these (audit v2, U-05).
+         */
+        public String valueLabel() {
+            Class<?> type = valueType();
+            if (type.isEnum()) {
+                return Arrays.stream(type.getEnumConstants()).map(c -> ((Enum<?>) c).name().toLowerCase(Locale.ROOT))
+                        .collect(java.util.stream.Collectors.joining("|", "{", "}"));
+            }
+            return switch (type.getSimpleName()) {
+                case "int", "Integer", "short", "Short", "byte", "Byte" -> "<n>";
+                case "long", "Long" -> "<size>";
+                case "double", "Double", "float", "Float" -> "<number>";
+                case "Duration" -> "<duration>";
+                case "Path" -> "<path>";
+                case "char", "Character" -> "<char>";
+                case "String" -> "<text>";
+                default -> Messages.get("help.option.value");
+            };
+        }
+
+        /** What an invalid value should have been, in words: "an integer", "a duration such as 30s"… */
+        String expected() {
+            Class<?> type = valueType();
+            return Messages.get(switch (type.getSimpleName()) {
+                case "int", "Integer" -> "option.expected.integer";
+                case "short", "Short" -> "option.expected.short";
+                case "byte", "Byte" -> "option.expected.byte";
+                case "long", "Long" -> "option.expected.size";
+                case "double", "Double", "float", "Float" -> "option.expected.number";
+                case "char", "Character" -> "option.expected.char";
+                case "Path" -> "option.expected.path";
+                default -> "option.expected.value";
+            });
+        }
+
         /** Displayed form: {@code -r, --recurse}. */
         public String display() {
             return (shortName != '\0' ? "-" + shortName + ", " : "    ") + "--" + longName;
@@ -225,7 +267,8 @@ public final class OptionBinder {
             for (int i = 0; i < specs.size(); i++) {
                 OptionSpec spec = specs.get(i);
                 if (spec.mandatory() && !given[i]) {
-                    throw new PjException(Messages.get("option.missingMandatory", command, spec.longName()));
+                    throw new PjException(Messages.get(spec.isPositional() ? "option.missingMandatory.positional"
+                            : "option.missingMandatory", command, spec.longName()));
                 }
                 if (values[i] == null) {
                     values[i] = defaultValue(spec.component().getType());
@@ -258,7 +301,15 @@ public final class OptionBinder {
                 return i;
             }
         }
-        throw new PjException(Messages.get("option.unknown.short", command, letter));
+        // a hint: the long option that starts with the letter, if only one does, else the letters that exist
+        List<String> startingWith = specs.stream().map(OptionSpec::longName).filter(n -> n.charAt(0) == letter).toList();
+        if (startingWith.size() == 1) {
+            throw new PjException(Messages.get("option.unknown.short.suggestion", command, letter, startingWith.getFirst()));
+        }
+        String letters = specs.stream().filter(sp -> sp.shortName() != '\0')
+                .map(sp -> "-" + sp.shortName()).collect(java.util.stream.Collectors.joining(", "));
+        throw new PjException(letters.isEmpty() ? Messages.get("option.unknown.short", command, letter)
+                : Messages.get("option.unknown.short.letters", command, letter, letters));
     }
 
     private static boolean parseBoolean(String command, OptionSpec spec, String text) {
@@ -373,7 +424,8 @@ public final class OptionBinder {
                         Arrays.toString(type.getEnumConstants()).toLowerCase(Locale.ROOT), text));
             }
         } catch (NumberFormatException | ArithmeticException | InvalidPathException e) {
-            throw new PjException(Messages.get("option.invalidValue", command, spec.longName(), text));
+            throw new PjException(Messages.get("option.invalidValue", command, spec.isPositional() ? "<" + spec.longName() + ">"
+                    : "--" + spec.longName(), text, spec.expected()));
         }
         throw new PjException(Messages.get("option.unsupportedType", command, type.getSimpleName()));
     }

@@ -82,7 +82,7 @@ final class ArgumentCompleter {
             }
             boolean used = words.stream().anyMatch(w -> w.equals("--" + spec.longName())
                     || w.startsWith("--" + spec.longName() + "=")
-                    || (spec.shortName() != '\0' && w.matches("-[^-]*" + spec.shortName() + "[^-]*")));
+                    || (spec.shortName() != '\0' && groupsLetter(w, spec.shortName(), false)));
             if (!used || spec.isList()) {
                 String label = "--" + spec.longName() + (spec.shortName() != '\0' ? ", -" + spec.shortName() : "");
                 candidates.add(new Candidate("--" + spec.longName(), label,
@@ -96,6 +96,17 @@ final class ArgumentCompleter {
         return candidates;
     }
 
+    /**
+     * Is {@code word} a group of short options ({@code -ra}) that holds {@code letter}, or ends with it? Not a regular
+     * expression built from the letter: {@code ?} or {@code .} as a short name would break it.
+     */
+    private static boolean groupsLetter(String word, char letter, boolean last) {
+        if (word.length() < 2 || word.charAt(0) != '-' || word.indexOf('-', 1) >= 0) {
+            return false;
+        }
+        return last ? word.charAt(word.length() - 1) == letter : word.indexOf(letter, 1) >= 0;
+    }
+
     /** Option expecting a value, designated by the last typed word ({@code --filter}, {@code -f}). */
     private static Optional<OptionBinder.OptionSpec> valueOf(List<OptionBinder.OptionSpec> specs, String word) {
         for (var spec : specs) {
@@ -103,7 +114,7 @@ final class ArgumentCompleter {
                 continue;
             }
             if (word.equals("--" + spec.longName())
-                    || (spec.shortName() != '\0' && word.matches("-[^-]*" + spec.shortName()))) {
+                    || (spec.shortName() != '\0' && groupsLetter(word, spec.shortName(), true))) {
                 return Optional.of(spec);
             }
         }

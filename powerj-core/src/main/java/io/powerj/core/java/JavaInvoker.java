@@ -48,7 +48,7 @@ public final class JavaInvoker {
                 for (Method m : t.getMethods()) {
                     // The name and the full types of the parameters: foo(java.util.Date) and foo(java.sql.Date) are two methods.
                     String identity = m.getName() + Arrays.toString(m.getParameterTypes());
-                    if (!Modifier.isStatic(m.getModifiers()) && Members.isAccessible(m.getDeclaringClass())
+                    if (!Modifier.isStatic(m.getModifiers()) && JavaClasses.callable(m)
                             && seen.putIfAbsent(identity, true) == null) {
                         byName.computeIfAbsent(m.getName(), _ -> new ArrayList<>()).add(m);
                     }
@@ -95,7 +95,7 @@ public final class JavaInvoker {
             Map<String, List<Method>> declared = new HashMap<>();
             Map<String, List<Method>> inherited = new HashMap<>();
             for (Method m : type.getMethods()) {
-                if (Modifier.isStatic(m.getModifiers()) && JavaClasses.accessible(m.getDeclaringClass())) {
+                if (Modifier.isStatic(m.getModifiers()) && JavaClasses.callable(m)) {
                     inherited.computeIfAbsent(m.getName(), _ -> new ArrayList<>()).add(m);
                     if (m.getDeclaringClass() == type) {
                         declared.computeIfAbsent(m.getName(), _ -> new ArrayList<>()).add(m);

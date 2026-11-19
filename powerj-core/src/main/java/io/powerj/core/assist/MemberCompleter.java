@@ -78,12 +78,12 @@ final class MemberCompleter {
         List<Candidate> candidates = new ArrayList<>();
         for (Method method : type.getMethods()) {
             if (Modifier.isStatic(method.getModifiers()) && method.getDeclaringClass() == type
-                    && (!preview || PreviewPolicy.allows(method))) {
+                    && JavaClasses.callable(method) && (!preview || PreviewPolicy.allows(method))) {
                 candidates.add(methodCandidate(method));
             }
         }
         for (Field field : type.getFields()) {
-            if (Modifier.isStatic(field.getModifiers())) {
+            if (Modifier.isStatic(field.getModifiers()) && JavaClasses.callable(field)) {
                 candidates.add(new Candidate(field.getName(), field.getName() + " : " + field.getType().getSimpleName(),
                         Messages.get("completion.staticField"), false));
             }
