@@ -1158,6 +1158,15 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   (the output is incomplete); the chunks of a parallel `grep` interleave between files above 1 000 matches, which FR-64 and the
   help of `-p` now say.
 
+### Fixed (Ctrl+C survives an interrupted Java call, [#165](https://github.com/yp44/powerj/issues/165))
+- **Ctrl+C is no longer lost when a Java method blocks** (audit v2, R-01; FR-03, FR-57). `Thread.sleep`,
+  `BlockingQueue.take`, `Process.waitFor`… throw `InterruptedException` **and clear the interrupt flag**; `JavaInvoker` made an
+  ordinary error of it, so `Thread.sleep(60000); rm -rf build` + Ctrl+C ran the `rm` and ended in `Success`, and the loop of
+  a `map { Thread.sleep(500); $_ }` went on after each Ctrl+C. An `InterruptedException` or a `ClosedByInterruptException`
+  thrown by a method, a getter or a block called from Java now sets the flag again and ends the line as a cancellation
+  (`java.Cancellation`). `Interpreter.execute` also tests the flag before each statement, so a line abandoned by a second
+  Ctrl+C stops at its next statement instead of running the rest. Tests: `JavaCallCancellationTest`, `PropertyReadTest`.
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.

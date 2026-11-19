@@ -171,6 +171,9 @@ public final class PropertyAccess {
             if (cause instanceof CancellationException cancelled) {
                 throw cancelled; // a getter that was interrupted: the command is being stopped, not unreadable
             }
+            if (Cancellation.isInterruption(cause)) {
+                throw Cancellation.cancelled(); // the JDK cleared the flag when it threw: set it again (#165)
+            }
             throw new PjException(PjError.of(Messages.get("property.readFailed", name, cause), cause));
         } catch (ReflectiveOperationException e) {
             throw new PjException(PjError.of(Messages.get("property.readImpossible", name, e), e));
