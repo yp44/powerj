@@ -199,4 +199,62 @@ class OptionBinderTest {
         assertThat(params.x()).isFalse();
         assertThat(params.objects()).hasSize(1);
     }
+
+    // --- every primitive has a default and a conversion (audit v2 R-02, #166) ---
+
+    record Small(@Option(shortName = 'r') float ratio, short count, byte flags, char letter, @Option(shortName = 'x') boolean x) { }
+
+    @Test
+    void everyPrimitiveComponentHasItsDefaultWhenNothingIsGiven() {
+        assertThat(OptionBinder.bind("t", Small.class, List.of())).isEqualTo(new Small(0f, (short) 0, (byte) 0, '\0', false));
+    }
+
+    @Test
+    void floatShortByteAndCharAreConvertedLikeTheOtherNumbers() {
+        Small bound = OptionBinder.bind("t", Small.class,
+                List.of("--ratio", "1.5", "--count", "300", "--flags", "-7", "--letter", "z"));
+
+        assertThat(bound).isEqualTo(new Small(1.5f, (short) 300, (byte) -7, 'z', false));
+    }
+
+    @Test
+    void aValueOutOfTheRangeOfTheTypeIsAnInvalidValueNotAnInternalError() {
+        assertThatThrownBy(() -> OptionBinder.bind("t", Small.class, List.of("--flags", "300")))
+                .isInstanceOf(io.powerj.core.error.PjException.class).hasMessageContaining("--flags");
+        assertThatThrownBy(() -> OptionBinder.bind("t", Small.class, List.of("--letter", "ab")))
+                .isInstanceOf(io.powerj.core.error.PjException.class).hasMessageContaining("--letter");
+    }
+
+    // --- a record of parameters is checked once, when its cmdlet is registered (#166) ---
+
+    record TwiceShort(@Option(shortName = 'f') String first, @Option(shortName = 'f') String second) { }
+
+    record TwiceLong(@Option(longName = "same") String first, @Option(longName = "same") String second) { }
+
+    record TwicePosition(@Option(position = 0) String first, @Option(position = 0) String second) { }
+
+    record ListNotLast(@Option(position = 0) List<String> many, @Option(position = 1) String last) { }
+
+    record Unsupported(Thread thread) { }
+
+    @Test
+    void aValidRecordHasNoProblem() {
+        OptionBinder.validate(Params.class);
+        OptionBinder.validate(Small.class);
+        OptionBinder.validate(Required.class);
+    }
+
+    @Test
+    void aRecordThatCannotWorkIsRefusedWithTheNameOfTheComponent() {
+        assertThatThrownBy(() -> OptionBinder.validate(TwiceShort.class)).isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("second").hasMessageContaining("-f");
+        assertThatThrownBy(() -> OptionBinder.validate(TwiceLong.class)).isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("second").hasMessageContaining("--same");
+        assertThatThrownBy(() -> OptionBinder.validate(TwicePosition.class)).isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("second").hasMessageContaining("position 0");
+        assertThatThrownBy(() -> OptionBinder.validate(ListNotLast.class)).isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("many");
+        assertThatThrownBy(() -> OptionBinder.validate(Unsupported.class)).isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("thread").hasMessageContaining("Thread");
+    }
 }

@@ -1158,6 +1158,18 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   (the output is incomplete); the chunks of a parallel `grep` interleave between files above 1 000 matches, which FR-64 and the
   help of `-p` now say.
 
+### Fixed (every primitive option, and a Params record checked at registration, [#166](https://github.com/yp44/powerj/issues/166))
+- **A `float`, `short`, `byte` or `char` option no longer breaks its cmdlet on every call** (audit v2, R-02). `OptionBinder`
+  had no default for these primitives (`null`, so `Constructor.newInstance` threw an `IllegalArgumentException` that nothing
+  caught) and no conversion: the cmdlet failed even when the option was not given. Every primitive now defaults to its zero
+  (`Array.get(Array.newInstance(type, 1), 0)`); `float`, `short`, `byte` and `char` (exactly one character) are converted like
+  the other numbers, and a value out of range is an "invalid value" error. `construct` also catches `IllegalArgumentException`.
+- **A faulty parameter record is reported when its cmdlet is registered**, not one failed call at a time: two components
+  with the same short name, long name or position, a positional `List` that is not the last positional, or an unsupported
+  type give one `module.cmdletIgnored` warning that names the component, and the cmdlet is left out
+  (`OptionBinder.validate`, called by `CmdletRegistry`). README, "Writing your own cmdlet": the supported types.
+  Tests: `OptionBinderTest`, `ParametersValidationTest`.
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.

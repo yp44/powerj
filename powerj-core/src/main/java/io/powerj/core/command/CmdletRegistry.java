@@ -207,6 +207,7 @@ public final class CmdletRegistry {
         if (!(arguments[0] instanceof Class<?> parameters) || !parameters.isRecord()) {
             throw new IllegalArgumentException(Messages.get("cmdlet.parametersNotRecord", type.getName()));
         }
+        OptionBinder.validate(parameters.asSubclass(Record.class));
         Class<?> input = rawType(arguments[1]);
         Class<?> output = rawType(arguments[2]);
         return new Registered(cmdlet, info, parameters.asSubclass(Record.class), input, output,
