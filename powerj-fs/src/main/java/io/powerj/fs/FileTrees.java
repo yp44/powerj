@@ -11,7 +11,10 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.BasicFileAttributeView;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.PosixFileAttributeView;
+import java.nio.file.attribute.PosixFileAttributes;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -125,7 +128,7 @@ public final class FileTrees {
         } else if (parallelism == 1) {
             sequentialCopy(source, target, replace, options, counted);
         } else {
-            new Work(parallelism).run(work -> work.copyDirectory(source, target, replace, options), _ -> { },
+            new Work(parallelism).run(work -> work.copyDirectory(source, target, replace, options, null), _ -> { },
                     counted);
         }
         return failures[0] == 0;
@@ -197,6 +200,7 @@ public final class FileTrees {
 
     private static void sequentialCopy(Path source, Path target, boolean replace, CopyOption[] options,
                                        BiConsumer<Path, IOException> errors) {
+        Deque<Boolean> created = new ArrayDeque<>(); // for the folders being walked: was it created here?
         try {
             Files.walkFileTree(source, new SimpleFileVisitor<>() {
                 @Override
@@ -204,11 +208,11 @@ public final class FileTrees {
                     checkCancelled();
                     Path copy = target.resolve(source.relativize(dir).toString());
                     try {
-                        createDirectory(dir, copy, replace);
+                        created.push(createDirectory(copy, replace));
                         return FileVisitResult.CONTINUE;
                     } catch (IOException e) {
                         errors.accept(copy, e);
-                        return FileVisitResult.SKIP_SUBTREE;
+                        return FileVisitResult.SKIP_SUBTREE; // and no postVisitDirectory
                     }
                 }
 
@@ -229,17 +233,67 @@ public final class FileTrees {
                     errors.accept(file, e);
                     return FileVisitResult.CONTINUE;
                 }
+
+                @Override
+                public FileVisitResult postVisitDirectory(Path dir, IOException e) {
+                    if (e != null) {
+                        errors.accept(dir, e);
+                    }
+                    if (created.pop()) {
+                        Path copy = target.resolve(source.relativize(dir).toString());
+                        try {
+                            finish(dir, copy);
+                        } catch (IOException failure) {
+                            errors.accept(copy, failure);
+                        }
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
             });
         } catch (IOException e) {
             errors.accept(source, e);
         }
     }
 
-    /** Creates the copy of a directory with its attributes; with {@code replace}, an existing one is merged. */
-    private static void createDirectory(Path dir, Path copy, boolean replace) throws IOException {
-        if (!(replace && Files.isDirectory(copy, LinkOption.NOFOLLOW_LINKS))) {
-            Files.copy(dir, copy, StandardCopyOption.COPY_ATTRIBUTES);
+    /**
+     * Creates the copy of a folder, empty and writable by its owner whatever the folder it copies allows (a read-only
+     * folder would refuse its own children): {@link #finish} gives it the attributes of the source once its content is
+     * in. With {@code replace}, a folder that is already there is merged and left as it is.
+     *
+     * @return {@code true} if the folder was created, so that it gets the attributes of the source at the end
+     */
+    private static boolean createDirectory(Path copy, boolean replace) throws IOException {
+        if (replace && Files.isDirectory(copy, LinkOption.NOFOLLOW_LINKS)) {
+            return false;
         }
+        Files.createDirectory(copy);
+        return true;
+    }
+
+    /**
+     * Gives the copy of a folder the owner, group, permissions and dates of the source, once everything is in it: its
+     * children would change its dates, and its permissions may forbid them. The owner and group are best effort (only a
+     * privileged user can give a file away), as in {@link StandardCopyOption#COPY_ATTRIBUTES}.
+     */
+    private static void finish(Path dir, Path copy) throws IOException {
+        PosixFileAttributeView from = Files.getFileAttributeView(dir, PosixFileAttributeView.class,
+                LinkOption.NOFOLLOW_LINKS);
+        PosixFileAttributeView to = Files.getFileAttributeView(copy, PosixFileAttributeView.class,
+                LinkOption.NOFOLLOW_LINKS);
+        BasicFileAttributes attributes = Files.readAttributes(dir, BasicFileAttributes.class,
+                LinkOption.NOFOLLOW_LINKS);
+        if (from != null && to != null) {
+            PosixFileAttributes posix = from.readAttributes();
+            try {
+                to.setOwner(posix.owner());
+                to.setGroup(posix.group());
+            } catch (IOException _) {
+                // not allowed to give the copy away: it stays ours
+            }
+            to.setPermissions(posix.permissions());
+        }
+        Files.getFileAttributeView(copy, BasicFileAttributeView.class, LinkOption.NOFOLLOW_LINKS)
+                .setTimes(attributes.lastModifiedTime(), attributes.lastAccessTime(), attributes.creationTime());
     }
 
     // --- Parallel ---
@@ -264,6 +318,18 @@ public final class FileTrees {
 
         Directory(Path path, BasicFileAttributes attributes, Directory parent) {
             this(path, attributes, parent, new AtomicInteger(1));
+        }
+    }
+
+    /**
+     * A folder being copied: it gets the attributes of its source when its last child is done, if it was created by this
+     * copy ({@code created}); then it counts as done for its parent. {@code remaining} starts at 1 while the children are
+     * submitted, so that it is not finished early.
+     */
+    private record Copied(Path source, Path copy, boolean created, Copied parent, AtomicInteger remaining) {
+
+        Copied(Path source, Path copy, boolean created, Copied parent) {
+            this(source, copy, created, parent, new AtomicInteger(1));
         }
     }
 
@@ -415,28 +481,37 @@ public final class FileTrees {
 
         // copy
 
-        /** Creates the copy of a directory, then submits its children; a directory not created skips its content. */
-        void copyDirectory(Path dir, Path copy, boolean replace, CopyOption[] options) throws InterruptedException {
+        /**
+         * Creates the copy of a directory, then submits its children; a directory not created skips its content. The
+         * attributes of the source are given to the copy when its last child is done.
+         */
+        void copyDirectory(Path dir, Path copy, boolean replace, CopyOption[] options, Copied parent)
+                throws InterruptedException {
             List<Entry> children = children(dir);
-            if (children == null) {
-                return; // not listed: not copied, as in a sequential walk
+            if (children == null) { // not listed: not copied, as in a sequential walk; done for its parent
+                copied(parent);
+                return;
             }
+            boolean created;
             permits.acquire();
             try {
-                createDirectory(dir, copy, replace);
+                created = createDirectory(copy, replace);
             } catch (IOException e) {
                 queue.put(new EntryError(copy, e));
+                copied(parent);
                 return;
             } finally {
                 permits.release();
             }
+            Copied self = new Copied(dir, copy, created, parent);
             for (Entry child : children) {
                 if (stopped) {
                     return;
                 }
                 Path childCopy = copy.resolve(child.path().getFileName().toString());
+                self.remaining().incrementAndGet();
                 if (child.attributes().isDirectory()) {
-                    submit(() -> copyDirectory(child.path(), childCopy, replace, options));
+                    submit(() -> copyDirectory(child.path(), childCopy, replace, options, self));
                 } else {
                     permits.acquire();
                     boolean submitted = false;
@@ -451,6 +526,7 @@ public final class FileTrees {
                             } finally {
                                 permits.release();
                             }
+                            copied(self);
                         });
                     } finally {
                         if (!submitted) {
@@ -458,6 +534,29 @@ public final class FileTrees {
                         }
                     }
                 }
+            }
+            copied(self); // the initial count: all the children are submitted
+        }
+
+        /** A child of {@code dir} is done: the last one finishes {@code dir}, which is then done for its parent. */
+        private void copied(Copied dir) throws InterruptedException {
+            for (Copied current = dir; current != null && current.remaining().decrementAndGet() == 0;
+                 current = current.parent()) {
+                finishCopy(current);
+            }
+        }
+
+        private void finishCopy(Copied dir) throws InterruptedException {
+            if (!dir.created() || stopped) {
+                return;
+            }
+            permits.acquire();
+            try {
+                finish(dir.source(), dir.copy());
+            } catch (IOException e) {
+                queue.put(new EntryError(dir.copy(), e));
+            } finally {
+                permits.release();
             }
         }
 
