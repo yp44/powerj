@@ -94,8 +94,7 @@ public final class Cat implements Cmdlet<Cat.Params, Object, Object> {
         Reading reading = reading(params, context);
         if (!params.paths().isEmpty()) {
             for (Object argument : params.paths()) {
-                for (Path file : FileArguments.expand(argument, false, context, error -> FileArguments.report(error, context),
-                        "cat.no.match")) {
+                for (Path file : FileArguments.expandOrReport(argument, false, context, "cat.no.match")) {
                     reading.read(file, context);
                 }
             }

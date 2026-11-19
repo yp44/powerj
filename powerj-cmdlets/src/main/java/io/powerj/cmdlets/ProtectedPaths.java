@@ -39,6 +39,8 @@ public final class ProtectedPaths {
     /** The lines of the file that were not read as a path of their own (relative ones), as written. */
     private final List<String> ignoredLines;
 
+    private static final java.util.logging.Logger LOG = java.util.logging.Logger.getLogger(ProtectedPaths.class.getName());
+
     /** Lines already reported in this session (the file is read at each command, so the same line would come back). */
     private static final java.util.Set<String> REPORTED = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
@@ -138,11 +140,15 @@ public final class ProtectedPaths {
         return ignoredLines;
     }
 
-    /** Reports each ignored line once per session, as a non-blocking error. */
-    void reportIgnored(io.powerj.api.CmdletContext<?> context) {
+    /**
+     * Reports each ignored line once per session, in the log at {@code WARNING}. Not as an error of the command: the
+     * {@code rm} that follows may be perfectly right, and a failure would make {@code &&} skip what comes next, or stop
+     * the command before it touches anything under {@code --on-error stop}. (The API has no channel for a warning yet.)
+     */
+    void reportIgnored() {
         for (String line : ignoredLines) {
             if (REPORTED.add(line)) {
-                context.error(Messages.get("fileops.protected.relative", FILE_NAME, line));
+                LOG.warning(Messages.get("fileops.protected.relative", FILE_NAME, line));
             }
         }
     }

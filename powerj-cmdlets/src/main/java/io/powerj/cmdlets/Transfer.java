@@ -79,7 +79,7 @@ final class Transfer {
                 ? ProtectedPaths.load(context.configDirectory(), context.environment(), context.currentDirectory())
                 : null;
         if (protectedPaths != null) {
-            protectedPaths.reportIgnored(context);
+            protectedPaths.reportIgnored();
         }
         if (destinationBlock != null) {
             runEach(protectedPaths, context);

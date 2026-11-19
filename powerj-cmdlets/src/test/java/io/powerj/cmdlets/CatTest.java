@@ -349,4 +349,17 @@ class CatTest {
             }
         }
     }
+
+    @Test
+    void aQuotedNameThatTheSystemCannotSpellIsAnErrorNotAnInternalFailure() throws Exception {
+        assumeTrue(posix(), "NUL is the invalid character of POSIX paths");
+        var name = new io.powerj.fs.GlobArgument("a\0b", "a\0b");
+
+        var cat = new Cat();
+        context.hasInput = false;
+        CmdletDriver.run(cat, new Cat.Params(new java.util.ArrayList<Object>(List.of(name)), false, false, false, false,
+                null, null), context);
+
+        assertThat(context.errors).singleElement().asString().startsWith("invalid path");
+    }
 }

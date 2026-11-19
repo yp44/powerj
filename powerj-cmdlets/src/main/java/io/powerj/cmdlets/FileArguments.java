@@ -122,6 +122,20 @@ final class FileArguments {
         return matches;
     }
 
+    /**
+     * Like {@link #expand(Object, boolean, CmdletContext, Consumer, String)}, for a command that reads the files: a name this
+     * system cannot spell (a quoted {@code ?} on Windows, a NUL) is reported as a non-blocking error and gives no path.
+     */
+    static List<Path> expandOrReport(Object argument, boolean includeHidden, CmdletContext<?> context,
+                                     String noMatchKey) {
+        try {
+            return expand(argument, includeHidden, context, error -> report(error, context), noMatchKey);
+        } catch (InvalidPathException e) {
+            context.error(Messages.get("files.invalid.path", text(argument), e.getMessage()));
+            return List.of();
+        }
+    }
+
     /** Reports a failure of the walk of a folder as a non-blocking error (shared by {@code ls}, {@code cat}, {@code grep}). */
     static void report(WalkError error, CmdletContext<?> context) {
         context.error(switch (error.kind()) {

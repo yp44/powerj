@@ -150,4 +150,22 @@ class EnvTest {
 
         assertThat(context.environment.get("ProgramFiles(x86)")).isEqualTo("C:\\pf" + File.pathSeparator + "D:\\more");
     }
+
+    @Test
+    void prependMovesAnEntryThatIsAlreadyLaterInTheListToTheHead() {
+        context.environment.put("PATH", "/usr/bin" + File.pathSeparator + "/opt/tools");
+
+        env("/opt/tools", null, null, null, "PATH", null); // "env --prepend PATH /opt/tools"
+
+        assertThat(context.environment.get("PATH")).isEqualTo("/opt/tools" + File.pathSeparator + "/usr/bin");
+    }
+
+    @Test
+    void appendLeavesAnEntryThatIsAlreadyInTheListWhereItIs() {
+        context.environment.put("PATH", "/usr/bin" + File.pathSeparator + "/opt/tools");
+
+        env("/usr/bin", null, null, "PATH", null, null);
+
+        assertThat(context.environment.get("PATH")).isEqualTo("/usr/bin" + File.pathSeparator + "/opt/tools");
+    }
 }

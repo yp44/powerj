@@ -119,6 +119,9 @@ public final class Kill implements Cmdlet<Kill.Params, Object, ProcessEntry> {
     /** Time that {@code --wait} gives a process to end when {@code --timeout} does not say. */
     static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(10);
 
+    /** The longest wait taken as asked. */
+    private static final Duration MAX_TIMEOUT = Duration.ofDays(365);
+
     /**
      * Stops a process.
      *
@@ -207,8 +210,10 @@ public final class Kill implements Cmdlet<Kill.Params, Object, ProcessEntry> {
     private static boolean awaited(Params p, ProcessHandle process, ProcessEntry entry,
                                    CmdletContext<ProcessEntry> context) {
         Duration timeout = p.timeout() == null ? DEFAULT_TIMEOUT : p.timeout();
+        // a duration of billions of days does not fit in milliseconds: it is a year, which is as good as for ever
+        long millis = timeout.compareTo(MAX_TIMEOUT) > 0 ? MAX_TIMEOUT.toMillis() : timeout.toMillis();
         try {
-            process.onExit().get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+            process.onExit().get(millis, TimeUnit.MILLISECONDS);
             while (process.isAlive()) { // Windows: the end may be seen a moment after onExit completes
                 Thread.sleep(10);
             }
@@ -218,8 +223,8 @@ public final class Kill implements Cmdlet<Kill.Params, Object, ProcessEntry> {
         } catch (ExecutionException e) {
             // onExit does not fail
         } catch (TimeoutException e) {
-            context.error(Messages.get("kill.timeout", process.pid(), entry.name() == null ? "?" : entry.name(),
-                    Formats.duration(timeout)));
+            context.error(Messages.get(p.force() ? "kill.timeout.forced" : "kill.timeout", process.pid(),
+                    entry.name() == null ? "?" : entry.name(), Formats.duration(timeout)));
             return false;
         }
         return true;

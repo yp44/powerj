@@ -5,6 +5,7 @@
 module io.powerj.cmdlets {
     requires transitive io.powerj.api;
     requires io.powerj.fs;
+    requires java.logging;
     requires io.powerj.text;
 
     // The core binds the options of a cmdlet by reflection on its public classes (OptionBinder). Nobody else needs

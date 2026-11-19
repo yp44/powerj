@@ -108,8 +108,7 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
         if (!params.paths().isEmpty()) {
             List<Path> roots = new ArrayList<>();
             for (Object argument : params.paths()) {
-                roots.addAll(FileArguments.expand(argument, params.all(), context, error -> FileArguments.report(error, context),
-                        "grep.no.match"));
+                roots.addAll(FileArguments.expandOrReport(argument, params.all(), context, "grep.no.match"));
             }
             search.files(roots, context);
         } else if (!context.hasInput()) {
@@ -220,6 +219,7 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
             Path absolute = file.toAbsolutePath();
             List<GrepMatch> pending = new ArrayList<>();
             int number = 0;
+            List<Integer> tooLong = new ArrayList<>(); // lines skipped for their length, as cat does
             try (InputStream in = opener.open(file)) {
                 byte[] head = in.readNBytes(BINARY_PROBE);
                 if (detectBinary && binary(head)) {
@@ -228,7 +228,14 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
                 var lines = new BoundedLines(new DecodingReader(
                         new SequenceInputStream(new ByteArrayInputStream(head), in), charset), BoundedLines.MAX_LINE);
                 while (true) {
-                    String text = lines.next();
+                    String text;
+                    try {
+                        text = lines.next();
+                    } catch (BoundedLines.TooLong _) {
+                        number++;
+                        tooLong.add(number);
+                        continue;
+                    }
                     if (text == null) {
                         break;
                     }
@@ -258,11 +265,12 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
                 // no fallback: the user chooses the charset with --encoding. The matches of the lines before it are kept.
                 flush(pending, sink);
                 throw new IOException(Messages.get("grep.decode.failed", charset.name(), number + 1));
-            } catch (BoundedLines.TooLong _) {
-                flush(pending, sink);
-                throw new IOException(Messages.get("grep.line.too.long", number + 1, BoundedLines.MAX_LINE));
             }
             flush(pending, sink);
+            if (!tooLong.isEmpty()) { // the file was searched but for those lines: say so, after its matches
+                throw new IOException(Messages.get("grep.line.too.long", tooLong.getFirst(), tooLong.size(),
+                        BoundedLines.MAX_LINE));
+            }
         }
 
         private static void flush(List<GrepMatch> pending, Consumer<List<GrepMatch>> sink) {

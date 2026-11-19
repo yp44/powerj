@@ -323,4 +323,15 @@ class PsKillTest {
         assertThatThrownBy(() -> run(new Kill(), new Kill.Params(List.of(String.valueOf(self())), false, true, false, false, false,
                 java.time.Duration.ZERO))).hasMessageContaining("timeout");
     }
+
+    @Test
+    void anEnormousTimeoutIsNotAnInternalError() throws Exception {
+        Process sleeper = sleeper();
+
+        run(new Kill(), new Kill.Params(List.of(String.valueOf(sleeper.pid())), true, true, false, false, false,
+                java.time.Duration.ofDays(99_999_999_999L)));
+
+        assertThat(context.errors).isEmpty();
+        assertThat(alive(sleeper)).isFalse();
+    }
 }

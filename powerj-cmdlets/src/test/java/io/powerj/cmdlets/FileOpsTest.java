@@ -409,6 +409,17 @@ class FileOpsTest {
     }
 
     @Test
+    void aRelativeLineOfTheListIsNotAnErrorOfTheCommand() throws Exception {
+        Files.write(config.resolve(ProtectedPaths.FILE_NAME), List.of("docs/private", tmp.resolve("work/keep").toString()));
+        file("old.txt", "x");
+
+        rm(false, false, false, false, false, args("old.txt"));
+
+        assertThat(context.errors).isEmpty(); // `rm old.txt && echo done` must still say done
+        assertThat(work.resolve("old.txt")).doesNotExist();
+    }
+
+    @Test
     void cpOfAProtectedSourceIsStillAllowedItIsNotRemoved() throws Exception {
         file("keep", "precious");
 

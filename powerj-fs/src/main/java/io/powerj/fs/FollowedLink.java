@@ -1,6 +1,7 @@
 package io.powerj.fs;
 
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.DosFileAttributes;
 import java.nio.file.attribute.FileTime;
 
 /**
@@ -12,7 +13,10 @@ public record FollowedLink(BasicFileAttributes target) implements BasicFileAttri
 
     /** The attributes of a link that was followed. */
     public static BasicFileAttributes of(BasicFileAttributes target) {
-        return target.isSymbolicLink() ? target : new FollowedLink(target);
+        if (target.isSymbolicLink()) {
+            return target;
+        }
+        return target instanceof DosFileAttributes dos ? new FollowedDosLink(dos) : new FollowedLink(target);
     }
 
     @Override

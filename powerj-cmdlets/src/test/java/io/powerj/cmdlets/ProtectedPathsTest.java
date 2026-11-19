@@ -175,16 +175,36 @@ class ProtectedPathsTest {
     }
 
     @Test
-    void theIgnoredLinesAreReportedOncePerSession() throws IOException {
+    void theIgnoredLinesAreLoggedOncePerSessionAndAreNotAnErrorOfTheCommand() throws IOException {
         ProtectedPaths.forgetReported();
-        ProtectedPaths paths = load("relative/dir");
-        var context = new io.powerj.testing.TestContext<Object>(tmp);
+        var logger = java.util.logging.Logger.getLogger(ProtectedPaths.class.getName());
+        var records = new java.util.ArrayList<java.util.logging.LogRecord>();
+        var handler = new java.util.logging.Handler() {
+            @Override
+            public void publish(java.util.logging.LogRecord record) {
+                records.add(record);
+            }
 
-        paths.reportIgnored(context);
-        paths.reportIgnored(context);
-        load("relative/dir").reportIgnored(context); // the file is read at each command
+            @Override
+            public void flush() {
+            }
 
-        assertThat(context.errors).singleElement().asString().contains("relative/dir").contains("absolute");
+            @Override
+            public void close() {
+            }
+        };
+        logger.addHandler(handler);
+        try {
+            load("relative/dir").reportIgnored();
+            load("relative/dir").reportIgnored(); // the file is read at each command
+        } finally {
+            logger.removeHandler(handler);
+        }
+
+        assertThat(records).singleElement().satisfies(r -> {
+            assertThat(r.getLevel()).isEqualTo(java.util.logging.Level.WARNING);
+            assertThat(r.getMessage()).contains("relative/dir").contains("absolute");
+        });
     }
 
     @Test

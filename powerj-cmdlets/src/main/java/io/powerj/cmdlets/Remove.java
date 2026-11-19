@@ -55,7 +55,7 @@ public final class Remove implements Cmdlet<Remove.Params, Object, Object> {
             throw new UsageException(Messages.get("fileops.path.expected", "rm"));
         }
         if (state.protectedPaths() != null) {
-            state.protectedPaths().reportIgnored(context);
+            state.protectedPaths().reportIgnored();
         }
         for (Object argument : arguments.words()) {
             for (Path path : FileOps.expand(argument, context, p.force())) {

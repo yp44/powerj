@@ -1140,6 +1140,24 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   values, is now a usage error, and an entry that is already in the list is not added again.
   Tests: `NumbersTest`, `MeasureTest`, `SortTest`, `JoinTest`, `JsonCsvCmdletsTest`, `EnvTest`.
 
+### Fixed (review of the pull request of phase 2 of the audit v2, [#141](https://github.com/yp44/powerj/issues/141))
+- **A relative line of `protected-paths` no longer fails the command** (#163): it was reported with `context.error`, so `rm old.txt
+  && echo done` did not say done, and `--on-error stop` stopped before touching anything. It is logged at `WARNING`, once per
+  session (the API has no channel for a warning).
+- **`cat` and `grep` report a name the system cannot spell** (#156) (`invalid path …`) instead of ending in an internal error;
+  `FileArguments.expandOrReport` is shared.
+- **`env --prepend NAME dir` moves a `dir` that is already in the list to the head** instead of doing nothing (#164): that is how
+  a folder is given priority. `--append` still leaves an entry already there where it is.
+- **`grep` skips a line that is too long and goes on** (#160), as `cat` does, instead of giving up on the rest of the file; the
+  skipped lines are reported after its matches.
+- **`kill -w --timeout`** (#161) says `even after a forcible stop` when `-f` was given, and a timeout beyond a year is a year
+  instead of an `ArithmeticException`.
+- **The hidden attribute of a link followed on Windows** (#162): `FollowedLink` kept only the basic attributes, so a link to a
+  hidden file was listed as visible. `FollowedDosLink` keeps the DOS attributes of the target.
+- Examined, not changed: the notice of `to-csv` on dropped columns stays a non-blocking error, like `from-csv`'s `csv.extra.fields`
+  (the output is incomplete); the chunks of a parallel `grep` interleave between files above 1 000 matches, which FR-64 and the
+  help of `-p` now say.
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.

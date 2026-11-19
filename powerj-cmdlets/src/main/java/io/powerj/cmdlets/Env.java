@@ -1,7 +1,9 @@
 package io.powerj.cmdlets;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.regex.Pattern;
 import java.util.Map;
 
@@ -75,11 +77,19 @@ public final class Env implements Cmdlet<Env.Params, Void, EnvVar>, Previewable<
             }
             String current = env.get(name);
             String separator = File.pathSeparator;
-            if (current != null && Arrays.asList(current.split(Pattern.quote(separator), -1)).contains(addition)) {
-                return; // already in the list: a second PATH entry would only slow every lookup down
+            List<String> entries = current == null || current.isEmpty() ? new ArrayList<>()
+                    : new ArrayList<>(Arrays.asList(current.split(Pattern.quote(separator), -1)));
+            if (p.append() != null) {
+                if (entries.contains(addition)) {
+                    return; // already in the list: a second entry would only slow every lookup down
+                }
+                entries.add(addition);
+            } else {
+                // --prepend gives a folder priority: one that is already there, later, is moved to the head
+                entries.remove(addition);
+                entries.add(0, addition);
             }
-            String updated = current == null || current.isEmpty() ? addition
-                    : p.append() != null ? current + separator + addition : addition + separator + current;
+            String updated = String.join(separator, entries);
             context.setEnvironment(name, updated);
         } else if (p.name() != null) {
             String value = env.get(p.name());

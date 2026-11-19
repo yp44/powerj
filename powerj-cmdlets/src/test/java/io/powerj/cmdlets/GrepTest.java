@@ -458,4 +458,29 @@ class GrepTest {
         assertThat(matches).extracting(GrepMatch::line).containsExactlyElementsOf(
                 java.util.stream.IntStream.rangeClosed(1, 2_500).boxed().toList());
     }
+
+    @Test
+    void aQuotedNameThatTheSystemCannotSpellIsAnErrorNotAnInternalFailure() throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeFalse(System.getProperty("os.name").startsWith("Windows"), "NUL is the invalid character of POSIX paths");
+
+        run(new Grep.Params("x", new java.util.ArrayList<Object>(List.of(new io.powerj.fs.GlobArgument("a\0b", "a\0b"))),
+                false, null, null, false, false, false, null, null, false, false));
+
+        assertThat(context.errors).singleElement().asString().startsWith("invalid path");
+    }
+
+    @Test
+    void aLineThatIsTooLongIsSkippedAndTheMatchesAfterItAreFound() throws Exception {
+        try (var out = Files.newBufferedWriter(tmp.resolve("minified.log"))) {
+            out.write("hit one\n");
+            out.write("x".repeat(BoundedLines.MAX_LINE + 1));
+            out.write("\nhit two\nhit three\n");
+        }
+
+        List<GrepMatch> matches = run(params("hit", "minified.log"));
+
+        assertThat(matches).extracting(GrepMatch::line).containsExactly(1, 3, 4); // the long line 2 is counted
+        assertThat(context.errors).singleElement().asString().contains("minified.log").contains("line 2")
+                .contains("1 line(s)");
+    }
 }
