@@ -13,6 +13,39 @@ public final class Scanning {
     private Scanning() {
     }
 
+    /**
+     * Is there a {@code |} (a pipe, not the {@code ||} operator) between {@code from} and {@code to} that is neither in a string,
+     * nor in a group, a block or an index? Such a text is a pipeline, never one expression: the parser need not try the
+     * expression first, which for groups nested in groups doubled the work at each level (audit v2, S-08).
+     */
+    public static boolean hasTopLevelPipe(String text, int from, int to) {
+        for (int i = from; i < to; i++) {
+            char c = text.charAt(i);
+            if (c == '"' || c == '\'') {
+                int end = quotedEnd(text, i);
+                if (end < 0) {
+                    return false;
+                }
+                i = end - 1;
+            } else if (c == '(' || c == '{' || c == '[') {
+                int close = matching(text, i);
+                if (close < 0) {
+                    return false;
+                }
+                i = close;
+            } else if (c == '|') {
+                boolean doubled = i + 1 < to && text.charAt(i + 1) == '|' || i > from && text.charAt(i - 1) == '|';
+                if (!doubled) {
+                    return true;
+                }
+                if (i + 1 < to && text.charAt(i + 1) == '|') {
+                    i++; // the second | of ||
+                }
+            }
+        }
+        return false;
+    }
+
     /** Position of the first character at or after {@code from} that is not a blank. */
     public static int skipBlanks(String text, int from) {
         int at = from;

@@ -109,7 +109,7 @@ class PropertiesAndOptionsTest {
         assertThatThrownBy(() -> typed("--flag=maybe")).hasMessage("t: --flag expects true or false, not \"maybe\"");
         assertThatThrownBy(() -> typed("--timeout", "x"))
                 .hasMessage("t: duration expected for --timeout (e.g. 30s, 5m, 2h, 7d), not \"x\"");
-        assertThatThrownBy(() -> typed("--ratio", "x")).hasMessage("t: invalid value for --ratio: \"x\"");
+        assertThatThrownBy(() -> typed("--ratio", "x")).hasMessage("t: invalid value for --ratio: \"x\" (a number expected)");
         assertThatThrownBy(() -> typed("--id", "x")).hasMessage("t: unsupported option type: UUID");
         assertThatThrownBy(() -> typed("-l")).hasMessage("t: value expected after -l");
     }

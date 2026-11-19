@@ -447,7 +447,7 @@ public final class ExpressionParser {
         if (contentStart == close) {
             throw new SyntaxException(Messages.get("syntax.emptyParentheses"));
         }
-        if (Lexer.expressionAt(input, contentStart, context)) {
+        if (Lexer.expressionAt(input, contentStart, context) && !Scanning.hasTopLevelPipe(input, contentStart, close)) {
             depth++;
             Expression inner = expression();
             depth--;

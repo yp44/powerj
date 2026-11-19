@@ -52,6 +52,28 @@ public final class NativeCommands {
     }
 
     /**
+     * Is {@code name} a program of the {@code PATH}? Answered from the names of the last scan (at most one scan per
+     * {@value #TTL_MILLIS} ms), not from the file system: the highlighting asks for every word at every keystroke (audit v2,
+     * S-08). On Windows the case of a name does not matter, as for the file system.
+     */
+    public synchronized boolean has(Map<String, String> environment, String name) {
+        Set<String> names = names(environment);
+        if (!windows) {
+            return names.contains(name);
+        }
+        if (lowered == null || loweredFrom != names) {
+            Set<String> copy = new java.util.HashSet<>();
+            names.forEach(n -> copy.add(n.toLowerCase(Locale.ROOT)));
+            lowered = copy;
+            loweredFrom = names;
+        }
+        return lowered.contains(name.toLowerCase(Locale.ROOT));
+    }
+
+    private Set<String> lowered;
+    private Set<String> loweredFrom;
+
+    /**
      * The names found by the last scan, without scanning again: empty until completion or highlighting has asked for
      * them. For what must never wait for the {@code PATH}, such as the hint of an error.
      */

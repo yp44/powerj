@@ -34,6 +34,39 @@ public final class CommandResolution {
     }
 
     /**
+     * What the word being typed stands for, to colour it: as {@link #resolve(String, Session)}, except that a bare word is looked
+     * up in the cached names of the {@code PATH} instead of on the file system, which the highlighting would do at every keystroke
+     * (audit v2, S-08). A word with a directory part ({@code ./run}, {@code bin/tool}) is still resolved on the file system: that
+     * is one path, not the whole {@code PATH}.
+     */
+    public CommandKind kind(String text, Session session) {
+        boolean forcedNative = text.length() > 1 && text.startsWith("^");
+        String name = forcedNative ? text.substring(1) : text;
+        if (!forcedNative) {
+            Optional<Resolved> inProcess = inProcess(name);
+            if (inProcess.isPresent()) {
+                return kindOf(inProcess.get());
+            }
+        }
+        if (name.isEmpty()) {
+            return CommandKind.UNKNOWN;
+        }
+        if (name.contains("/") || name.contains("\\")) {
+            return kindOf(resolve(text, session));
+        }
+        return nativeNames.has(session.environment(), name) ? CommandKind.NATIVE : CommandKind.UNKNOWN;
+    }
+
+    private static CommandKind kindOf(Resolved resolved) {
+        return switch (resolved) {
+            case Resolved.BuiltinCall _ -> CommandKind.BUILTIN;
+            case Resolved.CmdletCall _ -> CommandKind.CMDLET;
+            case Resolved.NativeCall _ -> CommandKind.NATIVE;
+            case Resolved.Unknown _ -> CommandKind.UNKNOWN;
+        };
+    }
+
+    /**
      * What a name typed as text stands for, with the {@code ^} prefix that forces a program. Looks at the file system
      * only when no built-in command or cmdlet has the name.
      */

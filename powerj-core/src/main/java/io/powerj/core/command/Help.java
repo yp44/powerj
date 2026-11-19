@@ -85,7 +85,7 @@ public final class Help {
         Set<String> statics = new TreeSet<>();
         Set<String> instance = new TreeSet<>();
         for (var m : type.getMethods()) {
-            if (!JavaClasses.accessible(m.getDeclaringClass()) && !Members.isAccessible(m.getDeclaringClass())) {
+            if (!JavaClasses.callable(m)) {
                 continue;
             }
             String line = JavaInvoker.signature(m) + " → " + m.getReturnType().getSimpleName();
@@ -99,6 +99,9 @@ public final class Help {
         }
         Set<String> fields = new TreeSet<>();
         for (var f : type.getFields()) {
+            if (!JavaClasses.callable(f)) {
+                continue; // a field that the shell would refuse to read is not offered
+            }
             boolean isStatic = Modifier.isStatic(f.getModifiers());
             fields.add((isStatic ? "static " : "") + f.getName() + " : " + f.getType().getSimpleName());
         }
@@ -144,9 +147,12 @@ public final class Help {
         List<String> lines = new ArrayList<>();
         lines.add(info.name() + " — " + registered.summary());
         var usage = new StringBuilder(info.name());
-        specs.stream().filter(OptionBinder.OptionSpec::isPositional).forEach(s ->
-                usage.append(" [").append(s.longName()).append(s.isList() ? "..." : "").append("]"));
-        if (specs.stream().anyMatch(s -> !s.isPositional())) {
+        specs.stream().filter(OptionBinder.OptionSpec::isPositional).forEach(s -> usage.append(s.mandatory() ? " <" : " [")
+                .append(s.longName()).append(s.isList() ? "..." : "").append(s.mandatory() ? ">" : "]"));
+        // what the command cannot run without is in the usage line, with the type of its value
+        specs.stream().filter(s -> !s.isPositional() && s.mandatory()).forEach(s -> usage.append(" --").append(s.longName())
+                .append(s.isFlag() ? "" : " " + s.valueLabel()));
+        if (specs.stream().anyMatch(s -> !s.isPositional() && !s.mandatory())) {
             usage.append(" [options]");
         }
         lines.add(Messages.get("help.usage", usage));
@@ -184,7 +190,7 @@ public final class Help {
     private static String optionLabel(OptionBinder.OptionSpec spec) {
         String label = spec.isPositional() ? "<" + spec.longName() + ">" : spec.display();
         if (!spec.isFlag() && !spec.isPositional()) {
-            label += " " + Messages.get("help.option.value");
+            label += " " + spec.valueLabel();
         }
         return label;
     }

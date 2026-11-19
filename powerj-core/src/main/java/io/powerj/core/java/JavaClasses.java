@@ -177,6 +177,16 @@ public final class JavaClasses {
         }
     }
 
+    /**
+     * Can the shell call this method or read this field? The rule that {@code help}, completion and {@link JavaInvoker} share
+     * (audit v2, B-08): a static member is reached through a class of the Java library, an instance member through a type
+     * that is public and exported; a member declared by an inaccessible class is not offered, since the call would be refused.
+     */
+    public static boolean callable(java.lang.reflect.Member member) {
+        Class<?> owner = member.getDeclaringClass();
+        return Modifier.isStatic(member.getModifiers()) ? accessible(owner) : Members.isAccessible(owner);
+    }
+
     /** Public class of a package exported by a {@code java.*} module (FR-52). */
     public static boolean accessible(Class<?> type) {
         if (type.isArray()) {

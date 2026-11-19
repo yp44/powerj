@@ -57,6 +57,26 @@ class CompletionOptionValuesTest {
                 .filter(v -> v.startsWith(result.word())).toList();
     }
 
+    @CmdletInfo(name = "odd", summary = "A short name that a regular expression would not survive")
+    static final class Odd implements Cmdlet<Odd.Params, Void, String> {
+
+        record Params(@Option(shortName = '?', description = "Odd") boolean odd,
+                      @Option(shortName = '.', description = "Dot") boolean dot,
+                      @Option(shortName = 'x', description = "Plain") boolean plain) { }
+    }
+
+    @Test
+    void aShortNameThatIsASpecialCharacterOfRegularExpressionsDoesNotSilenceCompletion() {
+        var session = new Session(tmp, tmp, Map.of("PATH", ""));
+        var interpreter = new Interpreter(session, new ShellIo(new PrintWriter(new StringWriter()), _ -> { }, false),
+                Map.of(), CmdletRegistry.of(List.of(new Odd())));
+        var odd = new Completions(interpreter);
+
+        var result = odd.complete("odd -? -", 8);
+        assertThat(result.candidates()).extracting(Completions.Candidate::value).contains("--dot", "--plain");
+        assertThat(result.candidates()).extracting(Completions.Candidate::value).doesNotContain("--odd");
+    }
+
     @Test
     void enumConstantsInLowerCase() {
         assertThat(values("opts --level ")).containsExactly("low", "high");
