@@ -164,7 +164,7 @@ class LexerTest {
                 new StringPart.Interpolation("?", List.of()),
                 new StringPart.Text(" "),
                 new StringPart.Interpolation("_", List.of()));
-        assertThatThrownBy(() -> Lexer.tokenize("\"$l[x]\"")).hasMessage("syntax: invalid index at position 4 (expected: [number])");
+        assertThatThrownBy(() -> Lexer.tokenize("\"$l[x]\"")).hasMessage("syntax: invalid index (position 4), expected: [number]");
         assertThatThrownBy(() -> Lexer.tokenize("\"$l[-]\"")).hasMessageContaining("invalid index");
         assertThatThrownBy(() -> Lexer.tokenize("\"$l[")).hasMessageContaining("invalid index");
     }
@@ -185,7 +185,7 @@ class LexerTest {
         assertThatThrownBy(() -> Lexer.tokenize("\"\"\"abc\"\"\""))
                 .hasMessage("syntax: a text block opens with \"\"\" followed by a line break (position 1)");
         assertThatThrownBy(() -> Lexer.tokenize("x \"\"\"\n abc"))
-                .hasMessage("syntax: unclosed text block (opened at position 3)");
+                .hasMessage("syntax: unclosed text block (position 3)");
     }
 
     @Test

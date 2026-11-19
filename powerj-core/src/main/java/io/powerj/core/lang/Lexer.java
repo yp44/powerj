@@ -55,8 +55,20 @@ public final class Lexer {
     }
 
     public static List<Token> tokenize(String input, ParseContext context) {
-        return new Lexer(input, context).run();
+        return tokenizeWithStarts(input, context).tokens();
     }
+
+    /** The tokens of a line and where each one starts in it (UTF-16 index), for the errors that say where. */
+    record Tokens(List<Token> tokens, int[] starts, int length) {
+    }
+
+    static Tokens tokenizeWithStarts(String input, ParseContext context) {
+        var lexer = new Lexer(input, context);
+        List<Token> tokens = lexer.run();
+        return new Tokens(tokens, lexer.starts.stream().mapToInt(Integer::intValue).toArray(), input.length());
+    }
+
+    private final List<Integer> starts = new ArrayList<>();
 
     private List<Token> run() {
         List<Token> tokens = new ArrayList<>();
@@ -65,6 +77,7 @@ public final class Lexer {
             if (atEnd()) {
                 return tokens;
             }
+            starts.add(pos);
             boolean statement = tokens.isEmpty() || tokens.getLast() instanceof Token.Separator
                     || tokens.getLast() instanceof Token.Background;
             boolean head = statement || tokens.getLast() instanceof Token.Pipe || tokens.getLast() instanceof Token.AssignTo;
@@ -120,9 +133,9 @@ public final class Lexer {
                 pos++;
                 return new Token.Background();
             }
-            case ')' -> throw new SyntaxException(Messages.get("syntax.unexpectedAt", ")", pos + 1));
-            case '}' -> throw new SyntaxException(Messages.get("syntax.unmatchedBrace", pos + 1));
-            case '=' -> throw new SyntaxException(Messages.get("syntax.unexpectedEquals", pos + 1));
+            case ')' -> throw new SyntaxException(Messages.get("syntax.unexpectedAt", ")", column(pos)), pos);
+            case '}' -> throw new SyntaxException(Messages.get("syntax.unmatchedBrace", column(pos)), pos);
+            case '=' -> throw new SyntaxException(Messages.get("syntax.unexpectedEquals", column(pos)), pos);
             default -> { }
         }
         if (statement) {
@@ -334,7 +347,7 @@ public final class Lexer {
             pos++;
         }
         if (atEnd() || peek() != ']' || pos == start || input.substring(start, pos).equals("-")) {
-            throw new SyntaxException(Messages.get("syntax.invalidIndex", open + 1));
+            throw new SyntaxException(Messages.get("syntax.invalidIndex", column(open)), open);
         }
         int value;
         try {
@@ -388,7 +401,7 @@ public final class Lexer {
         var text = new StringBuilder();
         while (true) {
             if (atEnd()) {
-                throw new SyntaxException(Messages.get("syntax.unclosedString", open + 1));
+                throw new SyntaxException(Messages.get("syntax.unclosedString", column(open)), open);
             }
             char c = input.charAt(pos++);
             switch (c) {
@@ -436,14 +449,14 @@ public final class Lexer {
             at++;
         }
         if (at >= input.length() || input.charAt(at) != '\n') {
-            throw new SyntaxException(Messages.get("syntax.textBlockOpening", open + 1));
+            throw new SyntaxException(Messages.get("syntax.textBlockOpening", column(open)), open);
         }
         int contentStart = at + 1;
         int close = contentStart;
         while (true) {
             close = input.indexOf("\"\"\"", close);
             if (close < 0) {
-                throw new SyntaxException(Messages.get("syntax.unclosedTextBlock", open + 1));
+                throw new SyntaxException(Messages.get("syntax.unclosedTextBlock", column(open)), open);
             }
             if (!escaped(close)) {
                 break;
@@ -541,5 +554,10 @@ public final class Lexer {
 
     private boolean atEnd() {
         return pos >= input.length();
+    }
+
+    /** The position that a message gives: the column in characters, not in UTF-16 units (an emoji is one). */
+    private int column(int index) {
+        return input.codePointCount(0, Math.min(index, input.length())) + 1;
     }
 }

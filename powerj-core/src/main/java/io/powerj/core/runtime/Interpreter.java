@@ -16,6 +16,7 @@ import io.powerj.core.command.Help;
 import io.powerj.core.command.CmdletRegistry;
 import io.powerj.core.command.ModuleLoader;
 import io.powerj.core.command.NativeAccessPolicy;
+import io.powerj.core.error.PjError;
 import io.powerj.core.error.PjException;
 import io.powerj.core.i18n.Messages;
 import io.powerj.core.lang.Ast.Statement;
@@ -197,7 +198,9 @@ public final class Interpreter implements CommandCatalog {
         try {
             script = Parser.parse(line, parseContext());
         } catch (SyntaxException e) {
-            throw new PjException(e.getMessage()); // a line that does not parse is an error to show, like any other
+            session.recordSuccess(false); // as in bash and PowerShell: a line that cannot be run has failed
+            // a line that does not parse is an error to show, like any other; the shell shows where
+            throw new PjException(PjError.of(e.getMessage()).at(e.offset()));
         }
         long parsed = System.nanoTime() - begin;
         LineMeasuring.Measurement measurement = perf.start(line, script, begin, parsed);

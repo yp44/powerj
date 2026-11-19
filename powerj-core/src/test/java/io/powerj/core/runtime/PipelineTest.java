@@ -87,7 +87,7 @@ class PipelineTest {
     @Test
     void evaluationErrorsAreNonBlocking() throws Exception {
         assertThat(run("items | filter { $_.nope > 1 } | count")).isEqualTo("0\n");
-        assertThat(errors).hasSize(3).allSatisfy(e -> assertThat(e).contains("filter: Item has no property 'nope'"));
+        assertThat(errors).hasSize(3).allSatisfy(e -> assertThat(e).contains("filter: Item has no property \"nope\""));
     }
 
     @Test
@@ -171,7 +171,7 @@ class PipelineTest {
     @Test
     void evaluationErrors() throws Exception {
         assertThat(run("eval { 1 / 0 }")).isEmpty();
-        assertThat(errors).singleElement().asString().contains("calculation failed", "/ by zero");
+        assertThat(errors).singleElement().asString().contains("calculation failed", "division by zero");
         run("eval { 1 && true }");
         assertThat(errors).singleElement().asString().contains("\"&&\" expects a boolean, got Integer 1");
         run("eval { \"a\" > 1 }");
@@ -336,7 +336,7 @@ class PipelineTest {
         assumeFalse(Host.windows());
         run("sh -c \"echo e1 >&2; echo a\" | sh -c \"cat; echo e2 >&2\" | filter { $_.nope } 2> err.txt");
         assertThat(Files.readAllLines(tmp.resolve("err.txt")))
-                .contains("e1", "e2").anyMatch(line -> line.contains("String has no property 'nope'"));
+                .contains("e1", "e2").anyMatch(line -> line.contains("String has no property \"nope\""));
         assertThat(errors).isEmpty();
     }
 

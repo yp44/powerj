@@ -76,7 +76,7 @@ public final class Builtins {
                 String name = Values.text(value);
                 lines.add(switch (resolution.get().resolve(name, session)) {
                     case Resolved.BuiltinCall _ -> Messages.get("which.builtin", name);
-                    case Resolved.CmdletCall(var cmdlet) -> Messages.get("which.cmdlet", name, cmdlet.module());
+                    case Resolved.CmdletCall(var cmdlet) -> Messages.get(cmdlet.module().equals(Messages.get("module.unnamed")) ? "which.cmdlet.unnamed" : "which.cmdlet", name, cmdlet.module());
                     case Resolved.NativeCall(var path) -> Messages.get("which.native", name, path);
                     case Resolved.Unknown(var program, var forcedNative) -> throw new PjException(Messages.get(
                             forcedNative ? "which.programNotFound" : "which.notFound", forcedNative ? program : name));

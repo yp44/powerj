@@ -107,7 +107,7 @@ class CmdletInterpreterTest {
     @Test
     void unknownPropertyListsTheKnownOnes() throws Exception {
         run("(items)[0].siz");
-        assertThat(errors).containsExactly("Item has no property 'siz' (properties: name, size)");
+        assertThat(errors).containsExactly("Item has no property \"siz\" (properties: name, size)");
     }
 
     @Test
@@ -171,7 +171,7 @@ class CmdletInterpreterTest {
         // Without *., the property applies to the list itself: explicit error.
         run("$i.size");
         assertThat(errors).singleElement().asString()
-                .contains("List has no property 'size'", "for each element: *.size", "method: size()");
+                .contains("List has no property \"size\"", "for each element: *.size", "method: size()");
         run("$i.name");
         assertThat(errors).singleElement().asString().contains("for each element: *.name");
         // *. is not a multiplication.

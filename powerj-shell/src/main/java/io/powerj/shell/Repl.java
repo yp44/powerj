@@ -13,6 +13,7 @@ import org.jline.reader.UserInterruptException;
 import org.jline.terminal.Terminal;
 
 import io.powerj.core.BuildInfo;
+import io.powerj.core.error.ErrorLocation;
 import io.powerj.core.error.PjException;
 import io.powerj.core.runtime.Interpreter;
 import io.powerj.core.runtime.Outcome;
@@ -130,7 +131,12 @@ public final class Repl {
                 return List.of();
             })) {
                 case Outcome.Success _ -> { }
-                case Outcome.Failure(var error) -> errors.print(error.message());
+                case Outcome.Failure(var error) -> {
+                    errors.print(error.message());
+                    if (error.offset() >= 0) {
+                        ErrorLocation.show(line, error.offset()).forEach(errors::print); // the line and a ^ under the place
+                    }
+                }
                 case Outcome.Cancelled() -> errors.print("^C");
                 case Outcome.Abandoned(var commandLine) ->
                         errors.print(Messages.get("command.abandoned", commandLine));

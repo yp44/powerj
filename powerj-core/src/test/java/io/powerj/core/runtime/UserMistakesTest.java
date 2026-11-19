@@ -25,7 +25,7 @@ import io.powerj.core.lang.RedirectedStream;
 import io.powerj.core.support.LogCapture;
 
 /**
- * A mistake of the user is an error with a message, never an "internal error (details in the log)" (audit v2, R-03,
+ * A mistake of the user is an error with a message, never an "internal error (details in the log: ~/.powerj/logs by default)" (audit v2, R-03,
  * R-04, R-15; #167); and the operators on decimals are those of Java (FR-33).
  */
 class UserMistakesTest {

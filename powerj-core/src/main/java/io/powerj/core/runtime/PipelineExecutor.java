@@ -423,8 +423,8 @@ final class PipelineExecutor {
     private List<Object> invokeBuiltin(String name, Builtin builtin, List<Object> args) throws InterruptedException {
         try {
             return builtin.run(args, session);
-        } catch (PjException | InterruptedException e) {
-            throw e;
+        } catch (PjException | InterruptedException | CancellationException e) {
+            throw e; // Ctrl+C in help, history or mod-load is a cancellation, not "help: null"
         } catch (Exception e) {
             throw new PjException(PjError.of(Messages.get("command.error", name, e.getMessage()), e));
         }

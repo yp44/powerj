@@ -90,10 +90,10 @@ class ExpressionParserTest {
         assertThatThrownBy(() -> ExpressionParser.parse("$_."))
                 .hasMessage("syntax: name expected after \".\" at end of expression");
         assertThatThrownBy(() -> ExpressionParser.parse("$_. 1"))
-                .hasMessage("syntax: name expected after \".\" at position 5");
+                .hasMessage("syntax: name expected after \".\" (position 5)");
         assertThatThrownBy(() -> ExpressionParser.parse("1 +")).hasMessage("syntax: incomplete expression in { 1 + }");
         assertThatThrownBy(() -> ExpressionParser.parse("[1, 2 3]"))
-                .hasMessage("syntax: \"]\" expected at position 7");
+                .hasMessage("syntax: \"]\" expected (position 7)");
     }
 
     @Test
@@ -206,7 +206,7 @@ class ExpressionParserTest {
         assertThatThrownBy(() -> ExpressionParser.parse("String::"))
                 .hasMessage("syntax: method name expected after \"::\" at end of expression");
         assertThatThrownBy(() -> ExpressionParser.parse("String:: 1"))
-                .hasMessage("syntax: method name expected after \"::\" at position 10");
+                .hasMessage("syntax: method name expected after \"::\" (position 10)");
     }
 
     @Test
@@ -215,7 +215,7 @@ class ExpressionParserTest {
         assertThatThrownBy(() -> ExpressionParser.parse("new"))
                 .hasMessage("syntax: class name expected after new at end of expression");
         assertThatThrownBy(() -> ExpressionParser.parse("new 1"))
-                .hasMessage("syntax: class name expected after new at position 5");
+                .hasMessage("syntax: class name expected after new (position 5)");
         assertThatThrownBy(() -> ExpressionParser.parse("new java."))
                 .hasMessage("syntax: name expected after \".\" at end of expression");
     }

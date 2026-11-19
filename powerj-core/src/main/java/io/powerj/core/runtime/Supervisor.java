@@ -92,7 +92,7 @@ public final class Supervisor {
         return switch (t) {
             case OutOfMemoryError _ -> Messages.get("error.outOfMemory");
             case StackOverflowError _ -> Messages.get("error.stackOverflow");
-            case LinkageError e -> Messages.get("error.linkage", e.getMessage());
+            case LinkageError e -> Messages.get("error.linkage", e.getMessage() == null ? e.getClass().getName() : e.getMessage());
             default -> Messages.get("error.internal", t);
         };
     }

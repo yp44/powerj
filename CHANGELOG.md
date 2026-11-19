@@ -1257,6 +1257,24 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   positions); a text shown whole keeps its line breaks. The characters whose width depends on the terminal (East Asian
   Ambiguous) count 1. The grid and the exports are not concerned. Tests: `DisplayWidthTest`, `OutputFormatterTest`.
 
+### Changed (what the user is told when a line is wrong, [#175](https://github.com/yp44/powerj/issues/175))
+- **A syntax error shows where** (audit v2, U-03). `SyntaxException` and `PjError` carry an `offset`; the parser knows where each
+  token starts, the lexer and the expression parser give the place they already named. The shell prints the line and a `^`
+  under the place (`ErrorLocation`, correct after wide characters and emoji). The errors of a block (`{ … }`), which is parsed
+  alone and whose positions are those of the block, have no place rather than a wrong one. The "(position N)" of a message
+  counts characters, not UTF-16 units (an emoji was two). `ls | | x`, `1 2`, `ls |` have tests for `offset()`.
+- **`$?` is `false` after a line that does not parse** (U-03), as in bash and PowerShell (it kept the value of the line before);
+  the characterization row says so.
+- **Messages** (U-11, U-02, C-04): `which items` says `(no module)` and no longer `((no module))`; an `ExceptionInInitializerError`
+  says its class instead of "unusable class: null"; a division by zero is `division by zero` in the language of the user (it was
+  `/ by zero`, in English, in a French sentence); `operator.overflow.long` suggests `new java.math.BigInteger("…")`; `error.internal`
+  says where the log is; **Ctrl+C in `help`, `history` or `mod-load` is a cancellation**, not "help: null" (`invokeBuiltin` rethrows
+  `CancellationException`, #89).
+- **One style for the messages of the core** (C-04), written in `CONTRIBUTING.md` ("Language") and applied to `core.i18n` and
+  `core.lang`, English and French: user input in double quotes (it was three styles), "program" for a native command
+  (`program not found: x`), `(position N)` always at the end, one wording for `cast.failed` and `java.conversionFailed`. The
+  completion tag `[internal]` stays: it is a label, not a sentence. Tests updated for the new words. Tests: `LanguageErrorsTest`.
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.

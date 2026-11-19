@@ -178,7 +178,8 @@ public final class Operators {
             return integer(op, a, b);
         } catch (ArithmeticException e) {
             // Once the division is compiled, the JVM may throw a preallocated exception without message.
-            String reason = e.getMessage() == null ? "/ by zero" : e.getMessage();
+            String reason = e.getMessage() == null || e.getMessage().equals("/ by zero")
+                    ? Messages.get("operator.divisionByZero") : e.getMessage();
             throw new PjException(PjError.of(Messages.get("operator.arithmeticFailed", reason), e));
         }
     }

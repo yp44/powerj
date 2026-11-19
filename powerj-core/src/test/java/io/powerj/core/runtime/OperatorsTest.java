@@ -118,7 +118,8 @@ class OperatorsTest {
     void aLongResultThatDoesNotFitIsAnError() {
         assertThatThrownBy(() -> binary(Operator.ADD, Long.MAX_VALUE, 1))
                 .isInstanceOf(PjException.class)
-                .hasMessage("calculation failed: 9223372036854775807 + 1 does not fit in a long");
+                .hasMessage("calculation failed: 9223372036854775807 + 1 does not fit in a long"
+                        + " (use new java.math.BigInteger(\"…\") to compute with larger numbers)");
         assertThatThrownBy(() -> binary(Operator.SUB, Long.MIN_VALUE, 1L))
                 .hasMessageContaining("does not fit in a long");
         assertThatThrownBy(() -> binary(Operator.MUL, 4_000_000_000L, 4_000_000_000L))
@@ -161,7 +162,8 @@ class OperatorsTest {
                     .hasMessage("calcul impossible : 100000 * 100000 ne tient pas dans un int"
                             + " (écrivez 100000L * 100000 pour calculer en long)");
             assertThatThrownBy(() -> binary(Operator.ADD, Long.MAX_VALUE, 1))
-                    .hasMessage("calcul impossible : 9223372036854775807 + 1 ne tient pas dans un long");
+                    .hasMessage("calcul impossible : 9223372036854775807 + 1 ne tient pas dans un long"
+                            + " (utilisez new java.math.BigInteger(\"…\") pour calculer avec de plus grands nombres)");
         } finally {
             LanguageSetting.set(Locale.ENGLISH);
         }
@@ -170,9 +172,9 @@ class OperatorsTest {
     @Test
     void anOverflowDoesNotHideADivisionByZero() {
         assertThatThrownBy(() -> binary(Operator.DIV, Integer.MIN_VALUE, 0))
-                .hasMessage("calculation failed: / by zero");
+                .hasMessage("calculation failed: division by zero");
         assertThatThrownBy(() -> binary(Operator.REM, Long.MAX_VALUE, 0L))
-                .hasMessage("calculation failed: / by zero");
+                .hasMessage("calculation failed: division by zero");
     }
 
     @Test
@@ -221,7 +223,7 @@ class OperatorsTest {
     void arithmeticErrors() {
         assertThatThrownBy(() -> binary(Operator.DIV, 1, 0))
                 .isInstanceOf(PjException.class)
-                .hasMessage("calculation failed: / by zero");
+                .hasMessage("calculation failed: division by zero");
         assertThatThrownBy(() -> binary(Operator.MUL, "a", 2))
                 .hasMessage("\"*\" is not possible between String \"a\" and Integer 2");
         assertThatThrownBy(() -> binary(Operator.SUB, true, 1))
@@ -232,7 +234,7 @@ class OperatorsTest {
     void divisionByZeroIsNamedEvenOnceCompiled() {
         // Many divisions by zero let the JIT replace the exception by a preallocated one, without message.
         for (int i = 0; i < 100_000; i++) {
-            assertThatThrownBy(() -> binary(Operator.DIV, 1, 0)).hasMessage("calculation failed: / by zero");
+            assertThatThrownBy(() -> binary(Operator.DIV, 1, 0)).hasMessage("calculation failed: division by zero");
         }
     }
 
