@@ -272,7 +272,7 @@ There is **no** long form (`pj-ls`, `Get-ChildItem`…).
 
 **FR-16 — Withdrawn.** A `native.prefer` setting in `config.properties` was specified to let a native command take precedence over a cmdlet of the same name. It was never built and was withdrawn: `^name` (FR-14) is the way to the native program.
 
-**FR-17 — Collisions between modules.** If a module declares a cmdlet whose name already exists, a warning is displayed at load time; the first one loaded keeps the short name, the other remains accessible as `module:name` (e.g. `docker:ps`), where `module` is the last segment of the Java module name (`com.example.greet` → `greet:greet`). A cmdlet named after a built-in command (`cd`, `help`, `mod-load`…) is ignored with a warning: it could never be called.
+**FR-17 — Collisions between modules.** If a module declares a cmdlet whose name already exists, a warning is displayed at load time; the first one loaded keeps the short name, the other remains accessible as `module:name` (e.g. `docker:ps`), where `module` is the last segment of the Java module name (`com.example.greet` → `greet:greet`); when another loaded module already has that last segment (`org.other.greet`), the whole module name is the prefix (`org.other.greet:greet`), so that two modules never share a qualified name; the warning and `mod-list` show the name that works. A cmdlet named after a built-in command (`cd`, `help`, `mod-load`…) is ignored with a warning: it could never be called.
 
 ### 3.5 Parameters
 

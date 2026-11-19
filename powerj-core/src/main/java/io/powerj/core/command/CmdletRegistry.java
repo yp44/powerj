@@ -36,7 +36,8 @@ public final class CmdletRegistry {
 
     /** Registered cmdlet with its metadata. */
     public record Registered(Cmdlet<?, ?, ?> cmdlet, CmdletInfo info, Class<? extends Record> parameters,
-                             Class<?> input, Class<?> output, String module, CmdletProvider provider) {
+                             Class<?> input, Class<?> output, String module, CmdletProvider provider,
+                             String prefix) {
 
         public String name() {
             return info.name();
@@ -106,9 +107,17 @@ public final class CmdletRegistry {
             return info.passThrough();
         }
 
-        /** Qualified name, always usable: {@code greet:greet} (FR-17). */
+        /**
+         * Qualified name, always usable: {@code greet:greet} (FR-17). The prefix is the last segment of the module name
+         * ({@code com.example.greet} gives {@code greet}), or the whole name when another module already has that segment
+         * ({@code org.other.greet:greet}): two modules never share a qualified name (audit v2, R-06).
+         */
         public String qualifiedName() {
-            return alias(module) + ":" + name();
+            return prefix + ":" + name();
+        }
+
+        private Registered withPrefix(String chosen) {
+            return new Registered(cmdlet, info, parameters, input, output, module, provider, chosen);
         }
     }
 
@@ -132,6 +141,8 @@ public final class CmdletRegistry {
     private final Map<String, Registered> byName = new LinkedHashMap<>();
     private final Map<String, Registered> byQualifiedName = new LinkedHashMap<>();
     private final Map<String, LoadedModule> modules = new LinkedHashMap<>();
+    /** The prefix of the qualified names of each module, by module name: the last segment, or the whole name. */
+    private final Map<String, String> prefixes = new LinkedHashMap<>();
 
     /** Cmdlets of the startup modules. */
     public static CmdletRegistry discover() {
@@ -151,7 +162,7 @@ public final class CmdletRegistry {
 
     /** Registers a cmdlet; a name already taken keeps its first owner (FR-17). */
     public void register(Cmdlet<?, ?, ?> cmdlet) {
-        add(registered(cmdlet, null)).ifPresent(LOG::warning);
+        add(qualified(registered(cmdlet, null))).ifPresent(LOG::warning);
     }
 
     /**
@@ -167,7 +178,7 @@ public final class CmdletRegistry {
         for (Cmdlet<?, ?, ?> cmdlet : cmdlets) {
             Registered registered;
             try {
-                registered = registered(cmdlet, provider);
+                registered = qualified(registered(cmdlet, provider));
             } catch (RuntimeException e) {
                 warnings.add(Messages.get("module.cmdletIgnored", moduleName, e.getMessage()));
                 continue;
@@ -185,6 +196,17 @@ public final class CmdletRegistry {
         modules.put(moduleName, new LoadedModule(moduleName, version, List.copyOf(names),
                 source.map(Path::toString).orElse(null)));
         return warnings;
+    }
+
+    /** Gives the cmdlet the prefix of its module, the same for all its cmdlets and different from any other module's. */
+    private synchronized Registered qualified(Registered registered) {
+        String prefix = prefixes.get(registered.module());
+        if (prefix == null) {
+            String alias = alias(registered.module());
+            prefix = prefixes.containsValue(alias) ? registered.module() : alias;
+            prefixes.put(registered.module(), prefix);
+        }
+        return registered.withPrefix(prefix);
     }
 
     private synchronized Optional<String> add(Registered registered) {
@@ -211,7 +233,7 @@ public final class CmdletRegistry {
         Class<?> input = rawType(arguments[1]);
         Class<?> output = rawType(arguments[2]);
         return new Registered(cmdlet, info, parameters.asSubclass(Record.class), input, output,
-                moduleName(type.getModule()), provider);
+                moduleName(type.getModule()), provider, alias(moduleName(type.getModule())));
     }
 
     private static String moduleName(Module module) {

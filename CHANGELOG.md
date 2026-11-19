@@ -1205,6 +1205,17 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   the statement (`Redirections.truncatedOnce`) and everything it writes, a blocking error included, appends. Test:
   `BlockingErrorRedirectionTest`; acceptance sheet `step-3.md`, row 21b.
 
+### Fixed (two modules whose names end with the same segment, and `mod-load` creating the built-in providers again, [#169](https://github.com/yp44/powerj/issues/169))
+- **`com.a.greet` and `org.b.greet` no longer share the qualified name `greet:greet`** (audit v2, R-06). The prefix was the
+  last segment of the module name and the second `putIfAbsent` was ignored: the warning said "available as greet:greet" and
+  that name ran the **first** module's cmdlet, so the second one could not be reached. The first module keeps `greet:`; a
+  module whose last segment is taken is qualified by its whole name (`org.b.greet:greet`), in the warning, in `mod-list` and
+  for the call (`CmdletRegistry.Registered.prefix`). FR-17 says so.
+- **`mod-load` creates only the providers of the module it loads** (B-08): `ServiceLoader.load(layer, …)` was iterated and
+  filtered afterwards, which instantiated every provider of the parent layers too, the built-in ones included, each time;
+  it now uses `stream()` and creates a provider only if it belongs to the layer.
+  Tests: `ModuleLoaderTest` (two modules, a provider counted at creation).
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.
