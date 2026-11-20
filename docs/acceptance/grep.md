@@ -58,7 +58,7 @@ Then `cd C:\tmp\g`.
 | 21b | `(ls -r C:\Windows\System32 --on-error silent \| collect).size()` then the same with `-p 16` | Same number of entries; with `-p 16`, the order of the entries is free and the walk faster on a cold folder. `ls -p 0` gives `ls: --parallel expects a number of threads of at least 1, got 0`. |
 | 21c | `1..3000 \| map { "hit " + $_ } > many.txt`, then `^printf 'hit\n\xc3\x28\n' >> many.txt`, then `grep hit many.txt \| count` | Every line before the bad bytes is counted, then `grep: cannot read …many.txt: not readable as UTF-8 text from line 3001 (choose the charset with --encoding)`. |
 | 21d | (a large log) `grep -v zzz big.log \| first 1`, then `grep -v zzz big.log \| count` | The first answers at once and does not read the file to its end; the second runs with a flat memory use. |
-| 22 | `help grep` | Help with the options `-r`, `-p, --parallel`, `--max-depth`, `-i`, `-v`, `-a`, `--encoding`, `--property`, and the examples. |
+| 22 | `help grep` | Help with the options `-r`, `-p, --parallel`, `--max-depth`, `-i`, `-v`, `-a`, `--encoding`, `--property` (which says that without it a String from the pipeline is the text itself, never a file name), and the examples. |
 | 23 | `grep TODO a.txt > out.txt` then `type out.txt` | The table, **without** color codes. |
 
 ## Known limitations

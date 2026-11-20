@@ -29,7 +29,8 @@ public final class FromCsv implements Cmdlet<FromCsv.Params, Object, Row> {
             String delimiter,
             @Option(description = "The first line is data: the columns are named c1, c2…")
             boolean noHeader,
-            @Option(description = "Property of the pipeline objects that holds the CSV text")
+            @Option(description = "Property of the pipeline objects that holds the CSV text"
+                    + "; without it, a String from the pipeline is the text itself, never a file name")
             String property) {
     }
 

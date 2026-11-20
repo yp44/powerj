@@ -11,7 +11,9 @@ final class Skipped {
     private Skipped() {
     }
 
+    /** Reports {@code error} for {@code input}; an exception without a message is named by its type, never "null". */
     static void report(CmdletContext<?> context, RuntimeException error, Object input) {
-        context.error(Messages.get("pipeline.object.skipped", error.getMessage(), Texts.abbreviate(input)));
+        context.error(Messages.get("pipeline.object.skipped",
+                error.getMessage() != null ? error.getMessage() : error.toString(), Texts.abbreviate(input)));
     }
 }

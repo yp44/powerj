@@ -17,7 +17,7 @@ import io.powerj.api.UsageException;
 
 /** {@code env}: session environment variables (specification FR-36b). */
 @CmdletInfo(name = "env", preview = true, category = "System", summary = "Shows or changes the session environment variables",
-        examples = {"env", "env PATH", "env --set MAVEN_OPTS=-Xmx2g", "env --append PATH C:\\tools", "env --unset MAVEN_OPTS",
+        examples = {"env", "env PATH", "env --set MAVEN_OPTS=-Xmx2g", "env --append PATH ~/tools", "env --unset MAVEN_OPTS",
                 "(env PATH).value"})
 public final class Env implements Cmdlet<Env.Params, Void, EnvVar>, Previewable<Env.Params> {
 

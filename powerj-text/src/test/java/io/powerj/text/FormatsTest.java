@@ -44,6 +44,19 @@ class FormatsTest {
         };
     }
 
+    /** Audit v2, B-10: the seconds took the digits of the locale of the machine (Persian digits under fa). */
+    @Test
+    void theDigitsOfADurationDoNotDependOnTheLocaleOfTheMachine() {
+        Locale before = Locale.getDefault();
+        try {
+            Locale.setDefault(Locale.forLanguageTag("fa"));
+
+            assertThat(Formats.duration(Duration.ofSeconds(65))).isEqualTo("1 min 05 s");
+        } finally {
+            Locale.setDefault(before);
+        }
+    }
+
     @ParameterizedTest(name = "{0} → {1}")
     @MethodSource("durations")
     void aDurationIsWrittenAsTheTerminalAlwaysDid(Duration duration, String expected) {

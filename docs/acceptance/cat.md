@@ -45,7 +45,7 @@ Then `cd C:\tmp\c`.
 | 19 | `ls --filter *.txt \| cat -c` | One `CatContent` with the content of the files received. |
 | 19b | (Linux/macOS) `cat /dev/zero`, then `mkfifo p`, `cat p`, `grep x /dev/zero` | Each returns at once with `not a regular file: … (a device, a pipe or a socket is not read)`; `cat` and `grep` give the same answer. |
 | 19c | (Linux/macOS) `^head -c 100000000 /dev/zero \| ^tr "\\0" x > long.txt`, then `cat long.txt`, then `cat long.txt` again and Ctrl+C at once | The first gives `line 1 of …long.txt is longer than 67108864 characters: skipped` and the memory does not grow; the second stops with `^C`. |
-| 20 | `help cat` | Help with `paths`, `-l, --lines`, `-t, --text`, `-n, --numbered`, `-c, --content`, `--encoding`, `--property`, and the examples. |
+| 20 | `help cat` | Help with `paths`, `-l, --lines`, `-t, --text`, `-n, --numbered`, `-c, --content`, `--encoding`, `--property` (which says that without it a String from the pipeline is a file name), and the examples. |
 | 21 | `POWERJ_LANG=fr`, then `cat absent.txt` | `cat : introuvable : …`. |
 
 ## Known limitations

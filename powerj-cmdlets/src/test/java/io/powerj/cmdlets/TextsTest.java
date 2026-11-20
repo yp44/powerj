@@ -4,7 +4,32 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
 
+import io.powerj.testing.TestContext;
+
 class TextsTest {
+
+    /** Audit v2, B-10: a cut between the two halves of a surrogate pair left half a character before the ellipsis. */
+    @Test
+    void theCutNeverSplitsACharacterOutsideTheBasicPlane() {
+        String text = "a".repeat(Texts.ABBREVIATED_LENGTH - 2) + "😀😀😀";
+
+        String cut = Texts.abbreviate(text);
+
+        assertThat(cut).endsWith("…").hasSizeLessThanOrEqualTo(Texts.ABBREVIATED_LENGTH);
+        assertThat(Character.isHighSurrogate(cut.charAt(cut.length() - 2))).as("half a character").isFalse();
+        assertThat(cut).isEqualTo("a".repeat(Texts.ABBREVIATED_LENGTH - 2) + "…");
+    }
+
+    /** Audit v2, B-10: an exception without a message printed "null (object skipped: …)". */
+    @Test
+    void anErrorWithoutAMessageIsReportedByItsType() {
+        var context = new TestContext<Object>();
+
+        Skipped.report(context, new IllegalStateException(), "x");
+
+        assertThat(context.errors).singleElement().asString()
+                .doesNotStartWith("null").contains("IllegalStateException").contains("object skipped: x");
+    }
 
     @Test
     void aPropertyIsANameOrADottedPathOfNames() {

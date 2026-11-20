@@ -73,7 +73,8 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
             boolean all,
             @Option(description = "Charset of the files (default: UTF-8)")
             String encoding,
-            @Option(description = "Property of the pipeline objects to search (e.g. name)")
+            @Option(description = "Property of the pipeline objects to search (e.g. name)"
+                    + "; without it, a String from the pipeline is the text itself, never a file name")
             String property,
             @Option(description = "Also searches binary files (no check of the NUL byte)")
             boolean binary,

@@ -22,6 +22,13 @@ final class Texts {
     /** The text of an object for a message: at most {@value #ABBREVIATED_LENGTH} characters, ending in an ellipsis if cut. */
     static String abbreviate(Object value) {
         String text = String.valueOf(value);
-        return text.length() > ABBREVIATED_LENGTH ? text.substring(0, ABBREVIATED_LENGTH - 1) + "…" : text;
+        if (text.length() <= ABBREVIATED_LENGTH) {
+            return text;
+        }
+        int cut = ABBREVIATED_LENGTH - 1;
+        if (Character.isHighSurrogate(text.charAt(cut - 1))) {
+            cut--; // never half of a character outside the basic plane (an emoji)
+        }
+        return text.substring(0, cut) + "…";
     }
 }

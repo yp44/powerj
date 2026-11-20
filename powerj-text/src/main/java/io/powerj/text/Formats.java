@@ -45,7 +45,7 @@ public final class Formats {
      */
     public static String duration(Duration duration) {
         if (duration.toMinutes() > 0) {
-            return Messages.get("duration.minutes", duration.toMinutes(), "%02d".formatted(duration.toSecondsPart()));
+            return Messages.get("duration.minutes", duration.toMinutes(), String.format(Locale.ROOT, "%02d", duration.toSecondsPart()));
         }
         if (duration.compareTo(Duration.ofMillis(1)) < 0) {
             long nanos = duration.toNanos();

@@ -1407,6 +1407,20 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   bundles no longer name the package `io.powerj.core.exec`, which is gone. (The Javadoc of `ValueUnroller` was corrected with
   #173.)
 
+### Fixed and documented (help examples that can be typed everywhere, the rule of a piped `String`, three text helpers, [#180](https://github.com/yp44/powerj/issues/180))
+- **Portable examples** (audit v2, B-10): `help ls` showed `ls -r -p 16 C:\dev` and `ls C:\Windows -d`, and `help env`
+  `env --append PATH C:\tools`, which name folders only Windows has; they are `ls -r -p 16 ~/dev`, `ls ~ -d` and
+  `env --append PATH ~/tools`. `CmdletExamplesTest` (in `powerj-shell`) parses every example of the 28 cmdlets and binds the
+  options of each stage that is a built-in cmdlet, groups `( … )` included, without running anything; it also refuses an
+  example that names a Windows drive.
+- **What a `String` from the pipeline is, written down** (U-10): a file name for `cat`, `cp`, `mv`, `rm`, `mkdir`, `touch`; the
+  text itself, never a file name, for `grep`, `from-json`, `from-csv`. The help of `--property` of each of them says which, and
+  the specification states the rule once (§3.9).
+- **Three text helpers** (B-10): `Texts.abbreviate` no longer cuts between the two halves of an emoji (half a character before
+  the ellipsis); an error of a block without a message is reported by its type (`java.lang.IllegalStateException (object
+  skipped: …)`) instead of `null (object skipped: …)`; `Formats.duration` writes the seconds of `1 min 05 s` with Latin digits
+  whatever the locale of the machine (under `fa` they were Persian digits). Tests: `TextsTest`, `FormatsTest`.
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.

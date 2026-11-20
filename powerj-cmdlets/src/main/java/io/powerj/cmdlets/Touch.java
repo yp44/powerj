@@ -28,7 +28,8 @@ public final class Touch implements Cmdlet<Touch.Params, Object, Object> {
             List<Object> paths,
             @Option(shortName = 'n', description = "Changes nothing: makes the checks of the real run and says for each file whether it would be created or updated")
             boolean dryRun,
-            @Option(description = "Property of the pipeline objects that gives the path (String, Path or File)")
+            @Option(description = "Property of the pipeline objects that gives the path (String, Path or File)"
+                    + "; without it, a String from the pipeline is a file name")
             String property) {
     }
 
