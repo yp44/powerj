@@ -66,5 +66,5 @@ Then `cd C:\tmp\g`.
 - The display of `GrepMatch` is the usual PowerJ table; long absolute paths take room (the `text` column is truncated to the terminal width). A grep-style display (`path:line:text`) may come later.
 - The highlighting applies to `GrepMatch` (files); filtered pipeline objects (`git log | grep fix`) are emitted unchanged, without color.
 - `grep` declares `Object` as output (it can emit `GrepMatch` or the filtered objects): Tab after `grep … | map { m -> m.` does not suggest the properties of `GrepMatch`.
-- With `-p`, the files received from the pipeline are searched one after the other (the parallelism applies to the walk of a folder).
+- With `-p`, the files received from the pipeline are kept and searched together, by one parallel walk, once the pipeline has sent them all (`ls -r --filter *.java | grep -p 16 TODO`): the first match comes after the last file is received. Without `-p`, each file is searched when it arrives.
 - In non-interactive mode (`powerj -c "grep …"`) with a redirected standard input, that input feeds `grep` like `where` (FR-04d): without a path, `grep` filters its lines and does not search the current folder (as GNU grep without a file). Give the folder explicitly: `powerj -c "grep TODO . -r"`.

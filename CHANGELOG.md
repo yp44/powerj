@@ -1421,6 +1421,20 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   skipped: …)`) instead of `null (object skipped: …)`; `Formats.duration` writes the seconds of `1 min 05 s` with Latin digits
   whatever the locale of the machine (under `fa` they were Persian digits). Tests: `TextsTest`, `FormatsTest`.
 
+### Changed (`ls` sorts without asking the disk again, `grep -p` searches piped files together, [#181](https://github.com/yp44/powerj/issues/181))
+- **`ls` sorts on the attributes it has already read** (audit v2, C-07): its comparator called `Files.isDirectory` at each
+  comparison, about 1.7 million system calls to sort a folder of 100 000 entries. `FileWalker.Builder.directoriesFirst(true)`
+  puts the folders first from the attributes read with the listing, and the order of paths only compares two folders or two
+  files (`FileWalkerTest.directoriesFirstSortsOnTheAttributesAlreadyRead`); the order is unchanged (folders first, then by
+  name, case ignored).
+- **`ls *.txt` expands its wildcard as every file cmdlet does**: `Ls.listWildcard` copied the split, the matcher and the
+  one-level walk of `FileArguments.expand`, which it now calls; the matches are sorted folders first from their `FileEntry`,
+  with no file read again.
+- **`grep -p n` with files from the pipeline reads them together** (S-09): each piped file started a walk and an executor of
+  its own, so `ls -r --filter *.java | grep -p 16 TODO` read the files one after the other. With `-p` they are kept and searched
+  in `end` by one parallel walk (`GrepTest.withParallelThePipedFilesAreSearchedTogether`, which waits for two files open at
+  the same time); without `-p`, each file is still searched when it arrives, so that `| first 1` stops the reading.
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.

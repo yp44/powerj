@@ -6,7 +6,6 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -47,9 +46,13 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
             Integer maxDepth) {
     }
 
-    private static final Comparator<Path> DIRECTORIES_FIRST = Comparator
-            .comparing((Path p) -> !Files.isDirectory(p))
-            .thenComparing(p -> p.getFileName().toString().toLowerCase(Locale.ROOT));
+    /** Within the folders, then within the files: by name, case ignored (the walker puts the folders first). */
+    private static final Comparator<Path> BY_NAME = Comparator
+            .comparing(p -> p.getFileName().toString().toLowerCase(Locale.ROOT));
+    /** The same order for entries already read: the matches of a wildcard. */
+    private static final Comparator<FileEntry> DIRECTORIES_FIRST = Comparator
+            .comparing((FileEntry e) -> !e.dir())
+            .thenComparing(e -> e.name().toLowerCase(Locale.ROOT));
 
     @Override
     public void begin(Params params, CmdletContext<FileEntry> context) {
@@ -92,28 +95,25 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
         }
     }
 
-    /** {@code ls *.txt} or {@code ls src/*.java}: wildcard on the last element of the path. */
+    /**
+     * {@code ls *.txt} or {@code ls src/*.java}: wildcard on the last element of the path, expanded as every file cmdlet
+     * expands it ({@link FileArguments#expand}); the matches come folders first, and a folder that matches is walked with
+     * {@code -r} or {@code --max-depth}.
+     */
     private void listWildcard(Object argument, Params params, Optional<PathMatcher> filter,
                               CmdletContext<FileEntry> context) {
-        FileArguments.Split split = FileArguments.split(argument);
-        PathMatcher pattern = Globs.matcher(split.namePattern(), FileArguments.ignoreCase(context));
-        Path base = context.currentDirectory().resolve(split.directory()).normalize();
-        List<FileEntry> matches = new ArrayList<>();
-        walker(params, 1, 1).walk(base,
-                (path, attributes) -> pattern.matches(path.getFileName()) ? entry(path, attributes) : null,
-                matches::add, error -> FileArguments.report(error, context));
+        List<FileEntry> matches = FileArguments.expand(argument, params.all(), context,
+                        error -> FileArguments.report(error, context), "files.no.match").stream()
+                .map(Ls::entry).flatMap(Optional::stream).sorted(DIRECTORIES_FIRST).toList();
+        // a match is at depth 1: its entries are one level deeper
+        int below = depth(params) == Integer.MAX_VALUE ? Integer.MAX_VALUE : depth(params) - 1;
         for (FileEntry match : matches) {
             if (keep(match, params, filter)) {
                 context.emit(match);
             }
-            // a match is at depth 1: its entries are one level deeper
-            int below = depth(params) == Integer.MAX_VALUE ? Integer.MAX_VALUE : depth(params) - 1;
-            if (below >= 1 && Files.isDirectory(match.path(), LinkOption.NOFOLLOW_LINKS)) {
+            if (below >= 1 && match.dir() && !match.link()) {
                 listDirectory(match.path(), below, params, filter, context);
             }
-        }
-        if (matches.isEmpty()) {
-            context.error(Messages.get("files.no.match", FileArguments.text(argument)));
         }
     }
 
@@ -138,8 +138,8 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
 
     /** With {@code parallelism > 1}, the order of the entries is free (FR-35). */
     private static FileWalker walker(Params params, int maxDepth, int parallelism) {
-        return FileWalker.builder().maxDepth(maxDepth).includeHidden(params.all()).order(DIRECTORIES_FIRST)
-                .parallelism(parallelism).build();
+        return FileWalker.builder().maxDepth(maxDepth).includeHidden(params.all()).directoriesFirst(true)
+                .order(BY_NAME).parallelism(parallelism).build();
     }
 
     private static boolean keep(FileEntry entry, Params params, Optional<PathMatcher> filter) {

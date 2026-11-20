@@ -483,4 +483,36 @@ class GrepTest {
         assertThat(context.errors).singleElement().asString().contains("minified.log").contains("line 2")
                 .contains("1 line(s)");
     }
+
+    /**
+     * Audit v2, S-09: {@code ls -r | grep -p 16 TODO} searched the piped files one by one, one walk and one executor each.
+     * They are now kept and searched in {@code end}, by one parallel walk: two files are open at the same time.
+     */
+    @Test
+    void withParallelThePipedFilesAreSearchedTogether() throws Exception {
+        var together = new java.util.concurrent.CountDownLatch(2);
+        var waited = new java.util.concurrent.ConcurrentLinkedQueue<Boolean>();
+        var opened = java.util.concurrent.ConcurrentHashMap.<Path>newKeySet();
+        var grep = new Grep(path -> {
+            if (opened.add(path)) { // a file is opened twice: once to look for a NUL byte, once to read it
+                together.countDown();
+            }
+            try {
+                waited.add(together.await(10, java.util.concurrent.TimeUnit.SECONDS));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new java.io.InterruptedIOException();
+            }
+            return Files.newInputStream(path);
+        });
+        var params = new Grep.Params("(?i)todo", List.of(), false, 4, null, false, false, false, null, null, false, false);
+        context.hasInput = true;
+
+        CmdletDriver.run(grep, params, context, tmp.resolve("a.txt"), tmp.resolve("src/B.java"),
+                tmp.resolve("src/deep/C.java"));
+
+        assertThat(waited).isNotEmpty().allMatch(Boolean::booleanValue);
+        assertThat(context.emitted).map(m -> ((GrepMatch) m).path().getFileName().toString()).containsOnly("a.txt",
+                "B.java", "C.java").contains("a.txt", "B.java", "C.java");
+    }
 }
