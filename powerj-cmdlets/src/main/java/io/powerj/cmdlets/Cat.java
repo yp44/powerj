@@ -63,7 +63,8 @@ public final class Cat implements Cmdlet<Cat.Params, Object, Object> {
             boolean content,
             @Option(description = "Charset of the files (default: UTF-8)")
             String encoding,
-            @Option(description = "Property of the pipeline objects that gives the file (String, Path or File)")
+            @Option(description = "Property of the pipeline objects that gives the file (String, Path or File)"
+                    + "; without it, a String from the pipeline is a file name")
             String property) {
     }
 

@@ -27,7 +27,8 @@ public final class MakeDirectory implements Cmdlet<MakeDirectory.Params, Object,
             boolean parents,
             @Option(shortName = 'n', description = "Changes nothing: makes the checks of the real run and shows each folder that would be created")
             boolean dryRun,
-            @Option(description = "Property of the pipeline objects that gives the path (String, Path or File)")
+            @Option(description = "Property of the pipeline objects that gives the path (String, Path or File)"
+                    + "; without it, a String from the pipeline is a file name")
             String property) {
     }
 

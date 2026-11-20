@@ -474,6 +474,12 @@ Short rule: **`$_` for one-line filters typed at the keyboard, a named lambda as
 
 The first steps delivered **four cmdlets**: `ls`, `where`, `map` and `env`; the mini-iterations added `collect` (FR-36d), `grep` (FR-64), `cat` (FR-65), `sort` (FR-67), `first`, `last` and `range` (FR-68), `select` (FR-69), `count` and `measure` (FR-70), `group` (FR-71), `join` (FR-78), and the file operations `mkdir`, `touch`, `cp`, `mv`, `rm` (FR-72), the conversions `to-json`, `from-json`, `to-csv`, `from-csv` (FR-73), and the processes `ps`, `kill` (FR-74), `perf` (FR-76), and `grid` (FR-77) in the optional module `powerj-fx`. The first two alone cover the core mechanisms: producing record objects, attribute access, the pipeline, expressions, and mixing with native commands.
 
+**A `String` received from the pipeline** is read by what the cmdlet works on (audit v2, U-10). A cmdlet that works on files (`cat`, FR-65;
+`cp`, `mv`, `rm`, `mkdir`, `touch`, FR-72) takes it as a **file name**: `"a.txt" | cat` reads `a.txt`. A cmdlet that works on text (`grep`,
+FR-64; `from-json`, `from-csv`, FR-73) takes it as the **text itself**, never as a file name: `"a.txt" | grep txt` emits `a.txt`, and
+`cat a.json -t | from-json` is how a file is converted. A `Path`, a `File` or a `FileEntry` is a file for both. `--property` names the property
+that gives the file or the text; the help of `--property` of each of these cmdlets says which of the two rules it follows.
+
 #### FR-35 — `ls`: list files
 
 ```text

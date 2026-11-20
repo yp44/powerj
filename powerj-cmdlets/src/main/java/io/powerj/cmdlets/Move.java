@@ -27,7 +27,8 @@ public final class Move implements Cmdlet<Move.Params, Object, Object> {
             boolean dryRun,
             @Option(description = "Also moves protected paths (list in the protected-paths file of the configuration folder)")
             boolean allowProtected,
-            @Option(description = "Property of the pipeline objects that gives the source (String, Path or File)")
+            @Option(description = "Property of the pipeline objects that gives the source (String, Path or File)"
+                    + "; without it, a String from the pipeline is a file name")
             String property) {
     }
 

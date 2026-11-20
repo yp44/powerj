@@ -36,7 +36,8 @@ public final class Remove implements Cmdlet<Remove.Params, Object, Object> {
             boolean dryRun,
             @Option(description = "Also removes protected paths (list in the protected-paths file of the configuration folder)")
             boolean allowProtected,
-            @Option(description = "Property of the pipeline objects that gives the path (String, Path or File)")
+            @Option(description = "Property of the pipeline objects that gives the path (String, Path or File)"
+                    + "; without it, a String from the pipeline is a file name")
             String property) {
     }
 

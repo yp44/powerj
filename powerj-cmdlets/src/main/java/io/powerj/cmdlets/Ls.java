@@ -23,7 +23,7 @@ import io.powerj.fs.Globs;
 
 /** {@code ls}: lists files as {@link FileEntry} objects (specification FR-35). */
 @CmdletInfo(name = "ls", preview = true, category = "Files", summary = "Lists files and directories",
-        examples = {"ls", "ls -r --filter *.java", "ls -r -p 16 C:\\dev", "ls C:\\Windows -d", "(ls).name", "$f = ls; $f[0].size"})
+        examples = {"ls", "ls -r --filter *.java", "ls -r -p 16 ~/dev", "ls ~ -d", "(ls).name", "$f = ls; $f[0].size"})
 public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
 
     /** Parameters of {@code ls}. */

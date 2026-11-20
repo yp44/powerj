@@ -28,7 +28,8 @@ public final class Copy implements Cmdlet<Copy.Params, Object, Object> {
             boolean verbose,
             @Option(shortName = 'n', description = "Changes nothing: shows each source that would be copied (a folder once, not its content)")
             boolean dryRun,
-            @Option(description = "Property of the pipeline objects that gives the source (String, Path or File)")
+            @Option(description = "Property of the pipeline objects that gives the source (String, Path or File)"
+                    + "; without it, a String from the pipeline is a file name")
             String property,
             @Option(description = "Also overwrites protected paths with -f (list in the protected-paths file of the configuration folder)")
             boolean allowProtected) {

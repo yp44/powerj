@@ -19,7 +19,8 @@ public final class FromJson implements Cmdlet<FromJson.Params, Object, Object> {
 
     /** Parameters of {@code from-json}. */
     public record Params(
-            @Option(description = "Property of the pipeline objects that holds the JSON text")
+            @Option(description = "Property of the pipeline objects that holds the JSON text"
+                    + "; without it, a String from the pipeline is the text itself, never a file name")
             String property) {
     }
 
