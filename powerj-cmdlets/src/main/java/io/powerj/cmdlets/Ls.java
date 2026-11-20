@@ -42,7 +42,9 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
             boolean files,
             @Option(shortName = 'p', description = "Walks the tree with n directories and entries read at the same time, "
                     + "in virtual threads (order free)")
-            Integer parallel) {
+            Integer parallel,
+            @Option(description = "Maximum depth of the walk (1: only the entries of the directory); implies --recurse")
+            Integer maxDepth) {
     }
 
     private static final Comparator<Path> DIRECTORIES_FIRST = Comparator
@@ -55,6 +57,9 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
             throw new UsageException(Messages.get("ls.dirs.files.incompatible"));
         }
         FileOps.parallelism(params.parallel()); // refuses a count below 1 before anything is listed
+        if (params.maxDepth() != null && params.maxDepth() < 1) {
+            throw new UsageException(Messages.get("files.maxDepth.invalid", params.maxDepth()));
+        }
         Optional<PathMatcher> filter = Optional.ofNullable(params.filter())
                 .map(pattern -> Globs.matcher(pattern, FileArguments.ignoreCase(context)));
         List<Object> paths = params.paths().isEmpty() ? List.of(".") : params.paths();
@@ -79,7 +84,7 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
         if (FileArguments.isWildcard(argument)) {
             listWildcard(argument, params, filter, context);
         } else if (Files.isDirectory(path)) {
-            listDirectory(path, params, filter, context);
+            listDirectory(path, depth(params), params, filter, context);
         } else if (Files.exists(path, LinkOption.NOFOLLOW_LINKS)) {
             entry(path).filter(e -> keep(e, params, filter)).ifPresent(context::emit);
         } else {
@@ -101,8 +106,10 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
             if (keep(match, params, filter)) {
                 context.emit(match);
             }
-            if (params.recurse() && Files.isDirectory(match.path(), LinkOption.NOFOLLOW_LINKS)) {
-                listDirectory(match.path(), params, filter, context);
+            // a match is at depth 1: its entries are one level deeper
+            int below = depth(params) == Integer.MAX_VALUE ? Integer.MAX_VALUE : depth(params) - 1;
+            if (below >= 1 && Files.isDirectory(match.path(), LinkOption.NOFOLLOW_LINKS)) {
+                listDirectory(match.path(), below, params, filter, context);
             }
         }
         if (matches.isEmpty()) {
@@ -110,10 +117,19 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
         }
     }
 
+    /** Depth of the walk below a listed directory: 1 without {@code -r}, the whole tree with it, or {@code --max-depth}. */
+    private static int depth(Params params) {
+        if (params.maxDepth() != null) {
+            return params.maxDepth();
+        }
+        return params.recurse() ? Integer.MAX_VALUE : 1;
+    }
+
     /** Lazy walk (FR-35): each entry is emitted as soon as it is read; symbolic links are not followed. */
-    private void listDirectory(Path dir, Params params, Optional<PathMatcher> filter, CmdletContext<FileEntry> context) {
+    private void listDirectory(Path dir, int maxDepth, Params params, Optional<PathMatcher> filter,
+                               CmdletContext<FileEntry> context) {
         int parallelism = FileOps.parallelism(params.parallel());
-        walker(params, params.recurse() ? Integer.MAX_VALUE : 1, parallelism).walk(dir, Ls::entry, entry -> {
+        walker(params, maxDepth, parallelism).walk(dir, Ls::entry, entry -> {
             if (keep(entry, params, filter)) {
                 context.emit(entry);
             }

@@ -21,19 +21,19 @@ Then `cd C:\tmp\j`.
 
 | # | Action | Expected result |
 |---|---|---|
-| 1 | `cat countries.csv \| from-csv \| join -r { (cat zip.csv \| from-csv) } --left-key statezip --right-key { $_.zipcode.toUpperCase() }` | Table `statezip country zipcode city`: `France` twice (`Paris`, `Lyon`), then `Italy` / `Rome`; no `Spain`. |
+| 1 | `cat countries.csv \| from-csv \| join --right { (cat zip.csv \| from-csv) } --left-key statezip --right-key { $_.zipcode.toUpperCase() }` | Table `statezip country zipcode city`: `France` twice (`Paris`, `Lyon`), then `Italy` / `Rome`; no `Spain`. |
 | 2 | The same line with `-o` | A fourth row `ES Spain` with empty `zipcode` and `city`. |
-| 3 | `join -l { (cat countries.csv \| from-csv) } -r { (cat zip.csv \| from-csv) } --left-key statezip --right-key { $_.zipcode.toUpperCase() } \| count` | `3`. |
-| 4 | `ls \| join -r { (cat owners.csv \| from-csv) } -k name` | One row for `countries.csv`: the columns of `ls` (`size` in readable form), then `owner` `alice`; a single `name` column. |
-| 5 | `ls \| join -r { (cat owners.csv \| from-csv) } --left-key name` | The same row, with a column `right_name`. |
+| 3 | `join --left { (cat countries.csv \| from-csv) } --right { (cat zip.csv \| from-csv) } --left-key statezip --right-key { $_.zipcode.toUpperCase() } \| count` | `3`. |
+| 4 | `ls \| join --right { (cat owners.csv \| from-csv) } -k name` | One row for `countries.csv`: the columns of `ls` (`size` in readable form), then `owner` `alice`; a single `name` column. |
+| 5 | `ls \| join --right { (cat owners.csv \| from-csv) } --left-key name` | The same row, with a column `right_name`. |
 | 6 | Line 1 followed by `\| select country city \| to-csv` | CSV `country,city` with the three pairs. |
-| 7 | `List.of(1, 2) \| join -r { List.of(1L, 1L) } --left-key { $_ } \| count` | `2` (`1` and `1L` match; `2` has no match). |
+| 7 | `List.of(1, 2) \| join --right { List.of(1L, 1L) } --left-key { $_ } \| count` | `2` (`1` and `1L` match; `2` has no match). |
 | 8 | `ls \| join -k name` | Error `join: right side expected: …`. |
-| 9 | `ls \| join -r { (cat owners.csv \| from-csv) }` | Error `join: key expected: …`. |
-| 10 | `ls \| join -l { (ls) } -r { (ls) } -k name` | Error `join: --left is only for the head of a pipeline; …`. |
-| 11 | `join -l { (ls) } -r { (cat missing.csv \| from-csv) } -k name` | The error of `cat` (`cat: not found: …missing.csv`); the right side is empty, so nothing is emitted. |
+| 9 | `ls \| join --right { (cat owners.csv \| from-csv) }` | Error `join: key expected: …`. |
+| 10 | `ls \| join --left { (ls) } --right { (ls) } -k name` | Error `join: --left is only for the head of a pipeline; …`. |
+| 11 | `join --left { (ls) } --right { (cat missing.csv \| from-csv) } -k name` | The error of `cat` (`cat: not found: …missing.csv`); the right side is empty, so nothing is emitted. |
 | 12 | Alt+V, then type line 1 | The preview shows the joined rows. |
-| 13 | `help join` | Help with `-r, --right`, `-l, --left`, `-k, --key`, `--left-key`, `--right-key`, `-o, --outer` and the examples. |
+| 13 | `help join` | Help with `--right`, `--left` (no short form), `-k, --key`, `--left-key`, `--right-key`, `-o, --outer` and the examples. |
 | 14 | `POWERJ_LANG=fr`, then `ls \| join -k name` | `join : côté droit attendu : …`. |
 | 15 | (automated only: `JoinTest`) a left or right object whose property getter throws | The object is skipped with a non-blocking error naming the property, and the join goes on with the others. |
 

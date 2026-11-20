@@ -24,7 +24,7 @@ Then `cd C:\tmp\g`.
 | 1 | `ls \| group ext` | Table `key count`, in the order of appearance in `ls`: the folder (empty key) 1, `txt` 4 (`lines.txt` included), `md` 1. |
 | 2 | `ls \| group ext \| sort count -d \| first` | The group `txt`, count 4. |
 | 3 | `ls \| group ext dir` | Keys `[, true]`, `[txt, false]`, `[md, false]`. |
-| 4 | `ls \| group ext -n`, then `ls \| group ext -n \| map { $_.items.size() }` | The same counts; then only `0`s. |
+| 4 | `ls \| group ext --no-items`, then `ls \| group ext --no-items \| map { $_.items.size() }` | The same counts; then only `0`s. |
 | 5 | `(ls \| group ext)[0].items` | The objects of the first group (the folder `docs`). |
 | 6 | `ls \| group ext \| where { $_.key == "txt" } \| map { $_.items } \| map { f -> f.name }` | `a.txt`, `b.txt`, `c.txt`, `lines.txt`. |
 | 7 | `cat lines.txt \| group \| where { $_.count > 1 }` | `error`, count 3. |
@@ -35,7 +35,7 @@ Then `cd C:\tmp\g`.
 | 12 | `ls \| group bad!` | Error `group: invalid property name: bad!`. |
 | 13 | `ls \| group { $_.name.substring(5) }` | One error per name shorter than 5 characters (`object skipped`); the others are grouped. |
 | 14 | Alt+V, then type `ls \| group ext` | The preview shows the groups. |
-| 15 | `help group` | Help with `<keys>`, `-n, --no-items` and the examples. |
+| 15 | `help group` | Help with `<keys>`, `--no-items` (no short form) and the examples. |
 | 16 | `POWERJ_LANG=fr`, then `ls \| group bad!` | `group : nom de propriété invalide : bad!`. |
 
 ## Known limitations
