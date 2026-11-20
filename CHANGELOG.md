@@ -1432,8 +1432,8 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   files (`FileWalkerTest.directoriesFirstSortsOnTheAttributesAlreadyRead`); the order is unchanged (folders first, then by
   name, case ignored).
 - **`ls *.txt` expands its wildcard as every file cmdlet does**: `Ls.listWildcard` copied the split, the matcher and the
-  one-level walk of `FileArguments.expand`, which it now calls; the matches are sorted folders first from their `FileEntry`,
-  with no file read again.
+  one-level walk of `FileArguments.expand`, and now calls `FileArguments.expandWildcard`, which builds each `FileEntry` from
+  the attributes read with the listing; the matches are sorted folders first, with no file read again.
 - **`grep -p n` with files from the pipeline reads them together** (S-09): each piped file started a walk and an executor of
   its own, so `ls -r --filter *.java | grep -p 16 TODO` read the files one after the other. With `-p n` they are searched by
   batches of `4n`, each batch by one parallel walk, and the last batch when the input ends
