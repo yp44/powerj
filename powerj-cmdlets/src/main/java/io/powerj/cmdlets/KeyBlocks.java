@@ -11,9 +11,9 @@ import io.powerj.api.UsageException;
  * Keys given to a cmdlet ({@code sort size}, {@code sort { $_.name.length() }}): a property name or path is compiled
  * into the block {@code { $_.<property> }}, a block or a method reference is kept as is.
  */
-final class Keys {
+final class KeyBlocks {
 
-    private Keys() {
+    private KeyBlocks() {
     }
 
     /**

@@ -20,16 +20,16 @@ final class PipelineFiles {
      * @param propertyNotAFile property that is not a file ({@code {0}}: the property, {@code {1}}: the object)
      * @param invalidPath      invalid path ({@code {0}}: the text, {@code {1}}: the reason)
      */
-    record Keys(String notAFile, String propertyNotAFile, String invalidPath) {
+    record MessageKeys(String notAFile, String propertyNotAFile, String invalidPath) {
     }
 
     private final String propertyName;
     private final ScriptBlock property;
     private final ScriptBlock block;
-    private final Keys keys;
+    private final MessageKeys keys;
 
     /** @param propertyName {@code --property}, or {@code null} for the objects themselves */
-    PipelineFiles(String propertyName, CmdletContext<?> context, Keys keys) {
+    PipelineFiles(String propertyName, CmdletContext<?> context, MessageKeys keys) {
         this(propertyName, null, context, keys);
     }
 
@@ -38,7 +38,7 @@ final class PipelineFiles {
      * @param block        block evaluated for each object to give its path ({@code touch { $_.name }}), or
      *                     {@code null}; a {@code null} result skips the object without error (FR-72)
      */
-    PipelineFiles(String propertyName, ScriptBlock block, CmdletContext<?> context, Keys keys) {
+    PipelineFiles(String propertyName, ScriptBlock block, CmdletContext<?> context, MessageKeys keys) {
         this.propertyName = propertyName;
         this.property = propertyName == null ? null : PropertyPath.of(propertyName, context);
         this.block = block;

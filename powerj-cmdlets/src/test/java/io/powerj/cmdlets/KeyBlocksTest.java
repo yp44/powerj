@@ -33,7 +33,7 @@ class KeysTest {
     @Test
     void aBlockIsKeptAsIs() {
         ScriptBlock block = block("$_.name.length()");
-        assertThat(Keys.block(block, context, "sort.key.invalid")).isSameAs(block);
+        assertThat(KeyBlocks.block(block, context, "sort.key.invalid")).isSameAs(block);
     }
 
     @Test
@@ -43,7 +43,7 @@ class KeysTest {
             asked.add(name);
             return name + " of " + target;
         };
-        var blocks = Keys.blocks(List.of("size", "path.fileName"), context, "sort.key.invalid");
+        var blocks = KeyBlocks.blocks(List.of("size", "path.fileName"), context, "sort.key.invalid");
 
         assertThat(blocks).extracting(ScriptBlock::source).containsExactly("$_.size", "$_.path.fileName");
         assertThat(asked).as("nothing is read before an object comes").isEmpty();
@@ -55,26 +55,26 @@ class KeysTest {
     void theCaseOfAPropertyMatters() {
         record Entry(long size) {
         }
-        var block = Keys.block("Size", context, "sort.key.invalid");
+        var block = KeyBlocks.block("Size", context, "sort.key.invalid");
 
         assertThatThrownBy(() -> block.invoke(new Entry(1))).isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Size");
-        assertThat(Keys.block("size", context, "sort.key.invalid").invoke(new Entry(1))).isEqualTo(1L);
+        assertThat(KeyBlocks.block("size", context, "sort.key.invalid").invoke(new Entry(1))).isEqualTo(1L);
     }
 
     @Test
     void noKey() {
-        assertThat(Keys.blocks(null, context, "sort.key.invalid")).isEmpty();
-        assertThat(Keys.blocks(List.of(), context, "sort.key.invalid")).isEmpty();
+        assertThat(KeyBlocks.blocks(null, context, "sort.key.invalid")).isEmpty();
+        assertThat(KeyBlocks.blocks(List.of(), context, "sort.key.invalid")).isEmpty();
     }
 
     @Test
     void invalidKeys() {
-        assertThatThrownBy(() -> Keys.block("a b", context, "sort.key.invalid"))
+        assertThatThrownBy(() -> KeyBlocks.block("a b", context, "sort.key.invalid"))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("a b");
-        assertThatThrownBy(() -> Keys.block(42, context, "sort.key.invalid"))
+        assertThatThrownBy(() -> KeyBlocks.block(42, context, "sort.key.invalid"))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("42");
-        assertThatThrownBy(() -> Keys.block(null, context, "sort.key.invalid"))
+        assertThatThrownBy(() -> KeyBlocks.block(null, context, "sort.key.invalid"))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("null");
     }
 }

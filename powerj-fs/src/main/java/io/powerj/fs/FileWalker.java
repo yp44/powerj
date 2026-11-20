@@ -34,8 +34,10 @@ import java.util.function.Consumer;
  * walk goes on.
  * <ul>
  *   <li><b>Sequential</b> ({@code parallelism(1)}, the default): everything happens in the calling thread,
- *       depth first, children in the {@link Builder#order order} given; results arrive as the walk goes
- *       (streaming).</li>
+ *       depth first, children in the {@link Builder#order order} given. Results arrive as the walk goes, between
+ *       folders: the entries of one folder are read whole (and sorted, when an order is given) before the first of
+ *       them is visited, so a folder of a million entries is listed before anything of it comes out (audit v2,
+ *       C-06).</li>
  *   <li><b>Parallel</b> ({@code parallelism(n)}, {@code n > 1}): directories are listed and entries visited
  *       in virtual threads, at most {@code n} at the same time (open files). The visitor is then called
  *       concurrently, but the two consumers are still called <b>only in the calling thread</b>: a cmdlet

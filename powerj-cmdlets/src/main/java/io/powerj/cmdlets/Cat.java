@@ -139,7 +139,7 @@ public final class Cat implements Cmdlet<Cat.Params, Object, Object> {
             mode = mode(params);
             charset = FileArguments.charset(params.encoding(), "files.encoding.unknown");
             files = new PipelineFiles(params.property(), context,
-                    new PipelineFiles.Keys("files.not.a.file", "files.property.not.a.file", "files.read.failed"));
+                    new PipelineFiles.MessageKeys("files.not.a.file", "files.property.not.a.file", "files.read.failed"));
         }
 
         /** Output chosen by the options: one at most, --lines by default. */

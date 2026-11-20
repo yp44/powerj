@@ -37,7 +37,7 @@ public final class Copy implements Cmdlet<Copy.Params, Object, Object> {
     @Override
     public void begin(Params p, CmdletContext<Object> context) {
         context.state(Transfer.class, () -> new Transfer(new Transfer.Options(false, p.recurse(),
-                FileOps.parallelism(p.parallel()), p.force(), p.verbose(), p.dryRun(), p.allowProtected()),
+                Parallelism.of(p.parallel()), p.force(), p.verbose(), p.dryRun(), p.allowProtected()),
                 p.paths(), p.property(), context));
     }
 

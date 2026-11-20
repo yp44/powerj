@@ -58,7 +58,7 @@ public final class Measure implements Cmdlet<Measure.Params, Object, Row>, Colum
 
     private static State state(Params p, CmdletContext<Row> context) {
         return context.state(State.class, () -> {
-            ScriptBlock key = p.key() == null ? null : Keys.block(p.key(), context, "measure.key.invalid");
+            ScriptBlock key = p.key() == null ? null : KeyBlocks.block(p.key(), context, "measure.key.invalid");
             return new State(key, new SortComparator(false, context::error));
         });
     }

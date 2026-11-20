@@ -20,7 +20,7 @@ import io.powerj.testing.TestContext;
  */
 class JsonRoundTripTest {
 
-    private static final Properties PROPERTIES = new Properties(new TestContext<>());
+    private static final ObjectProperties PROPERTIES = new ObjectProperties(new TestContext<>());
 
     private static final String[] PIECES = {"a", "Z", " ", "\"", "\\", "/", "\n", "\r", "\t", "\b", "\f", "\u0000",
             "\u001f", "\u007f", "é", "€", "\u2028", "\ud83d\ude00", "\ud800", "\udc00", "{", "}", "[", "]", ",", ":"};

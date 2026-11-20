@@ -13,7 +13,7 @@ java -cp "powerj-bench/target/classes:$(cat powerj-bench/target/classpath.txt)" 
 ```
 
 JMH needs a quiet machine: a result from a loaded laptop or a shared CI runner says little. The tests in
-`ReflectionCostTest`, `PropertiesCostTest` and `PropertyReadCostTest` are the guard that runs everywhere: they give a million
+`ReflectionCostTest`, `ObjectPropertiesCostTest` and `PropertyReadCostTest` are the guard that runs everywhere: they give a million
 reads a budget two orders of magnitude above the cached cost and one below the uncached cost.
 
 ## The cost of reflection per object (C-26)

@@ -21,7 +21,7 @@ final class JsonWriter {
 
     private final boolean pretty;
     private final int maxDepth;
-    private final Properties properties;
+    private final ObjectProperties properties;
     private boolean truncated;
     private int written;
 
@@ -31,7 +31,7 @@ final class JsonWriter {
      *                   level 0
      * @param properties reads the components of the records written
      */
-    JsonWriter(boolean pretty, int maxDepth, Properties properties) {
+    JsonWriter(boolean pretty, int maxDepth, ObjectProperties properties) {
         this.pretty = pretty;
         this.maxDepth = maxDepth;
         this.properties = properties;
@@ -45,7 +45,7 @@ final class JsonWriter {
     /**
      * Writes {@code value}, its nested lines indented by {@code indent} levels.
      *
-     * @throws Properties.Unreadable if a record component cannot be read
+     * @throws ObjectProperties.Unreadable if a record component cannot be read
      */
     void write(Object value, StringBuilder out, int indent) {
         value(value, out, 0, indent);

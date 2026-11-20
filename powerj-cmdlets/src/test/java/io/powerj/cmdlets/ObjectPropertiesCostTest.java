@@ -16,17 +16,17 @@ import io.powerj.testing.TestContext;
  * names come from a view computed once per class ({@code RecordView}), and the values from the context. The cost of the
  * read itself is the engine's ({@code PropertyReadCostTest} in the core).
  */
-class PropertiesCostTest {
+class ObjectPropertiesCostTest {
 
     record Item(String name, long size, Instant modified, Path path, boolean dir, String ext, int depth, double ratio) {
     }
 
-    private final Properties properties = new Properties(new TestContext<>());
+    private final ObjectProperties properties = new ObjectProperties(new TestContext<>());
 
     @Test
     void aMillionColumnsOfRecordsAreReadInSeconds() {
         var item = new Item("a.txt", 42, Instant.EPOCH, Path.of("a.txt"), false, "txt", 3, 0.5);
-        var columns = Properties.columns(item);
+        var columns = ObjectProperties.columns(item);
 
         long length = assertTimeoutPreemptively(Duration.ofSeconds(3), () -> {
             long total = 0;

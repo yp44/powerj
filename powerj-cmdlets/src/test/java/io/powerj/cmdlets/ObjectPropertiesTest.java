@@ -18,7 +18,7 @@ import io.powerj.testing.TestContext;
  * The columns and the values of an object, for {@code to-json}, {@code to-csv} and {@code join}: the names come from the
  * record, the values from the context ({@code CmdletContext.readProperty}), never from reflection in this module (#130).
  */
-class PropertiesTest {
+class ObjectPropertiesTest {
 
     record Entry(String name, @Bytes long size, @Bytes long used, int depth) {
     }
@@ -37,13 +37,13 @@ class PropertiesTest {
     }
 
     private final TestContext<Object> context = new TestContext<>();
-    private final Properties properties = new Properties(context);
+    private final ObjectProperties properties = new ObjectProperties(context);
 
     @Test
     void theColumnsAndTheValuesOfARecordAreThoseOfItsComponents() {
         var entry = new Entry("a.txt", 10, 20, 3);
 
-        assertThat(Properties.columns(entry)).containsExactly("name", "size", "used", "depth");
+        assertThat(ObjectProperties.columns(entry)).containsExactly("name", "size", "used", "depth");
         assertThat(properties.of(entry)).containsExactly(Map.entry("name", "a.txt"), Map.entry("size", 10L),
                 Map.entry("used", 20L), Map.entry("depth", 3));
         assertThat(properties.get(entry, "size")).isEqualTo(10L);
@@ -60,19 +60,19 @@ class PropertiesTest {
 
     @Test
     void theColumnsOfAMapAreItsKeysAndThoseOfAnythingElseIsOneColumnCalledValue() {
-        assertThat(Properties.columns(Map.of("first name", "Yves"))).containsExactly("first name");
+        assertThat(ObjectProperties.columns(Map.of("first name", "Yves"))).containsExactly("first name");
         assertThat(properties.get(Map.of("first name", "Yves"), "first name")).isEqualTo("Yves");
-        assertThat(Properties.columns("text")).containsExactly(Properties.VALUE);
-        assertThat(properties.get("text", Properties.VALUE)).isEqualTo("text");
+        assertThat(ObjectProperties.columns("text")).containsExactly(ObjectProperties.VALUE);
+        assertThat(properties.get("text", ObjectProperties.VALUE)).isEqualTo("text");
         assertThat(properties.get("text", "other")).isNull();
-        assertThat(Properties.columns(null)).containsExactly(Properties.VALUE);
+        assertThat(ObjectProperties.columns(null)).containsExactly(ObjectProperties.VALUE);
     }
 
     @Test
     void twoObjectsOfTheSameClassHaveTheSameColumns() {
-        List<String> first = List.copyOf(Properties.columns(new Entry("a", 1, 2, 3)));
+        List<String> first = List.copyOf(ObjectProperties.columns(new Entry("a", 1, 2, 3)));
 
-        assertThat(Properties.columns(new Entry("b", 4, 5, 6))).isEqualTo(first);
+        assertThat(ObjectProperties.columns(new Entry("b", 4, 5, 6))).isEqualTo(first);
     }
 
     @Test
@@ -108,7 +108,7 @@ class PropertiesTest {
     @Test
     void aRecordThatOtherCodeCannotSeeIsReadAndItsSizesAreKnown() {
         Object secret = io.powerj.cmdlets.support.HiddenRecords.secret();
-        context.reader = PropertiesTest::readAsOwner;
+        context.reader = ObjectPropertiesTest::readAsOwner;
 
         assertThat(properties.get(secret, "value")).isEqualTo("s");
         assertThat(properties.of((Record) secret)).containsEntry("size", 5L);
@@ -120,19 +120,19 @@ class PropertiesTest {
         var broken = new Broken("fine", "x", "y");
 
         assertThat(properties.get(broken, "ok")).isEqualTo("fine");
-        assertThatThrownBy(() -> properties.get(broken, "boom")).isInstanceOf(Properties.Unreadable.class)
+        assertThatThrownBy(() -> properties.get(broken, "boom")).isInstanceOf(ObjectProperties.Unreadable.class)
                 .hasMessageContaining("boom").hasMessageContaining("no luck");
         assertThatThrownBy(() -> properties.get(broken, "cancelled")).isInstanceOf(CancellationException.class);
-        assertThatThrownBy(() -> properties.of(broken)).isInstanceOf(Properties.Unreadable.class);
+        assertThatThrownBy(() -> properties.of(broken)).isInstanceOf(ObjectProperties.Unreadable.class);
     }
 
     @Test
     void theValuesAreReadByTheContextAndNotByThisModule() {
-        // A context that answers with its own value: nothing in Properties reads the record behind its back.
+        // A context that answers with its own value: nothing in ObjectProperties reads the record behind its back.
         var reading = new TestContext<Object>();
         reading.reader = (target, name) -> "read by the context: " + name;
 
-        assertThat(new Properties(reading).get(new Entry("a", 1, 2, 3), "size")).isEqualTo("read by the context: size");
-        assertThat(new Properties(reading).of(new Entry("a", 1, 2, 3))).containsEntry("depth", "read by the context: depth");
+        assertThat(new ObjectProperties(reading).get(new Entry("a", 1, 2, 3), "size")).isEqualTo("read by the context: size");
+        assertThat(new ObjectProperties(reading).of(new Entry("a", 1, 2, 3))).containsEntry("depth", "read by the context: depth");
     }
 }

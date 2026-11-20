@@ -23,7 +23,7 @@ import io.powerj.testing.TestContext;
 /** {@link JsonWriter}, {@link JsonParser} and {@link JsonSplitter} (specification FR-73). */
 class JsonTest {
 
-    private static final Properties PROPERTIES = new Properties(new TestContext<>());
+    private static final ObjectProperties PROPERTIES = new ObjectProperties(new TestContext<>());
 
     enum Color { RED }
 
