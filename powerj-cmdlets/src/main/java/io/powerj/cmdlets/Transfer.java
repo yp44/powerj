@@ -126,7 +126,7 @@ final class Transfer {
                 target = value instanceof String text ? context.currentDirectory().resolve(text)
                         : FileArguments.file(value, context);
             } catch (InvalidPathException e) {
-                context.error(Messages.get("fileops.invalid.path", value, e.getMessage()));
+                context.error(Messages.get("files.invalid.path", value, e.getMessage()));
                 continue;
             }
             if (target == null) {
@@ -142,7 +142,7 @@ final class Transfer {
 
     private void transfer(Path source, Path target, ProtectedPaths protectedPaths, CmdletContext<Object> context) {
         if (!FileOps.exists(source)) {
-            context.error(Messages.get("fileops.not.found", source));
+            context.error(Messages.get("files.not.found", source));
             return;
         }
         if (options.move() && protectedPaths != null) {

@@ -75,7 +75,7 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
             path = context.currentDirectory().resolve(text).normalize();
         } catch (InvalidPathException _) {
             if (argument instanceof GlobArgument && !FileArguments.isWildcard(argument)) {
-                context.error(Messages.get("ls.not.found", text)); // a quoted name that this system cannot spell
+                context.error(Messages.get("files.not.found", text)); // a quoted name that this system cannot spell
             } else {
                 listWildcard(argument, params, filter, context);
             }
@@ -88,7 +88,7 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
         } else if (Files.exists(path, LinkOption.NOFOLLOW_LINKS)) {
             entry(path).filter(e -> keep(e, params, filter)).ifPresent(context::emit);
         } else {
-            context.error(Messages.get("ls.not.found", text));
+            context.error(Messages.get("files.not.found", text));
         }
     }
 
@@ -113,7 +113,7 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
             }
         }
         if (matches.isEmpty()) {
-            context.error(Messages.get("ls.no.match", FileArguments.text(argument)));
+            context.error(Messages.get("files.no.match", FileArguments.text(argument)));
         }
     }
 

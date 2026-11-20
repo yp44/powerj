@@ -17,13 +17,12 @@ import java.util.regex.PatternSyntaxException;
 import io.powerj.api.CmdletContext;
 import io.powerj.api.UsageException;
 import io.powerj.fs.FileTrees;
-import io.powerj.fs.WalkError;
 
 /** What the file operations share (specification FR-72): paths, error messages, copy and removal of trees. */
 final class FileOps {
 
-    static final PipelineFiles.Keys KEYS = new PipelineFiles.Keys("fileops.not.a.file", "fileops.property.not.a.file",
-            "fileops.invalid.path");
+    static final PipelineFiles.Keys KEYS = new PipelineFiles.Keys("files.not.a.file", "files.property.not.a.file",
+            "files.invalid.path");
 
     private FileOps() {
     }
@@ -87,10 +86,10 @@ final class FileOps {
 
     private static List<Path> expand(Object argument, boolean ignoreCase, boolean quiet, CmdletContext<?> context) {
         try {
-            return FileArguments.expand(argument, false, ignoreCase, context, error -> report(error, context),
-                    quiet ? null : "fileops.no.match");
+            return FileArguments.expand(argument, false, ignoreCase, context, error -> FileArguments.report(error, context),
+                    quiet ? null : "files.no.match");
         } catch (InvalidPathException e) {
-            context.error(Messages.get("fileops.invalid.path", FileArguments.text(argument), e.getMessage()));
+            context.error(Messages.get("files.invalid.path", FileArguments.text(argument), e.getMessage()));
             return List.of();
         } catch (PatternSyntaxException e) {
             context.error(Messages.get("fileops.invalid.pattern", FileArguments.text(argument), e.getDescription()));
@@ -103,7 +102,7 @@ final class FileOps {
         try {
             return context.currentDirectory().resolve(argument).toAbsolutePath().normalize();
         } catch (InvalidPathException e) {
-            context.error(Messages.get("fileops.invalid.path", argument, e.getMessage()));
+            context.error(Messages.get("files.invalid.path", argument, e.getMessage()));
             return null;
         }
     }
@@ -134,19 +133,11 @@ final class FileOps {
     /** Reports a failed operation on {@code path} as a non-blocking error with a readable reason. */
     static void report(IOException e, Path path, CmdletContext<?> context) {
         context.error(switch (e) {
-            case NoSuchFileException _ -> Messages.get("fileops.not.found", path);
-            case AccessDeniedException _ -> Messages.get("fileops.access.denied", path);
+            case NoSuchFileException _ -> Messages.get("files.not.found", path);
+            case AccessDeniedException _ -> Messages.get("files.access.denied", path);
             case FileAlreadyExistsException _ -> Messages.get("fileops.exists", path);
             case DirectoryNotEmptyException _ -> Messages.get("fileops.not.empty", path);
             default -> Messages.get("fileops.failed", path, e.getMessage() == null ? e.toString() : e.getMessage());
-        });
-    }
-
-    static void report(WalkError error, CmdletContext<?> context) {
-        context.error(switch (error.kind()) {
-            case ACCESS_DENIED -> Messages.get("fileops.access.denied", error.path());
-            case NOT_FOUND -> Messages.get("fileops.not.found", error.path());
-            case IO -> Messages.get("fileops.failed", error.path(), error.message());
         });
     }
 

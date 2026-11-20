@@ -71,7 +71,7 @@ public final class Where implements Cmdlet<Where.Params, Object, Object> {
         if (words.size() == 3 && words.get(0) instanceof String property && words.get(1) instanceof String operator
                 && OPERATORS.contains(operator)) {
             if (!Texts.isPropertyPath(property)) {
-                throw new UsageException(Messages.get("where.property.invalid", property));
+                throw new UsageException(Messages.get("property.name.invalid", property));
             }
             return context.compile("$_." + property + " " + operator + " " + value(words.get(2)));
         }

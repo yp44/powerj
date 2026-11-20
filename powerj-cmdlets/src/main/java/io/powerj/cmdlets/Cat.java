@@ -94,7 +94,7 @@ public final class Cat implements Cmdlet<Cat.Params, Object, Object> {
         Reading reading = reading(params, context);
         if (!params.paths().isEmpty()) {
             for (Object argument : params.paths()) {
-                for (Path file : FileArguments.expandOrReport(argument, false, context, "cat.no.match")) {
+                for (Path file : FileArguments.expandOrReport(argument, false, context, "files.no.match")) {
                     reading.read(file, context);
                 }
             }
@@ -137,9 +137,9 @@ public final class Cat implements Cmdlet<Cat.Params, Object, Object> {
             this.maxLine = maxLine;
             this.opener = opener;
             mode = mode(params);
-            charset = FileArguments.charset(params.encoding(), "cat.encoding.unknown");
+            charset = FileArguments.charset(params.encoding(), "files.encoding.unknown");
             files = new PipelineFiles(params.property(), context,
-                    new PipelineFiles.Keys("cat.not.a.file", "cat.property.not.a.file", "cat.read.failed"));
+                    new PipelineFiles.Keys("files.not.a.file", "files.property.not.a.file", "files.read.failed"));
         }
 
         /** Output chosen by the options: one at most, --lines by default. */
@@ -203,15 +203,15 @@ public final class Cat implements Cmdlet<Cat.Params, Object, Object> {
                 }
             } catch (CharacterCodingException _) {
                 // no fallback: the user chooses the charset with --encoding
-                context.error(Messages.get("cat.read.failed", absolute,
+                context.error(Messages.get("files.read.failed", absolute,
                         Messages.get("cat.decode.failed", charset.name())));
             } catch (NoSuchFileException _) {
-                context.error(Messages.get("cat.not.found", absolute));
+                context.error(Messages.get("files.not.found", absolute));
             } catch (AccessDeniedException _) {
-                context.error(Messages.get("cat.access.denied", absolute));
+                context.error(Messages.get("files.access.denied", absolute));
             } catch (IOException e) {
                 Interruption.rethrow(e); // Ctrl+C inside a read: a cancellation, not "cannot read …: null" (R-11)
-                context.error(Messages.get("cat.read.failed", absolute, e.getMessage()));
+                context.error(Messages.get("files.read.failed", absolute, e.getMessage()));
             }
         }
 

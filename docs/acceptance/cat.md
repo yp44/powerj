@@ -40,7 +40,7 @@ Then `cd C:\tmp\c`.
 | 14 | `"a.txt" \| cat` | The lines of `a.txt` (a string received is a path). |
 | 15 | `cat b.txt -n` then `"a.txt" \| cat b.txt -n` | The second time: `un`, `deux` (1, 2) then the lines of `a.txt` numbered 3 to 5. |
 | 16 | `grep TODO -r -s \| cat --property path -n` | The lines of `src\B.java` (the property `path` of each `GrepMatch` gives the file). |
-| 17 | `grep TODO -r -s \| cat` | Error `cat: not a file: … (name the property that gives the file with --property)` for each object. |
+| 17 | `grep TODO -r -s \| cat` | Error `cat: not a file: … (name the property that gives the path with --property)` for each object. |
 | 18 | `grep TODO -r -s \| cat --property line` | Error `cat: property line is not a file (String, Path or File expected): …`. |
 | 19 | `ls --filter *.txt \| cat -c` | One `CatContent` with the content of the files received. |
 | 19b | (Linux/macOS) `cat /dev/zero`, then `mkfifo p`, `cat p`, `grep x /dev/zero` | Each returns at once with `not a regular file: … (a device, a pipe or a socket is not read)`; `cat` and `grep` give the same answer. |

@@ -26,7 +26,7 @@ public final class Ps implements Cmdlet<Ps.Params, Object, ProcessEntry> {
     /** Parameters of {@code ps}. */
     public record Params(
             @Option(position = 0, description = "Names of the processes to keep (wildcards * and ? accepted, case "
-                    + "ignored, .exe optional); default: all")
+                    + "ignored on Windows only, .exe optional there); default: all")
             List<String> names,
             @Option(shortName = 'u', description = "Keeps the processes of this user")
             String user) {

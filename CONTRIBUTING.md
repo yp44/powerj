@@ -190,7 +190,10 @@ are kept in the language in which they were commissioned. The issues they gave r
    object that cannot be processed. Evaluate a user block with `block.tryInvoke(…)`: it reports an evaluation error
    as a value and lets cancellation through. In a long loop, check `Thread.interrupted()`.
 5. Register it in `BuiltinCmdlets` (the ArchUnit rule `cmdletsAreDeclared` fails if you forget).
-6. **Texts:** `<name>.summary`, `<name>.option.<longName>` and the error keys, in both bundles.
+6. **Texts:** `<name>.summary`, `<name>.option.<longName>` and the error keys, in both bundles. `help` shows the bundle;
+   the text of `@CmdletInfo(summary)` and `@Option(description)` is the same as the English one (`HelpTextsTest` checks it).
+   A failure about a file reuses the `files.*` keys (`files.not.found`, `files.access.denied`…) rather than a copy under
+   the name of the cmdlet, and a walk error goes through `FileArguments.report`.
 7. `preview = true` only if the cmdlet has no side effect; otherwise implement `Previewable` and refuse the options that
    change something.
 8. Tests in `powerj-cmdlets/src/test/java/…/<Name>Test.java` with `TestContext` and `CmdletDriver.run(cmdlet, params, context, inputs…)` (module `powerj-testing`: begin, process for each object, end, as the shell does) and `@TempDir`.
