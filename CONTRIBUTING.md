@@ -179,7 +179,10 @@ are kept in the language in which they were commissioned. The issues they gave r
    its requirement `FR-nn` to the specification in the same commit.
 2. Write the class in `powerj-cmdlets/src/main/java/io/powerj/cmdlets/`: `@CmdletInfo(name, category, summary,
    examples, preview)`, `implements Cmdlet<Params, Input, Output>`, a nested `record Params` with `@Option`, output
-   records with `@Display`.
+   records with `@Display`. A short option (`shortName`) follows the table of
+   [FR-18b](docs/SPECIFICATION.md#34-command-naming-and-resolution): `-r` recurse, `-n` dry-run, `-f` force, `-v` verbose,
+   `-p` parallel, `-i` ignore case, `-a` all (hidden too), `-l` lines; a reserved letter is never given another meaning
+   (`CmdletOptionLettersTest` checks it), and an option that is rare or takes a block has no short form.
 3. **State of one execution** goes through `context.state(Type.class, Type::new)`, never through a field of the cmdlet or a
    map: the same instance runs in several pipelines at once. A state that implements `AutoCloseable` is closed however
    the run ends (end of input, error, Ctrl+C); `end` is for what the cmdlet emits once its input is over.

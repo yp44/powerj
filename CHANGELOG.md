@@ -1364,6 +1364,17 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   not a wrapper (`Collections.unmodifiableList`) around a list that may be lazy; the lists the shell makes (captures, `[…]`,
   `*.`) have a type of their own, `ShellLists`, which it reads (#176).
 
+### Changed (one meaning per short option, [#177](https://github.com/yp44/powerj/issues/177))
+- **A reserved letter means the same option in every cmdlet** (audit v2, B-07; FR-18b): `-r` recurse, `-n` dry-run, `-f` force,
+  `-v` verbose, `-p` parallel, `-i` ignore case, `-a` all, `-l` lines. Four exceptions keep the habit of the GNU program of the
+  same name (`grep -v` invert, `cat -n` numbered, `mkdir -p` parents, `ls -f` filter). The table is in the specification and in
+  `CONTRIBUTING.md`; `CmdletOptionLettersTest` fails on a built-in cmdlet that gives a reserved letter another meaning.
+- **Visible change: `join` loses `-r` and `-l`, `group` loses `-n`.** `join --right { … }`, `join --left { … }` and
+  `group --no-items` are written in full: `join -r` read as `--recurse` to anyone who knows `ls -r`, and the three options take a
+  block or are rare. `join -r { … }` is now refused with `unknown option -r`.
+- **`ls --max-depth <n>`**, as `grep` has it: `1` lists the folder, `2` its subfolders too; it implies `--recurse`, and a
+  wildcard match counts as the first level. The error for a depth below 1 is one key for both (`files.maxDepth.invalid`).
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.

@@ -26,25 +26,25 @@ import io.powerj.api.UsageException;
  * {@code join}: one {@link Row} per pair of a pipeline object and an object of {@code --right} with the same key
  * (specification FR-78).
  * <pre>
- * cat countries.csv | from-csv | join -r { (cat zip.csv | from-csv) } --left-key statezip --right-key zipcode
- * join -l { (cat a.csv | from-csv) } -r { (cat b.csv | from-csv) } -k code
- * ls | join -r { (cat sizes.csv | from-csv) } -k name -o
+ * cat countries.csv | from-csv | join --right { (cat zip.csv | from-csv) } --left-key statezip --right-key zipcode
+ * join --left { (cat a.csv | from-csv) } --right { (cat b.csv | from-csv) } -k code
+ * ls | join --right { (cat sizes.csv | from-csv) } -k name -o
  * </pre>
  * The right side is read once and indexed by key; the left side is streamed. A row has the columns of the left object,
  * then those of the right object; a right column whose name is already taken is renamed {@code right_<name>}.
  */
 @CmdletInfo(name = "join", preview = true, category = "Filters", summary = "Joins the objects with those of another source by key",
-        examples = {"cat a.csv | from-csv | join -r { (cat b.csv | from-csv) } -k id",
-                "cat countries.csv | from-csv | join -r { (cat zip.csv | from-csv) } --left-key statezip --right-key { $_.zipcode.toUpperCase() }",
-                "join -l { (cat a.csv | from-csv) } -r { (cat b.csv | from-csv) } -k code",
-                "ls | join -r { (cat sizes.csv | from-csv) } -k name -o"})
+        examples = {"cat a.csv | from-csv | join --right { (cat b.csv | from-csv) } -k id",
+                "cat countries.csv | from-csv | join --right { (cat zip.csv | from-csv) } --left-key statezip --right-key { $_.zipcode.toUpperCase() }",
+                "join --left { (cat a.csv | from-csv) } --right { (cat b.csv | from-csv) } -k code",
+                "ls | join --right { (cat sizes.csv | from-csv) } -k name -o"})
 public final class Join implements Cmdlet<Join.Params, Object, Row> {
 
     /** Parameters of {@code join}. */
     public record Params(
-            @Option(shortName = 'r', description = "Right side: block { … } evaluated once, its objects joined to the left ones")
+            @Option(description = "Right side: block { … } evaluated once, its objects joined to the left ones")
             Object right,
-            @Option(shortName = 'l', description = "Left side, at the head of a pipeline: block { … } evaluated once")
+            @Option(description = "Left side, at the head of a pipeline: block { … } evaluated once")
             Object left,
             @Option(shortName = 'k', description = "Key of both sides: property, property path or block { … }")
             Object key,

@@ -317,7 +317,7 @@ class BuiltinCmdletsTest {
                 """);
         assertThat(run("ls --files | group ext | sort count -d | first | map { $_.key }")).isEqualTo("txt\n");
         assertThat(run("(ls | group dir)[0].items | map { f -> f.name }")).isEqualTo("docs\n");
-        assertThat(run("ls | group ext dir -n | map { g -> g.items.size() }")).isEqualTo("0\n0\n");
+        assertThat(run("ls | group ext dir --no-items | map { g -> g.items.size() }")).isEqualTo("0\n0\n");
         assertThat(errors).isEmpty();
         run("ls | group bad!");
         assertThat(errors).containsExactly("group: invalid property name: bad!");
@@ -327,16 +327,16 @@ class BuiltinCmdletsTest {
     void joinMultipliesTheObjectsByKey() throws Exception {
         Files.writeString(tmp.resolve("countries.csv"), "statezip,country\nFR,France\nIT,Italy\nES,Spain\n");
         Files.writeString(tmp.resolve("zip.csv"), "zipcode,city\nfr,Paris\nfr,Lyon\nit,Rome\n");
-        assertThat(run("cat countries.csv | from-csv | join -r { (cat zip.csv | from-csv) } --left-key statezip"
+        assertThat(run("cat countries.csv | from-csv | join --right { (cat zip.csv | from-csv) } --left-key statezip"
                 + " --right-key { $_.zipcode.toUpperCase() } | map { $_.country + \"/\" + $_.city }"))
                 .isEqualTo("France/Paris\nFrance/Lyon\nItaly/Rome\n");
-        assertThat(run("join -l { (cat countries.csv | from-csv) } -r { (cat zip.csv | from-csv) } --left-key statezip"
+        assertThat(run("join --left { (cat countries.csv | from-csv) } --right { (cat zip.csv | from-csv) } --left-key statezip"
                 + " --right-key { $_.zipcode.toUpperCase() } -o | where { $_.city == null } | map { $_.country }"))
                 .isEqualTo("Spain\n");
-        assertThat(run("ls --files | join -r { (cat zip.csv | from-csv) } -k name | count")).isEqualTo("0\n");
-        assertThat(run("List.of(1, 2) | join -r { List.of(1L, 1L) } --left-key { $_ } | count")).isEqualTo("2\n");
+        assertThat(run("ls --files | join --right { (cat zip.csv | from-csv) } -k name | count")).isEqualTo("0\n");
+        assertThat(run("List.of(1, 2) | join --right { List.of(1L, 1L) } --left-key { $_ } | count")).isEqualTo("2\n");
         assertThat(errors).isEmpty();
-        assertThat(run("join -l { (ls) } -r { (cat missing.csv | from-csv) } -k name")).isEmpty();
+        assertThat(run("join --left { (ls) } --right { (cat missing.csv | from-csv) } -k name")).isEmpty();
         assertThat(errors).singleElement().asString().startsWith("cat: not found");
         run("ls | join -k name");
         assertThat(errors).singleElement().asString().startsWith("join: right side expected");

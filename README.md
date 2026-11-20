@@ -82,7 +82,7 @@ Out of scope for v1: control structures (`if`, `foreach`, functions — planned 
 
 | Cmdlet | What it does | Acceptance checklist |
 |---|---|---|
-| `ls` | Lists files as `FileEntry` records (`-r` recursive, `-a` hidden, `--filter *.java`, `-d` dirs, `-p 16` parallel walk; `link` and `hidden` are properties) | [step-3](docs/acceptance/step-3.md) |
+| `ls` | Lists files as `FileEntry` records (`-r` recursive, `--max-depth 2`, `-a` hidden, `--filter *.java`, `-d` dirs, `-p 16` parallel walk; `link` and `hidden` are properties) | [step-3](docs/acceptance/step-3.md) |
 | `grep` | Java regex search in files and folders, or in the pipeline objects; `GrepMatch` records with highlighted matches and capture groups | [grep](docs/acceptance/grep.md) |
 | `cat` | Reads files as lines (`-l`), one text (`-t`), numbered `CatLine` records (`-n`) or a `CatContent` (`-c`) | [cat](docs/acceptance/cat.md) |
 | `where` | Filters objects: `where { $_.size > 1mb }`, `where { f -> f.dir }`, short form `where name == usr` | [step-4](docs/acceptance/step-4.md) |
@@ -92,8 +92,8 @@ Out of scope for v1: control structures (`if`, `foreach`, functions — planned 
 | `range` | Objects between two bounds: positions (`range --from 5 --to 10`), regular expressions on a property (`range --from Paul --to Peter --property name`) or blocks, `--exclude`, `--repeat` | [first-last-range](docs/acceptance/first-last-range.md) |
 | `select` | Chooses and computes columns: `select name size`, `select file=name kb={ $_.size / 1kb }`; first in a pipeline it gives one row: `select content={(cat a.txt)}`; the `Row`s are tables and their columns stay properties (`\| sort kb -d`) | [select](docs/acceptance/select.md) |
 | `count`, `measure` | Count the objects (`ls -r \| count`); count, sum, average, min and max of a property (`ls -r \| measure size`, sizes in readable form) | [count-measure](docs/acceptance/count-measure.md) |
-| `group` | Groups by key: `ls -r \| group ext \| sort count -d \| first 5`; one `Group(key, count, items)` per key, several keys allowed, `-n` keeps only the counts | [group](docs/acceptance/group.md) |
-| `join` | Joins the pipeline objects with those of another source by key: `cat a.csv \| from-csv \| join -r { (cat b.csv \| from-csv) } -k id`; one `Row` per matching pair, `--left-key`/`--right-key` when the keys differ, `-o` keeps the objects without a match | [join](docs/acceptance/join.md) |
+| `group` | Groups by key: `ls -r \| group ext \| sort count -d \| first 5`; one `Group(key, count, items)` per key, several keys allowed, `--no-items` keeps only the counts | [group](docs/acceptance/group.md) |
+| `join` | Joins the pipeline objects with those of another source by key: `cat a.csv \| from-csv \| join --right { (cat b.csv \| from-csv) } -k id`; one `Row` per matching pair, `--left-key`/`--right-key` when the keys differ, `-o` keeps the objects without a match | [join](docs/acceptance/join.md) |
 | `mkdir`, `touch`, `cp`, `mv`, `rm` | File operations, also from the pipeline (`ls --filter *.tmp \| rm -v`); `-n` dry run, `-f` to overwrite, `-r` for folders, `-p <n>` to copy or remove a tree in virtual threads (`cp`, `rm`); `rm` and `mv` refuse the protected paths listed in `~/.powerj/protected-paths` | [fileops](docs/acceptance/fileops.md) |
 | `to-json`, `from-json`, `to-csv`, `from-csv` | JSON and CSV: `ls \| select name size \| to-json > files.json`, `cat files.json \| from-json \| where { $_.size > 1kb }`, `cat data.csv \| from-csv -d ";"`; always an array, JSON Lines with `-l`, CSV values as strings, objects as `Row`s | [json-csv](docs/acceptance/json-csv.md) |
 | `ps`, `kill` | Processes as objects: `ps java \| sort cpu --desc \| first 3`, `ps notepad \| kill -n`, then `ps notepad \| kill -w`; `-f` forcible stop, `-v` shows what was stopped | [ps-kill](docs/acceptance/ps-kill.md) |

@@ -20,11 +20,11 @@ import io.powerj.api.ScriptBlock;
  * <pre>
  * ls -r | group ext | sort count -d | first 5
  * ls -r | group ext dir          # key = [ext, dir]
- * ls -r | group ext -n           # counts only
+ * ls -r | group ext --no-items           # counts only
  * </pre>
  */
 @CmdletInfo(name = "group", preview = true, category = "Filters", summary = "Groups the pipeline objects by key",
-        examples = {"ls -r | group ext | sort count -d | first 5", "ls -r | group ext dir", "ls -r | group ext -n",
+        examples = {"ls -r | group ext | sort count -d | first 5", "ls -r | group ext dir", "ls -r | group ext --no-items",
                 "(ls -r | group ext)[0].items", "cat app.log | group | where { $_.count > 1 }"})
 public final class GroupCmdlet implements Cmdlet<GroupCmdlet.Params, Object, Group> {
 
@@ -32,7 +32,7 @@ public final class GroupCmdlet implements Cmdlet<GroupCmdlet.Params, Object, Gro
     public record Params(
             @Option(position = 0, description = "Grouping keys: property, property path or block { … }; none: the objects themselves")
             List<Object> keys,
-            @Option(shortName = 'n', description = "Keeps only the count of each group, not its objects")
+            @Option(description = "Keeps only the count of each group, not its objects")
             boolean noItems) {
     }
 

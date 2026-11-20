@@ -44,7 +44,7 @@ class LsTest {
 
     private static Ls.Params params(List<?> paths, boolean all, boolean recurse, String filter,
                                     boolean dirs, boolean files) {
-        return new Ls.Params(new java.util.ArrayList<Object>(paths), all, recurse, filter, dirs, files, null);
+        return new Ls.Params(new java.util.ArrayList<Object>(paths), all, recurse, filter, dirs, files, null, null);
     }
 
     @Test
@@ -131,15 +131,42 @@ class LsTest {
         assertThat(names(params(List.of("*.java"), false, false, null, false, false))).containsExactly("A.java");
     }
 
+    private static Ls.Params maxDepth(List<?> paths, int depth) {
+        return new Ls.Params(new java.util.ArrayList<Object>(paths), false, false, null, false, false, null, depth);
+    }
+
+    /** FR-35, FR-18b: --max-depth as in grep; it implies --recurse. */
+    @Test
+    void maxDepthStopsTheWalk() {
+        assertThat(names(maxDepth(List.of(), 1))).containsExactly("src", "A.java", "b.txt");
+        context.emitted.clear();
+        assertThat(names(maxDepth(List.of(), 2))).containsExactlyInAnyOrder("src", "main", "notes.TXT", "A.java", "b.txt");
+        context.emitted.clear();
+        assertThat(names(maxDepth(List.of(), 3))).contains("Main.java");
+    }
+
+    @Test
+    void maxDepthCountsAWildcardMatchAsTheFirstLevel() {
+        assertThat(names(maxDepth(List.of("s*"), 1))).containsExactly("src");
+        context.emitted.clear();
+        assertThat(names(maxDepth(List.of("s*"), 2))).containsExactlyInAnyOrder("src", "main", "notes.TXT");
+    }
+
+    @Test
+    void aMaxDepthBelowOneIsAUsageError() {
+        assertThatThrownBy(() -> names(maxDepth(List.of(), 0))).isInstanceOf(UsageException.class)
+                .hasMessageContaining("--max-depth");
+    }
+
     @Test
     void parallelWalkGivesTheSameEntriesInAnyOrder() {
-        var parallel = new Ls.Params(List.of(), false, true, null, false, false, 4);
+        var parallel = new Ls.Params(List.of(), false, true, null, false, false, 4, null);
         assertThat(names(parallel)).containsExactlyInAnyOrder("src", "main", "Main.java", "notes.TXT", "A.java", "b.txt");
         context.emitted.clear();
-        var filtered = new Ls.Params(List.of(), false, true, "*.java", false, true, 4);
+        var filtered = new Ls.Params(List.of(), false, true, "*.java", false, true, 4, null);
         assertThat(names(filtered)).containsExactlyInAnyOrder("Main.java", "A.java");
         assertThat(context.errors).isEmpty();
-        assertThatThrownBy(() -> new Ls().begin(new Ls.Params(List.of(), false, true, null, false, false, 0), context))
+        assertThatThrownBy(() -> new Ls().begin(new Ls.Params(List.of(), false, true, null, false, false, 0, null), context))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("--parallel");
     }
 
