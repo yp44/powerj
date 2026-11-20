@@ -56,7 +56,7 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
         if (params.dirs() && params.files()) {
             throw new UsageException(Messages.get("ls.dirs.files.incompatible"));
         }
-        FileOps.parallelism(params.parallel()); // refuses a count below 1 before anything is listed
+        Parallelism.of(params.parallel()); // refuses a count below 1 before anything is listed
         if (params.maxDepth() != null && params.maxDepth() < 1) {
             throw new UsageException(Messages.get("files.maxDepth.invalid", params.maxDepth()));
         }
@@ -128,7 +128,7 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
     /** Lazy walk (FR-35): each entry is emitted as soon as it is read; symbolic links are not followed. */
     private void listDirectory(Path dir, int maxDepth, Params params, Optional<PathMatcher> filter,
                                CmdletContext<FileEntry> context) {
-        int parallelism = FileOps.parallelism(params.parallel());
+        int parallelism = Parallelism.of(params.parallel());
         walker(params, maxDepth, parallelism).walk(dir, Ls::entry, entry -> {
             if (keep(entry, params, filter)) {
                 context.emit(entry);

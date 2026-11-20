@@ -21,7 +21,7 @@ import io.powerj.fs.FileTrees;
 /** What the file operations share (specification FR-72): paths, error messages, copy and removal of trees. */
 final class FileOps {
 
-    static final PipelineFiles.Keys KEYS = new PipelineFiles.Keys("files.not.a.file", "files.property.not.a.file",
+    static final PipelineFiles.MessageKeys KEYS = new PipelineFiles.MessageKeys("files.not.a.file", "files.property.not.a.file",
             "files.invalid.path");
 
     private FileOps() {
@@ -162,13 +162,5 @@ final class FileOps {
      */
     static boolean copyTree(Path source, Path target, int parallelism, boolean force, CmdletContext<?> context) {
         return FileTrees.copy(source, target, parallelism, force, (path, e) -> report(e, path, context));
-    }
-
-    /** Checks the value of {@code -p/--parallel}: {@code null} is sequential. */
-    static int parallelism(Integer parallel) {
-        if (parallel != null && parallel < 1) {
-            throw new UsageException(Messages.get("fileops.parallel.invalid", parallel));
-        }
-        return parallel == null ? 1 : parallel;
     }
 }

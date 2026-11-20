@@ -22,7 +22,7 @@ import io.powerj.testing.TestContext;
 class JoinTest {
 
     private final TestContext<Row> context = new TestContext<>(Path.of("."));
-    private final Properties properties = new Properties(context);
+    private final ObjectProperties properties = new ObjectProperties(context);
 
     {
         context.hasInput = true;
@@ -181,7 +181,7 @@ class JoinTest {
                 .hasMessageStartingWith("left side expected");
     }
 
-    /** A record whose accessor fails for one of its objects (a throwing getter: {@code Properties.Unreadable}). */
+    /** A record whose accessor fails for one of its objects (a throwing getter: {@code ObjectProperties.Unreadable}). */
     public record Fragile(String id, String detail) {
         @Override
         public String detail() {

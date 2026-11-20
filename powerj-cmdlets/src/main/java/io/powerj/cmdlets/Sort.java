@@ -42,7 +42,7 @@ public final class Sort implements Cmdlet<Sort.Params, Object, Object> {
     }
 
     private static State state(Params p, CmdletContext<Object> context) {
-        return context.state(State.class, () -> new State(Keys.blocks(p.keys(), context, "sort.key.invalid"),
+        return context.state(State.class, () -> new State(KeyBlocks.blocks(p.keys(), context, "sort.key.invalid"),
                 new ArrayList<>(), new SortComparator(p.ignoreCase(), context::error)));
     }
 

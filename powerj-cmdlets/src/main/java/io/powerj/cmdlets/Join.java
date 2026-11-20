@@ -66,7 +66,7 @@ public final class Join implements Cmdlet<Join.Params, Object, Row> {
      * @param columns   columns of the first right object, for the left objects without a match
      */
     private record State(ScriptBlock leftKey, Map<Object, List<Object>> index, String dropped, List<String> columns,
-                         Properties properties) {
+                         ObjectProperties properties) {
     }
 
     @Override
@@ -80,8 +80,8 @@ public final class Join implements Cmdlet<Join.Params, Object, Row> {
             throw new UsageException(Messages.get("join.key.expected"));
         }
         Object rightKeyArgument = p.rightKey() != null ? p.rightKey() : leftKeyArgument;
-        ScriptBlock leftKey = Keys.block(leftKeyArgument, context, "join.key.invalid");
-        ScriptBlock rightKey = Keys.block(rightKeyArgument, context, "join.key.invalid");
+        ScriptBlock leftKey = KeyBlocks.block(leftKeyArgument, context, "join.key.invalid");
+        ScriptBlock rightKey = KeyBlocks.block(rightKeyArgument, context, "join.key.invalid");
         ScriptBlock left = null;
         if (context.hasInput() && p.left() != null) {
             throw new UsageException(Messages.get("join.left.conflict"));
@@ -94,7 +94,7 @@ public final class Join implements Cmdlet<Join.Params, Object, Row> {
         List<String> columns = null;
         for (Object object : objects(right, "--right")) {
             if (columns == null) {
-                columns = Properties.columns(object);
+                columns = ObjectProperties.columns(object);
             }
             var attempt = rightKey.tryInvoke(object);
             if (attempt.failed()) {
@@ -103,13 +103,13 @@ public final class Join implements Cmdlet<Join.Params, Object, Row> {
             }
             Object key = attempt.value();
             if (key != null) {
-                index.computeIfAbsent(Keys.normalized(key), k -> new ArrayList<>()).add(object);
+                index.computeIfAbsent(KeyBlocks.normalized(key), k -> new ArrayList<>()).add(object);
             }
         }
         String dropped = p.key() instanceof String property && !property.contains(".") ? property : null;
         List<String> rightColumns = columns == null ? List.of() : columns;
         State state = context.state(State.class, () -> new State(leftKey, index, dropped, rightColumns,
-                new Properties(context)));
+                new ObjectProperties(context)));
         if (left != null) {
             for (Object object : objects(left, "--left")) {
                 join(state, p, object, context);
@@ -129,7 +129,7 @@ public final class Join implements Cmdlet<Join.Params, Object, Row> {
             return;
         }
         Object key = attempt.value();
-        List<Object> matches = key == null ? List.of() : state.index().getOrDefault(Keys.normalized(key), List.of());
+        List<Object> matches = key == null ? List.of() : state.index().getOrDefault(KeyBlocks.normalized(key), List.of());
         if (matches.isEmpty()) {
             if (p.outer()) {
                 emit(state, left, null, context);
@@ -146,7 +146,7 @@ public final class Join implements Cmdlet<Join.Params, Object, Row> {
         Row row;
         try {
             row = row(state, left, right);
-        } catch (Properties.Unreadable e) {
+        } catch (ObjectProperties.Unreadable e) {
             context.error(Messages.get("pipeline.object.skipped", e.getMessage(), Texts.abbreviate(left)));
             return;
         }
@@ -157,13 +157,13 @@ public final class Join implements Cmdlet<Join.Params, Object, Row> {
     private static Row row(State state, Object left, Object right) {
         Map<String, Object> values = new LinkedHashMap<>();
         Set<String> sizes = new HashSet<>();
-        for (String column : Properties.columns(left)) {
+        for (String column : ObjectProperties.columns(left)) {
             values.put(column, state.properties().get(left, column));
             if (isSize(left, column)) {
                 sizes.add(column);
             }
         }
-        for (String column : right == null ? state.columns() : Properties.columns(right)) {
+        for (String column : right == null ? state.columns() : ObjectProperties.columns(right)) {
             if (column.equals(state.dropped())) {
                 continue;
             }

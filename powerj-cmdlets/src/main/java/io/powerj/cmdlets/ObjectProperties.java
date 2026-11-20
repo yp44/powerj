@@ -18,8 +18,10 @@ import io.powerj.text.RecordView;
  * context ({@link CmdletContext#readProperty}), never by reflection here: a module can read by reflection only the
  * records of packages that are exported or opened to it, and an object comes from any module (the core, one loaded by
  * {@code mod-load}); the engine alone can read them all (#130).
+ * <p>
+ * Named {@code ObjectProperties}, not {@code Properties}, so as not to hide {@link java.util.Properties} (audit v2, C-05).
  */
-final class Properties {
+final class ObjectProperties {
 
     /** Column of an object that has no named values. */
     static final String VALUE = "value";
@@ -41,7 +43,7 @@ final class Properties {
     private final CmdletContext<?> context;
 
     /** The reader of one execution: the context of the cmdlet that asks. */
-    Properties(CmdletContext<?> context) {
+    ObjectProperties(CmdletContext<?> context) {
         this.context = Objects.requireNonNull(context, "context");
     }
 

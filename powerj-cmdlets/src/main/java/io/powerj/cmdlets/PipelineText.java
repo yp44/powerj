@@ -21,7 +21,7 @@ final class PipelineText {
      */
     PipelineText(String property, CmdletContext<?> context, String notTextKey) {
         this.property = property;
-        this.block = property == null ? null : Keys.block(property, context, "property.name.invalid");
+        this.block = property == null ? null : KeyBlocks.block(property, context, "property.name.invalid");
         this.notTextKey = notTextKey;
     }
 

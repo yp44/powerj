@@ -13,13 +13,13 @@ import io.powerj.api.UsageException;
 final class CsvWriter {
 
     private final char delimiter;
-    private final Properties properties;
+    private final ObjectProperties properties;
 
     /**
      * @param delimiter  the separator of the fields
      * @param properties reads the components of the records that a field holds (they are written as JSON)
      */
-    CsvWriter(char delimiter, Properties properties) {
+    CsvWriter(char delimiter, ObjectProperties properties) {
         this.delimiter = delimiter;
         this.properties = properties;
     }

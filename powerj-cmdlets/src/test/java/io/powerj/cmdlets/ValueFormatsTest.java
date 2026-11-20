@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
 /** Comparison of {@code sort}, and the CSV and JSON text of the values (FR-67, FR-73). */
 class ValueFormatsTest {
 
-    private static final Properties PROPERTIES = new Properties(new TestContext<>());
+    private static final ObjectProperties PROPERTIES = new ObjectProperties(new TestContext<>());
     private static final CsvWriter CSV = new CsvWriter(',', PROPERTIES);
 
     enum Size { SMALL, LARGE }

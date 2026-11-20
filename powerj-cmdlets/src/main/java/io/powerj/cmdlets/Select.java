@@ -172,10 +172,10 @@ public final class Select implements Cmdlet<Select.Params, Object, Row>, ColumnP
                 int equals = word.indexOf('=');
                 String name = name(word.substring(0, equals));
                 String property = word.substring(equals + 1);
-                column = new Column(name, Keys.block(property, context, "select.column.invalid"), simple(property));
+                column = new Column(name, KeyBlocks.block(property, context, "select.column.invalid"), simple(property));
             } else if (argument instanceof String property) {
                 String name = property.substring(property.lastIndexOf('.') + 1);
-                column = new Column(name, Keys.block(property, context, "select.column.invalid"), simple(property));
+                column = new Column(name, KeyBlocks.block(property, context, "select.column.invalid"), simple(property));
             } else {
                 throw new UsageException(Messages.get("select.column.invalid", argument));
             }

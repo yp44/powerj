@@ -30,12 +30,12 @@ public final class ToCsv implements Cmdlet<ToCsv.Params, Object, String> {
     /** One execution: the columns, known at the first object. */
     private static final class State {
         final CsvWriter writer;
-        final Properties properties;
+        final ObjectProperties properties;
         List<String> columns;
         /** Columns of later objects that the header does not have, already reported. */
         final Set<String> reported = new HashSet<>();
 
-        State(CsvWriter writer, Properties properties) {
+        State(CsvWriter writer, ObjectProperties properties) {
             this.writer = writer;
             this.properties = properties;
         }
@@ -43,7 +43,7 @@ public final class ToCsv implements Cmdlet<ToCsv.Params, Object, String> {
 
     private static State state(Params p, CmdletContext<String> context) {
         return context.state(State.class, () -> {
-            Properties properties = new Properties(context);
+            ObjectProperties properties = new ObjectProperties(context);
             return new State(new CsvWriter(CsvWriter.delimiter(p.delimiter()), properties), properties);
         });
     }
@@ -57,18 +57,18 @@ public final class ToCsv implements Cmdlet<ToCsv.Params, Object, String> {
     public void process(Params p, Object input, CmdletContext<String> context) {
         State state = state(p, context);
         boolean first = state.columns == null;
-        List<String> columns = first ? Properties.columns(input) : state.columns;
+        List<String> columns = first ? ObjectProperties.columns(input) : state.columns;
         List<Object> values = new ArrayList<>(columns.size());
         try {
             for (String column : columns) {
                 values.add(state.properties.get(input, column));
             }
-        } catch (Properties.Unreadable e) {
+        } catch (ObjectProperties.Unreadable e) {
             context.error(Messages.get("pipeline.object.skipped", e.getMessage(), Texts.abbreviate(input)));
             return;
         }
         if (!first) {
-            reportMissingColumns(state, Properties.columns(input), context);
+            reportMissingColumns(state, ObjectProperties.columns(input), context);
         }
         if (first) {
             state.columns = columns;

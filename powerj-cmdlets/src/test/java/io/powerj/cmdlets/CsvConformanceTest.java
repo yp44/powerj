@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
  */
 class CsvConformanceTest {
 
-    private static final Properties PROPERTIES = new Properties(new TestContext<>());
+    private static final ObjectProperties PROPERTIES = new ObjectProperties(new TestContext<>());
 
     /** The records of the text, given as the pieces the reader receives (each one ends with a line break). */
     private static List<List<String>> read(char delimiter, String... pieces) {

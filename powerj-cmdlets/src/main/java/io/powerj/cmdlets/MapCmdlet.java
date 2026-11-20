@@ -15,6 +15,9 @@ import io.powerj.api.UsageException;
  * ls | map FileEntry::name
  * </pre>
  * A {@code null} result emits nothing; a collection is unrolled by the pipeline.
+ * <p>
+ * The class is {@code MapCmdlet} because {@code Map} would hide {@link java.util.Map}, which the cmdlets use everywhere
+ * (audit v2, C-05).
  */
 @CmdletInfo(name = "map", preview = true, category = "Filters", summary = "Transforms each pipeline object with a lambda",
         examples = {"ls -r | map { f -> f.name + \" : \" + f.name.length() }", "ls | map FileEntry::name",

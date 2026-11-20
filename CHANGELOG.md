@@ -1392,6 +1392,21 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   `cp`, `mv` and `rm` now use the one of `ls`, `cat` and `grep`, so an unreadable folder met by `cp -r` reads
   `cannot read <path>: <reason>` instead of `<path>: <reason>`.
 
+### Changed (names that say what they are, and Javadoc that says what the code does, [#179](https://github.com/yp44/powerj/issues/179))
+- **Renamed in `powerj-cmdlets`** (audit v2, C-05): `Properties` → `ObjectProperties` (it hid `java.util.Properties`),
+  `Keys` → `KeyBlocks` and `PipelineFiles.Keys` → `PipelineFiles.MessageKeys` (two `Keys` in one package),
+  `FileOps.parallelism` → `Parallelism.of`, since `ls` and `grep`, which change nothing, called it; its message key is
+  `parallel.invalid` instead of `fileops.parallel.invalid`. The tests and the benchmark follow (`ObjectPropertiesTest`,
+  `ObjectPropertiesCostTest`, `KeyBlocksTest`, `ObjectPropertiesBenchmark`).
+- **Not renamed:** `GroupCmdlet` and `MapCmdlet` keep their suffix, now explained in their Javadoc: `Group` is the record that
+  `group` emits, whose name the user sees (`help group`, the banner of a preview, `help members`), and `Map` would hide
+  `java.util.Map`. Renaming the record (`GroupResult`, `Grouped`), as the ticket offered, would change what the user reads
+  for a gain inside the code only.
+- **Javadoc** (C-06): `FileWalker` no longer promises an entry "as soon as it is read": a sequential walk streams between
+  folders, but reads (and sorts) a whole folder before visiting its first entry. `core.i18n.Messages` and the header of its
+  bundles no longer name the package `io.powerj.core.exec`, which is gone. (The Javadoc of `ValueUnroller` was corrected with
+  #173.)
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.

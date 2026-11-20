@@ -47,7 +47,7 @@ public final class ToJson implements Cmdlet<ToJson.Params, Object, String> {
                 throw new UsageException(Messages.get("to-json.depth.invalid", p.depth()));
             }
             int depth = p.depth() == null ? DEFAULT_DEPTH : p.depth();
-            return new State(new JsonWriter(!p.compact() && !p.lines(), depth, new Properties(context)));
+            return new State(new JsonWriter(!p.compact() && !p.lines(), depth, new ObjectProperties(context)));
         });
     }
 
@@ -62,7 +62,7 @@ public final class ToJson implements Cmdlet<ToJson.Params, Object, String> {
         StringBuilder value = new StringBuilder();
         try {
             state.writer.write(input, value, p.lines() ? 0 : 1);
-        } catch (Properties.Unreadable e) {
+        } catch (ObjectProperties.Unreadable e) {
             context.error(Messages.get("pipeline.object.skipped", e.getMessage(), Texts.abbreviate(input)));
             return;
         }

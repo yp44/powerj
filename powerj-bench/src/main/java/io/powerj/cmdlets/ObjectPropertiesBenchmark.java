@@ -23,9 +23,9 @@ import io.powerj.core.java.PropertyAccess;
 
 /**
  * What {@code to-csv} and {@code to-json} pay for the columns of one object (review C-26): all the columns of a record of
- * eight components, read by {@code Properties.get} as {@code to-csv} reads them, and the record turned into a map as
+ * eight components, read by {@code ObjectProperties.get} as {@code to-csv} reads them, and the record turned into a map as
  * {@code to-json} does. The values are read as the engine reads them for a command ({@code CmdletContext.readProperty},
- * #130), by {@link PropertyAccess#property}. In the package of {@code Properties}, which is not public.
+ * #130), by {@link PropertyAccess#property}. In the package of {@code ObjectProperties}, which is not public.
  */
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
@@ -33,7 +33,7 @@ import io.powerj.core.java.PropertyAccess;
 @Measurement(iterations = 5, time = 1)
 @Fork(1)
 @State(Scope.Benchmark)
-public class PropertiesBenchmark {
+public class ObjectPropertiesBenchmark {
 
     /** A record of the width of {@code FileEntry}. */
     public record Item(String name, long size, Instant modified, Path path, boolean dir, String ext, int depth,
@@ -82,8 +82,8 @@ public class PropertiesBenchmark {
     }
 
     private final Item item = new Item("a.txt", 42, Instant.EPOCH, Path.of("a.txt"), false, "txt", 3, 0.5);
-    private final List<String> columns = Properties.columns(item);
-    private final Properties properties = new Properties(new EngineReading());
+    private final List<String> columns = ObjectProperties.columns(item);
+    private final ObjectProperties properties = new ObjectProperties(new EngineReading());
 
     @Benchmark
     public long toCsvColumnsOfOneRow() {

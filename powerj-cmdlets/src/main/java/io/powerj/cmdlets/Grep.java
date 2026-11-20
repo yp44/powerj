@@ -146,7 +146,7 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
 
         Search(Params params, CmdletContext<?> context, Opener opener) {
             this.opener = opener;
-            int parallelism = FileOps.parallelism(params.parallel());
+            int parallelism = Parallelism.of(params.parallel());
             if (params.maxDepth() != null && params.maxDepth() < 1) {
                 throw new UsageException(Messages.get("files.maxDepth.invalid", params.maxDepth()));
             }

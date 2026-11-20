@@ -46,7 +46,7 @@ public final class Remove implements Cmdlet<Remove.Params, Object, Object> {
     @Override
     public void begin(Params p, CmdletContext<Object> context) {
         FileOps.Arguments arguments = FileOps.arguments(p.paths(), p.property(), context);
-        int parallelism = FileOps.parallelism(p.parallel());
+        int parallelism = Parallelism.of(p.parallel());
         State state = context.state(State.class, () -> new State(
                 new PipelineFiles(p.property(), arguments.block(), context, FileOps.KEYS),
                 p.allowProtected() ? null : ProtectedPaths.load(context.configDirectory(), context.environment(),

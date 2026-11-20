@@ -4,7 +4,10 @@ import java.util.ResourceBundle;
 
 import io.powerj.api.Language;
 
-/** Messages of the {@code io.powerj.core.exec} package, in the current {@link Language} (FR-61). */
+/**
+ * Messages of the {@code powerj-core} module (the bundle {@code io.powerj.core.i18n.messages}), in the current
+ * {@link Language} (FR-61).
+ */
 public final class Messages {
 
     private static final String BUNDLE = "io.powerj.core.i18n.messages";

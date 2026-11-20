@@ -1,6 +1,6 @@
 # Acceptance test — Mini-iteration 19: `group` cmdlet
 
-**Goal:** verify that `group` emits one `Group(key, count, items)` per distinct key, in the order the keys first appear. The key can be a property, a property path, a block, several keys (list key) or the objects themselves. Also check that `-n` keeps only the counts, and that the groups can be sorted, filtered and read downstream.
+**Goal:** verify that `group` emits one `Group(key, count, items)` per distinct key, in the order the keys first appear. The key can be a property, a property path, a block, several keys (list key) or the objects themselves. Also check that `--no-items` keeps only the counts, and that the groups can be sorted, filtered and read downstream.
 
 > Messages are shown in the system language; set `language=en` in config.properties (or `POWERJ_LANG=en`) to get the English texts quoted here.
 

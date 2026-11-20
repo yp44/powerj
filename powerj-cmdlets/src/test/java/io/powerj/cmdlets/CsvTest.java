@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 /** {@link CsvWriter} and {@link CsvReader} (specification FR-73). */
 class CsvTest {
 
-    private static final Properties PROPERTIES = new Properties(new TestContext<>());
+    private static final ObjectProperties PROPERTIES = new ObjectProperties(new TestContext<>());
     private static final CsvWriter CSV = new CsvWriter(',', PROPERTIES);
 
     record Item(String name, long size) {
