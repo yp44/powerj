@@ -125,8 +125,14 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
             search.filter(input, context);
         } else if (params.recurse() || params.maxDepth() != null || !Files.isDirectory(file)) {
             // a directory received without -r is skipped: ls -r already emits its files
-            search.files(List.of(file), context);
+            search.received(file, context);
         }
+    }
+
+    /** With {@code -p}, the files received from the pipeline are searched now, together (audit v2, S-09). */
+    @Override
+    public void end(Params params, CmdletContext<Object> context) {
+        search(params, context).flush(context);
     }
 
     /** One execution of {@code grep}: compiled pattern and settings of the walk. */
@@ -144,6 +150,13 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
         private final Opener opener;
         /** Matches handed over together: one by one when the walk is sequential, so nothing waits for the end of the file. */
         private final int chunk;
+        /**
+         * With {@code -p}, the files received from the pipeline, searched in {@code end} by one parallel walk: one walk per
+         * file started an executor each and read them one after the other. Without {@code -p}, each file is searched
+         * when it arrives, so that {@code | first 1} stops the reading.
+         */
+        private final List<Path> received = new ArrayList<>();
+        private final boolean parallel;
 
         Search(Params params, CmdletContext<?> context, Opener opener) {
             this.opener = opener;
@@ -167,6 +180,7 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
             int maxDepth = params.maxDepth() != null ? params.maxDepth()
                     : params.recurse() ? Integer.MAX_VALUE : 1;
             chunk = parallelism == 1 ? 1 : PARALLEL_CHUNK;
+            parallel = parallelism > 1;
             walker = FileWalker.builder().maxDepth(maxDepth).includeHidden(params.all()).order(FileArguments.BY_NAME)
                     .parallelism(parallelism).build();
         }
@@ -188,6 +202,24 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
             }
             walker.walkStreaming(readable, this::search, matches -> matches.forEach(context::emit),
                     error -> FileArguments.report(error, context));
+        }
+
+        /** A file received from the pipeline: searched now, or kept for {@link #flush} with {@code -p}. */
+        void received(Path file, CmdletContext<Object> context) {
+            if (parallel) {
+                received.add(file);
+            } else {
+                files(List.of(file), context);
+            }
+        }
+
+        /** Searches the files kept by {@link #received}, in one walk. */
+        void flush(CmdletContext<Object> context) {
+            if (!received.isEmpty()) {
+                List<Path> files = List.copyOf(received);
+                received.clear();
+                files(files, context);
+            }
         }
 
         /** Lets the object through if its text (or that of its property) matches. */

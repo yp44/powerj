@@ -84,6 +84,40 @@ class FileWalkerTest {
                 "root.txt");
     }
 
+    /**
+     * Audit v2, C-07: {@code ls} sorted with {@code Files.isDirectory} in its comparator, one system call per comparison.
+     * The folders now come first from the attributes read with the listing: the order of paths is only asked to compare
+     * two folders or two files, never a folder with a file.
+     */
+    @Test
+    void directoriesFirstSortsOnTheAttributesAlreadyRead() throws IOException {
+        Files.createDirectories(tmp.resolve("z-dir"));
+        Files.writeString(tmp.resolve("b.txt"), "b");
+        List<String> compared = new ArrayList<>();
+        Comparator<Path> byName = (x, y) -> {
+            compared.add(x.getFileName() + "|" + y.getFileName());
+            return x.getFileName().toString().compareTo(y.getFileName().toString());
+        };
+        List<String> visited = new ArrayList<>();
+
+        FileWalker.builder().maxDepth(1).directoriesFirst(true).order(byName).build()
+                .walk(tmp, (path, attributes) -> name(path), visited::add, errors::add);
+
+        assertThat(visited).containsExactly("a", "z-dir", "b.txt", "root.txt");
+        assertThat(compared).isNotEmpty().allMatch(pair -> pair.contains(".txt|") == pair.endsWith(".txt"));
+    }
+
+    @Test
+    void directoriesFirstWithoutAnOrderKeepsTheFoldersFirst() {
+        List<String> visited = new ArrayList<>();
+
+        FileWalker.builder().maxDepth(1).directoriesFirst(true).build()
+                .walk(tmp, (path, attributes) -> name(path), visited::add, errors::add);
+
+        assertThat(visited.getFirst()).isEqualTo("a");
+        assertThat(visited).containsExactlyInAnyOrder("a", "root.txt");
+    }
+
     @ParameterizedTest
     @ValueSource(ints = {1, 4})
     void aFileRootIsVisitedItself(int parallelism) {
