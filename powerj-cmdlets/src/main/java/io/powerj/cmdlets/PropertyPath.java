@@ -32,7 +32,7 @@ final class PropertyPath implements ScriptBlock {
      */
     static ScriptBlock of(String path, CmdletContext<?> context) {
         if (!Texts.isPropertyPath(path)) {
-            throw new UsageException(Messages.get("where.property.invalid", path));
+            throw new UsageException(Messages.get("property.name.invalid", path));
         }
         return new PropertyPath(path, Objects.requireNonNull(context, "context"));
     }

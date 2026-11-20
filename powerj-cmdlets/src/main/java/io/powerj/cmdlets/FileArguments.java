@@ -136,7 +136,10 @@ final class FileArguments {
         }
     }
 
-    /** Reports a failure of the walk of a folder as a non-blocking error (shared by {@code ls}, {@code cat}, {@code grep}). */
+    /**
+     * Reports a failure of the walk of a folder as a non-blocking error: the one reporter of a {@link WalkError}, shared by
+     * {@code ls}, {@code cat}, {@code grep}, {@code cp}, {@code mv} and {@code rm} (audit v2, C-04).
+     */
     static void report(WalkError error, CmdletContext<?> context) {
         context.error(switch (error.kind()) {
             case ACCESS_DENIED -> Messages.get("files.access.denied", error.path());

@@ -76,7 +76,7 @@ public final class Remove implements Cmdlet<Remove.Params, Object, Object> {
     private static void remove(Params p, State state, Path path, CmdletContext<Object> context) {
         if (!FileOps.exists(path)) {
             if (!p.force()) {
-                context.error(Messages.get("fileops.not.found", path));
+                context.error(Messages.get("files.not.found", path));
             }
             return;
         }

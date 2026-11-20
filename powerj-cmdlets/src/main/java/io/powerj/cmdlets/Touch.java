@@ -89,7 +89,7 @@ public final class Touch implements Cmdlet<Touch.Params, Object, Object> {
             // the parent is missing; any other reason is the file's own
             Path parent = path.getParent();
             context.error(parent != null && !Files.exists(parent) ? Messages.get("fileops.parent.missing", path)
-                    : Messages.get("fileops.not.found", path));
+                    : Messages.get("files.not.found", path));
             return;
         } catch (IOException e) {
             FileOps.report(e, path, context);

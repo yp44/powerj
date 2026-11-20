@@ -61,7 +61,7 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
             @Option(shortName = 'r', description = "Walks subdirectories")
             boolean recurse,
             @Option(shortName = 'p', description = "Walks the tree with n files read at the same time, in virtual threads "
-                    + "(order of the files free)")
+                    + "(order of the files free; the matches of a file stay in order, and together up to 1000 of them)")
             Integer parallel,
             @Option(description = "Maximum depth of the walk (1: only the files of the directory); implies --recurse")
             Integer maxDepth,
@@ -108,7 +108,7 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
         if (!params.paths().isEmpty()) {
             List<Path> roots = new ArrayList<>();
             for (Object argument : params.paths()) {
-                roots.addAll(FileArguments.expandOrReport(argument, params.all(), context, "grep.no.match"));
+                roots.addAll(FileArguments.expandOrReport(argument, params.all(), context, "files.no.match"));
             }
             search.files(roots, context);
         } else if (!context.hasInput()) {
@@ -158,7 +158,7 @@ public final class Grep implements Cmdlet<Grep.Params, Object, Object> {
                         e.getDescription(), e.getIndex()));
             }
             invert = params.invert();
-            charset = FileArguments.charset(params.encoding(), "grep.encoding.unknown");
+            charset = FileArguments.charset(params.encoding(), "files.encoding.unknown");
             detectBinary = !params.binary()
                     && !charset.name().startsWith("UTF-16") && !charset.name().startsWith("UTF-32");
             property = params.property() == null ? null : PropertyPath.of(params.property(), context);

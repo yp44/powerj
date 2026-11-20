@@ -20,7 +20,7 @@ import io.powerj.api.perf.PerfReports;
 /**
  * {@code perf}: what was measured in perf mode (Alt+P), as records to process in a pipeline (specification FR-76).
  */
-@CmdletInfo(name = "perf", preview = true, category = "System", summary = "Shows what perf mode measured",
+@CmdletInfo(name = "perf", preview = true, category = "System", summary = "Shows what perf mode (Alt+P) measured: stages, blocks, native processes, phases, JVM",
         examples = {"perf", "perf | sort active -d | first 1", "perf 2 --view blocks", "perf --view jvm --all",
                 "perf --view lines | sort total -d | first 5", "perf --view hot", "perf --save ~/slow.jfr"})
 public final class Perf implements Cmdlet<Perf.Params, Void, Object>, Previewable<Perf.Params> {
@@ -36,7 +36,7 @@ public final class Perf implements Cmdlet<Perf.Params, Void, Object>, Previewabl
             View view,
             @Option(shortName = 'a', longName = "all", description = "Every kept line, oldest first")
             boolean all,
-            @Option(longName = "save", description = "Writes the Flight Recorder file of the line here (a file, or a folder)")
+            @Option(longName = "save", description = "Writes the Flight Recorder file of the line here (a file, or a folder), to open in JDK Mission Control")
             Path save) {
     }
 

@@ -197,7 +197,7 @@ class CatTest {
     void otherObjectsWithoutPropertyAreSkippedWithAnError() throws Exception {
         assertThat(run(params(Out.LINES), 42, "b.txt")).containsExactly("un", "deux");
         assertThat(context.errors).containsExactly(
-                "not a file: 42 (name the property that gives the file with --property)");
+                "not a file: 42 (name the property that gives the path with --property)");
     }
 
     private void property(String expected, Function<Object, Object> getter) {

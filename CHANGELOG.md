@@ -1375,6 +1375,23 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
 - **`ls --max-depth <n>`**, as `grep` has it: `1` lists the folder, `2` its subfolders too; it implies `--recurse`, and a
   wildcard match counts as the first level. The error for a depth below 1 is one key for both (`files.maxDepth.invalid`).
 
+### Changed (help texts written once, one family of file messages, [#178](https://github.com/yp44/powerj/issues/178))
+- **The annotation and the bundle say the same thing** (audit v2, C-03): `help` shows `<name>.summary` and
+  `<name>.option.<long>` of the bundle, and the text of `@CmdletInfo`/`@Option`, which a reader of the class sees and which is
+  the fallback, had drifted in five places (`ps --names` said "case ignored" where the bundle and the code say "on Windows
+  only"; `perf`, `perf --save`, `grep --parallel`, `from-csv --no-header`). They are aligned, and `HelpTextsTest` fails when
+  an annotation of a built-in cmdlet differs from the English bundle or has no key. The annotation is kept rather than emptied:
+  `summary` is mandatory in the API, and the text stays readable next to the option.
+- **One family of keys for the failures about files** (C-04): `ls.not.found`, `cat.not.found`, `fileops.not.found` →
+  `files.not.found`; the four `*.no.match` → `files.no.match`; `cat|grep.encoding.unknown` → `files.encoding.unknown`;
+  `cat|fileops.access.denied`, `cat.read.failed`, `cat|fileops.property.not.a.file`, `cat|fileops.not.a.file`,
+  `fileops.invalid.path` → their `files.*` key (12 keys fewer in each bundle). `cat` now says "the property that gives the path", as the file
+  operations did. `range` has its own `range.pattern.invalid` instead of borrowing `grep`'s, and the property paths of every
+  cmdlet use `property.name.invalid` instead of `where.property.invalid`.
+- **One reporter of a walk error** (C-04): `FileOps.report(WalkError)` was a copy of `FileArguments.report` with other keys;
+  `cp`, `mv` and `rm` now use the one of `ls`, `cat` and `grep`, so an unreadable folder met by `cp -r` reads
+  `cannot read <path>: <reason>` instead of `<path>: <reason>`.
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.

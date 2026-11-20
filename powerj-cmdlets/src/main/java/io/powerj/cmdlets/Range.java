@@ -176,7 +176,7 @@ public final class Range implements Cmdlet<Range.Params, Object, Object> {
                 return new Match(property, Pattern.compile(text,
                         ignoreCase ? Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE : 0));
             } catch (PatternSyntaxException e) {
-                throw new UsageException(Messages.get("grep.pattern.invalid", text, e.getDescription(),
+                throw new UsageException(Messages.get("range.pattern.invalid", text, e.getDescription(),
                         e.getIndex()));
             }
         }
