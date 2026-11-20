@@ -1,10 +1,12 @@
 # Plan — cmdlet `join` (mini-iteration 27, FR-78)
 
+> **Since #177 (audit v2, B-07):** `--right` and `--left` have no short form; `-r` means `--recurse` and `-l` `--lines` in every cmdlet that has them (FR-18b). This plan is kept as it was written; the examples use the current form.
+
 ## Context
 Crossing two sources of objects (countries × zip codes, files × metadata) needed `collect` and Java loops. `join` multiplies the pipeline objects by those of a second source that have the same key, and gives merged `Row`s that `select`, `sort`, `to-csv` and `grid` use as they are:
 
 ```text
-cat countries.csv | from-csv | join -r { (cat zip.csv | from-csv) } --left-key statezip --right-key { $_.zipcode.toUpperCase() }
+cat countries.csv | from-csv | join --right { (cat zip.csv | from-csv) } --left-key statezip --right-key { $_.zipcode.toUpperCase() }
 ```
 
 Decisions taken with the user:

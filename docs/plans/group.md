@@ -1,5 +1,7 @@
 # Plan — cmdlet `group` (mini-iteration 19, FR-71)
 
+> **Since #177 (audit v2, B-07):** `--no-items` has no short form; `-n` means `--dry-run` in every cmdlet that has it (FR-18b). This plan is kept as it was written; the examples use the current form.
+
 ## Context
 Phase 5 of the cmdlet roadmap (`docs/plans/cmdlet-roadmap.md`). The backlog (§12.3) lists `group`, "Grouping", with output `Group<T>`.
 
@@ -90,7 +92,7 @@ public record Group(Object key, long count, List<Object> items) { }
 - Manual:
   - `ls -r | group ext | sort count -d | first 5`
   - `ls -r | group ext dir`
-  - `ls -r | group ext -n`
+  - `ls -r | group ext --no-items` (`-n` until #177)
   - `cat app.log | group`
   - `ls -r | group { $_.size > 1kb }`
   - `(ls -r | group ext)[0].items`

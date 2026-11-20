@@ -10,7 +10,7 @@ find src --name *.java --since 7d | where { $_.size > 2kb } | group { $_.path.pa
 
 With the cmdlets now available:
 ```text
-ls src -r --filter *.java | where { $_.modified > Instant.now().minus(Duration.ofDays(7)) } | where { $_.size > 2kb } | group { $_.path.parent } -n | sort count --desc | first 5 | to-json > rapport.json
+ls src -r --filter *.java | where { $_.modified > Instant.now().minus(Duration.ofDays(7)) } | where { $_.size > 2kb } | group { $_.path.parent } --no-items | sort count --desc | first 5 | to-json > rapport.json
 ```
 
 ## Preparation
@@ -23,7 +23,7 @@ A source tree with `.java` files, for example a clone of PowerJ (`git clone http
 |---|---|---|
 | 1 | `ls . -r --filter *.java \| count` | The number of Java files. |
 | 2 | `ls . -r --filter *.java \| where { $_.size > 2kb } \| measure size` | Count, sum, average, min and max of their sizes (`measure`). |
-| 3 | `ls . -r --filter *.java \| group { $_.path.parent } -n \| sort count --desc \| first 5` | The five folders that hold the most Java files (`group`, `sort`, `first`). |
+| 3 | `ls . -r --filter *.java \| group { $_.path.parent } --no-items \| sort count --desc \| first 5` | The five folders that hold the most Java files (`group`, `sort`, `first`). |
 | 4 | The pipeline above, with `.` for `src` | `rapport.json` is written; nothing is displayed. |
 | 5 | `cat rapport.json` | An indented JSON array of at most 5 objects `{"key": "…", "count": …, "items": []}`. |
 | 6 | `cat rapport.json \| from-json \| select key count` | The same folders and counts, as a table (`from-json`, `select`). |

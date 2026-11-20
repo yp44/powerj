@@ -110,14 +110,27 @@ final class FileArguments {
                 // Windows: * and ? are invalid in a path, handled as a wildcard
             }
         }
+        return expandWildcard(argument, includeHidden, ignoreCase, context, onError, noMatchKey, (path, _) -> path);
+    }
+
+    /**
+     * The matches of a wildcard on the last element of {@code argument}, in name order, each made by {@code visitor} from
+     * the attributes that the walk read with the listing: {@code ls *.txt} builds its entries without reading a file a
+     * second time, and a match that cannot be read is reported by the walk (review of #225). A wildcard without match
+     * reports {@code noMatchKey}, unless it is {@code null}.
+     */
+    static <T> List<T> expandWildcard(Object argument, boolean includeHidden, boolean ignoreCase,
+                                      CmdletContext<?> context, Consumer<WalkError> onError, String noMatchKey,
+                                      FileWalker.Visitor<T> visitor) {
         Split split = split(argument);
         PathMatcher pattern = Globs.matcher(split.namePattern(), ignoreCase);
-        List<Path> matches = new ArrayList<>();
+        List<T> matches = new ArrayList<>();
         FileWalker.builder().maxDepth(1).includeHidden(includeHidden).order(BY_NAME).build()
                 .walk(context.currentDirectory().resolve(split.directory()).normalize(),
-                        (path, _) -> pattern.matches(path.getFileName()) ? path : null, matches::add, onError);
+                        (path, attributes) -> pattern.matches(path.getFileName()) ? visitor.visit(path, attributes) : null,
+                        matches::add, onError);
         if (matches.isEmpty() && noMatchKey != null) { // null: the caller does not want it said (rm -f)
-            context.error(Messages.get(noMatchKey, text));
+            context.error(Messages.get(noMatchKey, text(argument)));
         }
         return matches;
     }

@@ -1389,8 +1389,12 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   operations did. `range` has its own `range.pattern.invalid` instead of borrowing `grep`'s, and the property paths of every
   cmdlet use `property.name.invalid` instead of `where.property.invalid`.
 - **One reporter of a walk error** (C-04): `FileOps.report(WalkError)` was a copy of `FileArguments.report` with other keys;
-  `cp`, `mv` and `rm` now use the one of `ls`, `cat` and `grep`, so an unreadable folder met by `cp -r` reads
-  `cannot read <path>: <reason>` instead of `<path>: <reason>`.
+  `cp`, `mv`, `rm` and `touch` now use the one of `ls`, `cat` and `grep`. **Visible change:** a folder that cannot be
+  read while a wildcard is expanded (`rm /mnt/flaky/*.tmp`) is reported as `cannot read /mnt/flaky: <reason>` instead of
+  `/mnt/flaky: <reason>`, as `ls` and `grep` already said. Step 1.8 of the architecture review had kept the shorter wording on
+  purpose, for a difference of wording that the two copies no longer had otherwise; the message says what failed (reading the
+  folder), so it now has one wording. The failures of the operation itself (a file that cannot be copied or removed) keep
+  `fileops.failed` (`<path>: <reason>`).
 
 ### Changed (names that say what they are, and Javadoc that says what the code does, [#179](https://github.com/yp44/powerj/issues/179))
 - **Renamed in `powerj-cmdlets`** (audit v2, C-05): `Properties` → `ObjectProperties` (it hid `java.util.Properties`),
@@ -1431,9 +1435,21 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   one-level walk of `FileArguments.expand`, which it now calls; the matches are sorted folders first from their `FileEntry`,
   with no file read again.
 - **`grep -p n` with files from the pipeline reads them together** (S-09): each piped file started a walk and an executor of
-  its own, so `ls -r --filter *.java | grep -p 16 TODO` read the files one after the other. With `-p` they are kept and searched
-  in `end` by one parallel walk (`GrepTest.withParallelThePipedFilesAreSearchedTogether`, which waits for two files open at
-  the same time); without `-p`, each file is still searched when it arrives, so that `| first 1` stops the reading.
+  its own, so `ls -r --filter *.java | grep -p 16 TODO` read the files one after the other. With `-p n` they are searched by
+  batches of `4n`, each batch by one parallel walk, and the last batch when the input ends
+  (`GrepTest.withParallelThePipedFilesAreSearchedTogether`, which waits for two files open at the same time); the first
+  matches come while the previous stage still runs, and memory does not grow with the input
+  (`…SearchedByBatchesBeforeTheInputEnds`). Without `-p`, each file is still searched when it arrives, so that `| first 1`
+  stops the reading.
+
+### Fixed (review of the pull request of phase 4 of the audit v2, [#225](https://github.com/yp44/powerj/pull/225))
+- **`grep -p` with files from the pipeline searches them by batches of `4n`** instead of keeping them all until the end of the
+  input: `ls -r / | grep -p 8 TODO | first 1` gave nothing before `ls` had walked the whole disk, and the list grew with the
+  input (#181).
+- **`ls *.txt` builds its entries from the attributes read with the listing** (`FileArguments.expandWildcard`): each match was
+  read a second time, and one that could not be read then vanished without an error (#181).
+- **The changed wording of a walk error of `cp`, `mv`, `rm`, `touch` is written down** (#178), and the examples of
+  `docs/acceptance/pipeline-v1.md`, `docs/plans/group.md` and `docs/plans/join.md` use `--no-items` and `--right` (#177).
 
 ## [0.1.0] — never released (baseline)
 

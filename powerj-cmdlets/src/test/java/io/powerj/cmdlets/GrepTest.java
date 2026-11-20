@@ -486,7 +486,7 @@ class GrepTest {
 
     /**
      * Audit v2, S-09: {@code ls -r | grep -p 16 TODO} searched the piped files one by one, one walk and one executor each.
-     * They are now kept and searched in {@code end}, by one parallel walk: two files are open at the same time.
+     * They are now searched together, by one parallel walk: two files are open at the same time.
      */
     @Test
     void withParallelThePipedFilesAreSearchedTogether() throws Exception {
@@ -514,5 +514,31 @@ class GrepTest {
         assertThat(waited).isNotEmpty().allMatch(Boolean::booleanValue);
         assertThat(context.emitted).map(m -> ((GrepMatch) m).path().getFileName().toString()).containsOnly("a.txt",
                 "B.java", "C.java").contains("a.txt", "B.java", "C.java");
+    }
+
+    /**
+     * Review of #225: kept until the end of the input, the piped files gave nothing before the previous stage ended
+     * ({@code ls -r / | grep -p 8 TODO | first 1} waited for the whole disk) and filled memory. They are searched by batches
+     * of {@code -p} × {@value Grep#BATCH_PER_THREAD}: the first matches come while the input still flows.
+     */
+    @Test
+    void withParallelThePipedFilesAreSearchedByBatchesBeforeTheInputEnds() throws Exception {
+        var grep = new Grep();
+        var params = new Grep.Params("(?i)todo", List.of(), false, 2, null, false, false, false, null, null, false, false);
+        context.hasInput = true;
+        int batch = 2 * Grep.BATCH_PER_THREAD;
+
+        grep.begin(params, context);
+        for (int i = 1; i < batch; i++) {
+            grep.process(params, tmp.resolve("src/B.java"), context);
+        }
+        assertThat(context.emitted).as("before the batch is full").isEmpty();
+        grep.process(params, tmp.resolve("src/B.java"), context);
+        assertThat(context.emitted).as("once the batch is full").hasSize(batch);
+        grep.process(params, tmp.resolve("src/deep/C.java"), context);
+        grep.end(params, context);
+        context.closeStates();
+
+        assertThat(context.emitted).hasSize(batch + 1);
     }
 }

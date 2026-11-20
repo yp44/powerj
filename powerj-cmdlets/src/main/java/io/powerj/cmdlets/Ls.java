@@ -97,14 +97,14 @@ public final class Ls implements Cmdlet<Ls.Params, Void, FileEntry> {
 
     /**
      * {@code ls *.txt} or {@code ls src/*.java}: wildcard on the last element of the path, expanded as every file cmdlet
-     * expands it ({@link FileArguments#expand}); the matches come folders first, and a folder that matches is walked with
-     * {@code -r} or {@code --max-depth}.
+     * expands it ({@link FileArguments#expandWildcard}), each entry made from the attributes read with the listing; the
+     * matches come folders first, and a folder that matches is walked with {@code -r} or {@code --max-depth}.
      */
     private void listWildcard(Object argument, Params params, Optional<PathMatcher> filter,
                               CmdletContext<FileEntry> context) {
-        List<FileEntry> matches = FileArguments.expand(argument, params.all(), context,
-                        error -> FileArguments.report(error, context), "files.no.match").stream()
-                .map(Ls::entry).flatMap(Optional::stream).sorted(DIRECTORIES_FIRST).toList();
+        List<FileEntry> matches = FileArguments.expandWildcard(argument, params.all(), FileArguments.ignoreCase(context),
+                        context, error -> FileArguments.report(error, context), "files.no.match", Ls::entry).stream()
+                .sorted(DIRECTORIES_FIRST).toList();
         // a match is at depth 1: its entries are one level deeper
         int below = depth(params) == Integer.MAX_VALUE ? Integer.MAX_VALUE : depth(params) - 1;
         for (FileEntry match : matches) {
