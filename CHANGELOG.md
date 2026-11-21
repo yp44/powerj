@@ -1557,13 +1557,15 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
 - **`echo-options`** in the example module `examples/samples`: it declares one option of each kind a cmdlet can have and
   emits one `OptionValues` that holds the value received for each, so that an author sees what the shell gives a cmdlet
   for what the user typed: a positional list, text, `int` against `Integer` (`0` against `null` when absent), a size with a
-  unit (`long`), `double`, `float`, `short`, `byte`, `char`, a switch, a `Duration`, a `Path`, an enum, a repeatable list
+  unit (`long`), `double`, `float`, `short`, `byte`, a `Character` (boxed, so that an absent letter is `null` and not a
+  NUL character in a table or a CSV file), a switch, a `Duration`, a `Path`, an enum, a repeatable list
   (`longName`), an `Object` and a `Pattern`, which the shell does not convert. No option is mandatory, so the cmdlet run
   alone shows every default; only `-t`, `-c` and `-v` have a short form, `-v` keeping its reserved meaning (FR-18b).
 - **A block is evaluated by the cmdlet**: `--block { … }` reaches it as a `ScriptBlock`, which it evaluates once with no
   current object (`tryInvoke(null)`, as `join --right` does) into `blockValue`; `--block ( … )` reaches it as a value,
-  which the shell computed. A block that fails is a non-blocking error and the object is still emitted; a cancellation
-  is still thrown. The README of the module explains the rule, which every built-in cmdlet follows.
+  which the shell computed. A block that fails is a non-blocking error (an exception without a message named by its type,
+  as `Skipped.report` does) and the object is still emitted; a cancellation is still thrown. The README of the module
+  explains the rule, which every built-in cmdlet follows.
 
 ### Fixed (the French help of `passthrough`)
 - **`--skip-null` was described in English in a French `help passthrough`**: its key was `passthrough.option.skipNull`, the

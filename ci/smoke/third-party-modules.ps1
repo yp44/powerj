@@ -29,6 +29,8 @@ smoke third-party-modules {
     if (($echo -join ',') -ne 'passthrough,echo-options,[hi, 3, 7, 10240, HIGH, true, PT1.5S, [a, b], { 1 + 2 }, 3, [one, two]],[0, null, false, [], [], null, null],[3, 3],true') { throw "echo-options is wrong: $echo" }
     $errors = & $PJ -c 'mod-load examples/samples/target/samples.jar; echo-options --block { 1 / 0 } | count; echo-options --count abc' 2>&1 | Out-String
     $errors
+    # count 1: the object is still emitted after the block failed
     if (-not ($errors -match 'echo-options: --block: calculation failed: division by zero') -or
+        -not ($errors -match '(?m)^1\r?$') -or
         -not ($errors -match 'echo-options: invalid value for --count')) { throw "echo-options errors are wrong: $errors" }
 }

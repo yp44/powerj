@@ -25,7 +25,8 @@ public record EchoOptionsParams(
         @Option(description = "Decimal number, as a float") float factor,
         @Option(description = "Short integer, from -32768 to 32767") short small,
         @Option(description = "Byte, from -128 to 127") byte tiny,
-        @Option(description = "Exactly one character") char letter,
+        // Character, not char: an absent char would be '\0', a NUL character written as is in a table or a CSV file
+        @Option(description = "Exactly one character") Character letter,
         @Option(shortName = 'v', description = "Switch, without a value") boolean verbose,
         @Option(description = "Duration, with a unit: 250ms, 1.5s, 5m, 2h, 7d") Duration timeout,
         @Option(description = "Path") Path path,

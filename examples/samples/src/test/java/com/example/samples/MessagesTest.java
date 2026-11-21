@@ -2,6 +2,9 @@ package com.example.samples;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.RecordComponent;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -12,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletInfo;
 import io.powerj.api.Option;
+import io.powerj.api.Previewable;
 
 /**
  * The translations of every cmdlet of the module: {@code <cmdlet>.summary} and {@code <cmdlet>.option.<long name>}
@@ -21,12 +25,30 @@ import io.powerj.api.Option;
  */
 class MessagesTest {
 
-    /** The long name the shell gives an option: {@code longName}, or the component name in kebab case. */
-    private static String longName(java.lang.reflect.RecordComponent component) {
-        String declared = component.getAnnotation(Option.class).longName();
-        return declared.isEmpty()
-                ? component.getName().replaceAll("([a-z0-9])([A-Z])", "$1-$2").toLowerCase(Locale.ROOT)
-                : declared;
+    /**
+     * The long name the shell gives an option ({@code OptionBinder}): {@code longName}, or the component name in kebab
+     * case, also for a component without {@code @Option}.
+     */
+    private static String longName(RecordComponent component) {
+        Option option = component.getAnnotation(Option.class);
+        return option != null && !option.longName().isEmpty()
+                ? option.longName()
+                : component.getName().replaceAll("([a-z0-9])([A-Z])", "$1-$2").toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * The parameter record of a cmdlet: the first type argument of {@code Cmdlet<P, I, O>}, found by its raw type among
+     * the interfaces of the class and of its superclasses ({@code implements Previewable, Cmdlet<…>} or a base class).
+     */
+    static Class<?> parameters(Class<?> type) {
+        for (Class<?> c = type; c != null; c = c.getSuperclass()) {
+            for (Type implemented : c.getGenericInterfaces()) {
+                if (implemented instanceof ParameterizedType p && p.getRawType() == Cmdlet.class) {
+                    return (Class<?>) p.getActualTypeArguments()[0];
+                }
+            }
+        }
+        throw new IllegalArgumentException(type + " does not implement Cmdlet<P, I, O> with its type arguments");
     }
 
     private static List<String> expectedKeys() {
@@ -34,9 +56,7 @@ class MessagesTest {
         for (Cmdlet<?, ?, ?> cmdlet : new SamplesProvider().cmdlets()) {
             String name = cmdlet.getClass().getAnnotation(CmdletInfo.class).name();
             keys.add(name + ".summary");
-            Class<?> params = (Class<?>) ((java.lang.reflect.ParameterizedType) cmdlet.getClass()
-                    .getGenericInterfaces()[0]).getActualTypeArguments()[0];
-            for (var component : params.getRecordComponents()) {
+            for (RecordComponent component : parameters(cmdlet.getClass()).getRecordComponents()) {
                 keys.add(name + ".option." + longName(component));
             }
         }
@@ -66,6 +86,27 @@ class MessagesTest {
                     .as(component.getName()).isEqualTo(component.getAnnotation(Option.class).description());
         }
         assertThat(new SamplesProvider().messages(Locale.FRENCH).getString("category.Examples")).isEqualTo("Exemples");
+    }
+
+    /** Test cases for {@link #parameters} and {@link #longName}: shapes that no cmdlet of the module has today. */
+    record Bare(int noAnnotation, @Option(longName = "named") String renamed, @Option String plainName) {
+    }
+
+    abstract static class Base implements Previewable<Bare>, Cmdlet<Bare, Void, String> {
+    }
+
+    static final class Derived extends Base {
+        @Override
+        public boolean canPreview(Bare params) {
+            return true;
+        }
+    }
+
+    @Test
+    void theKeysAreComputedForEveryShapeOfCmdletAndComponent() {
+        assertThat(parameters(Derived.class)).isEqualTo(Bare.class);
+        assertThat(java.util.Arrays.stream(Bare.class.getRecordComponents()).map(MessagesTest::longName))
+                .containsExactly("no-annotation", "named", "plain-name");
     }
 
     @Test

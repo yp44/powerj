@@ -105,7 +105,7 @@ blockValue : 3
 | `--size` | `long` | A size with a unit: `10kb` gives `10240` |
 | `--ratio`, `--factor` | `double`, `float` | Decimal numbers |
 | `--small`, `--tiny` | `short`, `byte` | Out of range is an error that names the option and the range |
-| `--letter` | `char` | Exactly one character; `'\0'` when not given |
+| `--letter` | `Character` | Exactly one character; `null` when not given. Boxed on purpose: a primitive `char` would be `'\0'`, a NUL character written as is into a table or a CSV file |
 | `-v`, `--verbose` | `boolean` | A switch, without a value (`--verbose=false` also works) |
 | `--timeout` | `Duration` | A duration with a unit: `250ms`, `1.5s`, `5m`, `2h`, `7d` |
 | `--path` | `Path` | A path |

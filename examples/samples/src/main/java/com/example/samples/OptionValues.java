@@ -15,7 +15,7 @@ import java.util.regex.Pattern;
  *                   block failed
  */
 public record OptionValues(List<String> words, String text, int count, Integer number, long size, double ratio,
-                           float factor, short small, byte tiny, char letter, boolean verbose, Duration timeout,
+                           float factor, short small, byte tiny, Character letter, boolean verbose, Duration timeout,
                            Path path, Level level, List<String> tags, Object block, Pattern pattern,
                            Object blockValue) {
 }

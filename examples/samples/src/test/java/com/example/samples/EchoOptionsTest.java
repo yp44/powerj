@@ -47,7 +47,7 @@ class EchoOptionsTest {
 
     /** What the shell gives for {@code echo-options} without arguments: the default of each type. */
     private static EchoOptionsParams defaults(Object block) {
-        return new EchoOptionsParams(List.of(), null, 0, null, 0L, 0.0, 0f, (short) 0, (byte) 0, '\0', false, null,
+        return new EchoOptionsParams(List.of(), null, 0, null, 0L, 0.0, 0f, (short) 0, (byte) 0, null, false, null,
                 null, null, List.of(), block, null);
     }
 
@@ -84,7 +84,7 @@ class EchoOptionsTest {
         assertThat(values.tags()).isEmpty();
         assertThat(values.number()).isNull(); // boxed: absent is null, while the primitive count is 0
         assertThat(values.count()).isZero();
-        assertThat(values.letter()).isEqualTo('\0');
+        assertThat(values.letter()).isNull(); // Character: no NUL character in a table or a CSV file
         assertThat(values.block()).isNull();
         assertThat(values.blockValue()).isNull();
     }
@@ -114,6 +114,15 @@ class EchoOptionsTest {
         assertThat(values.blockValue()).isNull();
         assertThat(values.block()).isSameAs(block);
         assertThat(context.errors).containsExactly("--block: / by zero");
+    }
+
+    @Test
+    void anExceptionWithoutAMessageIsNamedByItsType() throws Exception {
+        var block = new RecordingBlock(current -> {
+            throw new IllegalStateException();
+        });
+        run(defaults(block));
+        assertThat(context.errors).containsExactly("--block: java.lang.IllegalStateException");
     }
 
     @Test

@@ -41,7 +41,10 @@ public final class EchoOptions implements Cmdlet<EchoOptionsParams, Void, Option
         }
         Attempt<Object> attempt = script.tryInvoke(null);
         if (attempt.failed()) {
-            ctx.error(Messages.get("echo-options.block.failed", attempt.error().getMessage()));
+            // an exception without a message is named by its type, never "null", as the built-in cmdlets do
+            RuntimeException error = attempt.error();
+            ctx.error(Messages.get("echo-options.block.failed",
+                    error.getMessage() != null ? error.getMessage() : error.toString()));
             return null;
         }
         return attempt.value();
