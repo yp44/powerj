@@ -6,7 +6,8 @@
 #   ci/smoke/profiler.ps1             the runtime of the image holds the profiler of the perf mode (profiler.sh)
 #   ci/smoke/modules.ps1              the runtime of the image holds the modules of PowerJ (modules.sh)
 #   ci/smoke/non-interactive.ps1      -c, a script file, standard input, the options of the launcher (non-interactive.sh)
-#   ci/smoke/third-party-modules.ps1  greet.jar loaded from the modules folder, in English and French (third-party-modules.sh)
+#   ci/smoke/third-party-modules.ps1  greet.jar loaded from the modules folder, in English and French; samples.jar loaded
+#                                     with mod-load (third-party-modules.sh)
 #   ci/smoke/fx.ps1                   the JavaFX module: consent and loading; a window is checked by hand (fx.sh)
 #
 # A script ends with `exit 0` once its checks passed (the function `smoke` does it): a pwsh step of GitHub Actions takes

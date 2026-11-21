@@ -20,7 +20,7 @@ import io.powerj.api.CmdletInfo;
  */
 @CmdletInfo(name = "passthrough", preview = true, category = "Examples",
         summary = "Emits each object it receives, optionally without the nulls or wrapped in an Optional",
-        examples = {"ls | passthrough", "ls | passthrough --optional", "java.util.Arrays.asList(\"a\", null) | passthrough -n"})
+        examples = {"ls | passthrough", "ls | passthrough --optional", "java.util.Arrays.asList(\"a\", null) | passthrough -s"})
 public final class Passthrough implements Cmdlet<PassthroughParams, Object, Object> {
 
     @Override
