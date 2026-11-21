@@ -1583,6 +1583,13 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   already offered paths and `^import <Tab>` still offers packages (that branch ignores `^`). `^mod-load <Tab>` offers every
   file, without the folder and `.jar` filter, which is for the built-in `mod-load` only.
 
+### Fixed (Tab completes a command name after its dash, [#243](https://github.com/yp44/powerj/issues/243))
+- **`mod-loa<Tab>` offered nothing**: the word to complete stopped at the dash, so it was `loa`, an argument of a command
+  named `mod-`. At the head of a command stage (also after `|`, `;`, `&&`, `^` and `$x =`), the name now runs back over
+  its dashes, and `mod-load`, `mod-list`, `to-json`, `from-csv`, the dashed cmdlets of a module and programs such as
+  `apt-get` are completed once the dash is typed. Elsewhere a dash keeps its meaning: an option (`--name`), an operator
+  (`$a-1`) or a character of an argument.
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.
