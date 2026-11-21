@@ -1577,6 +1577,11 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
 - **`mod-load <Tab>` offered nothing**: `ArgumentCompleter` gave no suggestion to any built-in command but `cd`. `mod-load`
   now completes paths, and offers the folders and the `.jar` files only (a module is one or the other; the case of the
   extension is ignored). `PathCompleter.paths` takes an optional filter for the files; the folders are always offered.
+- **Behaviour change: after `^`, a built-in name no longer silences completion.** `^` runs a program of the `PATH` even
+  when a built-in has the same name, so `^help <Tab>`, `^history <Tab>`, `^jobs <Tab>`, `^pwd <Tab>`, `^which <Tab>`,
+  `^mod-list <Tab>` and `^exit <Tab>` now offer paths, as any native program does; they used to offer nothing. `^cd <Tab>`
+  already offered paths and `^import <Tab>` still offers packages (that branch ignores `^`). `^mod-load <Tab>` offers every
+  file, without the folder and `.jar` filter, which is for the built-in `mod-load` only.
 
 ## [0.1.0] — never released (baseline)
 
