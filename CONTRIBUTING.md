@@ -209,7 +209,8 @@ are kept in the language in which they were commissioned. The issues they gave r
    specification, [CHANGELOG.md](CHANGELOG.md).
 
 A cmdlet written outside the repository follows the same contract: see "Writing your own cmdlet" in the
-[README](README.md#writing-your-own-cmdlet) and the example module [`examples/greet`](examples/greet/README.md).
+[README](README.md#writing-your-own-cmdlet) and the example modules [`examples/greet`](examples/greet/README.md) and
+[`examples/samples`](examples/samples/README.md), whose tests use `powerj-testing` as above.
 
 ## Acceptance sheets
 

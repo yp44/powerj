@@ -294,6 +294,7 @@ All modules are JPMS modules (`module-info.java`); the only runtime dependency i
 | `powerj-bench` | JMH benchmarks, outside the default build (`-Pbench`, [numbers](docs/quality/performance.md)) |
 | `powerj-dist` | Distribution: jlink runtime + jpackage launcher / installer |
 | `examples/greet` | Example third-party module, not shipped: a template for your own cmdlets |
+| `examples/samples` | Example third-party module, not shipped: small sample cmdlets loaded with `mod-load` (`passthrough`) |
 
 ### Life of a line
 
@@ -376,7 +377,7 @@ A cmdlet is **one object shared by every command that uses it**, even by two sta
 
 A `CmdletProvider` lists the module's cmdlets (and may provide translations through `messages(Locale)`), declared in `module-info.java` with `provides io.powerj.api.CmdletProvider with …`. Build the jar and drop it into `~/.powerj/modules/`, or load it without restarting with `mod-load path/to/greet.jar`; `mod-list` shows what is loaded. Each module gets its own `ModuleLayer`, so dependencies of different modules do not clash; if two modules declare the same name, the second one is reachable as `module:name`.
 
-The complete example lives in [`examples/greet`](examples/greet) (also built by the CI as the `greet-module` artifact); the contract is detailed in [§4 of the specification](docs/SPECIFICATION.md#4-extension-api-third-party-cmdlets).
+The complete example lives in [`examples/greet`](examples/greet) (also built by the CI as the `greet-module` artifact). [`examples/samples`](examples/samples) gathers smaller sample cmdlets that you load with `mod-load`; the first one, `passthrough`, is the simplest cmdlet that reads the pipeline (`process` only), with two switches (`--skip-null`, `--optional`). The contract is detailed in [§4 of the specification](docs/SPECIFICATION.md#4-extension-api-third-party-cmdlets).
 
 ## Tests
 
@@ -414,7 +415,7 @@ The v1 cmdlet roadmap is done ([roadmap](docs/plans/cmdlet-roadmap.md), end-to-e
 - [Architecture](docs/ARCHITECTURE.md): modules, layers, how a line runs, the rules and the tests that keep them; [decision records](docs/adr/).
 - [Contributing](CONTRIBUTING.md): building, the gates of `verify`, the backlog (GitHub issues), how we work, the language policy, adding a cmdlet. [Security policy](SECURITY.md).
 - [Acceptance checklists](docs/acceptance/) for each development step, and [plans](docs/plans/) of the latest iterations.
-- [Example module `greet`](examples/greet/README.md).
+- [Example module `greet`](examples/greet/README.md) and [example module `samples`](examples/samples/README.md).
 - [Architecture review](docs/REVUE-ARCHITECTURE.md) (in French): strengths, findings, target organization, design patterns and a phased refactoring plan; Phases 0 to 5 are done, see its §11 to §16. [Audit v2 of 2026-11-14](docs/AUDIT-v2-2026-11-14.md) (in French): robustness, clarity, best practices, stability and the user experience of the shell; its plan is the epic [#141](https://github.com/yp44/powerj/issues/141). [Changelog](CHANGELOG.md).
 - [Module `powerj-fx` and `grid`](docs/plans/fx-grid.md): plan, decisions and [acceptance checklist](docs/acceptance/fx-grid.md).
 

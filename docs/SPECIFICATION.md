@@ -1404,6 +1404,7 @@ A value is matched on its prefix: `fr`, `fr_FR`, `FR` give French; `en`, `de`…
 | `io/powerj/cmdlets` | idem | Built-in cmdlets (summaries, options, categories, errors) |
 | `io/powerj/shell` | idem | REPL, history, startup, configuration |
 | `com/example/greet` | idem | Example module (§4.3) |
+| `com/example/samples` | idem | Example module of sample cmdlets (`passthrough`) |
 
 Third-party modules translate their cmdlets with `CmdletProvider.messages(Locale)` (§4.2).
 

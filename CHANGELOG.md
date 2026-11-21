@@ -1538,6 +1538,19 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
 - **The Javadoc of `CmdletContext.service`** no longer gives `PerfReports` as its example, a type that a third-party module can no
   longer see (#185): the services of today are for the built-in cmdlets only.
 
+### Added (an example module of sample cmdlets, loaded with `mod-load`, [#237](https://github.com/yp44/powerj/issues/237))
+- **`examples/samples`**: a second example third-party module, not shipped, that gathers small sample cmdlets, each showing one
+  aspect of the extension API. It builds `examples/samples/target/samples.jar`, which `mod-load` loads without restarting the
+  shell; the CI uploads it as the `samples-module` artifact.
+- **Its first cmdlet, `passthrough`**, is the simplest cmdlet that reads the pipeline: `process` emits each object it receives,
+  `null` included. `-n`/`--skip-null` drops the nulls; `-o`/`--optional` emits `Optional.ofNullable(object)` instead; with
+  both, the nulls are dropped first. `passThrough` is left `false` in `@CmdletInfo`, because with `--optional` the output is not
+  the input: completion does not look through it. Its README notes that an `Optional` is unrolled before the next stage
+  (FR-30b), so `passthrough -o` only shows its `Optional`s at the end of a line or in a variable.
+- **Tested** with `powerj-testing` (`PassthroughTest`, each combination of the options, no input, the annotation, both
+  bundles), and in the packaged shell by `ci/smoke/third-party-modules.sh` and `.ps1` (`mod-load`, a `null` that reaches the
+  cmdlet, `--optional` kept at the end of a line and unrolled before `count`).
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.

@@ -24,6 +24,7 @@
         <module>powerj-coverage</module>
         <module>powerj-dist</module>
         <module>examples/greet</module>
+        <module>examples/samples</module>
     </modules>
 
     <properties>
@@ -256,7 +257,7 @@
                             <includeSystemScope>false</includeSystemScope>
                             <includeTestScope>false</includeTestScope>
                             <!-- What ships is the shell and the libraries it needs; powerj-fx is shipped apart and stays. -->
-                            <excludeArtifactId>powerj-coverage,powerj-dist,powerj-architecture,powerj-testing,powerj-example-greet</excludeArtifactId>
+                            <excludeArtifactId>powerj-coverage,powerj-dist,powerj-architecture,powerj-testing,powerj-example-greet,powerj-example-samples</excludeArtifactId>
                         </configuration>
                     </plugin>
                 </plugins>
