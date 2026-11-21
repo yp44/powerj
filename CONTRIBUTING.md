@@ -15,12 +15,14 @@ You need **JDK 25 or newer**. Maven is not needed: the `mvnw` wrapper downloads 
 ./mvnw -DskipFx verify                 # without the optional graphical module (a platform that has no JavaFX)
 ./mvnw -Psbom -DskipTests package      # + target/bom.json, the CycloneDX bill of materials
 bash ci/smoke/launcher.sh              # then any script of ci/smoke/ against that image
+pwsh ci/smoke/launcher.ps1             # on Windows, after mvnw.cmd -Pdist verify: the same sessions in PowerShell
 ./mvnw spotless:apply                  # fixes the formatting that `verify` would refuse
 ```
 
 Use `-pl <module> -am`, never `-pl <module>` alone: the other modules are then taken from your local repository, which
 may hold an older build. The smoke tests of `ci/smoke/` exercise what unit tests cannot: the module system of the
-packaged launcher. `ci/smoke/fx.sh` needs a display (Xvfb is enough).
+packaged launcher. `ci/smoke/fx.sh` needs a display (Xvfb is enough). Each `*.ps1` is the Windows counterpart of the
+`*.sh` of the same name (`ci/smoke/common.sh` lists them): a change to a session goes into both.
 
 ## The gates of `./mvnw verify`
 
