@@ -1464,6 +1464,18 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   `FilterParserTest`, `RowExporterTest` and the new `ValueOrderTest`, with a test double of `java.sql.Date`: the module does
   not read `java.sql`).
 
+### Changed (the types of a commit are written down, and the CI checks the subjects, [#184](https://github.com/yp44/powerj/issues/184))
+- **Ten types, and the scope in parentheses** (audit v2, C-09): `CONTRIBUTING.md` listed seven types while `perf`, `chore` and
+  `style` were in use, and seven subjects of `main` had a scope in place of the type (`select:` ×2, `fx:` ×2, `shell:`,
+  `join:`, `group:`). The list now has the ten types, `!` for a breaking change, and the rule that a scope goes in parentheses
+  (`feat(select): …`). History is not rewritten.
+- **`ci/check-commit-subjects.sh`** checks the subject of each commit of a pull request (job "Commit subjects" of `ci.yml`): a
+  pull request with a commit `shell: x` is red. A merge or a revert written by git passes. No dependency: git and bash;
+  `ci/check-commit-subjects-test.sh` runs its cases (`shell: x`, `fix (core): x`, `fixup! …` fail; `refactor(api,cmdlets): …`,
+  `feat(api)!: …` pass), seen failing with the types loosened on purpose.
+- **Dependabot writes `build(deps): bump …` and `ci(deps): bump …`** (`commit-message` in `.github/dependabot.yml`), so that its
+  pull requests pass the check.
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.

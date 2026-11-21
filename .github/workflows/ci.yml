@@ -113,6 +113,26 @@ jobs:
           if-no-files-found: error
 
   # The jobs below do not need the application image: they run beside the build, not after it.
+  commit-subjects:
+    name: Commit subjects
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Cases of the check
+        run: ci/check-commit-subjects-test.sh
+
+      # type(scope): subject, with a type of CONTRIBUTING.md (#184). Only a pull request has a range of commits of its own.
+      - name: Subjects of the commits of the pull request
+        if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: ci/check-commit-subjects.sh "$BASE" "$HEAD"
+
   fx-ui:
     name: Window of the graphical module (Linux, xvfb)
     runs-on: ubuntu-latest

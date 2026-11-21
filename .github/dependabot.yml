@@ -6,6 +6,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # "build(deps): bump …", as the CI asks of every commit of a pull request (ci/check-commit-subjects.sh, #184).
+    commit-message:
+      prefix: build
+      include: scope
     open-pull-requests-limit: 5
     groups:
       maven-plugins:
@@ -23,6 +27,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    commit-message:
+      prefix: ci
+      include: scope
     # One pull request a week for the minor and patch updates of all the actions, as for the Maven plugins and the test
     # libraries (issue #144): the queue was eight pull requests long. A major version stays a pull request of its own, since
     # it can change the inputs or the Node runtime of an action and one red check must not hold back all the others. JLine and
