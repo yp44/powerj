@@ -1493,6 +1493,23 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
 - **`TestContext.perfReports` is replaced by `TestContext.services`** (module `powerj-testing`, test scope only): a test puts the
   services the shell offers by type. The kit of tests no longer names the `perf` package, which its users may not read.
 
+### Fixed (no English left in a French perf footer, and the keys the code builds are checked, [#186](https://github.com/yp44/powerj/issues/186))
+- **The perf footer is in the language of the session** (audit v2, B-09; FR-61, FR-76): its first column header came from the
+  bundle, the next five (`in`, `out`, `active`, `starved`, `blocked`) and the `display` row were literals, so a French summary
+  was half English. They are `perf.footer.*` keys: `entrée`, `sortie`, `actif`, `à vide`, `bloqué`, `affichage`
+  (`PerfFooterTest`, seen red first). `── perf ·` keeps the name of the mode.
+- **`help <class>` writes its first line as Java does, in every language**: `class` went through the bundle (`classe` in French)
+  while `interface`, `enum`, `record`, `annotation` and `extends` did not, which gave `classe java.util.ArrayList extends
+  AbstractList`. The ticket offered to translate them all or none; they are Java keywords, like the signatures below them, so
+  none is (`help.kind.class` is removed; `HelpJavaClassTest`, seen red first).
+- **The keys built by the code exist in both languages**: `DynamicMessageKeysTest` lists the families that
+  `MessageBundlesTest` cannot see because they are not written whole (`located(…)` → `.end`/`.at` and `inContext(…)` →
+  `.block` of the parser, `block.arity.<one|other>.<one|other>`), and `CommandResolutionTest` checks
+  `help.builtin.<name>.usage` as well as `.description` for each built-in command. It was seen failing with
+  `syntax.missing.block` removed from the French bundle.
+- Already done before this ticket: `MessageBundlesTest` compares the `{n}` of each key in `en` and `fr`, and the `/ by zero` of
+  the JDK is `operator.divisionByZero` (#175).
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.

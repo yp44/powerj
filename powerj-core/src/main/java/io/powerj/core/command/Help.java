@@ -69,11 +69,15 @@ public final class Help {
         throw new PjException(Messages.get("help.unknown", name));
     }
 
-    /** Constructors, static and instance methods, public fields of a Java class (FR-54). */
+    /**
+     * Constructors, static and instance methods, public fields of a Java class (FR-54). The first line is the declaration as
+     * Java writes it ({@code class java.util.ArrayList extends AbstractList}): its keywords are Java, not English, and are
+     * not translated, as the names and signatures below it are not (audit v2, B-09).
+     */
     public static List<Object> javaClass(Class<?> type) {
         List<Object> lines = new ArrayList<>();
         String kind = type.isAnnotation() ? "annotation" : type.isInterface() ? "interface" : type.isEnum() ? "enum"
-                : type.isRecord() ? "record" : Messages.get("help.kind.class");
+                : type.isRecord() ? "record" : "class";
         lines.add(kind + " " + type.getName() + (type.getSuperclass() != null && type.getSuperclass() != Object.class
                 && !type.isEnum() && !type.isRecord() ? " extends " + type.getSuperclass().getSimpleName() : ""));
         List<String> constructors = new ArrayList<>();

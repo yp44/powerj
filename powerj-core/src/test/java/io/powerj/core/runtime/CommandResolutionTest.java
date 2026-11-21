@@ -19,6 +19,7 @@ import io.powerj.api.Cmdlet;
 import io.powerj.api.CmdletInfo;
 import io.powerj.core.command.CmdletRegistry;
 import io.powerj.core.command.Help;
+import io.powerj.core.i18n.Messages;
 import io.powerj.core.nativeexec.CommandResolver;
 import io.powerj.core.support.FakeCmdlets;
 import io.powerj.fs.Host;
@@ -138,6 +139,8 @@ class CommandResolutionTest {
                 continue; // provided by the shell, documented here all the same
             }
             assertThat(Help.isDocumentedBuiltin(name)).as("help.builtin.%s.description", name).isTrue();
+            // Help builds the key of the usage too (audit v2, B-09); MessageBundlesTest checks it is in both languages
+            assertThat(Messages.has("help.builtin." + name + ".usage")).as("help.builtin.%s.usage", name).isTrue();
         }
         assertThat(Help.isDocumentedBuiltin("history")).isTrue();
     }
