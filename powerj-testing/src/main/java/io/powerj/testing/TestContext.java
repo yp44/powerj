@@ -18,8 +18,6 @@ import java.util.function.Supplier;
 
 import io.powerj.api.CmdletContext;
 import io.powerj.api.ScriptBlock;
-import io.powerj.api.perf.PerfReport;
-import io.powerj.api.perf.PerfReports;
 
 /**
  * In-memory {@link CmdletContext} for the tests of a cmdlet: it collects what the cmdlet emits and the errors it reports,
@@ -43,8 +41,11 @@ public final class TestContext<O> implements CmdletContext<O> {
     public int objectsSent;
     /** Configuration folder given to the cmdlet ({@code null}: none). */
     public Path configDirectory;
-    /** Lines measured in perf mode, most recent first. */
-    public List<PerfReport> perfReports = List.of();
+    /**
+     * The services the shell offers ({@link #service}), by type; none by default. A test of {@code perf} puts its
+     * {@code PerfReports} here: the package {@code io.powerj.api.perf} is exported to the built-in modules only.
+     */
+    public final Map<Class<?>, Object> services = new HashMap<>();
     /** Simulated compilation: refused by default, the message is the source. */
     public Function<String, ScriptBlock> compiler = source -> {
         throw new UnsupportedOperationException(source);
@@ -116,7 +117,7 @@ public final class TestContext<O> implements CmdletContext<O> {
 
     @Override
     public <S> Optional<S> service(Class<S> type) {
-        return type == PerfReports.class ? Optional.of(type.cast((PerfReports) () -> perfReports)) : Optional.empty();
+        return Optional.ofNullable(type.cast(services.get(type)));
     }
 
     @Override

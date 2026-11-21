@@ -1476,6 +1476,23 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
 - **Dependabot writes `build(deps): bump …` and `ci(deps): bump …`** (`commit-message` in `.github/dependabot.yml`), so that its
   pull requests pass the check.
 
+### Changed (the extension API before its first release: `perf` is not API, `Row` refuses a nameless column, [#185](https://github.com/yp44/powerj/issues/185))
+- **Breaking change of the API** (before the first release): `io.powerj.api.perf` is exported to `io.powerj.core` and
+  `io.powerj.cmdlets` only (audit v2, B-04). Its eleven records (`PerfReport`, `StageStat`…) were 190 of the 302 lines of the
+  snapshot of the API, with public constructors: once japicmp compares versions (#57), a field added to a measure would have
+  been a break. They are the data of the built-in `perf` cmdlet, which the core produces; the user still reads them through
+  `$perf`. The snapshot loses them (one regeneration), and `ApiSurfaceTest` now reads the exports of `module-info.class`: a
+  package exported to the built-in modules only is not API, whatever its name.
+- **Breaking change of the API**: `Row.of` throws `NullPointerException` for a `null` column name (R-17). It was accepted, and
+  the table display failed later (`List.copyOf` of the keys), far from the cmdlet that built the row. Tested in `RowTest`.
+- **Javadoc**: `CmdletProvider.cmdlets()` says when it is called (once per load, on the loading thread), that the list is not
+  kept, that an invalid cmdlet is left out with a warning, and that an exception fails the load of the module;
+  `CmdletContext.variable()` says that the automatic variables are included and that an unset variable and one that holds
+  `null` both give an empty `Optional`. No `hasVariable` is added: no cmdlet needs it, and a `default` method can be added
+  later without a break.
+- **`TestContext.perfReports` is replaced by `TestContext.services`** (module `powerj-testing`, test scope only): a test puts the
+  services the shell offers by type. The kit of tests no longer names the `perf` package, which its users may not read.
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.

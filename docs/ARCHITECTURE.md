@@ -50,7 +50,7 @@ flowchart BT
 
 | Module | Depends on | Is |
 |---|---|---|
-| `powerj-api` | the JDK | The contract of a cmdlet (`Cmdlet`, `CmdletContext`, `@CmdletInfo`, `@Option`, `CmdletProvider`), the values it exchanges (`Row`, `Collected`, `Span`…), the capability interfaces (`Previewable`, `ColumnProvider`) and `io.powerj.api.perf`. The only module a third party compiles against. |
+| `powerj-api` | the JDK | The contract of a cmdlet (`Cmdlet`, `CmdletContext`, `@CmdletInfo`, `@Option`, `CmdletProvider`), the values it exchanges (`Row`, `Collected`, `Span`…), the capability interfaces (`Previewable`, `ColumnProvider`). The only module a third party compiles against; `io.powerj.api.perf` (the measures of the perf mode) and `io.powerj.api.internal` are exported to the built-in modules only. |
 | `powerj-fs` | the JDK | `FileWalker` and `FileTrees`: sequential or parallel walks, copy and delete of trees; `Host`, the one place that reads the operating system. |
 | `powerj-text` | `api` | What `core`, `cmdlets` and `fx` share about the output contract (reading a record, showing and parsing values), so that the terminal, the grid and the exports cannot disagree ([ADR 0010](adr/0010-shared-output-helpers-live-in-powerj-text.md)). Not API. It holds `Formats`, `RecordView`, `SizeUnits` and `GuardedText` (issues #108 to #111). In the image, so that `powerj-fx` finds it in the boot layer like `api`. |
 | `powerj-core` | `api` | The language (`lang`), the engine (`runtime`, `command`, `java`, `nativeexec`, `format`), the completion (`assist`), the profiler (`perf`). Exported to the shell only. |

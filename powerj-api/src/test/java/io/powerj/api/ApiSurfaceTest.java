@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
 import java.io.IOException;
+import java.lang.module.ModuleDescriptor;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -15,6 +16,9 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
@@ -64,18 +68,34 @@ class ApiSurfaceTest {
     @Test
     void theSnapshotCoversEveryClassOfThePackage() throws Exception {
         assertThat(classNames()).isNotEmpty().contains("io.powerj.api.Cmdlet", "io.powerj.api.CmdletContext",
-                "io.powerj.api.Option", "io.powerj.api.Row", "io.powerj.api.perf.PerfReport");
+                "io.powerj.api.Option", "io.powerj.api.Row");
+    }
+
+    @Test
+    void thePackagesExportedToTheBuiltInModulesOnlyAreNotApi() throws Exception {
+        // audit v2, B-04: the records of the perf mode were half of the snapshot, and a field added to one a break
+        assertThat(publicPackages()).containsExactly("io.powerj.api");
+        assertThat(classNames()).noneMatch(n -> n.startsWith("io.powerj.api.perf.") || n.startsWith("io.powerj.api.internal."));
+    }
+
+    /** The packages the module exports to every module: what a third-party module compiles against. */
+    private static Set<String> publicPackages() throws IOException {
+        try (var in = Files.newInputStream(Path.of("target/classes/module-info.class"))) {
+            return ModuleDescriptor.read(in).exports().stream().filter(e -> !e.isQualified())
+                    .map(ModuleDescriptor.Exports::source).collect(Collectors.toCollection(TreeSet::new));
+        }
     }
 
     private static List<String> classNames() throws IOException {
+        Set<String> exported = publicPackages();
         try (Stream<Path> files = Files.walk(CLASSES)) {
             return files.map(CLASSES::relativize).map(Path::toString)
                     .filter(n -> n.endsWith(".class") && !n.endsWith("module-info.class")
-                            && !n.endsWith("package-info.class")
-                            // exported to the built-in modules only, so not what a third-party module compiles against
-                            && !n.startsWith("internal" + java.io.File.separator))
+                            && !n.endsWith("package-info.class"))
                     .map(n -> "io.powerj.api." + n.substring(0, n.length() - ".class".length())
                             .replace(java.io.File.separatorChar, '.'))
+                    // a package exported to the built-in modules only is not what a third-party module compiles against
+                    .filter(n -> exported.contains(n.substring(0, n.lastIndexOf('.'))))
                     .sorted()
                     .toList();
         }

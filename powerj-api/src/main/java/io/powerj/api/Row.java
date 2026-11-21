@@ -4,12 +4,13 @@ import java.util.AbstractMap;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
  * Object made of named columns, produced by {@code select} (specification FR-69): an immutable {@code Map} of column
  * name → value that keeps the order of the columns. The shell reads a column like a property ({@code $_.kb}) and
- * displays successive rows with the same columns as a table.
+ * displays successive rows with the same columns as a table. Every column has a name; a value may be {@code null}.
  */
 public final class Row extends AbstractMap<String, Object> {
 
@@ -17,11 +18,18 @@ public final class Row extends AbstractMap<String, Object> {
     private final Set<String> sizeColumns;
 
     private Row(Map<String, ?> values, Set<String> sizeColumns) {
-        this.values = Collections.unmodifiableMap(new LinkedHashMap<>(values));
+        var copy = new LinkedHashMap<String, Object>(values);
+        // Refused here rather than when the table is drawn, far from the cmdlet that built the row (audit v2, R-17).
+        copy.keySet().forEach(name -> Objects.requireNonNull(name, "a column name of a Row is null"));
+        this.values = Collections.unmodifiableMap(copy);
         this.sizeColumns = Set.copyOf(sizeColumns);
     }
 
-    /** Row of these columns, in the iteration order of {@code values} ({@code null} values allowed). */
+    /**
+     * Row of these columns, in the iteration order of {@code values} ({@code null} values allowed).
+     *
+     * @throws NullPointerException if a column name is {@code null}
+     */
     public static Row of(Map<String, ?> values) {
         return new Row(values, Set.of());
     }
@@ -29,6 +37,8 @@ public final class Row extends AbstractMap<String, Object> {
     /**
      * Row of these columns, of which {@code sizeColumns} hold sizes in bytes, displayed in readable form like a
      * {@link Bytes} component ({@code 14.2 KB}).
+     *
+     * @throws NullPointerException if a column name, or one of {@code sizeColumns}, is {@code null}
      */
     public static Row of(Map<String, ?> values, Set<String> sizeColumns) {
         return new Row(values, sizeColumns);

@@ -6,7 +6,13 @@
 @SuppressWarnings("module")
 module io.powerj.api {
     exports io.powerj.api;
-    exports io.powerj.api.perf;
+
+    /**
+     * What the perf mode measured (FR-75): the data of the built-in {@code perf} cmdlet, produced by the core. Not API: its
+     * records change with what is measured, and a third-party cmdlet has no use for them (audit v2, B-04). The user reads a
+     * report through {@code $perf}, which the core shows, not through this package.
+     */
+    exports io.powerj.api.perf to io.powerj.core, io.powerj.cmdlets;
 
     /**
      * Where the language is written. Not API: the built-in modules only, so that a third-party cmdlet can read the
