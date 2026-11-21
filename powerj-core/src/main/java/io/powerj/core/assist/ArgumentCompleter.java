@@ -41,6 +41,9 @@ final class ArgumentCompleter {
         if (name.equals("import")) {
             return packages.imports(wordStart, word);
         }
+        if (!forceNative && name.equals("mod-load")) {
+            return paths.paths(line, wordStart, cursor, ArgumentCompleter::isJar); // a module: a folder or a jar
+        }
         if (cmdlet.isPresent()) {
             List<OptionBinder.OptionSpec> specs = OptionBinder.specs(cmdlet.get().parameters());
             if (word.startsWith("-")) {
@@ -62,6 +65,10 @@ final class ArgumentCompleter {
             return Result.none(cursor);
         }
         return paths.paths(line, wordStart, cursor); // cd and native commands: paths (FR-25)
+    }
+
+    private static boolean isJar(Path file) {
+        return file.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".jar");
     }
 
     private static boolean isArgumentBoundary(char c) {

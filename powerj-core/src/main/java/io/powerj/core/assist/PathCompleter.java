@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.Predicate;
 
 import io.powerj.core.assist.Completions.Candidate;
 import io.powerj.core.assist.Completions.Result;
@@ -36,6 +37,11 @@ final class PathCompleter {
 
     /** File paths for the word starting at {@code start} (possibly quoted). */
     Result paths(String line, int start, int cursor) {
+        return paths(line, start, cursor, _ -> true);
+    }
+
+    /** Like {@link #paths(String, int, int)}, keeping the files for which {@code fileFilter} is true (folders are always offered). */
+    Result paths(String line, int start, int cursor, Predicate<Path> fileFilter) {
         String raw = line.substring(start, cursor);
         boolean quoted = raw.startsWith("\"");
         String text = quoted ? unescape(raw.substring(1)) : raw;
@@ -66,6 +72,9 @@ final class PathCompleter {
                     continue;
                 }
                 boolean dir = Files.isDirectory(entry);
+                if (!dir && !fileFilter.test(entry)) {
+                    continue;
+                }
                 String value = dirPart + name + (dir ? String.valueOf(separator) : "");
                 candidates.add(new Candidate(value, name + (dir ? separator : ""), dir ? Messages.get("completion.directory") : "", !dir));
                 if (candidates.size() >= MAX_FILES) {

@@ -323,7 +323,7 @@ nothing, so there is nothing to force). Other letters (`-d`, `-c`, `-s`, `-k`, `
 **FR-22 — Option completion.** After `-` or `--`, Tab offers the options of the current command with their description, **excluding those already typed**. Options are read from the cmdlet metadata: a third-party cmdlet is therefore completed without any extra code.
 - CA: `ls --<Tab>` offers `--all --filter --recurse`.
 
-**FR-23 — Value completion.** Depending on the parameter type: enum → constants, in lower case; `Path` or positional text → file paths; `boolean` → nothing. A path containing a space is inserted between quotes with Java escapes. A cmdlet will be able to provide its own completion via `@Completion(MonCompleteur.class)` (after v1).
+**FR-23 — Value completion.** Depending on the parameter type: enum → constants, in lower case; `Path` or positional text → file paths; `boolean` → nothing. A path containing a space is inserted between quotes with Java escapes. After `mod-load`, only folders and `.jar` files are offered. A cmdlet will be able to provide its own completion via `@Completion(MonCompleteur.class)` (after v1).
 
 **FR-24 — Property and variable completion.** After `$` → defined variables. After `$_.` in a `{ }` block → components of the record produced by the previous stage (static output type of the upstream cmdlet). After `$var.` → components of the type of the value of `$var`.
 - CA: `ls | where { $_.<Tab>` offers `name size modified path dir ext`.

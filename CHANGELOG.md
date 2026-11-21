@@ -1573,6 +1573,11 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   checked the same wrong key. `MessagesTest` now computes every key from the annotations as the shell does, and fails on
   the old one.
 
+### Fixed (Tab completes the path of `mod-load`, [#241](https://github.com/yp44/powerj/issues/241))
+- **`mod-load <Tab>` offered nothing**: `ArgumentCompleter` gave no suggestion to any built-in command but `cd`. `mod-load`
+  now completes paths, and offers the folders and the `.jar` files only (a module is one or the other; the case of the
+  extension is ignored). `PathCompleter.paths` takes an optional filter for the files; the folders are always offered.
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.
