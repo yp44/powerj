@@ -1544,12 +1544,14 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   shell; the CI uploads it as the `samples-module` artifact.
 - **Its first cmdlet, `passthrough`**, is the simplest cmdlet that reads the pipeline: `process` emits each object it receives,
   `null` included. `-s`/`--skip-null` drops the nulls (not `-n`, which FR-18b reserves for `--dry-run`); `-o`/`--optional`
-  emits `Optional.ofNullable(object)` instead; with both, the nulls are dropped first. `passThrough` is left `false` in `@CmdletInfo`, because with `--optional` the output is not
-  the input: completion does not look through it. Its README notes that an `Optional` is unrolled before the next stage
-  (FR-30b), so `passthrough -o` only shows its `Optional`s at the end of a line or in a variable.
+  emits `Optional.ofNullable(object)` instead; with both, the nulls are dropped first. `passThrough` is left `false` in
+  `@CmdletInfo`, because with `--optional` the output is not the input: completion does not look through it. Its README notes
+  that an `Optional` is unrolled before the next stage (FR-30b), so `passthrough -o` only shows its `Optional`s at the end of a
+  line or in a variable.
 - **Tested** with `powerj-testing` (`PassthroughTest`, each combination of the options, no input, the annotation, both
   bundles), and in the packaged shell by `ci/smoke/third-party-modules.sh` and `.ps1` (`mod-load`, a `null` that reaches the
-  cmdlet, `--optional` kept at the end of a line and unrolled before `count`).
+  cmdlet, `-s` that drops it, `--optional` kept at the end of a line and unrolled before `count`; the whole output is compared
+  and stderr must stay empty, so an option that does nothing fails the test).
 
 ## [0.1.0] — never released (baseline)
 
