@@ -12,6 +12,10 @@
 #   ci/smoke/tilde.sh                    ~ is the home folder
 #   ci/smoke/wildcards.sh                wildcards in the arguments of a native command, and the case rule
 #   ci/smoke/fx.sh                       the optional JavaFX module, under a virtual display (xvfb)
+#
+# Windows runs the same sessions written for PowerShell (#183): common.ps1, launcher.ps1, profiler.ps1, modules.ps1,
+# non-interactive.ps1, third-party-modules.ps1 and fx.ps1. A change to a session here (the session examples of FR-55 in
+# launcher.sh, the options of the launcher in non-interactive.sh) goes into its .ps1 counterpart in the same commit.
 set -euo pipefail
 
 PJ="${PJ:-$PWD/powerj-dist/target/jpackage/powerj/bin/powerj}"

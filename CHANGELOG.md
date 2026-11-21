@@ -1510,6 +1510,19 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
 - Already done before this ticket: `MessageBundlesTest` compares the `{n}` of each key in `en` and `fr`, and the `/ by zero` of
   the JDK is `operator.divisionByZero` (#175).
 
+### Changed (the Windows smoke tests are scripts, shared by the CI and the release, [#183](https://github.com/yp44/powerj/issues/183))
+- **`ci/smoke/*.ps1`** (audit v2, B-06): the Windows job of `ci.yml` carried its smoke tests inline, 65 lines of PowerShell
+  that copied the session of `ci/smoke/launcher.sh`, and `release.yml` ran none of them on the files it uploads. They are now
+  `common.ps1` (the launcher, a work folder removed however the script ends, `expect` as in `common.sh`), `launcher.ps1`,
+  `profiler.ps1`, `modules.ps1`, `non-interactive.ps1`, `third-party-modules.ps1` and `fx.ps1`; `ci.yml` calls them, and the
+  Windows job of `release.yml` runs them before it adds the files to the draft. `ci.yml` holds no inline session script.
+- **Two checks that only Linux made run on Windows too**: a `--cd` folder that does not exist (exit code 1, the error names it)
+  and an unknown option of the launcher (exit code 2 and the usage).
+- **`powerj.exe` reads the session through `Start-Process -RedirectStandardInput`** instead of `cmd /c "… < smoke.txt"`, so a
+  path with spaces needs no quoting rule of `cmd`.
+- `common.sh` lists the PowerShell counterparts, and `CONTRIBUTING.md` says that a change to a session goes into both.
+  `NoHardcodedFrenchTest` reads the `.ps1` of `ci/` as it reads the `.sh`.
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.

@@ -52,11 +52,11 @@ class NoHardcodedFrenchTest {
     /**
      * French that is test data and not a text of the project, by file: only the lines that contain one of the markers, so
      * that French written elsewhere in the same file is still found. The smoke test of the languages checks the French
-     * messages of the packaged launcher (and the Windows job of {@code ci.yml} does the same check inline).
+     * messages of the packaged launcher, and the smoke test of the third-party modules on Windows does the same check.
      */
     private static final Map<String, List<String>> FRENCH_TEST_DATA = Map.of(
             "ci/smoke/languages.sh", List.of("commande inconnue : nope", "Bonjour Yves !"),
-            ".github/workflows/ci.yml", List.of("commande inconnue : nope"));
+            "ci/smoke/third-party-modules.ps1", List.of("commande inconnue : nope", "Bonjour Yves !"));
 
     /** A string, text block or char literal of a source file. */
     record Literal(int line, String value) { }
@@ -119,7 +119,7 @@ class NoHardcodedFrenchTest {
     void buildFilesAreFound() throws IOException {
         assertThat(buildFiles()).extracting(p -> MessageBundlesTest.ROOT.relativize(p).toString().replace('\\', '/'))
                 .contains("pom.xml", "powerj-dist/pom.xml", "examples/greet/pom.xml", "ci/smoke/fx.sh",
-                        "ci/smoke/languages.sh", ".github/workflows/ci.yml")
+                        "ci/smoke/languages.sh", "ci/smoke/launcher.ps1", ".github/workflows/ci.yml")
                 .noneMatch(path -> path.contains("/target/"));
     }
 
@@ -175,7 +175,7 @@ class NoHardcodedFrenchTest {
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
                 String path = root.relativize(file).toString().replace('\\', '/');
-                if (path.endsWith("pom.xml") || path.startsWith("ci/") && path.endsWith(".sh")
+                if (path.endsWith("pom.xml") || path.startsWith("ci/") && (path.endsWith(".sh") || path.endsWith(".ps1"))
                         || path.startsWith(".github/workflows/") && path.endsWith(".yml")) {
                     files.add(file);
                 }
