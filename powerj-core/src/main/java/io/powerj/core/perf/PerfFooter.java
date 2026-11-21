@@ -27,7 +27,9 @@ final class PerfFooter {
     /** Lines of the footer, gray when {@code colors}. */
     static List<String> lines(PerfReport report, boolean colors) {
         List<String[]> rows = new ArrayList<>();
-        rows.add(new String[] {Messages.get("perf.footer.stage"), "in", "out", "active", "starved", "blocked", ""});
+        rows.add(new String[] {Messages.get("perf.footer.stage"), Messages.get("perf.footer.in"),
+                Messages.get("perf.footer.out"), Messages.get("perf.footer.active"), Messages.get("perf.footer.starved"),
+                Messages.get("perf.footer.blocked"), ""});
         for (StageStat stage : report.stages()) {
             rows.add(new String[] {stage.command(), count(stage.in()), count(stage.out()), duration(stage.active()),
                     duration(stage.starved()), duration(stage.blocked()),
@@ -35,7 +37,7 @@ final class PerfFooter {
         }
         Duration display = report.phases().stream().filter(p -> p.name().equals("display")).map(p -> p.time())
                 .findFirst().orElse(Duration.ZERO);
-        rows.add(new String[] {"display", "", "", duration(display), "", "", ""});
+        rows.add(new String[] {Messages.get("perf.footer.display"), "", "", duration(display), "", "", ""});
 
         int[] widths = new int[7];
         for (String[] row : rows) {
