@@ -27,7 +27,7 @@ unzip powerj-fx/target/powerj-fx-*.zip -d ~/.powerj/modules/      # creates ~/.p
 | 7 | `ls \| where { $_.size > 1tb } \| grid` | A window with `No result` and `0 rows`, not an error. |
 | 8 | `exit` while a window is open | The process ends, the windows disappear. |
 | 9 | With the language set to French (`POWERJ_LANG=fr`), `ls \| grid` | The summary in `help grid` and the status bar are in French (`3 lignes`). |
-| 10 | Without a display (`env -u DISPLAY powerj`, or over SSH), `ls \| grid` | Error `grid: the graphical toolkit cannot start (no graphical display?): Unable to open DISPLAY`; the shell keeps working. |
+| 10 | Without a display (`env -u DISPLAY powerj`, or over SSH), `ls \| grid` | Error `grid: the JavaFX toolkit cannot start (no graphical display?): Unable to open DISPLAY`; the shell keeps working. |
 | 11 | Same session, `ls \| grid` again | At once (no hang), error `… failed to start earlier in this session and cannot be restarted: restart PowerJ (…)`. |
 | 12 | Start `powerj` **without** the module in `~/.powerj/modules`, then `mod-load ~/.powerj/modules/fx` and `ls \| grid` | The module loads without restarting, `grid` works. |
 | 13 | `mod-load ~/.powerj/modules/fx` a second time | `fx: module io.powerj.fx already loaded` then `mod-load: fx not loaded`; nothing else changes. |

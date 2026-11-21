@@ -1451,6 +1451,19 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
 - **The changed wording of a walk error of `cp`, `mv`, `rm`, `touch` is written down** (#178), and the examples of
   `docs/acceptance/pipeline-v1.md`, `docs/plans/group.md` and `docs/plans/join.md` use `--no-items` and `--right` (#177).
 
+### Fixed (`grid` without a toolkit is not a wrong command line, and a `java.sql.Date` cell, [#182](https://github.com/yp44/powerj/issues/182))
+- **A JavaFX toolkit that cannot start is an error of the command, not of its usage** (audit v2, R-21): `grid` wrapped the
+  failure (no display, GTK missing, a start that timed out) in an `IllegalArgumentException`, which the shell reads as "the
+  cmdlet was used incorrectly". It is now reported as an error of the command (`grid: the JavaFX toolkit cannot start (no
+  graphical display?): …`, `$?` false), which stops reading its input; `--wait` and `--pass-thru` do not wait for a window
+  that never opened, and nothing is passed on. The messages of the toolkit name it: "the JavaFX toolkit" instead of "the
+  graphical toolkit" (`GridCmdletTest.aToolkitThatCannotStartIsAnErrorOfTheEnvironmentNotOfUsage`).
+- **A `java.sql.Date` or `java.sql.Time` cell no longer breaks the filter, the sort or the copy of its column**: both extend
+  `java.util.Date` and throw `UnsupportedOperationException` from `toInstant()`, which `FilterParser`, `ValueOrder` and
+  `RowExporter` called. One helper, `Dates.instant`, falls back to the milliseconds since the epoch (tests in
+  `FilterParserTest`, `RowExporterTest` and the new `ValueOrderTest`, with a test double of `java.sql.Date`: the module does
+  not read `java.sql`).
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.

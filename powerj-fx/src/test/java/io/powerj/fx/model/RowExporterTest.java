@@ -100,6 +100,16 @@ class RowExporterTest {
     }
 
     @Test
+    void aSqlDateIsCopiedAsIsoLikeAnyDate() {
+        // java.sql.Date.toInstant() throws UnsupportedOperationException: a JDBC result must not break the copy (R-21)
+        var values = new LinkedHashMap<String, Object>();
+        values.put("d", new SqlDate(Instant.EPOCH));
+        List<ColumnSpec> columns = List.of(new ColumnSpec("d", ColumnKind.DATE));
+        assertThat(RowExporter.json(columns, List.of(new GridRow(values, values))))
+                .contains("\"d\": \"1970-01-01T00:00:00Z\"");
+    }
+
+    @Test
     void aNumberThatIsNotFiniteIsNull() {
         var values = new LinkedHashMap<String, Object>();
         values.put("a", Double.NaN);
