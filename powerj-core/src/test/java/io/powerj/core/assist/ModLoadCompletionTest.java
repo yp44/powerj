@@ -75,8 +75,8 @@ class ModLoadCompletionTest {
     }
 
     @Test
-    void aPathStartingWithTheHomeFolderIsCompleted() {
-        assertThat(offered("mod-load ~/")).containsExactlyInAnyOrder("~/modules" + File.separator, "~/samples.jar");
+    void aPathStartingWithTheHomeFolderIsCompleted() { // typed with /, so completed with /, on every system
+        assertThat(offered("mod-load ~/")).containsExactlyInAnyOrder("~/modules/", "~/samples.jar");
     }
 
     @Test
