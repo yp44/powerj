@@ -58,6 +58,28 @@ class ModLoadCompletionTest {
     }
 
     @Test
+    void aFolderNamedLikeAJarIsOfferedAsAFolderAndNotAsAFile() throws Exception {
+        Files.createDirectories(tmp.resolve("dir.jar"));
+        assertThat(offered("mod-load d")).containsExactly("dir.jar" + File.separator);
+    }
+
+    @Test
+    void aForcedNativeCommandKeepsEveryFile() {
+        assertThat(offered("^mod-load s")).containsExactlyInAnyOrder("samples.jar", "samples.txt");
+    }
+
+    @Test
+    void aQuotedPathIsCompleted() {
+        assertThat(offered("mod-load \"mod")).containsExactly("modules" + File.separator);
+        assertThat(offered("mod-load \"modules/g")).containsExactly("modules/greet.JAR");
+    }
+
+    @Test
+    void aPathStartingWithTheHomeFolderIsCompleted() {
+        assertThat(offered("mod-load ~/")).containsExactlyInAnyOrder("~/modules" + File.separator, "~/samples.jar");
+    }
+
+    @Test
     void thePathIsCompletedInsideAFolder() {
         assertThat(offered("mod-load modules/")).containsExactly("modules/greet.JAR");
     }

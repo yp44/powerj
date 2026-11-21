@@ -75,7 +75,7 @@ public final class ModuleLoader {
         Set<Path> entries = new TreeSet<>();
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
             for (Path entry : stream) {
-                if (Files.isDirectory(entry) || isJar(entry)) {
+                if (Files.isDirectory(entry) || isModuleFile(entry)) {
                     entries.add(entry);
                 }
             }
@@ -91,7 +91,7 @@ public final class ModuleLoader {
         if (!Files.exists(path)) {
             return Result.failure(Messages.get("module.notFound", path));
         }
-        if (!Files.isDirectory(path) && !isJar(path)) {
+        if (!Files.isDirectory(path) && !isModuleFile(path)) {
             return Result.failure(Messages.get("module.notJar", path.getFileName()));
         }
         try {
@@ -242,7 +242,8 @@ public final class ModuleLoader {
         return layer != null ? layer : ModuleLayer.boot();
     }
 
-    private static boolean isJar(Path path) {
+    /** Is {@code path} a module file, i.e. a regular file named {@code *.jar}? Tab completion of {@code mod-load} asks the same question. */
+    public static boolean isModuleFile(Path path) {
         return Files.isRegularFile(path) && path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".jar");
     }
 }
