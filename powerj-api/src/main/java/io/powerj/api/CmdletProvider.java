@@ -12,6 +12,19 @@ import java.util.ResourceBundle;
  */
 public interface CmdletProvider {
 
+    /**
+     * The cmdlets of the module. Called once each time the module is loaded (when the shell starts, or by {@code mod-load}),
+     * on the thread that loads it: the shell registers the cmdlets the list holds and does not keep the list, so it may be
+     * a new list or an immutable one. The same instance of each cmdlet then runs every command that names it, in several
+     * pipelines at once ({@link CmdletContext#state} holds what belongs to one execution). A cmdlet that is not valid (no
+     * {@link CmdletInfo}, a {@code Params} record the shell cannot bind, a name reserved for a built-in command) is left out
+     * with a warning, and the others are registered.
+     * <p>
+     * It should not throw: an exception is reported as an error while loading the module, whose cmdlets are then not
+     * available.
+     *
+     * @return the cmdlets, none {@code null}
+     */
     List<Cmdlet<?, ?, ?>> cmdlets();
 
     /**

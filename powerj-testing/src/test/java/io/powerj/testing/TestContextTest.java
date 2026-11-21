@@ -10,7 +10,6 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import io.powerj.api.ScriptBlock;
-import io.powerj.api.perf.PerfReports;
 
 /** The in-memory {@code CmdletContext} that the tests of the cmdlets share (#98). */
 class TestContextTest {
@@ -77,12 +76,13 @@ class TestContextTest {
     }
 
     @Test
-    void thePerfReportsAreTheOnlyServiceOffered() {
+    void aServiceIsOfferedOnlyWhenTheTestPutsIt() {
         var context = new TestContext<String>();
 
-        assertThat(context.service(PerfReports.class)).hasValueSatisfying(r -> assertThat(r.reports()).isEmpty());
-        context.perfReports = new ArrayList<>(List.of());
-        assertThat(context.service(String.class)).isEmpty();
+        assertThat(context.service(CharSequence.class)).isEmpty();
+        context.services.put(CharSequence.class, "a service");
+        assertThat(context.service(CharSequence.class)).contains("a service");
+        assertThat(context.service(String.class)).isEmpty(); // by its exact type
     }
 
     @Test

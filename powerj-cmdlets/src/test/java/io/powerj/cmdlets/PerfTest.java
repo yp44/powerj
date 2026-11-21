@@ -18,6 +18,7 @@ import io.powerj.api.perf.JvmStat;
 import io.powerj.api.perf.LineStat;
 import io.powerj.api.perf.NativeStat;
 import io.powerj.api.perf.PerfReport;
+import io.powerj.api.perf.PerfReports;
 import io.powerj.api.perf.PhaseStat;
 import io.powerj.api.perf.StageStat;
 import io.powerj.testing.TestContext;
@@ -51,7 +52,12 @@ class PerfTest {
         for (int i = lines; i >= 1; i--) {
             reports.add(report(i, "line " + i));
         }
-        context.perfReports = reports;
+        offer(context, reports);
+    }
+
+    /** The session offers its reports to {@code perf} as a service, most recent first. */
+    private static void offer(TestContext<?> context, List<PerfReport> reports) {
+        context.services.put(PerfReports.class, (PerfReports) () -> reports);
     }
 
     private void run(Perf.Params params) throws Exception {
@@ -82,7 +88,7 @@ class PerfTest {
         for (int i = 60; i >= 11; i--) { // 50 lines kept out of 60 measured
             reports.add(report(i, "line " + i));
         }
-        context.perfReports = reports;
+        offer(context, reports);
         run(new Perf.Params(null, null, false, null));
         assertThat(context.emitted).extracting(o -> ((StageStat) o).line()).containsOnly(60);
         context.emitted.clear();
@@ -170,7 +176,7 @@ class PerfTest {
     @Test
     void profilerViewsEmitTheRecordedData() throws Exception {
         var file = Files.createTempFile("perf", ".jfr");
-        context.perfReports = List.of(report(1, "line 1", file));
+        offer(context, List.of(report(1, "line 1", file)));
         for (var view : List.of(Perf.View.HOT, Perf.View.GC, Perf.View.ALLOC)) {
             context.emitted.clear();
             run(new Perf.Params(null, view, false, null));
@@ -191,10 +197,10 @@ class PerfTest {
     @Test
     void saveCopiesTheRecordingToAFileOrIntoAFolder(@org.junit.jupiter.api.io.TempDir Path tmp) throws Exception {
         var recording = Files.writeString(tmp.resolve("source.jfr"), "jfr");
-        context.perfReports = List.of(report(4, "line 4", recording));
+        offer(context, List.of(report(4, "line 4", recording)));
         var cmdlet = new Perf();
         var ctx = new TestContext<Object>(tmp);
-        ctx.perfReports = context.perfReports;
+        ctx.services.putAll(context.services);
 
         cmdlet.begin(new Perf.Params(null, null, false, Path.of("copy.jfr")), ctx);
         assertThat(tmp.resolve("copy.jfr")).hasContent("jfr");
@@ -211,7 +217,7 @@ class PerfTest {
         var recording = Files.writeString(tmp.resolve("source.jfr"), "new recording");
         var precious = Files.writeString(tmp.resolve("precious.jfr"), "a file of the user");
         var ctx = new TestContext<Object>(tmp);
-        ctx.perfReports = List.of(report(4, "line 4", recording));
+        offer(ctx, List.of(report(4, "line 4", recording)));
 
         new Perf().begin(new Perf.Params(null, null, false, Path.of("precious.jfr")), ctx);
 

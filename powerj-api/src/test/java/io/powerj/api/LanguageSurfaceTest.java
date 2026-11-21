@@ -45,8 +45,7 @@ class LanguageSurfaceTest {
 
         Set<String> open = exports.stream().filter(e -> !e.isQualified()).map(ModuleDescriptor.Exports::source)
                 .collect(Collectors.toSet());
-        assertThat(open).as("packages a third-party module can use").containsExactlyInAnyOrder("io.powerj.api",
-                "io.powerj.api.perf");
+        assertThat(open).as("packages a third-party module can use").containsExactly("io.powerj.api");
         ModuleDescriptor.Exports writer = exports.stream()
                 .filter(e -> e.source().equals("io.powerj.api.internal")).findFirst().orElse(null);
         assertThat(writer).as("the package where the language is written").isNotNull();

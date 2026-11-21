@@ -40,6 +40,17 @@ class RowTest {
     }
 
     @Test
+    void aColumnWithoutANameIsRefusedWhenTheRowIsBuilt() {
+        // Accepted before, it broke the display of the table later, far from the cmdlet that made the row (audit v2, R-17).
+        Map<String, Object> source = new LinkedHashMap<>();
+        source.put("name", "a.txt");
+        source.put(null, 1);
+        assertThatThrownBy(() -> Row.of(source)).isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("column name");
+        assertThatThrownBy(() -> Row.of(source, Set.of())).isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
     void sizeColumnsAreDeclaredWithTheRow() {
         assertThat(Row.of(Map.of("kb", 1)).sizeColumns()).isEmpty();
         assertThat(Row.of(Map.of("size", 1, "n", 2), Set.of("size")).sizeColumns()).containsExactly("size");
