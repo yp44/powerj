@@ -44,9 +44,10 @@ class TypeInferenceTest {
     static final class Pick implements Cmdlet<Pick.Params, Object, Row>, io.powerj.api.ColumnProvider {
         record Params() { }
 
+        /** {@code ~} stands for a name that a careless module gives as {@code null}. */
         @Override
         public List<String> columnsOf(String arguments) {
-            return List.of(arguments.strip().split("\\s+"));
+            return java.util.Arrays.stream(arguments.strip().split("\\s+")).map(w -> w.equals("~") ? null : w).toList();
         }
     }
 
@@ -221,6 +222,15 @@ class TypeInferenceTest {
         var scope = scopeAt("items | pick a b | map { $_.");
 
         assertThat(scope.current()).isEqualTo(Row.class);
+        assertThat(scope.sample()).isNotNull();
+        assertThat(scope.sample().keySet()).containsExactly("a", "b");
+    }
+
+    @Test
+    void aColumnWithoutANameFromAModuleIsLeftOut() {
+        // Row refuses a null column name (#185): the completion offers the other columns instead of nothing
+        var scope = scopeAt("items | pick a ~ b | map { $_.");
+
         assertThat(scope.sample()).isNotNull();
         assertThat(scope.sample().keySet()).containsExactly("a", "b");
     }

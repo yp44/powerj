@@ -10,6 +10,7 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -93,8 +94,9 @@ final class TypeInference {
                 return null;
             }
             Map<String, Object> columns = new LinkedHashMap<>();
-            names.forEach(column -> columns.put(column, null));
-            return Row.of(columns);
+            // A module may give a null name: Row refuses it (#185), and the completion must not fail for it
+            names.stream().filter(Objects::nonNull).forEach(column -> columns.put(column, null));
+            return columns.isEmpty() ? null : Row.of(columns);
         }
         return null;
     }

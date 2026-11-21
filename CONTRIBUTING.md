@@ -141,8 +141,9 @@ JLine and JavaFX, which ship in the application, come alone.
   changes neither the product nor its build) and `style` (formatting only); `!` after the type or the scope marks a breaking
   change (`feat(api)!: …`). The scope is optional and goes **in parentheses**, in lower case: the module or the cmdlet
   (`fix(fx): …`, `feat(select): …`, `refactor(api,cmdlets): …`), never in place of the type (`select: …`). The CI checks the
-  subject of every commit of a pull request (`ci/check-commit-subjects.sh origin/main HEAD` runs it before you push); a
-  merge or a revert written by git passes as it is. Reference the issue (`#nn`, always in the squashed commit), and the
+  subject of every commit of a pull request (`ci/check-commit-subjects.sh origin/main HEAD` runs it before you push) and
+  its title, which "Squash and merge" makes the subject of the commit on `main`; a merge, a revert or a reapply written by
+  git passes as it is. Reference the issue (`#nn`, always in the squashed commit), and the
   requirement (`FR-70`) or the review finding (`C-13`) when there is one.
 - **Requirements are traced.** Behavior comes from a requirement `FR-nn` of [the specification](docs/SPECIFICATION.md);
   cite it in the Javadoc of the class that implements it and in the test that checks it.

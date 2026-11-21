@@ -1523,6 +1523,21 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
 - `common.sh` lists the PowerShell counterparts, and `CONTRIBUTING.md` says that a change to a session goes into both.
   `NoHardcodedFrenchTest` reads the `.ps1` of `ci/` as it reads the `.sh`.
 
+### Fixed (review of the pull request of phase 5 of the audit v2, [#232](https://github.com/yp44/powerj/pull/232))
+- **The Windows smoke tests stop the release** (#183): `release.yml` ran the six scripts in one step ending with `exit 0`, and a
+  pwsh step fails on its last command only, so a script that exits with 2 (no `powerj.exe`) did not keep the files from being
+  uploaded. One step per script, as in `ci.yml`.
+- **The title of a pull request is checked as a commit subject** (#184): "Squash and merge" makes it the subject of the commit
+  on `main`, and only the commits of the branch were checked. `ci/check-commit-subjects.sh --title`; the job "Commit subjects"
+  moves to a workflow of its own, `subjects.yml`, which runs again when the title is edited without running the build. `Reapply
+  "…"`, which git writes for the revert of a revert, passes as `Revert "…"` does.
+- **A column without a name from a third-party module no longer empties the completion** (#185): `TypeInference` built a `Row`
+  from the names of `ColumnProvider.columnsOf`, and `Row` now refuses `null`; the completion of the line failed as a whole
+  (caught, so nothing was offered). A `null` name is left out (`TypeInferenceTest.aColumnWithoutANameFromAModuleIsLeftOut`,
+  seen red first), and the Javadoc of `columnsOf` says that no name is `null`.
+- **The Javadoc of `CmdletContext.service`** no longer gives `PerfReports` as its example, a type that a third-party module can no
+  longer see (#185): the services of today are for the built-in cmdlets only.
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.

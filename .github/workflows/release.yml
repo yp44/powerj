@@ -111,17 +111,32 @@ jobs:
         shell: cmd
         run: mvnw.cmd -B -Pdist,installer verify
 
-      # The smoke tests of the CI on the image that is uploaded (ci/smoke/*.ps1, #183).
-      - name: Smoke tests of powerj.exe
+      # The smoke tests of the CI on the image that is uploaded (ci/smoke/*.ps1, #183), one step each as in ci.yml: a pwsh
+      # step fails on the exit code of its last command only, so a script that exits with 2 (no powerj.exe) followed by
+      # another one in the same step would not stop the upload.
+      - name: Smoke test of powerj.exe
         shell: pwsh
-        run: |
-          ci/smoke/launcher.ps1
-          ci/smoke/profiler.ps1
-          ci/smoke/modules.ps1
-          ci/smoke/non-interactive.ps1
-          ci/smoke/third-party-modules.ps1
-          ci/smoke/fx.ps1
-          exit 0
+        run: ci/smoke/launcher.ps1
+
+      - name: Profiler of the perf mode in the launcher
+        shell: pwsh
+        run: ci/smoke/profiler.ps1
+
+      - name: Modules of PowerJ in the image
+        shell: pwsh
+        run: ci/smoke/modules.ps1
+
+      - name: Smoke test of the non-interactive mode
+        shell: pwsh
+        run: ci/smoke/non-interactive.ps1
+
+      - name: Smoke test of the third-party modules
+        shell: pwsh
+        run: ci/smoke/third-party-modules.ps1
+
+      - name: Smoke test of the graphical module (powerj-fx)
+        shell: pwsh
+        run: ci/smoke/fx.ps1
 
       - name: Add the files to the draft
         shell: pwsh
