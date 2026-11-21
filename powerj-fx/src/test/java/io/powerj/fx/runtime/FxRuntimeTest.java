@@ -63,7 +63,7 @@ class FxRuntimeTest {
         platform.startupFailure = new UnsupportedOperationException("Unable to open DISPLAY");
         assertThatThrownBy(() -> new FxRuntime(platform).ensureStarted())
                 .isInstanceOf(FxUnavailableException.class)
-                .hasMessage("the graphical toolkit cannot start (no graphical display?): Unable to open DISPLAY")
+                .hasMessage("the JavaFX toolkit cannot start (no graphical display?): Unable to open DISPLAY")
                 .hasCause(platform.startupFailure);
     }
 
@@ -116,8 +116,8 @@ class FxRuntimeTest {
         platform.startupFailure = null;
         assertThatThrownBy(() -> runtime.runAndWait(() -> { }))
                 .isInstanceOf(FxUnavailableException.class)
-                .hasMessage("the graphical toolkit failed to start earlier in this session and cannot be restarted: "
-                        + "restart PowerJ (the graphical toolkit cannot start (no graphical display?): no display)");
+                .hasMessage("the JavaFX toolkit failed to start earlier in this session and cannot be restarted: "
+                        + "restart PowerJ (the JavaFX toolkit cannot start (no graphical display?): no display)");
         assertThat(platform.startups).hasValue(1);
     }
 
@@ -144,7 +144,7 @@ class FxRuntimeTest {
         FxRuntime runtime = new FxRuntime(platform, Duration.ofMillis(50));
         assertThatThrownBy(() -> runtime.runAndWait(() -> { }))
                 .isInstanceOf(FxUnavailableException.class)
-                .hasMessage("the graphical toolkit did not answer in 0 s");
+                .hasMessage("the JavaFX toolkit did not answer in 0 s");
     }
 
     @Test

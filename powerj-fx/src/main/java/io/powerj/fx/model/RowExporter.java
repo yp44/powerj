@@ -66,7 +66,7 @@ public final class RowExporter {
             case Float f when !Float.isFinite(f) -> out.append("null");
             case Number n -> out.append(n);
             case Instant i -> string(out, i.toString());
-            case Date d -> string(out, d.toInstant().toString());
+            case Date d -> string(out, Dates.instant(d).toString());
             case Temporal t -> string(out, t.toString());
             default -> string(out, String.valueOf(value));
         }

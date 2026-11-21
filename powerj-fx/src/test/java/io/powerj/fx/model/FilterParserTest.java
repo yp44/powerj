@@ -486,6 +486,15 @@ class FilterParserTest {
     }
 
     @Test
+    void aSqlDateCellIsFilteredByItsTime() {
+        // java.sql.Date.toInstant() throws UnsupportedOperationException: a JDBC result must not break the filter (R-21)
+        Parsed parsed = date("=2026-10-05");
+        assertThat(parsed.keeps(new SqlDate(at("2026-10-05T10:00:00Z")))).isTrue();
+        assertThat(parsed.keeps(new SqlDate(at("2026-10-06T10:00:00Z")))).isFalse();
+        assertThat(date(">2026-10-04").keeps(new SqlDate(at("2026-10-05T10:00:00Z")))).isTrue();
+    }
+
+    @Test
     void aBadDateIsReported() {
         assertThat(date(">abc").error())
                 .isEqualTo("not a date (2026, 2026-10, 2026-10-05, 2026-10-05 18:12): abc");

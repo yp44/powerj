@@ -272,16 +272,22 @@ class GridCmdletTest {
     }
 
     @Test
-    void aWindowThatCannotOpenIsAUsageError() {
+    void aToolkitThatCannotStartIsAnErrorOfTheEnvironmentNotOfUsage() throws Exception {
+        // R-21: a missing display is not a wrong command line; the runner reads an IllegalArgumentException as one.
         WindowOpener failing = (options, live) -> {
-            throw new FxUnavailableException("no display", new RuntimeException("x"));
+            throw new FxUnavailableException("the JavaFX toolkit cannot start (no graphical display?): no display",
+                    new RuntimeException("x"));
         };
-        assertThatThrownBy(() -> CmdletDriver.run(new GridCmdlet(failing), NO_OPTIONS, piped(), "a"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("no display")
-                .hasCauseInstanceOf(FxUnavailableException.class);
-        assertThatThrownBy(() -> CmdletDriver.run(new GridCmdlet(failing), NO_OPTIONS, piped()))
-                .isInstanceOf(IllegalArgumentException.class); // an empty input opens it at the end
+        TestContext<Object> context = piped();
+        CmdletDriver.run(new GridCmdlet(failing), NO_OPTIONS, context, "a", "b");
+        assertThat(context.errors).containsExactly("the JavaFX toolkit cannot start (no graphical display?): no display");
+        assertThat(context.stopInputCalls).isEqualTo(1); // nobody to read for
+        assertThat(context.emitted).isEmpty();
+
+        TestContext<Object> empty = piped();
+        CmdletDriver.run(new GridCmdlet(failing), new GridParams(null, null, null, true, true, false, false), empty);
+        assertThat(empty.errors).hasSize(1); // an empty input opens it at the end; --wait does not wait for nothing
+        assertThat(empty.emitted).isEmpty();
     }
 
     // --- title, columns, wait, settings ---

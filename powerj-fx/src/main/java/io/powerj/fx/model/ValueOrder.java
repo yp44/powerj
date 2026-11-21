@@ -105,7 +105,7 @@ final class ValueOrder implements Comparator<Object> {
     private static Instant instant(Object value) {
         return switch (value) {
             case Instant i -> i;
-            case Date d -> d.toInstant();
+            case Date d -> Dates.instant(d);
             case ZonedDateTime z -> z.toInstant();
             case OffsetDateTime o -> o.toInstant();
             default -> null;

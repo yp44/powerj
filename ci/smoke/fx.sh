@@ -29,7 +29,7 @@ cat "$WORK/fx.txt" "$WORK/fxwin.txt"
 expect "$WORK/fx.txt" 'no answer is recorded for this version of it (set modules.nativeAccess.io.powerj.fx=sha256:' \
     'native access refused for module io.powerj.fx' 'does not hold for the module as it is now' \
     'io.powerj.fx .*\[grid\]' '--max-rows' \
-    'the graphical toolkit cannot start'
+    'the JavaFX toolkit cannot start'
 unexpected="$(unexpected_window_messages "$WORK/fxwin.txt")"
 if [ -n "$unexpected" ]; then
     echo "window: unexpected message: $unexpected" >&2

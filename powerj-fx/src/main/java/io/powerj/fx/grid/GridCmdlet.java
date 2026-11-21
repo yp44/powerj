@@ -46,6 +46,8 @@ public final class GridCmdlet implements Cmdlet<GridParams, Object, Object> {
         final Set<String> seenColumns = new HashSet<>();
         LiveTable live;
         int count;
+        /** The window could not open: the error is reported and there is nothing more to do. */
+        boolean failed;
         boolean truncated;
         boolean stopped;
         /** The table is complete and the window no longer depends on the command. */
@@ -129,7 +131,9 @@ public final class GridCmdlet implements Cmdlet<GridParams, Object, Object> {
         if (execution.live == null) {
             execution.live = new LiveTable(LIVE_CAPACITY);
             execution.live.offer(reading);
-            open(execution);
+            if (!open(execution, context)) {
+                return;
+            }
         } else if (!execution.live.offer(reading)) {
             stop(execution, context); // the window was closed: nobody to read for
             return;
@@ -142,7 +146,10 @@ public final class GridCmdlet implements Cmdlet<GridParams, Object, Object> {
         Execution execution = execution(context);
         if (execution.live == null) {
             execution.live = new LiveTable(LIVE_CAPACITY); // nothing arrived: the window says so
-            open(execution);
+            open(execution, context);
+        }
+        if (execution.failed) {
+            return; // no window: nothing to wait for, nothing to give back
         }
         execution.live.finish(execution.truncated);
         execution.handedOver = true;
@@ -169,11 +176,22 @@ public final class GridCmdlet implements Cmdlet<GridParams, Object, Object> {
         context.stopInput();
     }
 
-    private void open(Execution execution) {
+    /**
+     * Opens the window. A toolkit that cannot start (no display, a missing native library, a timeout) is a failure of the
+     * environment, not of the command line: it is reported as an error of the command, which stops reading, and not as an
+     * {@link IllegalArgumentException}, which the shell takes for a wrong usage (audit v2, R-21).
+     *
+     * @return {@code false} if the window could not open
+     */
+    private boolean open(Execution execution, CmdletContext<Object> context) {
         try {
             opener.open(execution.options, execution.live);
+            return true;
         } catch (FxUnavailableException e) {
-            throw new IllegalArgumentException(e.getMessage(), e);
+            execution.failed = true;
+            stop(execution, context);
+            context.error(e.getMessage());
+            return false;
         }
     }
 

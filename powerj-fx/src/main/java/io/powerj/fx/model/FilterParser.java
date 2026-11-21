@@ -279,7 +279,7 @@ public final class FilterParser {
     private Instant instant(Object value) {
         return switch (value) {
             case Instant i -> i;
-            case Date d -> d.toInstant();
+            case Date d -> Dates.instant(d);
             case ZonedDateTime z -> z.toInstant();
             case OffsetDateTime o -> o.toInstant();
             case LocalDateTime l -> l.atZone(zone).toInstant();

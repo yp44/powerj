@@ -41,7 +41,7 @@ expect "a stack that is not the picking" reported "$npe"$'\n'"$frame_support"$'\
 expect "a stack with a frame of PowerJ" reported "$npe"$'\n'"$frame_support"$'\n'"$frame_picking"$'\n'"$frame_ours"
 expect "another exception" reported 'Exception in thread "main" java.lang.IllegalStateException: boom'
 expect "a restricted-method warning" reported 'WARNING: A restricted method in java.lang.System has been called'
-expect "a toolkit that cannot start" reported 'grid: the graphical toolkit cannot start (no graphical display?)'
+expect "a toolkit that cannot start" reported 'grid: the JavaFX toolkit cannot start (no graphical display?)'
 expect "a clean output" ignored 'ls | grid: opened'
 
 [ "$failures" -eq 0 ] || { echo "$failures case(s) of the filter failed" >&2; exit 1; }
