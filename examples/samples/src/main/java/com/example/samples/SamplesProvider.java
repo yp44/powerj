@@ -12,7 +12,7 @@ public final class SamplesProvider implements CmdletProvider {
 
     @Override
     public List<Cmdlet<?, ?, ?>> cmdlets() {
-        return List.of(new Passthrough());
+        return List.of(new Passthrough(), new EchoOptions());
     }
 
     /** Translations of the summaries, options and category ({@code messages_en/fr.properties}). */

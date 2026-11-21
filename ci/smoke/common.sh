@@ -5,7 +5,7 @@
 #   ci/smoke/profiler.sh                 the runtime of the image holds the profiler of the perf mode
 #   ci/smoke/modules.sh                  the runtime of the image holds the modules that a module loaded later needs
 #   ci/smoke/non-interactive.sh          -c, a script file, standard input
-#   ci/smoke/third-party-modules.sh      greet.jar loaded from ~/.powerj/modules, samples.jar loaded with mod-load
+#   ci/smoke/third-party-modules.sh      greet.jar loaded from ~/.powerj/modules, samples.jar loaded with mod-load (passthrough, echo-options)
 #   ci/smoke/native-access.sh            the consent to native access is a gate: a module that did not declare it is refused
 #   ci/smoke/properties.sh               the built-in cmdlets read the objects of the core and of a third-party module
 #   ci/smoke/languages.sh                English and French messages

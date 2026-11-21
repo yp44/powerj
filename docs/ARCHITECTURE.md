@@ -62,7 +62,7 @@ flowchart BT
 | `powerj-bench` | `api`, `core`, `cmdlets` | JMH benchmarks, outside the default build (`-Pbench`): [docs/quality/performance.md](quality/performance.md). |
 | `powerj-dist` | all but `fx` | jlink runtime and jpackage launcher. |
 | `examples/greet` | `api` | An example third-party module. Not shipped. |
-| `examples/samples` | `api` (`testing` for its tests) | Example third-party module of small sample cmdlets (`passthrough`), loaded with `mod-load`. Not shipped. |
+| `examples/samples` | `api` (`testing` for its tests) | Example third-party module of small sample cmdlets (`passthrough`, `echo-options`), loaded with `mod-load`. Not shipped. |
 
 ## 3. The core, by layer
 

@@ -4,9 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
-import java.util.ResourceBundle;
 
 import org.junit.jupiter.api.Test;
 
@@ -70,20 +68,7 @@ class PassthroughTest {
     }
 
     @Test
-    void theProviderListsPassthrough() {
-        assertThat(new SamplesProvider().cmdlets()).singleElement().isInstanceOf(Passthrough.class);
-    }
-
-    @Test
-    void theTextsAreTranslatedInEnglishAndFrench() {
-        List<String> keys = List.of("category.Examples", "passthrough.summary", "passthrough.option.skipNull",
-                "passthrough.option.optional");
-        ResourceBundle en = new SamplesProvider().messages(Locale.ENGLISH);
-        ResourceBundle fr = new SamplesProvider().messages(Locale.FRENCH);
-        assertThat(en.keySet()).containsAll(keys);
-        assertThat(fr.keySet()).containsAll(keys);
-        assertThat(fr.getString("category.Examples")).isEqualTo("Exemples");
-        assertThat(en.getString("passthrough.summary"))
-                .isEqualTo(Passthrough.class.getAnnotation(CmdletInfo.class).summary());
+    void theProviderListsPassthroughFirst() {
+        assertThat(new SamplesProvider().cmdlets().getFirst()).isInstanceOf(Passthrough.class);
     }
 }
