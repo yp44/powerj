@@ -1583,12 +1583,18 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   already offered paths and `^import <Tab>` still offers packages (that branch ignores `^`). `^mod-load <Tab>` offers every
   file, without the folder and `.jar` filter, which is for the built-in `mod-load` only.
 
-### Fixed (Tab completes a command name after its dash, [#243](https://github.com/yp44/powerj/issues/243))
+### Fixed (Tab completes a command name after its dash or its module, [#243](https://github.com/yp44/powerj/issues/243))
 - **`mod-loa<Tab>` offered nothing**: the word to complete stopped at the dash, so it was `loa`, an argument of a command
   named `mod-`. At the head of a command stage (also after `|`, `;`, `&&`, `^` and `$x =`), the name now runs back over
   its dashes, and `mod-load`, `mod-list`, `to-json`, `from-csv`, the dashed cmdlets of a module and programs such as
   `apt-get` are completed once the dash is typed. Elsewhere a dash keeps its meaning: an option (`--name`), an operator
   (`$a-1`) or a character of an argument.
+- **A name qualified by its module is completed** (FR-17): `greet:to-j<Tab>`, `greet:<Tab>` and `greet-2:say-<Tab>` offer
+  the qualified names, those of the cmdlets that a namesake shadows included. They are offered only once a `:` is typed,
+  so `to<Tab>` still lists the short names alone. `CommandCatalog.qualifiedCmdlets()` gives them to the completion. A colon
+  keeps its other meanings: `$env:PATH`, `String::valueOf` and a drive (`C:`) are not read as a module.
+- **Not completed after its dash: a name that contains a `.`** (`python3.12-config`), because a `.` starts a Java member
+  access at the head of a stage (`x.size-1`); the name is still completed up to the dash.
 
 ## [0.1.0] — never released (baseline)
 

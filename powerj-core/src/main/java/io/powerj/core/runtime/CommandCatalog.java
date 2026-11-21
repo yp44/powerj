@@ -23,6 +23,14 @@ public interface CommandCatalog {
     /** Every cmdlet that is registered. */
     Collection<CmdletRegistry.Registered> cmdlets();
 
+    /**
+     * Every cmdlet that a name qualified by its module reaches ({@code greet:greet}, FR-17): those of {@link #cmdlets()} and
+     * those that a namesake shadows.
+     */
+    default Collection<CmdletRegistry.Registered> qualifiedCmdlets() {
+        return cmdlets();
+    }
+
     /** The cmdlet that runs under this name, if a built-in command does not take the name first (FR-13). */
     Optional<CmdletRegistry.Registered> cmdlet(String name);
 

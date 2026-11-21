@@ -137,6 +137,13 @@ public final class Interpreter implements CommandCatalog {
     }
 
     @Override
+    public Collection<CmdletRegistry.Registered> qualifiedCmdlets() {
+        List<CmdletRegistry.Registered> all = new ArrayList<>(registry.all());
+        all.addAll(registry.shadowed());
+        return all;
+    }
+
+    @Override
     public Optional<CmdletRegistry.Registered> cmdlet(String name) {
         return resolution.cmdlet(name);
     }

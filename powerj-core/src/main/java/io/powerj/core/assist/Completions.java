@@ -121,7 +121,7 @@ public final class Completions {
         while (identStart > 0 && LineText.isIdentifierChar(line.charAt(identStart - 1))) {
             identStart--;
         }
-        int nameStart = dashedCommandNameStart(line, frame, identStart);
+        int nameStart = compoundCommandNameStart(line, frame, identStart);
         if (nameStart >= 0) {
             return commands.commands(line, frame, nameStart, line.substring(nameStart, cursor), previewMode);
         }
@@ -166,27 +166,38 @@ public final class Completions {
     }
 
     /**
-     * Start of a command name that contains a dash and ends at the cursor ({@code mod-loa}, {@code to-}, {@code ^apt-g}),
-     * or -1 (#243). An identifier stops at a dash, so without this the word would be {@code loa}, an argument of {@code mod-}.
-     * Only the head of a command stage is read this way: elsewhere a dash is an option ({@code --name}) or an operator
-     * ({@code $a-1}).
+     * Start of a command name that ends at the cursor and that an identifier does not cover, or -1: a name with a dash
+     * ({@code mod-loa}, {@code to-}, {@code ^apt-g}, #243) or qualified by its module ({@code greet:gr}, {@code greet:to-j},
+     * {@code greet-2:to-j}, FR-17). An identifier stops at {@code -} and {@code :}, so without this the word would be
+     * {@code loa}, an argument of {@code mod-}. Only the head of a command stage is read this way: elsewhere a dash is an
+     * option ({@code --name}) or an operator ({@code $a-1}). {@code .} is not crossed: it starts a Java member access
+     * ({@code x.size-1}), so a name such as {@code python3.12-config} is not completed after its dash.
      */
-    private int dashedCommandNameStart(String line, Frame frame, int identStart) {
-        if (frame.kind != Frame.Kind.COMMAND || identStart == 0 || line.charAt(identStart - 1) != '-') {
+    private int compoundCommandNameStart(String line, Frame frame, int identStart) {
+        if (frame.kind != Frame.Kind.COMMAND || identStart == 0
+                || line.charAt(identStart - 1) != '-' && line.charAt(identStart - 1) != ':') {
             return -1;
         }
         int start = identStart;
-        while (start > 0 && (LineText.isIdentifierChar(line.charAt(start - 1)) || line.charAt(start - 1) == '-')) {
+        while (start > 0 && isCompoundNameChar(line.charAt(start - 1))) {
             start--;
         }
         while (start < identStart && line.charAt(start) == '-') {
             start++; // a word that starts with a dash is an option, not a name
         }
-        if (start == identStart || !LineText.isHead(line, frame, start)
+        String typed = line.substring(start, identStart);
+        int colon = typed.indexOf(':');
+        if (start == identStart || typed.contains("::") // String::valueOf, a method reference
+                || colon == 0 || colon == 1 // C:, a drive
+                || !LineText.isHead(line, frame, start)
                 || Lexer.expressionAt(line, start, session().java()::isStaticReference)) {
             return -1;
         }
         return start;
+    }
+
+    private static boolean isCompoundNameChar(char c) {
+        return LineText.isIdentifierChar(c) || c == '-' || c == ':';
     }
 
     /** Is the current stage an expression ({@code new java.io.F}, {@code Math.max(…)}) rather than a command? */

@@ -39,6 +39,14 @@ final class CommandCompleter {
                 candidates.add(new Candidate(cmdlet.name(), cmdlet.name() + " " + Messages.get("completion.tag.cmdlet"),
                         cmdlet.summary(), true));
             }
+            if (fragment.indexOf(':') > 0) { // greet:gr, a name qualified by its module (FR-17)
+                for (var cmdlet : catalog.qualifiedCmdlets()) {
+                    if (!preview || cmdlet.preview()) {
+                        candidates.add(new Candidate(cmdlet.qualifiedName(),
+                                cmdlet.qualifiedName() + " " + Messages.get("completion.tag.cmdlet"), cmdlet.summary(), true));
+                    }
+                }
+            }
             if (!fragment.isEmpty() && Character.isUpperCase(fragment.charAt(0))) {
                 packages.importedClasses().forEach(c -> candidates.add(new Candidate(c, c, Messages.get("completion.javaClass"), false)));
             }

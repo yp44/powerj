@@ -26,6 +26,7 @@ import org.junit.jupiter.api.io.CleanupMode;
 import org.junit.jupiter.api.io.TempDir;
 
 import io.powerj.api.CmdletProvider;
+import io.powerj.core.assist.Completions;
 import io.powerj.core.runtime.CommandKind;
 import io.powerj.core.runtime.Interpreter;
 import io.powerj.core.runtime.Session;
@@ -169,6 +170,29 @@ class ModuleLoaderTest {
         assertThat(errors).singleElement().asString().contains("available as greet-2:greet");
         assertThat(registry.find("greet:greet").orElseThrow().module()).isEqualTo("com.a.greet");
         assertThat(registry.find("greet-2:greet").orElseThrow().module()).isEqualTo("greet");
+    }
+
+    /** Tab completes a name qualified by its module, with or without a dash, a shadowed one included (#243, FR-17). */
+    @Test
+    void qualifiedNamesAreCompleted() throws Exception {
+        hello(tmp.resolve("a.jar"), "com.a.greet", "say-hello");
+        hello(tmp.resolve("b.jar"), "greet", "say-hello");
+        run("mod-load a.jar");
+        run("mod-load b.jar");
+        var completions = new Completions(interpreter);
+
+        assertThat(offered(completions, "greet:say-h")).containsExactly("greet:say-hello");
+        assertThat(offered(completions, "greet:s")).containsExactly("greet:say-hello");
+        assertThat(offered(completions, "greet:")).containsExactly("greet:say-hello");
+        assertThat(offered(completions, "greet-2:say-")).containsExactly("greet-2:say-hello"); // shadowed by com.a.greet
+        assertThat(offered(completions, "ls | greet:say-h")).containsExactly("greet:say-hello");
+        assertThat(offered(completions, "say-h")).containsExactly("say-hello"); // no qualified name without a colon
+    }
+
+    private static List<String> offered(Completions completions, String line) {
+        var result = completions.complete(line, line.length());
+        return result.candidates().stream().map(Completions.Candidate::value)
+                .filter(v -> v.startsWith(result.word())).toList();
     }
 
     @Test

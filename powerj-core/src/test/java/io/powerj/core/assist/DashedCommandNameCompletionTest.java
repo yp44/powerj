@@ -21,7 +21,10 @@ import io.powerj.core.runtime.Interpreter;
 import io.powerj.core.runtime.Session;
 import io.powerj.core.runtime.ShellIo;
 
-/** Tab completion of a command name that contains a dash, once the dash is typed (#243): mod-loa, to-j, ^apt-g. */
+/**
+ * Tab completion of a command name that contains a dash, once the dash is typed (#243): mod-loa, to-j, ^apt-g. Names
+ * qualified by a module ({@code greet:to-j}) are tested with real modules in {@code ModuleLoaderTest}.
+ */
 class DashedCommandNameCompletionTest {
 
     @CmdletInfo(name = "to-json", summary = "To JSON", preview = true)
@@ -60,6 +63,11 @@ class DashedCommandNameCompletionTest {
         var result = completions.complete(line, line.length());
         return result.candidates().stream().map(Completions.Candidate::value)
                 .filter(v -> v.startsWith(result.word())).toList();
+    }
+
+    /** Every candidate, before JLine keeps those that extend the word. */
+    private List<String> allValues(String line) {
+        return completions.complete(line, line.length()).candidates().stream().map(Completions.Candidate::value).toList();
     }
 
     @Test
@@ -111,5 +119,13 @@ class DashedCommandNameCompletionTest {
         assertThat(offered("-mod-l")).isEmpty(); // a word that starts with a dash is not a name
         assertThat(offered("$a-mod")).doesNotContain("mod-load", "mod-list"); // an operator
         assertThat(offered("(1 + $a-mo")).doesNotContain("mod-load", "mod-list"); // an expression
+    }
+
+    @Test
+    void aColonThatIsNotInAQualifiedNameKeepsItsMeaning() {
+        assertThat(allValues("C:")).doesNotContain("mod-load"); // a drive, not a module: no command is a candidate
+        assertThat(allValues("$env:PA")).doesNotContain("mod-load"); // a variable of the environment
+        assertThat(offered("String::val")).contains("valueOf"); // a method reference
+        assertThat(offered("to-json:")).isEmpty(); // no module of that name
     }
 }
