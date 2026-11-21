@@ -1,0 +1,40 @@
+name: Commit subjects
+
+# type(scope): subject, with a type of CONTRIBUTING.md, for every commit of a pull request and for its title, which "Squash
+# and merge" makes the subject of the commit on main (#184). A workflow of its own: editing the title runs it again, without
+# running the build of ci.yml.
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: subjects-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  subjects:
+    name: Commit subjects
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Cases of the check
+        run: ci/check-commit-subjects-test.sh
+
+      - name: Subjects of the commits of the pull request
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: ci/check-commit-subjects.sh "$BASE" "$HEAD"
+
+      # Passed through the environment, never written into the script: a title is text anyone who opens a pull request writes.
+      - name: Title of the pull request
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: ci/check-commit-subjects.sh --title "$TITLE"

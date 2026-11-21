@@ -29,6 +29,7 @@ expect pass 'style(core): formatting'
 expect pass 'Merge pull request #188 from yp44/claude/serene-franklin-nnlyi5'
 expect pass "Merge branch 'claude/audit_phase_5' into fix/182-grid"
 expect pass 'Revert "fix(fx): x"'
+expect pass 'Reapply "fix(fx): x"'
 expect fail 'shell: x'
 expect fail 'select: keep the order of the properties'
 expect fail 'README: link the audit'
@@ -45,6 +46,30 @@ expect fail 'fixup! fix(core): x'
 # Several subjects: one wrong is enough.
 if printf '%s\n' 'fix(fx): a' 'shell: b' | "$check" - > /dev/null 2>&1; then
     echo "WRONG: one wrong subject among several passed" >&2
+    failures=$((failures + 1))
+fi
+
+# The title of a pull request, which "Squash and merge" makes the subject of the commit on main.
+title() {
+    local verdict="$1" title="$2" got
+    if "$check" --title "$title" > /dev/null 2>&1; then got=pass; else got=fail; fi
+    if [ "$got" = "$verdict" ]; then
+        echo "ok: title $verdict: $title"
+    else
+        echo "WRONG: title expected $verdict, got $got: $title" >&2
+        failures=$((failures + 1))
+    fi
+}
+title pass 'feat: audit v2 phase 5, graphical module, CI, API and governance (#182 to #186)'
+title pass 'Revert "fix(fx): x"'
+title fail 'Update grid'
+title fail 'shell: x'
+title fail ''
+reported="$("$check" --title 'Update grid' 2>&1 > /dev/null || true)"
+if grep -q '^pull request title outside the convention: Update grid$' <<< "$reported"; then
+    echo "ok: a wrong title is named as a title"
+else
+    echo "WRONG: a wrong title is not reported as the title of the pull request" >&2
     failures=$((failures + 1))
 fi
 

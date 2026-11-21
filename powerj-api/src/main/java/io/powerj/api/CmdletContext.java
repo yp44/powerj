@@ -162,7 +162,8 @@ public interface CmdletContext<O> {
 
     /**
      * A service that the shell offers for what only a few cmdlets need, so that the contract of every cmdlet does not
-     * grow with it ({@code context.service(PerfReports.class)}, in {@code io.powerj.api.perf}).
+     * grow with it. The services offered today are for the built-in cmdlets only (the reports of the perf mode, whose
+     * package is not exported to other modules): a third-party module gets none yet.
      *
      * @return the service, or empty if this shell does not offer it
      */

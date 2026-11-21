@@ -11,7 +11,8 @@ public interface ColumnProvider {
 
     /**
      * Names of the columns of the rows the cmdlet emits, read from the text of its arguments. Called on text that may
-     * be incomplete or invalid: it must not fail. An empty list says that none is known.
+     * be incomplete or invalid: it must not fail. An empty list says that none is known. No name is {@code null}, as
+     * for the columns of a {@link Row}; one that is is left out.
      *
      * @param arguments text following the command name in the stage, as typed
      */
