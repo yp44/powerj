@@ -20,13 +20,7 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CancellationException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -63,9 +57,6 @@ public final class FileTrees {
             Objects.requireNonNull(attributes, "attributes");
         }
     }
-
-    /** Results waiting for the calling thread (backpressure: a slow consumer slows down the work). */
-    private static final int QUEUE_CAPACITY = 256;
 
     private FileTrees() {
     }
@@ -310,10 +301,6 @@ public final class FileTrees {
     private record EntryError(Path path, IOException exception) {
     }
 
-    /** An unchecked exception or error of a worker, thrown back in the calling thread. */
-    private record Failure(Throwable exception) {
-    }
-
     /**
      * A directory being removed: it is removed when its last child is done; then it counts as done for its parent.
      * {@code remaining} starts at 1 while the children are submitted, so that the directory is not removed early.
@@ -340,27 +327,16 @@ public final class FileTrees {
     }
 
     /**
-     * One parallel removal or copy: workers in virtual threads, at most {@code parallelism} listings, removals or
-     * copies at the same time; results and errors handed over to the calling thread by a bounded queue.
+     * One parallel removal or copy, on a {@link ParallelEngine}: at most {@code parallelism} listings, removals or copies
+     * at the same time, results and errors handed over to the calling thread. This class keeps the order: a folder is
+     * removed by its last child, and created before its content.
      */
     private static final class Work {
 
-        private static final Object END = new Object();
-
-        @FunctionalInterface
-        private interface Task {
-            void run() throws Exception;
-        }
-
-        private final BlockingQueue<Object> queue = new ArrayBlockingQueue<>(QUEUE_CAPACITY);
-        private final Semaphore permits;
-        /** Tasks submitted and not finished; the last one to finish signals the end. */
-        private final AtomicInteger pending = new AtomicInteger();
-        private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
-        private volatile boolean stopped;
+        private final ParallelEngine<Removed, EntryError> engine;
 
         Work(int parallelism) {
-            this.permits = new Semaphore(parallelism);
+            this.engine = new ParallelEngine<>(parallelism);
         }
 
         @FunctionalInterface
@@ -369,32 +345,7 @@ public final class FileTrees {
         }
 
         void run(Start start, Consumer<? super Removed> removed, BiConsumer<Path, IOException> errors) {
-            try (executor) {
-                try {
-                    submit(() -> start.run(this));
-                    while (true) {
-                        Object item = queue.take();
-                        switch (item) {
-                            case Failure(Throwable e) when e instanceof RuntimeException r -> throw r;
-                            case Failure(Throwable e) when e instanceof Error error -> throw error;
-                            case Failure(Throwable e) -> throw new IllegalStateException(e);
-                            case EntryError(Path path, IOException e) -> errors.accept(path, e);
-                            case Removed entry -> removed.accept(entry);
-                            default -> {
-                                if (item == END) {
-                                    return;
-                                }
-                            }
-                        }
-                    }
-                } catch (InterruptedException _) {
-                    Thread.currentThread().interrupt();
-                    throw new CancellationException();
-                } finally {
-                    stopped = true;
-                    executor.shutdownNow(); // interrupts the workers; close() waits for them
-                }
-            }
+            engine.run(() -> start.run(this), removed, error -> errors.accept(error.path(), error.exception()));
         }
 
         // removal
@@ -404,7 +355,7 @@ public final class FileTrees {
             try {
                 attributes = Files.readAttributes(root, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
             } catch (IOException e) {
-                queue.put(new EntryError(root, e));
+                engine.error(new EntryError(root, e));
                 return;
             }
             if (attributes.isDirectory()) {
@@ -430,29 +381,15 @@ public final class FileTrees {
             }
             Directory dir = new Directory(path, attributes, parent, complete[0]);
             for (Entry child : children) {
-                if (stopped) {
+                if (engine.stopped()) {
                     return;
                 }
                 dir.remaining().incrementAndGet();
                 if (child.attributes().isDirectory()) {
-                    submit(() -> deleteDirectory(child.path(), child.attributes(), dir, dryRun));
+                    engine.submit(() -> deleteDirectory(child.path(), child.attributes(), dir, dryRun));
                 } else {
-                    permits.acquire(); // bounds the waiting tasks too: the listing waits for a free permit
-                    boolean submitted = false;
-                    try {
-                        submitted = submit(() -> {
-                            try {
-                                removeHeld(child.path(), child.attributes(), dryRun);
-                            } finally {
-                                permits.release();
-                            }
-                            done(dir, dryRun);
-                        });
-                    } finally {
-                        if (!submitted) {
-                            permits.release();
-                        }
-                    }
+                    engine.submitHolding(() -> removeHeld(child.path(), child.attributes(), dryRun),
+                            () -> done(dir, dryRun));
                 }
             }
             done(dir, dryRun); // the initial count: all the children are submitted
@@ -469,27 +406,27 @@ public final class FileTrees {
         }
 
         private void remove(Path path, BasicFileAttributes attributes, boolean dryRun) throws InterruptedException {
-            permits.acquire();
+            engine.acquire();
             try {
                 removeHeld(path, attributes, dryRun);
             } finally {
-                permits.release();
+                engine.release();
             }
         }
 
         /** Removes an entry; the caller holds a permit. */
         private void removeHeld(Path path, BasicFileAttributes attributes, boolean dryRun)
                 throws InterruptedException {
-            if (stopped) {
+            if (engine.stopped()) {
                 return;
             }
             try {
                 if (!dryRun) {
                     Files.delete(path);
                 }
-                queue.put(new Removed(path, attributes));
+                engine.result(new Removed(path, attributes));
             } catch (IOException e) {
-                queue.put(new EntryError(path, e));
+                engine.error(new EntryError(path, e));
             }
         }
 
@@ -507,46 +444,27 @@ public final class FileTrees {
                 return;
             }
             boolean created;
-            permits.acquire();
+            engine.acquire();
             try {
                 created = createDirectory(copy, replace);
             } catch (IOException e) {
-                queue.put(new EntryError(copy, e));
+                engine.error(new EntryError(copy, e));
                 copied(parent);
                 return;
             } finally {
-                permits.release();
+                engine.release();
             }
             Copied self = new Copied(dir, copy, created, parent);
             for (Entry child : children) {
-                if (stopped) {
+                if (engine.stopped()) {
                     return;
                 }
                 Path childCopy = copy.resolve(child.path().getFileName().toString());
                 self.remaining().incrementAndGet();
                 if (child.attributes().isDirectory()) {
-                    submit(() -> copyDirectory(child.path(), childCopy, replace, options, self));
+                    engine.submit(() -> copyDirectory(child.path(), childCopy, replace, options, self));
                 } else {
-                    permits.acquire();
-                    boolean submitted = false;
-                    try {
-                        submitted = submit(() -> {
-                            try {
-                                if (!stopped) {
-                                    Files.copy(child.path(), childCopy, options);
-                                }
-                            } catch (IOException e) {
-                                queue.put(new EntryError(childCopy, e));
-                            } finally {
-                                permits.release();
-                            }
-                            copied(self);
-                        });
-                    } finally {
-                        if (!submitted) {
-                            permits.release();
-                        }
-                    }
+                    engine.submitHolding(() -> copyHeld(child.path(), childCopy, options), () -> copied(self));
                 }
             }
             copied(self); // the initial count: all the children are submitted
@@ -560,17 +478,29 @@ public final class FileTrees {
             }
         }
 
-        private void finishCopy(Copied dir) throws InterruptedException {
-            if (!dir.created() || stopped) {
+        /** Copies a file or a link; the caller holds a permit. */
+        private void copyHeld(Path file, Path copy, CopyOption[] options) throws InterruptedException {
+            if (engine.stopped()) {
                 return;
             }
-            permits.acquire();
+            try {
+                Files.copy(file, copy, options);
+            } catch (IOException e) {
+                engine.error(new EntryError(copy, e));
+            }
+        }
+
+        private void finishCopy(Copied dir) throws InterruptedException {
+            if (!dir.created() || engine.stopped()) {
+                return;
+            }
+            engine.acquire();
             try {
                 finish(dir.source(), dir.copy());
             } catch (IOException e) {
-                queue.put(new EntryError(dir.copy(), e));
+                engine.error(new EntryError(dir.copy(), e));
             } finally {
-                permits.release();
+                engine.release();
             }
         }
 
@@ -587,7 +517,7 @@ public final class FileTrees {
         /** As {@link #children(Path)}; {@code complete[0]} is set to {@code false} if the listing failed half way. */
         private List<Entry> children(Path dir, boolean[] complete) throws InterruptedException {
             List<Entry> children = new ArrayList<>();
-            permits.acquire();
+            engine.acquire();
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
                 for (Path child : stream) {
                     try {
@@ -596,63 +526,19 @@ public final class FileTrees {
                     } catch (NoSuchFileException _) {
                         // vanished between listing and reading
                     } catch (IOException e) {
-                        queue.put(new EntryError(child, e));
+                        engine.error(new EntryError(child, e));
                     }
                 }
             } catch (DirectoryIteratorException e) {
                 complete[0] = false;
-                queue.put(new EntryError(dir, e.getCause())); // failed while listing: the entries read are kept
+                engine.error(new EntryError(dir, e.getCause())); // failed while listing: the entries read are kept
             } catch (IOException e) {
-                queue.put(new EntryError(dir, e));
+                engine.error(new EntryError(dir, e));
                 return null;
             } finally {
-                permits.release();
+                engine.release();
             }
             return children;
-        }
-
-        private boolean submit(Task task) {
-            pending.incrementAndGet();
-            try {
-                executor.execute(() -> {
-                    try {
-                        task.run();
-                    } catch (Throwable e) {
-                        fail(e);
-                    } finally {
-                        if (pending.decrementAndGet() == 0) {
-                            signal(END);
-                        }
-                    }
-                });
-                return true;
-            } catch (RejectedExecutionException _) {
-                pending.decrementAndGet(); // work already stopped
-                return false;
-            }
-        }
-
-        private void fail(Throwable e) {
-            if (stopped || e instanceof InterruptedException || e instanceof CancellationException) {
-                return; // consequence of the stop
-            }
-            stopped = true;
-            deliver(new Failure(e)); // read by the calling thread, which waits for it
-        }
-
-        /** Signals the end, unless the work is stopped: nobody reads anymore, and a full queue would block. */
-        private void signal(Object item) {
-            if (!stopped) {
-                deliver(item);
-            }
-        }
-
-        private void deliver(Object item) {
-            try {
-                queue.put(item);
-            } catch (InterruptedException _) {
-                Thread.currentThread().interrupt(); // work stopped: nobody reads anymore
-            }
         }
     }
 }
