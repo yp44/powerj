@@ -7,6 +7,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
@@ -23,7 +24,8 @@ import java.util.function.Consumer;
  *   <li>An interruption of the calling thread (Ctrl+C) stops the work: {@link #run} throws {@link CancellationException},
  *       with the interrupt flag set.</li>
  * </ul>
- * Whatever the way it ends, {@link #run} returns only once every task has ended. One engine runs once.
+ * Whatever the way it ends, {@link #run} returns only once every task has ended. One engine runs once: a second call to
+ * {@link #run} throws {@link IllegalStateException} (its executor is closed, and nothing would ever end the wait).
  *
  * @param <T> type of the results
  * @param <E> type of the errors
@@ -63,6 +65,7 @@ final class ParallelEngine<T, E> {
     /** Tasks submitted and not finished; the last one to finish signals the end. */
     private final AtomicInteger pending = new AtomicInteger();
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
+    private final AtomicBoolean started = new AtomicBoolean();
     private volatile boolean stopped;
 
     ParallelEngine(int parallelism) {
@@ -74,8 +77,12 @@ final class ParallelEngine<T, E> {
      * has ended.
      *
      * @throws CancellationException if the calling thread is interrupted
+     * @throws IllegalStateException   if this engine has already run
      */
     void run(Task start, Consumer<? super T> results, Consumer<? super E> errors) {
+        if (!started.compareAndSet(false, true)) {
+            throw new IllegalStateException("a ParallelEngine runs once");
+        }
         try (executor) {
             try {
                 submit(start);
