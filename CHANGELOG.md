@@ -1596,22 +1596,6 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
 - **Not completed after its dash: a name that contains a `.`** (`python3.12-config`), because a `.` starts a Java member
   access at the head of a stage (`x.size-1`); the name is still completed up to the dash.
 
-## [0.1.0] — never released (baseline)
-
-The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.
-
-- Interactive shell on JLine: history, Ctrl+R, Tab completion, syntax highlighting, continuation prompt; scripts
-  (`powerj file.pj`, `-c`), profile, `~` expansion, English/French messages.
-- Java as the expression language: `{ … }` blocks, lambdas, method references, direct access to the JRE API.
-- Object pipeline, one virtual thread per stage with bounded queues; native commands and background jobs.
-- 28 cmdlets: `ls`, `grep`, `cat`, `where`, `map`, `sort`, `first`, `last`, `range`, `select`, `count`, `measure`,
-  `group`, `join`, `mkdir`, `touch`, `cp`, `mv`, `rm`, `to-json`, `from-json`, `to-csv`, `from-csv`, `ps`, `kill`,
-  `collect`, `env`, `perf`.
-- Preview mode (Alt+V) and perf mode (Alt+P) with the Java Flight Recorder.
-- Third-party modules loaded from jars, one `ModuleLayer` each; consent for native access.
-- Optional `powerj-fx` module with the `grid` cmdlet.
-- Distribution as a self-contained image (jlink + jpackage), Windows installer, CI smoke tests on the packaged launcher.
-
 ### Changed (one parallel engine for the walks, the removals and the copies of a tree, [#96](https://github.com/yp44/powerj/issues/96))
 - **`FileWalker` and `FileTrees` share one parallel engine.** `FileTrees.Work` was a copy of `FileWalker.ParallelWalk`:
   the same bounded queue to the calling thread, the same permits, the same count of pending tasks and the same protocol
@@ -1628,3 +1612,19 @@ The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0
   `FaultyFileSystem` injects these failures.
 - **Mutation testing of `io.powerj.fs`**: `./mvnw -Pmutation -pl powerj-fs test-compile org.pitest:pitest-maven:mutationCoverage`.
   83.8 % before the change (74.6 % with the tests of before #96), 84.0-84.2 % after; see `docs/quality/mutation.md`.
+
+## [0.1.0] — never released (baseline)
+
+The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.
+
+- Interactive shell on JLine: history, Ctrl+R, Tab completion, syntax highlighting, continuation prompt; scripts
+  (`powerj file.pj`, `-c`), profile, `~` expansion, English/French messages.
+- Java as the expression language: `{ … }` blocks, lambdas, method references, direct access to the JRE API.
+- Object pipeline, one virtual thread per stage with bounded queues; native commands and background jobs.
+- 28 cmdlets: `ls`, `grep`, `cat`, `where`, `map`, `sort`, `first`, `last`, `range`, `select`, `count`, `measure`,
+  `group`, `join`, `mkdir`, `touch`, `cp`, `mv`, `rm`, `to-json`, `from-json`, `to-csv`, `from-csv`, `ps`, `kill`,
+  `collect`, `env`, `perf`.
+- Preview mode (Alt+V) and perf mode (Alt+P) with the Java Flight Recorder.
+- Third-party modules loaded from jars, one `ModuleLayer` each; consent for native access.
+- Optional `powerj-fx` module with the `grid` cmdlet.
+- Distribution as a self-contained image (jlink + jpackage), Windows installer, CI smoke tests on the packaged launcher.
