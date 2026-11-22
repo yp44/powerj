@@ -46,7 +46,7 @@
         <jacoco.version>0.8.16</jacoco.version>
         <archunit.version>1.5.1</archunit.version>
         <spotless.version>3.11.0</spotless.version>
-        <errorprone.version>2.51.0</errorprone.version>
+        <errorprone.version>2.53.0</errorprone.version>
 
         <!-- Per-module coverage floor, overridden by each module (see the jacoco plugin below). -->
         <coverage.module.line>0.00</coverage.module.line>
