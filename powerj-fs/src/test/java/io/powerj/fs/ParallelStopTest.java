@@ -39,7 +39,7 @@ class ParallelStopTest {
     private final FaultyFileSystem faulty = new FaultyFileSystem();
     private final List<String> errors = new ArrayList<>();
 
-    /** A wide tree: 10 folders, each with a subfolder, and 40 files in each pair: 430 entries in all. */
+    /** A wide tree: 10 folders, each with a subfolder, and 40 files in each pair: 420 entries in all. */
     @BeforeEach
     void tree() throws IOException {
         for (int d = 0; d < 10; d++) {
@@ -101,7 +101,7 @@ class ParallelStopTest {
 
         assertThat(thrown).isInstanceOf(CancellationException.class);
         assertThat(interrupted).isTrue();
-        assertThat(visits.get()).isLessThan(430); // stopped before the end
+        assertThat(visits.get()).isLessThan(420); // stopped before the end
     }
 
     @Test

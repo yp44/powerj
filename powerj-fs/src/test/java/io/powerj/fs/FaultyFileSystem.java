@@ -3,6 +3,7 @@ package io.powerj.fs;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.channels.SeekableByteChannel;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.AccessMode;
 import java.nio.file.CopyOption;
 import java.nio.file.DirectoryIteratorException;
@@ -23,6 +24,7 @@ import java.nio.file.attribute.FileAttribute;
 import java.nio.file.attribute.FileAttributeView;
 import java.nio.file.attribute.UserPrincipalLookupService;
 import java.nio.file.spi.FileSystemProvider;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -35,11 +37,13 @@ import java.util.concurrent.atomic.AtomicInteger;
  * The file system of the machine seen through a wrapper that can fail in the middle of the listing of a folder, as a
  * flaky network file system does: the entries already read are returned, then the iteration of the folder throws
  * {@link DirectoryIteratorException}, which no real folder can be made to do on every system. Everything else goes to the
- * real file system. It can also make the removal or the copy of a chosen entry throw an unchecked exception, as a faulty
- * provider would, to reach the path of a worker that fails (#96), and it counts the removals done.
+ * real file system. It can also (#96) refuse to open a folder; make the removal, the copy or the creation of a chosen
+ * entry throw (an {@link IOException}, or an unchecked exception as a faulty provider would); count the removals done;
+ * and measure how many listings, removals, copies and creations of folders run at the same time.
  * <pre>
  * var faulty = new FaultyFileSystem();
  * faulty.failListing(folder, 2);          // the third entry of folder cannot be read
+ * faulty.failOpening(other);              // other cannot be listed at all
  * faulty.failOperation(file, new IllegalStateException("x")); // its removal or copy throws
  * Path root = faulty.wrap(tmp);           // walk root, not tmp
  * </pre>
@@ -51,18 +55,33 @@ final class FaultyFileSystem extends FileSystem {
     private final Provider provider = new Provider();
     /** Entries read before the failure, by folder (absolute, normalized, as the real file system sees it). */
     private final Map<Path, Integer> failAfter = new ConcurrentHashMap<>();
-    /** Unchecked exceptions thrown by the removal or the copy of an entry (absolute, normalized, real). */
-    private final Map<Path, RuntimeException> failOperation = new ConcurrentHashMap<>();
+    /** Exceptions thrown by the removal or the copy of an entry (absolute, normalized, real). */
+    private final Map<Path, Exception> failOperation = new ConcurrentHashMap<>();
+    /** Folders that cannot be opened (absolute, normalized, real). */
+    private final Set<Path> failOpening = ConcurrentHashMap.newKeySet();
     private final AtomicInteger deletions = new AtomicInteger();
+    private final Occupancy occupancy = new Occupancy();
+    private volatile Duration delay = Duration.ZERO;
 
     /** The listing of {@code folder} throws after {@code entriesBeforeTheFailure} entries. */
     void failListing(Path folder, int entriesBeforeTheFailure) {
         failAfter.put(folder.toAbsolutePath().normalize(), entriesBeforeTheFailure);
     }
 
-    /** The removal of {@code entry}, and its copy (as a source), throw {@code failure}. */
-    void failOperation(Path entry, RuntimeException failure) {
+    /**
+     * The removal of {@code entry}, its copy (as a source) and its creation as a folder throw {@code failure}: an
+     * {@link IOException} or an unchecked exception.
+     */
+    void failOperation(Path entry, Exception failure) {
+        if (!(failure instanceof IOException || failure instanceof RuntimeException)) {
+            throw new IllegalArgumentException("neither an IOException nor unchecked: " + failure);
+        }
         failOperation.put(entry.toAbsolutePath().normalize(), failure);
+    }
+
+    /** {@code folder} cannot be opened: listing it throws {@link AccessDeniedException}. */
+    void failOpening(Path folder) {
+        failOpening.add(folder.toAbsolutePath().normalize());
     }
 
     /** Removals done so far, through this file system. */
@@ -70,11 +89,41 @@ final class FaultyFileSystem extends FileSystem {
         return deletions.get();
     }
 
-    private void checkOperation(Path real) {
-        RuntimeException failure = failOperation.get(real.toAbsolutePath().normalize());
-        if (failure != null) {
-            throw failure;
+    /**
+     * Listings (from opening to closing), removals, copies and creations of folders in progress. Each of them lasts at
+     * least {@link #slowDown the delay}, so that those that may overlap do.
+     */
+    Occupancy occupancy() {
+        return occupancy;
+    }
+
+    /** Each listing, removal, copy and creation of a folder lasts at least {@code delay}. */
+    void slowDown(Duration delay) {
+        this.delay = delay;
+    }
+
+    private void checkOperation(Path real) throws IOException {
+        Exception failure = failOperation.get(real.toAbsolutePath().normalize());
+        if (failure instanceof IOException e) {
+            throw e;
         }
+        if (failure != null) {
+            throw (RuntimeException) failure;
+        }
+    }
+
+    /** Enters an operation, waits for the delay, and returns what to call when it ends. */
+    private Runnable enter() {
+        occupancy.enter();
+        Duration wait = delay;
+        if (!wait.isZero()) {
+            try {
+                Thread.sleep(wait);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        return occupancy::exit;
     }
 
     /** The path of the real file system, as this one sees it. */
@@ -310,8 +359,17 @@ final class FaultyFileSystem extends FileSystem {
         public DirectoryStream<Path> newDirectoryStream(Path dir, DirectoryStream.Filter<? super Path> filter)
                 throws IOException {
             Path realDir = unwrap(dir);
-            DirectoryStream<Path> stream = realProvider.newDirectoryStream(realDir,
-                    entry -> filter.accept(wrap(entry)));
+            if (failOpening.contains(realDir.toAbsolutePath().normalize())) {
+                throw new AccessDeniedException(realDir.toString(), null, "injected failure while opening");
+            }
+            Runnable exit = enter();
+            DirectoryStream<Path> stream;
+            try {
+                stream = realProvider.newDirectoryStream(realDir, entry -> filter.accept(wrap(entry)));
+            } catch (IOException | RuntimeException e) {
+                exit.run();
+                throw e;
+            }
             Integer limit = failAfter.get(realDir.toAbsolutePath().normalize());
             return new DirectoryStream<>() {
                 @Override
@@ -339,28 +397,48 @@ final class FaultyFileSystem extends FileSystem {
 
                 @Override
                 public void close() throws IOException {
-                    stream.close();
+                    try {
+                        stream.close();
+                    } finally {
+                        exit.run();
+                    }
                 }
             };
         }
 
         @Override
         public void createDirectory(Path dir, FileAttribute<?>... attributes) throws IOException {
-            realProvider.createDirectory(unwrap(dir), attributes);
+            Runnable exit = enter();
+            try {
+                checkOperation(unwrap(dir));
+                realProvider.createDirectory(unwrap(dir), attributes);
+            } finally {
+                exit.run();
+            }
         }
 
         @Override
         public void delete(Path path) throws IOException {
             Path real = unwrap(path);
-            checkOperation(real);
-            realProvider.delete(real);
-            deletions.incrementAndGet();
+            Runnable exit = enter();
+            try {
+                checkOperation(real);
+                realProvider.delete(real);
+                deletions.incrementAndGet();
+            } finally {
+                exit.run();
+            }
         }
 
         @Override
         public void copy(Path source, Path target, CopyOption... options) throws IOException {
-            checkOperation(unwrap(source));
-            realProvider.copy(unwrap(source), unwrap(target), options);
+            Runnable exit = enter();
+            try {
+                checkOperation(unwrap(source));
+                realProvider.copy(unwrap(source), unwrap(target), options);
+            } finally {
+                exit.run();
+            }
         }
 
         @Override
