@@ -89,8 +89,14 @@ ordinary user may score a little higher, never lower.
 | `io.powerj.fs`, with the tests of #96, before the change | 414 | 347 | 83.8 % | 28 |
 | of which `FileTrees` | 153 | 134 | 87.6 % | 17 |
 | of which `FileWalker` | 104 | 94 | 90.4 % | 8 |
+| `io.powerj.fs`, after the change (two runs) | 399 | 335 / 336 | 84.0 % / 84.2 % | 20 |
+| of which `FileTrees` + `FileWalker` + `ParallelEngine` | 242 | 216 / 217 | 89.3 % / 89.7 % | 17 |
 
-Two runs gave the same numbers to the mutant. What the first run found, and the tests of #96 now cover, for every user:
+Before the change, two runs gave the same numbers to the mutant; the same code scored 88.7 % (228 of 257) in `FileTrees`
+and `FileWalker`. After it there are fewer mutations (the stop protocol is mutated once instead of twice) and the score is
+not lower. The one mutant that differs between the two runs after is `copied` called on a folder before its last child is
+done: it is killed when a child is copied after the folder got its date, which depends on the order in which the threads
+end; it was killed in both runs before, and in one of the two after. What the first run found, and the tests of #96 now cover, for every user:
 
 - **No test bounded the parallelism.** Removing the `acquire` of a permit, or releasing a permit twice, survived in both
   classes: the Javadoc promises at most `parallelism` open folders or files, and nothing checked it. `ParallelismBoundTest`
@@ -104,7 +110,8 @@ Two runs gave the same numbers to the mutant. What the first run found, and the 
   still finished (removed, or given its attributes) once its other children are done.
 
 What survives in the parallel code is the path of a work already stopped: the permit given back when the executor refuses
-a task, and the interrupt flag set again in a worker that is ending. No test can observe them.
+a task, the interrupt flag set again in a worker that is ending, and `ParallelEngine.stopped()` answering `false` (the work
+then goes on until its end instead of stopping early, and the result is the same). No test can observe them.
 
 ## Reading a survivor
 
