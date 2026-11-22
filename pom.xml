@@ -184,7 +184,8 @@
         <!-- Mutation testing (PIT), apart from the build because it takes minutes: it changes the code of the core, one
              operator at a time, and counts the changes that no test notices. See docs/quality/mutation.md.
              ./mvnw -Pmutation -pl powerj-core -am test-compile org.pitest:pitest-maven:mutationCoverage
-             -DtargetClasses='io.powerj.core.lang.*' narrows it to a package. -->
+             -DtargetClasses='io.powerj.core.lang.*' narrows it to a package. powerj-fs redefines the targets in a profile
+             of the same name (its pom.xml). -->
         <profile>
             <id>mutation</id>
             <build>
