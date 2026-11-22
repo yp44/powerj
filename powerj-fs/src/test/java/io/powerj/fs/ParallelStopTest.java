@@ -28,8 +28,8 @@ import org.junit.jupiter.params.provider.ValueSource;
  */
 class ParallelStopTest {
 
-    /** Capacity of the queue between the workers and the calling thread, in both classes. */
-    private static final int QUEUE_CAPACITY = 256;
+    /** Capacity of the queue between the workers and the calling thread: the tree must hold more entries. */
+    private static final int QUEUE_CAPACITY = ParallelEngine.QUEUE_CAPACITY;
     /** Time allowed to a stopped walk to end all its threads and return. */
     private static final Duration BOUND = Duration.ofSeconds(10);
 
@@ -42,6 +42,7 @@ class ParallelStopTest {
     /** A wide tree: 10 folders, each with a subfolder, and 40 files in each pair: 420 entries in all. */
     @BeforeEach
     void tree() throws IOException {
+        assertThat(QUEUE_CAPACITY + 1).as("entries the workers must produce to fill the queue").isLessThan(420);
         for (int d = 0; d < 10; d++) {
             Path dir = Files.createDirectories(tmp.resolve("w/d" + d + "/sub"));
             for (int f = 0; f < 20; f++) {

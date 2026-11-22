@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -371,6 +372,7 @@ final class FaultyFileSystem extends FileSystem {
                 throw e;
             }
             Integer limit = failAfter.get(realDir.toAbsolutePath().normalize());
+            AtomicBoolean closed = new AtomicBoolean();
             return new DirectoryStream<>() {
                 @Override
                 public Iterator<Path> iterator() {
@@ -395,12 +397,15 @@ final class FaultyFileSystem extends FileSystem {
                     };
                 }
 
+                /** May be called more than once: the listing ends (for {@link #occupancy}) at the first call. */
                 @Override
                 public void close() throws IOException {
                     try {
                         stream.close();
                     } finally {
-                        exit.run();
+                        if (closed.compareAndSet(false, true)) {
+                            exit.run();
+                        }
                     }
                 }
             };
