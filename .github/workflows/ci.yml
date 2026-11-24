@@ -38,6 +38,20 @@ jobs:
       - name: Build, tests and application image
         run: ./mvnw -B -Pdist verify
 
+      # The assumeTrue guards skip differently per system (#95): show what each one actually ran.
+      - name: Tests run and skipped on ${{ runner.os }}
+        if: always()
+        shell: bash
+        run: |
+          total=0; skipped=0
+          while IFS= read -r f; do
+            line=$(grep -m1 'Tests run:' "$f" || true)
+            [ -n "$line" ] || continue
+            total=$((total + $(echo "$line" | sed -E 's/.*Tests run: ([0-9]+).*/\1/')))
+            skipped=$((skipped + $(echo "$line" | sed -E 's/.*Skipped: ([0-9]+).*/\1/')))
+          done < <(find . -path '*/surefire-reports/*.txt' -type f)
+          echo "${{ runner.os }}: tests run: $total, skipped: $skipped"
+
       # No test writes to the native stream of the forked JVM: Surefire keeps what it lost in a .dumpstream file (#145).
       - name: Surefire channel is not corrupted
         if: always()
@@ -142,6 +156,20 @@ jobs:
       - name: UI tests
         run: xvfb-run -a ./mvnw -B -ntp -Pfx-ui -pl powerj-fx -am test -Dsurefire.failIfNoSpecifiedTests=false
 
+      # The assumeTrue guards skip differently per system (#95): show what each one actually ran.
+      - name: Tests run and skipped on ${{ runner.os }}
+        if: always()
+        shell: bash
+        run: |
+          total=0; skipped=0
+          while IFS= read -r f; do
+            line=$(grep -m1 'Tests run:' "$f" || true)
+            [ -n "$line" ] || continue
+            total=$((total + $(echo "$line" | sed -E 's/.*Tests run: ([0-9]+).*/\1/')))
+            skipped=$((skipped + $(echo "$line" | sed -E 's/.*Skipped: ([0-9]+).*/\1/')))
+          done < <(find . -path '*/surefire-reports/*.txt' -type f)
+          echo "${{ runner.os }}: tests run: $total, skipped: $skipped"
+
   without-fx:
     name: Build without the graphical module (Linux)
     runs-on: ubuntu-latest
@@ -159,6 +187,20 @@ jobs:
       - name: Build and tests
         run: ./mvnw -B -DskipFx verify
 
+      # The assumeTrue guards skip differently per system (#95): show what each one actually ran.
+      - name: Tests run and skipped on ${{ runner.os }}
+        if: always()
+        shell: bash
+        run: |
+          total=0; skipped=0
+          while IFS= read -r f; do
+            line=$(grep -m1 'Tests run:' "$f" || true)
+            [ -n "$line" ] || continue
+            total=$((total + $(echo "$line" | sed -E 's/.*Tests run: ([0-9]+).*/\1/')))
+            skipped=$((skipped + $(echo "$line" | sed -E 's/.*Skipped: ([0-9]+).*/\1/')))
+          done < <(find . -path '*/surefire-reports/*.txt' -type f)
+          echo "${{ runner.os }}: tests run: $total, skipped: $skipped"
+
   macos:
     name: Build and launcher (macOS)
     runs-on: macos-latest
@@ -175,6 +217,20 @@ jobs:
       # -fae: every module that can be built is, so that one run shows all that macOS breaks.
       - name: Build, tests and application image
         run: ./mvnw -B -fae -Pdist verify
+      # The assumeTrue guards skip differently per system (#95): show what each one actually ran.
+      - name: Tests run and skipped on ${{ runner.os }}
+        if: always()
+        shell: bash
+        run: |
+          total=0; skipped=0
+          while IFS= read -r f; do
+            line=$(grep -m1 'Tests run:' "$f" || true)
+            [ -n "$line" ] || continue
+            total=$((total + $(echo "$line" | sed -E 's/.*Tests run: ([0-9]+).*/\1/')))
+            skipped=$((skipped + $(echo "$line" | sed -E 's/.*Skipped: ([0-9]+).*/\1/')))
+          done < <(find . -path '*/surefire-reports/*.txt' -type f)
+          echo "${{ runner.os }}: tests run: $total, skipped: $skipped"
+
 
       - name: Surefire channel is not corrupted
         if: always()
@@ -237,6 +293,20 @@ jobs:
       - name: Build, tests, powerj.exe and installer
         shell: cmd
         run: mvnw.cmd -B -Pdist,installer verify
+
+      # The assumeTrue guards skip differently per system (#95): show what each one actually ran.
+      - name: Tests run and skipped on ${{ runner.os }}
+        if: always()
+        shell: bash
+        run: |
+          total=0; skipped=0
+          while IFS= read -r f; do
+            line=$(grep -m1 'Tests run:' "$f" || true)
+            [ -n "$line" ] || continue
+            total=$((total + $(echo "$line" | sed -E 's/.*Tests run: ([0-9]+).*/\1/')))
+            skipped=$((skipped + $(echo "$line" | sed -E 's/.*Skipped: ([0-9]+).*/\1/')))
+          done < <(find . -path '*/surefire-reports/*.txt' -type f)
+          echo "${{ runner.os }}: tests run: $total, skipped: $skipped"
 
       # No Surefire channel check here, on purpose: on Windows the forked JVM of powerj-architecture and powerj-testing writes
       # "Boot Manifest-JAR contains absolute paths in classpath ... disableClassPathURLCheck" to the channel, which the script

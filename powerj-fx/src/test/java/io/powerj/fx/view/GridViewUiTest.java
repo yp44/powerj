@@ -1,5 +1,6 @@
 package io.powerj.fx.view;
 
+import java.util.concurrent.locks.LockSupport;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
@@ -138,7 +139,7 @@ class GridViewUiTest {
             if (onToolkit(condition)) {
                 return;
             }
-            Thread.sleep(25);
+            LockSupport.parkNanos(200_000);
         }
         throw new AssertionError("timed out waiting for " + what);
     }

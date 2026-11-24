@@ -4,6 +4,7 @@ import static io.powerj.shell.TestTerminal.CTRL_C;
 import static io.powerj.shell.TestTerminal.ENTER;
 import static io.powerj.shell.TestTerminal.UP;
 import static org.assertj.core.api.Assertions.assertThat;
+import static io.powerj.shell.Awaits.awaitUntil;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -14,9 +15,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.BooleanSupplier;
+import java.util.concurrent.TimeUnit;
 
 import org.jline.reader.LineReader;
 import org.jline.reader.Reference;
@@ -404,13 +404,4 @@ class PreviewControlKeysTest {
         }
     }
 
-    private static void awaitUntil(BooleanSupplier condition) throws InterruptedException {
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
-        while (!condition.getAsBoolean()) {
-            if (System.nanoTime() > deadline) {
-                throw new AssertionError("condition never reached");
-            }
-            Thread.sleep(10);
-        }
-    }
 }

@@ -20,12 +20,11 @@ import io.powerj.core.command.CmdletRegistry;
 import io.powerj.core.support.FakeCmdlets;
 
 /**
- * Defects of the architecture review that a test demonstrates (docs/REVUE-ARCHITECTURE.md, §4). A test marked
- * {@code @Disabled} is red today: it states the expected behaviour and names the phase of the plan that fixes it, where
- * the annotation is removed. See also {@code KnownDefectsTest} in powerj-cmdlets and {@code ExitGuardTest} in
- * powerj-architecture.
+ * Behaviors that the architecture review (docs/REVUE-ARCHITECTURE.md, §4) flagged and that turned out correct, pinned
+ * here so a future cleanup does not "fix" them into a bug. See also {@code PinnedBehaviorsTest} in powerj-cmdlets and
+ * {@code ExitGuardTest} in powerj-architecture.
  */
-class KnownDefectsTest {
+class PinnedBehaviorsTest {
 
     @TempDir
     Path tmp;

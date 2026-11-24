@@ -6,6 +6,7 @@ import static io.powerj.shell.TestTerminal.CTRL_R;
 import static io.powerj.shell.TestTerminal.ENTER;
 import static io.powerj.shell.TestTerminal.UP;
 import static org.assertj.core.api.Assertions.assertThat;
+import static io.powerj.shell.Awaits.awaitUntil;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -14,7 +15,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.function.BooleanSupplier;
 
 import org.jline.reader.History;
 import org.junit.jupiter.api.Test;
@@ -140,15 +140,6 @@ class ReplTest {
         }
     }
 
-    private static void awaitUntil(BooleanSupplier condition) throws InterruptedException {
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
-        while (!condition.getAsBoolean()) {
-            if (System.nanoTime() > deadline) {
-                throw new AssertionError("condition never reached");
-            }
-            Thread.sleep(10);
-        }
-    }
 
     @Test
     void upArrowRecallsPreviousCommands() throws Exception {
