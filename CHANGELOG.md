@@ -901,8 +901,8 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
 - **The first release** ([#47](https://github.com/yp44/powerj/issues/47)) **and how to sign it**
   ([#48](https://github.com/yp44/powerj/issues/48)). The release workflow is written ([docs/RELEASING.md](docs/RELEASING.md))
   and has never run; nothing is signed. Tagging, and the way to sign, are the maintainer's decisions.
-- **Code scanning** ([#50](https://github.com/yp44/powerj/issues/50)). A CodeQL workflow was added in Phase 0 and taken out
-  again on the maintainer's request, to be looked at later (it is in the history, commit `cf487bb`).
+- **Code scanning** ([#50](https://github.com/yp44/powerj/issues/50)): decided, the CodeQL workflow is back (see "Added
+  (code scanning with CodeQL)" below); what is left is the triage of its first alerts.
 - **Private vulnerability reporting** ([#49](https://github.com/yp44/powerj/issues/49)) has to be switched on in the
   settings of the repository (`SECURITY.md` relies on it).
 - **Phase 6**: control structures and functions ([#52](https://github.com/yp44/powerj/issues/52)), on the foundations of
@@ -1595,6 +1595,22 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   keeps its other meanings: `$env:PATH`, `String::valueOf` and a drive (`C:`) are not read as a module.
 - **Not completed after its dash: a name that contains a `.`** (`python3.12-config`), because a `.` starts a Java member
   access at the head of a stage (`x.size-1`); the name is still completed up to the dash.
+
+### Added (code scanning with CodeQL, [#50](https://github.com/yp44/powerj/issues/50))
+- **`.github/workflows/codeql.yml`** analyses the Java sources (`java-kotlin`) and the workflows themselves (`actions`) on
+  every pull request, on every push to `main` and once a week (the schedule picks up the queries CodeQL adds between two
+  changes of the code). It is the workflow of Phase 0 (commit `cf487bb`), taken out at the maintainer's request and decided
+  again on 2026-11-24: the extraction is made from the sources, with no build (`build-mode: none`), so it does not depend on
+  the JDK 25 of the CI. The actions are pinned by commit like the others, and Dependabot keeps them up to date.
+- **The workflows are the main gain**: `release.yml` will be allowed to publish, and CodeQL checks the workflows for what
+  opens a supply-chain attack (untrusted text such as a pull request title written into a script, permissions that are too
+  wide).
+- **The Java findings are expected to be few and, for the first wave, by design**: a shell runs the command that is typed,
+  opens the path that is typed and compiles the regular expression of `grep` (bounded by `GuardedText`). Those alerts are
+  dismissed once, in Security, Code scanning, with their reason; only a new alert shows after that. This triage is the last
+  item of #50 and needs the first run.
+- **The "default setup" of CodeQL must stay off** in the settings of the repository (Code security): the two cannot run
+  together, and a workflow file is the one that is versioned and reviewed.
 
 ## [0.1.0] — never released (baseline)
 
