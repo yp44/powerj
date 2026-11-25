@@ -100,7 +100,7 @@ Out of scope for v1: control structures (`if`, `foreach`, functions — planned 
 | `perf` | What perf mode (Alt+P) measured, as records: `perf \| sort active -d \| first 1`, `perf --view blocks`, `perf --view hot`, `perf --save f.jfr`; views `stages`, `blocks`, `natives`, `phases`, `jvm`, `lines`, `hot`, `gc`, `alloc` | [perf](docs/acceptance/perf.md) |
 | `grid` | **Optional module** `powerj-fx`: shows the objects in a JavaFX window, with sorting and filtering by column, loading while the pipeline runs, copy, and `--pass-thru` to send the ticked rows on: `ls -r \| grid`, `ps \| grid --columns pid,name`, `ls -r \| grid --pass-thru \| rm` | [fx-grid](docs/acceptance/fx-grid.md) |
 | `collect` | Gathers a pipeline into one list: `(ls -r \| collect).size()` | [step-8](docs/acceptance/step-8-collect.md) |
-| `env` | Reads and sets environment variables (`env --set MAVEN_OPTS=-Xmx2g`) | [step-3](docs/acceptance/step-3.md) |
+| `env` | Reads and sets environment variables (`env PATH JAVA_HOME`, `env --set GREETING hello world`, `env --set MAVEN_OPTS=-Xmx2g`) | [step-3](docs/acceptance/step-3.md) |
 
 Built-in commands: `cd` (`cd -`, `cd ~`, `cd D:`), `pwd`, `which`, `help` (`help ls`, `help java.util.List`, `help members $x`), `history` (plus `!!`, `!n`, `!text`), `import`, `mod-load`, `mod-list`, `jobs`, `exit [code]`.
 

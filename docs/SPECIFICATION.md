@@ -694,8 +694,8 @@ CA:
 
 ```text
 env                               # list all variables
-env <NAME>                        # a single variable
-env --set <NAME>=<value>          # create or modify (also: env -s NAME=value)
+env <NAME>...                     # the variables named, in this order
+env --set <NAME> <value>...       # create or modify (also: env -s NAME value, env --set NAME=value)
 env --unset <NAME>                # remove
 env --append <NAME> <value>       # append to a list (separator ; on Windows, : elsewhere)
 env --prepend <NAME> <value>      # same, at the head of the list
@@ -703,12 +703,18 @@ env --prepend <NAME> <value>      # same, at the head of the list
 
 Output: stream of `record EnvVar(String name, String value)`, sorted by name (names case-insensitive on Windows).
 
+`env <NAME>...` emits one `EnvVar` per name, in the order given; a name that is not set is a non-blocking error (`no such variable: X`) and the other names are still shown.
+
+`--set` takes the name of the variable as its argument; the words that follow are the value, joined by one blank (`env --set GREETING hello world` gives `hello world`; quote the value to keep its blanks as written). The value may hold a `=`. Without a word after it, `--set NAME=value` is understood as before: it is the way to give a value that starts with `-` (`env --set MAVEN_OPTS=-Xmx2g`), which would otherwise be read as an option, unless `--` comes before it (`env --set MAVEN_OPTS -- -Xmx2g`). `--set NAME` without a value, or an argument of `--set` that cannot be a name followed by a value (`env --set A=b c`), is a usage error.
+
 `--append` and `--prepend` take the name of the variable as their argument, then one value (`env --append PATH /tools`). An argument that cannot be a name (it holds `/`, `\`, `=`, as in `env PATH --append /x`, where `/x` would otherwise become a variable) or two values is a usage error; an entry that is **already in the list** is not added again by `--append`, and `--prepend` moves it to the head (it is how a folder is given priority). Entries are compared as written.
 
 Changes apply to **the PowerJ session environment**: they apply to all native commands launched afterwards, to the lookup of executables in the `PATH` (FR-13) and to the settings read by PowerJ (`POWERJ_NATIVE_ENCODING`…). They are not persisted: to make them permanent, put them in `profile.pj` (§8). Note: `System.getenv()` in a Java expression returns the **initial** environment of the process (a JVM cannot modify its own environment); use `env` for the session environment.
 
 CA:
 - `env | where { $_.name.startsWith("JAVA") }`;
+- `env PATH NOPE JAVA_HOME` shows `PATH` and `JAVA_HOME`, and the error `no such variable: NOPE`;
+- `env --set GREETING hello world` then `(env GREETING).value` is `hello world`;
 - `(env PATH).value.split(";")` lists the folders of the `PATH`;
 - `env --append PATH C:\tools` then a tool from `C:\tools` is found and `which` reports it;
 - `env --set MAVEN_OPTS=-Xmx2g` then `mvn` receives the variable;

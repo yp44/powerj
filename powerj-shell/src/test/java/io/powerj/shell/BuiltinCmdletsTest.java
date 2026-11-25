@@ -143,6 +143,22 @@ class BuiltinCmdletsTest {
     }
 
     @Test
+    void envSetsAValueWithoutEqualsAndShowsSeveralVariables() throws Exception {
+        run("env --set MY_VAR the value of the var");
+        assertThat(session.environment()).containsEntry("MY_VAR", "the value of the var");
+        run("env -s QUOTED \"two  blanks\" kept");
+        assertThat(session.environment()).containsEntry("QUOTED", "two  blanks kept");
+        run("env --set OPTS -- -Xmx2g -Dfoo=bar"); // after --, a value that starts with - is no option
+        assertThat(session.environment()).containsEntry("OPTS", "-Xmx2g -Dfoo=bar");
+        run("env --set LEGACY=-Xmx2g");
+        assertThat(session.environment()).containsEntry("LEGACY", "-Xmx2g");
+        assertThat(errors).isEmpty();
+
+        assertThat(run("env MY_VAR ABSENTE_XYZ POWERJ_TEST | map { $_.value }")).isEqualTo("the value of the var\n1\n");
+        assertThat(errors).containsExactly("env: no such variable: ABSENTE_XYZ");
+    }
+
+    @Test
     void helpListsCategories() throws Exception {
         assertThat(run("help")).contains("Files", "ls", "System", "env");
     }

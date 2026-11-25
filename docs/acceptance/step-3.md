@@ -39,6 +39,7 @@ As in the previous steps: **Actions** tab, latest run of the **CI** workflow, ar
 | 22 | Reduce the window width, then `ls` in a folder with long names | Columns shrink and overly long texts end with `…`. |
 | 22b | (Linux/macOS) `mkdir real`, `ln -s real alias`, `ln -s nowhere broken`, then `ls`, `(ls)*.link`, `ls broken`, `ls -a \| where { $_.hidden }` | `alias` is listed as a folder, `broken` is listed too; `(ls)*.link` gives `False` for `real` and `True` for `alias` and `broken`; `ls broken` lists the one entry (it said nothing before); the last one lists the dot files. |
 | 22c | `env --append PATH /tmp/x`, again, then `env PATH --append /tmp/x` | The first adds `/tmp/x` to `PATH` once (the second does nothing: it is already there); the last is `env: --append expects the name of a variable, got /tmp/x: write env --append NAME value`, and no variable `/tmp/x` exists. |
+| 22d | `env --set GREETING hello world`, then `env GREETING PATH NOPE`, then `env --set GREETING` | `GREETING` is `hello world`; the second shows `GREETING` and `PATH`, then `env: no such variable: NOPE`; the last is `env: value expected: env --set NAME value` and changes nothing. |
 
 ## Known limitations of step 3
 

@@ -1613,6 +1613,17 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
 - **Mutation testing of `io.powerj.fs`**: `./mvnw -Pmutation -pl powerj-fs test-compile org.pitest:pitest-maven:mutationCoverage`.
   83.8 % before the change (74.6 % with the tests of before #96), 84.0-84.2 % after; see `docs/quality/mutation.md`.
 
+### Changed (`env` shows several variables, `--set` without `=`, [#249](https://github.com/yp44/powerj/issues/249))
+- **`env PATH JAVA_HOME MAVEN_OPTS` shows each variable**, in the order given; a name that is not set is a non-blocking
+  error and the others are still shown. `env` alone still lists them all.
+- **`env --set NAME the value` sets a variable without `=`**, like `--append` and `--prepend`: the argument of `--set` is
+  the name, the words that follow are the value, joined by one blank (quote the value to keep several blanks). A value
+  may hold a `=` (`env --set OPTS -- -Dfoo=bar`). `env --set NAME=value` alone is still understood: it is the short way to
+  give a value that starts with `-`, which would otherwise be read as an option (or write `--` before it).
+  `env --set NAME` without a value, or `env --set A=b c`, is a usage error that shows the expected form.
+- `Env.Params` (`powerj-cmdlets`): the positional `String name` and `String value` are one `List<String> names`, as in
+  `ps`. Messages: `env.set.format` is gone, `env.value.expected` names the option, `env.value.twice` lists the values.
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.

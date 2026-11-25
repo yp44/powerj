@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.File;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Locale;
 
 import org.junit.jupiter.api.AfterEach;
@@ -26,41 +27,88 @@ class EnvTest {
         context.environment.put("PATH", "/bin");
     }
 
-    private void env(String name, String set, String unset, String append, String prepend, String value) {
-        new Env().begin(new Env.Params(name, set, unset, append, prepend, value), context);
+    /** {@code names}: the positional words, separated by blanks ({@code null}: none). */
+    private void env(String names, String set, String unset, String append, String prepend) {
+        new Env().begin(params(names, set, unset, append, prepend), context);
+    }
+
+    private static Env.Params params(String names, String set, String unset, String append, String prepend) {
+        return new Env.Params(names == null ? List.of() : List.of(names.split(" ")), set, unset, append, prepend);
     }
 
     @Test
     void listsAllOrOne() {
-        env(null, null, null, null, null, null);
+        env(null, null, null, null, null);
         assertThat(context.emitted).contains(new EnvVar("JAVA_HOME", "/jdk"), new EnvVar("PATH", "/bin"));
         context.emitted.clear();
-        env("PATH", null, null, null, null, null);
+        env("PATH", null, null, null, null);
         assertThat(context.emitted).containsExactly(new EnvVar("PATH", "/bin"));
     }
 
     @Test
     void setAndUnset() {
-        env(null, "MAVEN_OPTS=-Xmx2g", null, null, null, null);
+        env(null, "MAVEN_OPTS=-Xmx2g", null, null, null);
         assertThat(context.environment).containsEntry("MAVEN_OPTS", "-Xmx2g");
-        env(null, null, "MAVEN_OPTS", null, null, null);
+        env(null, null, "MAVEN_OPTS", null, null);
         assertThat(context.environment).doesNotContainKey("MAVEN_OPTS");
-        env(null, null, "MAVEN_OPTS", null, null, null);
+        env(null, null, "MAVEN_OPTS", null, null);
         assertThat(context.errors).containsExactly("no such variable: MAVEN_OPTS");
     }
 
     @Test
     void appendAndPrependUseThePathSeparator() {
         // "env --append PATH /tools": PATH is the value of --append, /tools lands in position 0
-        env("/tools", null, null, "PATH", null, null);
+        env("/tools", null, null, "PATH", null);
         assertThat(context.environment.get("PATH")).isEqualTo("/bin" + File.pathSeparator + "/tools");
-        env("/first", null, null, null, "PATH", null);
+        env("/first", null, null, null, "PATH");
         assertThat(context.environment.get("PATH")).startsWith("/first" + File.pathSeparator);
     }
 
     @Test
+    void showsSeveralVariablesInTheOrderGiven() {
+        env("PATH JAVA_HOME", null, null, null, null); // "env PATH JAVA_HOME"
+        assertThat(context.emitted).containsExactly(new EnvVar("PATH", "/bin"), new EnvVar("JAVA_HOME", "/jdk"));
+    }
+
+    @Test
+    void aMissingVariableAmongSeveralDoesNotStopTheOthers() {
+        env("PATH NOPE JAVA_HOME", null, null, null, null);
+        assertThat(context.emitted).containsExactly(new EnvVar("PATH", "/bin"), new EnvVar("JAVA_HOME", "/jdk"));
+        assertThat(context.errors).containsExactly("no such variable: NOPE");
+    }
+
+    @Test
+    void setTakesTheNameThenTheWordsOfTheValueWithoutEquals() {
+        env("the value of the var", "MY_VAR", null, null, null); // "env --set MY_VAR the value of the var"
+        assertThat(context.environment).containsEntry("MY_VAR", "the value of the var");
+        env("-Dfoo=bar", "OPTS", null, null, null); // "env --set OPTS -- -Dfoo=bar": an = in the value is kept
+        assertThat(context.environment).containsEntry("OPTS", "-Dfoo=bar");
+        env("/jdk25", "JAVA_HOME", null, null, null);
+        assertThat(context.environment).containsEntry("JAVA_HOME", "/jdk25");
+    }
+
+    @Test
+    void setStillUnderstandsNameEqualsValueAloneAndAnEmptyValue() {
+        env(null, "MAVEN_OPTS=-Xmx2g -Xss4m", null, null, null);
+        env(null, "EMPTY=", null, null, null);
+        assertThat(context.environment).containsEntry("MAVEN_OPTS", "-Xmx2g -Xss4m").containsEntry("EMPTY", "");
+    }
+
+    @Test
+    void setWithoutAValueOrWithANameThatIsNoNameIsAUsageError() {
+        assertThatThrownBy(() -> env(null, "MY_VAR", null, null, null)).isInstanceOf(UsageException.class)
+                .hasMessage("value expected: env --set NAME value");
+        // "env --set A=b c": either the name and the value are separated by =, or by a blank, not both
+        assertThatThrownBy(() -> env("c", "A=b", null, null, null)).isInstanceOf(UsageException.class)
+                .hasMessage("--set expects the name of a variable, got A=b: write env --set NAME value");
+        assertThatThrownBy(() -> env(null, "=b", null, null, null)).isInstanceOf(UsageException.class)
+                .hasMessageContaining("--set expects the name of a variable");
+        assertThat(context.environment).doesNotContainKeys("MY_VAR", "A", "A=b", "");
+    }
+
+    @Test
     void missingVariableIsANonBlockingError() {
-        env("NOPE", null, null, null, null, null);
+        env("NOPE", null, null, null, null);
         assertThat(context.emitted).isEmpty();
         assertThat(context.errors).containsExactly("no such variable: NOPE");
     }
@@ -73,15 +121,15 @@ class EnvTest {
     @Test
     void missingVariableInFrench() {
         LanguageSetting.set(Locale.FRENCH);
-        env("NOPE", null, null, null, null, null);
+        env("NOPE", null, null, null, null);
         assertThat(context.errors).containsExactly("variable absente : NOPE");
     }
 
     @Test
     void invalidSetInFrench() {
         LanguageSetting.set(Locale.FRENCH);
-        assertThatThrownBy(() -> env(null, "NOEQUALS", null, null, null, null))
-                .isInstanceOf(IllegalArgumentException.class).hasMessage("--set attend NOM=valeur");
+        assertThatThrownBy(() -> env(null, "SANS_VALEUR", null, null, null))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("valeur attendue : env --set NOM valeur");
     }
 
     @Test
@@ -91,26 +139,29 @@ class EnvTest {
                 .isEqualTo("Shows or changes the session environment variables");
         assertThat(provider.messages(Locale.FRENCH).getString("category.System")).isEqualTo("Système");
         assertThat(provider.messages(Locale.FRENCH).getString("env.option.set"))
-                .isEqualTo("Crée ou modifie une variable : NOM=valeur");
+                .isEqualTo("Crée ou modifie une variable : --set NOM valeur (ou NOM=valeur)");
     }
 
     @Test
     void oneActionAtATimeAndAValueToAppend() {
-        assertThatThrownBy(() -> env(null, "A=1", "B", null, null, null))
+        assertThatThrownBy(() -> env(null, "A=1", "B", null, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("only one action at a time among --set, --unset, --append, --prepend");
-        assertThatThrownBy(() -> env(null, null, null, "PATH", null, null))
+        assertThatThrownBy(() -> env(null, null, null, "PATH", null))
                 .hasMessage("value expected: env --append NAME value");
-        env(null, null, null, "NEW_LIST", null, "/a");
+        assertThatThrownBy(() -> env(null, null, null, null, "PATH"))
+                .hasMessage("value expected: env --prepend NAME value");
+        env("/a", null, null, "NEW_LIST", null);
         context.environment.put("EMPTY", "");
-        env(null, null, null, null, "EMPTY", "/b");
+        env("/b", null, null, null, "EMPTY");
         assertThat(context.environment).containsEntry("NEW_LIST", "/a").containsEntry("EMPTY", "/b");
     }
 
     @Test
     void onlyReadingIsPreviewed() {
-        assertThat(new Env().canPreview(new Env.Params("PATH", null, null, null, null, null))).isTrue();
-        assertThat(new Env().canPreview(new Env.Params(null, "A=1", null, null, null, null))).isFalse();
+        assertThat(new Env().canPreview(params("PATH JAVA_HOME", null, null, null, null))).isTrue();
+        assertThat(new Env().canPreview(params("x", "A", null, null, null))).isFalse();
+        assertThat(new Env().canPreview(params(null, "A=1", null, null, null))).isFalse();
     }
 
     // --- audit v2, U-09 ---
@@ -118,7 +169,7 @@ class EnvTest {
     @Test
     void aNameBeforeTheActionWithAPathAsItsArgumentIsAUsageErrorNotAVariableCalledSlashX() {
         // "env PATH --append /x" binds PATH to the positional name and /x to --append: /x is no variable
-        assertThatThrownBy(() -> env("PATH", null, null, "/x", null, null)).isInstanceOf(UsageException.class)
+        assertThatThrownBy(() -> env("PATH", null, null, "/x", null)).isInstanceOf(UsageException.class)
                 .hasMessageContaining("/x").hasMessageContaining("env --append NAME value");
 
         assertThat(context.environment).doesNotContainKey("/x");
@@ -127,17 +178,17 @@ class EnvTest {
 
     @Test
     void twoValuesAfterTheNameAreAUsageErrorNotOneOfThemSilentlyDropped() {
-        assertThatThrownBy(() -> env("/a", null, null, "PATH", null, "/b")).isInstanceOf(UsageException.class)
-                .hasMessageContaining("/a").hasMessageContaining("/b");
+        assertThatThrownBy(() -> env("/a /b", null, null, "PATH", null)).isInstanceOf(UsageException.class)
+                .hasMessage("--append takes one value, got /a, /b");
 
         assertThat(context.environment.get("PATH")).isEqualTo("/bin");
     }
 
     @Test
     void anEntryThatIsAlreadyInTheListIsNotAddedAgain() {
-        env("/tools", null, null, "PATH", null, null);
-        env("/tools", null, null, "PATH", null, null);
-        env("/bin", null, null, null, "PATH", null);
+        env("/tools", null, null, "PATH", null);
+        env("/tools", null, null, "PATH", null);
+        env("/bin", null, null, null, "PATH");
 
         assertThat(context.environment.get("PATH")).isEqualTo("/bin" + File.pathSeparator + "/tools");
     }
@@ -146,7 +197,7 @@ class EnvTest {
     void aVariableNameMayHaveParenthesesAsOnWindows() {
         context.environment.put("ProgramFiles(x86)", "C:\\pf");
 
-        env("D:\\more", null, null, "ProgramFiles(x86)", null, null);
+        env("D:\\more", null, null, "ProgramFiles(x86)", null);
 
         assertThat(context.environment.get("ProgramFiles(x86)")).isEqualTo("C:\\pf" + File.pathSeparator + "D:\\more");
     }
@@ -155,7 +206,7 @@ class EnvTest {
     void prependMovesAnEntryThatIsAlreadyLaterInTheListToTheHead() {
         context.environment.put("PATH", "/usr/bin" + File.pathSeparator + "/opt/tools");
 
-        env("/opt/tools", null, null, null, "PATH", null); // "env --prepend PATH /opt/tools"
+        env("/opt/tools", null, null, null, "PATH"); // "env --prepend PATH /opt/tools"
 
         assertThat(context.environment.get("PATH")).isEqualTo("/opt/tools" + File.pathSeparator + "/usr/bin");
     }
@@ -164,7 +215,7 @@ class EnvTest {
     void appendLeavesAnEntryThatIsAlreadyInTheListWhereItIs() {
         context.environment.put("PATH", "/usr/bin" + File.pathSeparator + "/opt/tools");
 
-        env("/usr/bin", null, null, "PATH", null, null);
+        env("/usr/bin", null, null, "PATH", null);
 
         assertThat(context.environment.get("PATH")).isEqualTo("/usr/bin" + File.pathSeparator + "/opt/tools");
     }
