@@ -105,7 +105,7 @@ wildcards; it says "case ignored" for `ps` (FR-74).
 
 Proposed shape (the name and the values are mine, to confirm):
 - **Variable `POWERJ_GLOB_IGNORE_CASE`**, like `POWERJ_NATIVE_ENCODING` (FR-40b): read from the session environment at each
-  use, so `env --set POWERJ_GLOB_IGNORE_CASE=true` applies from the next command. Cmdlets read it through
+  use, so `env --set POWERJ_GLOB_IGNORE_CASE true` applies from the next command. Cmdlets read it through
   `CmdletContext.environment()`, so `powerj-api` does not change; the native expansion reads `Session.environment()`.
   `true` or `1` ignores case, `false` or `0` keeps it, anything else is an explicit error, as for an invalid charset name.
 - **One helper in `powerj-fs`** that turns the variable into the `ignoreCase` flag of `Globs.matcher(pattern, ignoreCase)`.

@@ -100,7 +100,7 @@ Out of scope for v1: control structures (`if`, `foreach`, functions — planned 
 | `perf` | What perf mode (Alt+P) measured, as records: `perf \| sort active -d \| first 1`, `perf --view blocks`, `perf --view hot`, `perf --save f.jfr`; views `stages`, `blocks`, `natives`, `phases`, `jvm`, `lines`, `hot`, `gc`, `alloc` | [perf](docs/acceptance/perf.md) |
 | `grid` | **Optional module** `powerj-fx`: shows the objects in a JavaFX window, with sorting and filtering by column, loading while the pipeline runs, copy, and `--pass-thru` to send the ticked rows on: `ls -r \| grid`, `ps \| grid --columns pid,name`, `ls -r \| grid --pass-thru \| rm` | [fx-grid](docs/acceptance/fx-grid.md) |
 | `collect` | Gathers a pipeline into one list: `(ls -r \| collect).size()` | [step-8](docs/acceptance/step-8-collect.md) |
-| `env` | Reads and sets environment variables (`env PATH JAVA_HOME`, `env --set GREETING hello world`, `env --set MAVEN_OPTS=-Xmx2g`) | [step-3](docs/acceptance/step-3.md) |
+| `env` | Reads and sets environment variables (`env PATH JAVA_HOME`, `env --set GREETING hello world`, `env --set MAVEN_OPTS -- -Xmx2g`) | [step-3](docs/acceptance/step-3.md) |
 
 Built-in commands: `cd` (`cd -`, `cd ~`, `cd D:`), `pwd`, `which`, `help` (`help ls`, `help java.util.List`, `help members $x`), `history` (plus `!!`, `!n`, `!text`), `import`, `mod-load`, `mod-list`, `jobs`, `exit [code]`.
 
@@ -251,7 +251,7 @@ PowerJ keeps its files in `~/.powerj/` (`%USERPROFILE%\.powerj\` on Windows, or 
 |---|---|
 | `history` | Command history (UTF-8), reloaded at startup. A line that starts with a space is not kept: type ` curl -u me:secret …` to keep a line with a secret out of it |
 | `config.properties` | `history.size=10000`, `language=en` (or `fr`), `modules.nativeAccess.<module>=sha256:<fingerprint>` or `=false` (consent to load a module that uses native code, asked once per version of the module). Java properties syntax: a backslash in a value is written twice. A file that cannot be read is reported at startup and the defaults apply |
-| `profile.pj` | Commands run when the interactive shell starts: `$proj = Path.of("/home/me/dev")`, `import java.time.*`, `env --set MAVEN_OPTS=-Xmx2g` — errors show their line and never prevent startup ([profile](docs/acceptance/profile.md)) |
+| `profile.pj` | Commands run when the interactive shell starts: `$proj = Path.of("/home/me/dev")`, `import java.time.*`, `env --set MAVEN_OPTS -- -Xmx2g` — errors show their line and never prevent startup ([profile](docs/acceptance/profile.md)) |
 | `protected-paths` | Paths that `rm` and `mv` refuse to remove (one per line, `~` for the home folder); written with the defaults of the platform on first launch, then yours to edit ([fileops](docs/acceptance/fileops.md)) |
 | `modules/` | Third-party module jars, or folders (a module and its dependencies), loaded at startup |
 | `fx-grid.properties` | Position and size of the window of `grid`, written when it is closed |

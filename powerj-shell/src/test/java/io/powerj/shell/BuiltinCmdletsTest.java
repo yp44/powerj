@@ -134,7 +134,7 @@ class BuiltinCmdletsTest {
     @Test
     void envReadsAndChangesTheSessionEnvironment() throws Exception {
         assertThat(run("(env POWERJ_TEST).value")).isEqualTo("1\n");
-        run("env --set POWERJ_AUTRE=deux");
+        run("env --set POWERJ_AUTRE deux");
         assertThat(session.environment()).containsEntry("POWERJ_AUTRE", "deux");
         run("env --unset POWERJ_AUTRE");
         assertThat(session.environment()).doesNotContainKey("POWERJ_AUTRE");
@@ -150,9 +150,15 @@ class BuiltinCmdletsTest {
         assertThat(session.environment()).containsEntry("QUOTED", "two  blanks kept");
         run("env --set OPTS -- -Xmx2g -Dfoo=bar"); // after --, a value that starts with - is no option
         assertThat(session.environment()).containsEntry("OPTS", "-Xmx2g -Dfoo=bar");
-        run("env --set LEGACY=-Xmx2g");
-        assertThat(session.environment()).containsEntry("LEGACY", "-Xmx2g");
+        run("env --set EMPTY \"\"");
+        run("env --set NUMBER 1"); // as ci/smoke/wildcards.sh does
+        assertThat(session.environment()).containsEntry("EMPTY", "").containsEntry("NUMBER", "1");
         assertThat(errors).isEmpty();
+        run("env --set DASH -Xmx2g"); // without --, -Xmx2g is read as options
+        assertThat(errors).containsExactly("env: unknown option -X (short options: -s)");
+        run("env --set OLD=form");
+        assertThat(errors).containsExactly("env: --set expects the name of a variable, got OLD=form: write env --set NAME value");
+        assertThat(session.environment()).doesNotContainKeys("DASH", "OLD", "OLD=form");
 
         assertThat(run("env MY_VAR ABSENTE_XYZ POWERJ_TEST | map { $_.value }")).isEqualTo("the value of the var\n1\n");
         assertThat(errors).containsExactly("env: no such variable: ABSENTE_XYZ");

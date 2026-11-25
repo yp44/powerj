@@ -31,10 +31,10 @@ A folder with `a.txt`, `Notes.TXT` and a sub-folder. Where a row says "Windows" 
 | 13 | `Math.max(1, 2)`, then `math.max(1, 2)` | `2`; then `"math" unknown: neither a Java class nor a command here (a variable is written $math)`. |
 | 14 | `import java.math.RoundingMode` then `RoundingMode.HALF_UP`, then `RoundingMode.half_up` | `HALF_UP`; then `RoundingMode has no static field half_up` (the constants of Java are written as Java writes them). |
 | 15 | Start PowerJ with `POWERJ_LANG=FR`, then with `POWERJ_LANG=fr`, and type `ls --Recurse` | The first shows the English message (`FR` is not a language, FR-61); the second the French one (`ls : option inconnue --Recurse, vouliez-vous dire --recurse ?`). |
-| 16 | `env --set POWERJ_GLOB_IGNORE_CASE=TRUE` then `^echo *.txt` | `the variable POWERJ_GLOB_IGNORE_CASE must be true, false, 1 or 0, not 'TRUE'`. `env --set POWERJ_GLOB_IGNORE_CASE=false` restores the default. |
-| 17 | `env --set POWERJ_NATIVE_ENCODING=AUTO` then `^echo x` | `unknown encoding 'AUTO' (variable POWERJ_NATIVE_ENCODING)`: `AUTO` is read as the name of a charset. `env --set POWERJ_NATIVE_ENCODING=auto` restores the default. |
+| 16 | `env --set POWERJ_GLOB_IGNORE_CASE TRUE` then `^echo *.txt` | `the variable POWERJ_GLOB_IGNORE_CASE must be true, false, 1 or 0, not 'TRUE'`. `env --set POWERJ_GLOB_IGNORE_CASE false` restores the default. |
+| 17 | `env --set POWERJ_NATIVE_ENCODING AUTO` then `^echo x` | `unknown encoding 'AUTO' (variable POWERJ_NATIVE_ENCODING)`: `AUTO` is read as the name of a charset. `env --set POWERJ_NATIVE_ENCODING auto` restores the default. |
 | 18 | `ps powerj*`, then `ps POWERJ*`; then `ps -u <your user>`, then `ps -u <YOUR USER>` | **Linux and macOS**: PowerJ itself for `powerj*`, none for `POWERJ*`; your processes for the first user name, none for the second. **Windows**: both find them (the system ignores case; the process is `powerj.exe`). |
-| 19 | `env --set Foo=1`, then `env \| where { $_.name == "FOO" }` | **Linux and macOS**: nothing (`Foo` and `FOO` are two variables). **Windows**: the variable, as the system sees it. |
+| 19 | `env --set Foo 1`, then `env \| where { $_.name == "FOO" }` | **Linux and macOS**: nothing (`Foo` and `FOO` are two variables). **Windows**: the variable, as the system sees it. |
 
 ### What keeps its own rule
 

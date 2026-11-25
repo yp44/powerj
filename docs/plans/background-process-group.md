@@ -187,7 +187,7 @@ that types the lines of `docs/acceptance/background.md` (E1 to E8) and a real Ct
 | Step | Result |
 |---|---|
 | E1, variable unset: `sleep 300 &` | `pgid 22281 = tpgid 22281`, state `S+`: in the foreground group of the terminal (protected only by `sh`). |
-| E2, `env --set POWERJ_BACKGROUND=group`, `sleep 301 &` | `pid 22333 = pgid 22333`, `tpgid 22281`, state `S`: own group, background. |
+| E2, `env --set POWERJ_BACKGROUND group`, `sleep 301 &` | `pid 22333 = pgid 22333`, `tpgid 22281`, state `S`: own group, background. |
 | E5, `sleep 302 \| sleep 303 &` | both processes in `pgid 22340`, the pid of the first stage. |
 | E3, `sleep 100` then Ctrl+C (`\x03`) | `^C`, only this `sleep` stops; `jobs` still lists the three jobs as running. |
 | E6, `printf ... \| ^sort > f &` | `a`, `b` in both modes (the first stage ends at once: see the fix below). |

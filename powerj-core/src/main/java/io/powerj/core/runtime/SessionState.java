@@ -40,7 +40,7 @@ final class SessionState {
 
     /**
      * Home directory, designated by {@code ~} (FR-62): the {@code HOME} variable of the session environment
-     * (so {@code env --set HOME=…} applies at once), else {@code USERPROFILE} (Windows), else the user
+     * (so {@code env --set HOME …} applies at once), else {@code USERPROFILE} (Windows), else the user
      * directory given at startup.
      */
     Path home() {

@@ -47,7 +47,7 @@ class EnvTest {
 
     @Test
     void setAndUnset() {
-        env(null, "MAVEN_OPTS=-Xmx2g", null, null, null);
+        env("-Xmx2g", "MAVEN_OPTS", null, null, null); // "env --set MAVEN_OPTS -- -Xmx2g"
         assertThat(context.environment).containsEntry("MAVEN_OPTS", "-Xmx2g");
         env(null, null, "MAVEN_OPTS", null, null);
         assertThat(context.environment).doesNotContainKey("MAVEN_OPTS");
@@ -88,22 +88,23 @@ class EnvTest {
     }
 
     @Test
-    void setStillUnderstandsNameEqualsValueAloneAndAnEmptyValue() {
-        env(null, "MAVEN_OPTS=-Xmx2g -Xss4m", null, null, null);
-        env(null, "EMPTY=", null, null, null);
-        assertThat(context.environment).containsEntry("MAVEN_OPTS", "-Xmx2g -Xss4m").containsEntry("EMPTY", "");
+    void anEmptyQuotedValueSetsAnEmptyVariable() {
+        env("", "EMPTY", null, null, null); // "env --set EMPTY \"\""
+        assertThat(context.environment).containsEntry("EMPTY", "");
     }
 
     @Test
     void setWithoutAValueOrWithANameThatIsNoNameIsAUsageError() {
         assertThatThrownBy(() -> env(null, "MY_VAR", null, null, null)).isInstanceOf(UsageException.class)
                 .hasMessage("value expected: env --set NAME value");
-        // "env --set A=b c": either the name and the value are separated by =, or by a blank, not both
+        // NAME=value is not a form of --set: the name and the value are separated by a blank
+        assertThatThrownBy(() -> env(null, "A=b", null, null, null)).isInstanceOf(UsageException.class)
+                .hasMessage("--set expects the name of a variable, got A=b: write env --set NAME value");
         assertThatThrownBy(() -> env("c", "A=b", null, null, null)).isInstanceOf(UsageException.class)
                 .hasMessage("--set expects the name of a variable, got A=b: write env --set NAME value");
-        assertThatThrownBy(() -> env(null, "=b", null, null, null)).isInstanceOf(UsageException.class)
-                .hasMessageContaining("--set expects the name of a variable");
-        assertThat(context.environment).doesNotContainKeys("MY_VAR", "A", "A=b", "");
+        assertThatThrownBy(() -> env("x", "/x", null, null, null)).isInstanceOf(UsageException.class) // env x --set /x
+                .hasMessageContaining("--set expects the name of a variable, got /x");
+        assertThat(context.environment).doesNotContainKeys("MY_VAR", "A", "A=b", "/x");
     }
 
     @Test
@@ -139,12 +140,12 @@ class EnvTest {
                 .isEqualTo("Shows or changes the session environment variables");
         assertThat(provider.messages(Locale.FRENCH).getString("category.System")).isEqualTo("Système");
         assertThat(provider.messages(Locale.FRENCH).getString("env.option.set"))
-                .isEqualTo("Crée ou modifie une variable : --set NOM valeur (ou NOM=valeur)");
+                .isEqualTo("Crée ou modifie une variable : --set NOM valeur");
     }
 
     @Test
     void oneActionAtATimeAndAValueToAppend() {
-        assertThatThrownBy(() -> env(null, "A=1", "B", null, null))
+        assertThatThrownBy(() -> env("1", "A", "B", null, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("only one action at a time among --set, --unset, --append, --prepend");
         assertThatThrownBy(() -> env(null, null, null, "PATH", null))
@@ -161,7 +162,7 @@ class EnvTest {
     void onlyReadingIsPreviewed() {
         assertThat(new Env().canPreview(params("PATH JAVA_HOME", null, null, null, null))).isTrue();
         assertThat(new Env().canPreview(params("x", "A", null, null, null))).isFalse();
-        assertThat(new Env().canPreview(params(null, "A=1", null, null, null))).isFalse();
+        assertThat(new Env().canPreview(params("1", "A", null, null, null))).isFalse();
     }
 
     // --- audit v2, U-09 ---

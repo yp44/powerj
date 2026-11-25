@@ -20,7 +20,7 @@ bonjour
 $langs = List.of(
     "java",
     "kotlin")
-env --set GREETING=hello
+env --set GREETING hello
 ```
 
 ## Scenario

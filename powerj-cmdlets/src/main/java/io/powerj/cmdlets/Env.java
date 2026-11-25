@@ -17,7 +17,7 @@ import io.powerj.api.UsageException;
 
 /** {@code env}: session environment variables (specification FR-36b). */
 @CmdletInfo(name = "env", preview = true, category = "System", summary = "Shows or changes the session environment variables",
-        examples = {"env", "env PATH", "env PATH JAVA_HOME", "env --set GREETING hello world", "env --set MAVEN_OPTS=-Xmx2g",
+        examples = {"env", "env PATH", "env PATH JAVA_HOME", "env --set GREETING hello world", "env --set MAVEN_OPTS -- -Xmx2g",
                 "env --append PATH ~/tools", "env --unset MAVEN_OPTS", "(env PATH).value"})
 public final class Env implements Cmdlet<Env.Params, Void, EnvVar>, Previewable<Env.Params> {
 
@@ -25,7 +25,7 @@ public final class Env implements Cmdlet<Env.Params, Void, EnvVar>, Previewable<
     public record Params(
             @Option(position = 0, description = "Names of the variables to show; with --set, --append, --prepend: the value")
             List<String> names,
-            @Option(shortName = 's', description = "Creates or changes a variable: --set NAME value (or NAME=value)")
+            @Option(shortName = 's', description = "Creates or changes a variable: --set NAME value")
             String set,
             @Option(description = "Removes a variable")
             String unset,
@@ -76,21 +76,16 @@ public final class Env implements Cmdlet<Env.Params, Void, EnvVar>, Previewable<
 
     /**
      * {@code env --set NAME the value}: the name is the argument of {@code --set}, the words that follow are the value, joined
-     * by one blank. {@code env --set NAME=value} (no word after it) is still understood: it is how a value that starts with
-     * {@code -} is given, which would otherwise be read as an option.
+     * by one blank. A value that starts with {@code -} comes after {@code --}, else it is read as an option:
+     * {@code env --set MAVEN_OPTS -- -Xmx2g}.
      */
     private static void set(String name, List<String> words, CmdletContext<EnvVar> context) {
-        if (words.isEmpty()) {
-            int equals = name.indexOf('=');
-            if (equals > 0) {
-                context.setEnvironment(name.substring(0, equals), name.substring(equals + 1));
-                return;
-            }
-            throw new UsageException(Messages.get(equals == 0 ? "env.name.invalid" : "env.value.expected", "--set", name));
-        }
         if (!isVariableName(name)) {
-            // "env --set A=b c", or "env VALUE --set /x": the argument of --set is no name
+            // "env --set A=b", or "env VALUE --set /x": the argument of --set is no name
             throw new UsageException(Messages.get("env.name.invalid", "--set", name));
+        }
+        if (words.isEmpty()) {
+            throw new UsageException(Messages.get("env.value.expected", "--set"));
         }
         context.setEnvironment(name, String.join(" ", words));
     }

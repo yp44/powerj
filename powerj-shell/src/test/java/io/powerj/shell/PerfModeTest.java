@@ -130,7 +130,7 @@ class PerfModeTest {
 
     @Test
     void autoExitEndsTheModeAfterOneLine() throws Exception {
-        line("env --set POWERJ_PERF_AUTOEXIT=1"); // in normal mode: not measured
+        line("env --set POWERJ_PERF_AUTOEXIT 1"); // in normal mode: not measured
         awaitUntil(() -> reader.isReading() && terminal.screen().endsWith("PJ " + cwd + "> "));
         terminal.type(ALT_P);
         awaitUntil(() -> terminal.screen().contains("PJ%"));

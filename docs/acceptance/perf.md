@@ -44,15 +44,15 @@ A folder with a few hundred files, for example the PowerJ sources: `cd C:\dev\po
 | 25 | `perf --view hot` | One row per method and stage (`stage`, `method`, `samples`, `percent`), most sampled first; `where { $_.stage == 2 }` and `sort samples -d` work. |
 | 26 | `perf --view gc`, `perf --view alloc` | The collections (`name`, `cause`, `pause`), and the allocations per stage and type (`bytes` readable, `byte[]`, `java.lang.String`…). |
 | 27 | `perf --save %TEMP%\slow.jfr` (then `perf 1 --save %TEMP%` for the line numbered 1) | The path written; with a folder, `perf-<line>.jfr`. `jfr summary <file>` (or JDK Mission Control) opens it and lists `jdk.ExecutionSample`, `jdk.ObjectAllocationSample`. `perf --save f --view hot` is refused. |
-| 28 | `env --set POWERJ_PERF_JFR_SAMPLEPERIOD=1ms`, then a CPU-bound line (`ls -r / \| where { $_.name.length() > 3 } \| count`) and `(perf --view hot \| measure samples).sum` | Several times more samples than with the default 10 ms (run the line once before to compare). |
-| 29 | `env --set POWERJ_PERF_JFR_SAMPLEPERIOD=often`, then a measured line | One message `POWERJ_PERF_JFR_SAMPLEPERIOD=often is not a duration …`, not repeated by the next line; the profiler keeps sampling every 10 ms. `100us` gives a message too, and samples every 1 ms. |
-| 30 | Put `env --set POWERJ_PERF_JFR_SAMPLEPERIOD=2ms` in `profile.pj`, restart | The setting applies from the first measured line. |
-| 31 | `env --set POWERJ_PERF_JFR_ALLOCTHROTTLE=1/s`, then an allocating line (`ls -r / \| where { $_.name.length() > 3 } \| count`), `perf --save %TEMP%\a.jfr` and `jfr summary` on it | A handful of `jdk.ObjectAllocationSample` events. |
-| 32 | `env --set POWERJ_PERF_JFR_ALLOCTHROTTLE=off`, the same line again and `jfr summary` | Thousands of `jdk.ObjectAllocationSample` events. |
-| 33 | `env --set POWERJ_PERF_JFR_ALLOCTHROTTLE=lots`, then a measured line | One message `POWERJ_PERF_JFR_ALLOCTHROTTLE=lots is not a rate …`, not repeated by the next line. |
-| 34 | `env --set POWERJ_PERF_AUTOEXIT=1`, Alt+P, then `ls \| count` | The summary, then the normal prompt `PJ <dir>> `: the mode has ended. |
+| 28 | `env --set POWERJ_PERF_JFR_SAMPLEPERIOD 1ms`, then a CPU-bound line (`ls -r / \| where { $_.name.length() > 3 } \| count`) and `(perf --view hot \| measure samples).sum` | Several times more samples than with the default 10 ms (run the line once before to compare). |
+| 29 | `env --set POWERJ_PERF_JFR_SAMPLEPERIOD often`, then a measured line | One message `POWERJ_PERF_JFR_SAMPLEPERIOD=often is not a duration …`, not repeated by the next line; the profiler keeps sampling every 10 ms. `100us` gives a message too, and samples every 1 ms. |
+| 30 | Put `env --set POWERJ_PERF_JFR_SAMPLEPERIOD 2ms` in `profile.pj`, restart | The setting applies from the first measured line. |
+| 31 | `env --set POWERJ_PERF_JFR_ALLOCTHROTTLE 1/s`, then an allocating line (`ls -r / \| where { $_.name.length() > 3 } \| count`), `perf --save %TEMP%\a.jfr` and `jfr summary` on it | A handful of `jdk.ObjectAllocationSample` events. |
+| 32 | `env --set POWERJ_PERF_JFR_ALLOCTHROTTLE off`, the same line again and `jfr summary` | Thousands of `jdk.ObjectAllocationSample` events. |
+| 33 | `env --set POWERJ_PERF_JFR_ALLOCTHROTTLE lots`, then a measured line | One message `POWERJ_PERF_JFR_ALLOCTHROTTLE=lots is not a rate …`, not repeated by the next line. |
+| 34 | `env --set POWERJ_PERF_AUTOEXIT 1`, Alt+P, then `ls \| count` | The summary, then the normal prompt `PJ <dir>> `: the mode has ended. |
 | 35 | `ls \| count`, then `perf` | The first line is not measured; `perf` shows the stages of the line measured in 34. |
-| 36 | Alt+P, `ls \| count`, then `env --set POWERJ_PERF_AUTOEXIT=0`, Alt+P, `ls \| count`, `ls \| count` | Each Alt+P measured one line with `1`; with `0` the mode stays on for both lines. |
+| 36 | Alt+P, `ls \| count`, then `env --set POWERJ_PERF_AUTOEXIT 0`, Alt+P, `ls \| count`, `ls \| count` | Each Alt+P measured one line with `1`; with `0` the mode stays on for both lines. |
 | 37 | `help perf` | The synopsis, the options (`--view`, `--all`, `--save`) and the examples. |
 
 ## Known limitations

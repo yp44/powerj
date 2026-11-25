@@ -30,9 +30,9 @@ As in the previous steps: **Actions** tab, latest run of the **CI** workflow, ar
 | 15 | `help members $f[0]` | Properties (`name`, `size`…) and methods of `FileEntry`, with their types. |
 | 16 | `which ls env ^ls cd` | `ls → cmdlet (io.powerj.cmdlets)`, `env → cmdlet (…)`, `^ls → native …` (if an `ls.exe` exists, e.g. Git Bash), `cd → built-in command`. |
 | 17 | `env` then `env PATH` then `(env PATH).value` | All variables; the `PATH` line; the value alone. |
-| 18 | `env --set MAVEN_OPTS=-Xmx2g` then `env MAVEN_OPTS` then `env --unset MAVEN_OPTS` | Variable created, displayed, deleted (for this session only). |
+| 18 | `env --set MAVEN_OPTS -- -Xmx2g` then `env MAVEN_OPTS` then `env --unset MAVEN_OPTS` | Variable created, displayed, deleted (for this session only). |
 | 19 | `env --append PATH C:\outils` then `which monoutil` (a tool placed in `C:\outils`) | The tool becomes executable in the session and `which` finds it. |
-| 20 | `env --set POWERJ_NATIVE_ENCODING=windows-1252`, then `$l = ipconfig` and `$l`; `env --unset POWERJ_NATIVE_ENCODING` | `ipconfig`'s accented characters are wrong (setting applied immediately), then restored. |
+| 20 | `env --set POWERJ_NATIVE_ENCODING windows-1252`, then `$l = ipconfig` and `$l`; `env --unset POWERJ_NATIVE_ENCODING` | `ipconfig`'s accented characters are wrong (setting applied immediately), then restored. |
 | 21 | `ls > liste.txt` then `^cmd /c type liste.txt` | The table is written to the file, without truncation. |
 | 21b | (Linux/macOS) `^sh -c "echo e1 >&2; echo x" \| first --on-error stop 2> e.txt`, then `cat e.txt` | `e.txt` holds the error of the first stage (`e1`) **and**, if the last stage ends with a blocking error, that error: a blocking error of the last stage no longer truncates the file (#168). The automated test is `BlockingErrorRedirectionTest`. |
 | 21c | `help ls`, then `ls -p x`, then `cp` (without arguments), then `kill -9` | `help ls` shows `--parallel <n>`, `--filter <text>`… instead of `<value>`; `ls -p x` says `invalid value for --parallel: "x" (an integer expected)`; the usage line of a command with a mandatory named option shows it (#176). |
