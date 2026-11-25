@@ -344,6 +344,23 @@ class FileWalkerTest {
         assertThat(errors).isEmpty();
     }
 
+    /**
+     * A result is a result whatever its type: a visitor whose results happen to be {@link WalkError}s (a cmdlet that
+     * lists the errors of a previous walk, say) gets them in the result consumer, in both modes. The parallel walk used to
+     * tell them apart by their class on the shared queue, and sent them to the error consumer (#96).
+     */
+    @ParameterizedTest
+    @ValueSource(ints = {1, 4})
+    void aResultThatIsAWalkErrorIsStillAResult(int parallelism) {
+        List<Object> found = new ArrayList<>();
+
+        FileWalker.builder().parallelism(parallelism).build().<Object>walk(tmp,
+                (path, attributes) -> WalkError.of(path, new IOException("listed")), found::add, errors::add);
+
+        assertThat(found).hasSize(7).allMatch(WalkError.class::isInstance);
+        assertThat(errors).isEmpty();
+    }
+
     @Test
     void errorsAreClassified() {
         Path path = tmp.resolve("x");

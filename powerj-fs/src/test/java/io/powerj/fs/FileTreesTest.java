@@ -195,6 +195,32 @@ class FileTreesTest {
         assertThat(Files.getLastModifiedTime(copy.resolve("a/b/two.txt"))).isEqualTo(time);
     }
 
+    /**
+     * Each copied folder gets the date and the permissions of its source once its content is in, in both modes: what the
+     * read-only tree below checks too, but for every user, root included (#96).
+     */
+    @ParameterizedTest
+    @ValueSource(ints = {1, 8})
+    void eachCopiedFolderGetsTheDateAndThePermissionsOfItsSource(int parallelism) throws Exception {
+        assumeTrue(!WINDOWS, "POSIX permissions");
+        FileTime outer = FileTime.fromMillis(1_500_000_000_000L);
+        FileTime inner = FileTime.fromMillis(1_400_000_000_000L);
+        Files.setPosixFilePermissions(tree.resolve("a/b"), PosixFilePermissions.fromString("rwx--x---"));
+        Files.setLastModifiedTime(tree.resolve("a/b/c"), inner);
+        Files.setLastModifiedTime(tree.resolve("a/b"), inner);
+        Files.setLastModifiedTime(tree, outer);
+        Path copy = tmp.resolve("copy");
+
+        assertThat(FileTrees.copy(tree, copy, parallelism, false, this::error)).isTrue();
+
+        assertThat(errors).isEmpty();
+        assertThat(Files.getLastModifiedTime(copy)).isEqualTo(outer);
+        assertThat(Files.getLastModifiedTime(copy.resolve("a/b"))).isEqualTo(inner);
+        assertThat(Files.getLastModifiedTime(copy.resolve("a/b/c"))).isEqualTo(inner);
+        assertThat(Files.getPosixFilePermissions(copy.resolve("a/b")))
+                .isEqualTo(PosixFilePermissions.fromString("rwx--x---"));
+    }
+
     /** A tree of read-only folders (a module cache, an archive after chmod -R a-w), each with its own date. */
     @ParameterizedTest
     @ValueSource(ints = {1, 8})

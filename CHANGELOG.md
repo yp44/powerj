@@ -1612,6 +1612,23 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
 - **The "default setup" of CodeQL must stay off** in the settings of the repository (Code security): the two cannot run
   together, and a workflow file is the one that is versioned and reviewed.
 
+### Changed (one parallel engine for the walks, the removals and the copies of a tree, [#96](https://github.com/yp44/powerj/issues/96))
+- **`FileWalker` and `FileTrees` share one parallel engine.** `FileTrees.Work` was a copy of `FileWalker.ParallelWalk`:
+  the same bounded queue to the calling thread, the same permits, the same count of pending tasks and the same protocol
+  to stop on an error, on Ctrl+C or at the end (review finding C-27). `ParallelEngine` (package-private) now holds it once;
+  each class keeps what is its own (reading a folder, removing a folder after its last child, creating it before its
+  content). No change of API or of behavior for `ls`, `cat`, `grep`, `rm`, `cp` and `mv`.
+- **Fixed: a parallel walk whose results happen to be `WalkError`s gives them to the result consumer**, as a sequential
+  walk does. The queue carried `Object`s and told results from errors by their class; it now carries typed items.
+  No cmdlet of PowerJ produces such results; a module could.
+- Tests written before the change, so that it could be checked: an unchecked exception of a worker, an interruption while
+  the workers wait on a full queue (`ParallelStopTest`); never more than `parallelism` operations at the same time
+  (`ParallelismBoundTest`); a folder that cannot be opened, an entry that cannot be removed, copied or created
+  (`FileTreesFaultTest`); the date and permissions of each copied folder, for every user, root included.
+  `FaultyFileSystem` injects these failures.
+- **Mutation testing of `io.powerj.fs`**: `./mvnw -Pmutation -pl powerj-fs test-compile org.pitest:pitest-maven:mutationCoverage`.
+  83.8 % before the change (74.6 % with the tests of before #96), 84.0-84.2 % after; see `docs/quality/mutation.md`.
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.

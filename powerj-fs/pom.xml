@@ -31,4 +31,30 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <profiles>
+        <!-- Mutation testing of this module (#96): the root profile `mutation` targets the core; here it targets
+             io.powerj.fs, with the tests of this module. combine.self="override" replaces the lists of the root profile
+             instead of merging them entry by entry. See docs/quality/mutation.md.
+             ./mvnw -Pmutation -pl powerj-fs test-compile org.pitest:pitest-maven:mutationCoverage -->
+        <profile>
+            <id>mutation</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.pitest</groupId>
+                        <artifactId>pitest-maven</artifactId>
+                        <configuration>
+                            <targetClasses combine.self="override">
+                                <param>io.powerj.fs.*</param>
+                            </targetClasses>
+                            <targetTests combine.self="override">
+                                <param>io.powerj.fs.*</param>
+                            </targetTests>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>
