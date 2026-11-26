@@ -140,7 +140,7 @@ class EnvTest {
                 .isEqualTo("Shows or changes the session environment variables");
         assertThat(provider.messages(Locale.FRENCH).getString("category.System")).isEqualTo("Système");
         assertThat(provider.messages(Locale.FRENCH).getString("env.option.set"))
-                .isEqualTo("Crée ou modifie une variable : --set NOM valeur");
+                .isEqualTo("Crée ou modifie une variable : --set NOM valeur (une valeur qui commence par - se met après --)");
     }
 
     @Test

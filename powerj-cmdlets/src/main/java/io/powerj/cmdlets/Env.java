@@ -25,7 +25,7 @@ public final class Env implements Cmdlet<Env.Params, Void, EnvVar>, Previewable<
     public record Params(
             @Option(position = 0, description = "Names of the variables to show; with --set, --append, --prepend: the value")
             List<String> names,
-            @Option(shortName = 's', description = "Creates or changes a variable: --set NAME value")
+            @Option(shortName = 's', description = "Creates or changes a variable: --set NAME value (a value that starts with - goes after --)")
             String set,
             @Option(description = "Removes a variable")
             String unset,

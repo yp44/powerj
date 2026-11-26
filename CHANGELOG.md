@@ -1622,6 +1622,9 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   -Xmx2g`. The `NAME=value` form is gone (there is no release to stay compatible with): `env --set A=b` is a usage error
   that shows the expected form, as is `env --set NAME` without a value. The documentation, the acceptance sheets and the
   smoke test `ci/smoke/wildcards.sh` use the new form.
+- **FR-18 states the rule for every command**: a word that starts with `-` is an option, even between double quotes, so a
+  value that starts with `-` goes after `--`; single quotes stay in the argument (`'-Xmx2g'` keeps its quotes, without an
+  error). The help of `env --set` says it too.
 - `Env.Params` (`powerj-cmdlets`): the positional `String name` and `String value` are one `List<String> names`, as in
   `ps`. Messages: `env.set.format` is gone, `env.value.expected` names the option, `env.value.twice` lists the values.
 

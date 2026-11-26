@@ -154,6 +154,11 @@ class BuiltinCmdletsTest {
         run("env --set NUMBER 1"); // as ci/smoke/wildcards.sh does
         assertThat(session.environment()).containsEntry("EMPTY", "").containsEntry("NUMBER", "1");
         assertThat(errors).isEmpty();
+        Files.writeString(tmp.resolve("dash.txt"), "a\n-x b\n");
+        assertThat(run("grep -- -x dash.txt | map { $_.text }")).isEqualTo("-x b\n"); // the rule of FR-18, for any cmdlet
+        run("env --set QUOTES '-Xmx2g'"); // single quotes are no quotes: they stay in the value, without an error
+        assertThat(session.environment()).containsEntry("QUOTES", "'-Xmx2g'");
+        assertThat(errors).isEmpty();
         run("env --set DASH -Xmx2g"); // without --, -Xmx2g is read as options
         assertThat(errors).containsExactly("env: unknown option -X (short options: -s)");
         run("env --set OLD=form");
