@@ -30,8 +30,8 @@ In an empty folder: `touch a.txt b.txt c.log Notes.TXT .hidden.txt`, `mkdir sub 
 | 12 | `touch -- -n` then `^echo -*` | `./-n`: a name that starts with `-` is not taken for an option. |
 | 13 | `^echo *.TXT` and `^echo notes*` | `Notes.TXT`, then `notes*`: case counts by default. |
 | 14 | `ls *.txt` and `ls --filter *.TXT` | `a.txt`, `b.txt`; then `Notes.TXT`: the cmdlets follow the same rule. |
-| 15 | `env --set POWERJ_GLOB_IGNORE_CASE=true` then `^echo *.txt`, `ls *.txt`, `^echo notes*` | `a.txt b.txt Notes.TXT`, the three files, `Notes.TXT`: case is ignored, from the next command on. |
-| 16 | `env --set POWERJ_GLOB_IGNORE_CASE=maybe` then `^echo plain` and `^echo *.txt` | `plain`; then an error that names the variable and the value `maybe`. `env --set POWERJ_GLOB_IGNORE_CASE=false` restores the default. |
+| 15 | `env --set POWERJ_GLOB_IGNORE_CASE true` then `^echo *.txt`, `ls *.txt`, `^echo notes*` | `a.txt b.txt Notes.TXT`, the three files, `Notes.TXT`: case is ignored, from the next command on. |
+| 16 | `env --set POWERJ_GLOB_IGNORE_CASE maybe` then `^echo plain` and `^echo *.txt` | `plain`; then an error that names the variable and the value `maybe`. `env --set POWERJ_GLOB_IGNORE_CASE false` restores the default. |
 | 17 | `ps java*` then `ps JAVA*` (with the variable unset) | Linux and macOS: the Java processes for `java*`, none for `JAVA*` (the names of the processes are case-sensitive there). Windows: the Java processes both times (the system ignores case, FR-74). |
 | 18 | `ls "*.txt"`, then `touch "a?.txt" ab.txt`, `ls "a?.txt"`, `rm "a?.txt"`, `ls` | The first gives `ls: not found: *.txt`: a cmdlet takes a quoted word as a name, like a native program (FR-40, FR-72). `ls "a?.txt"` lists the one file of that name; `rm "a?.txt"` removes it and leaves `ab.txt` (create it first). |
 | 19 | `^printf "[%s]" "my docs"/*` | `[my docs/a note.txt]`: a quoted text and plain text written without a blank are **one** word (FR-32c), and only the plain part is a wildcard. |

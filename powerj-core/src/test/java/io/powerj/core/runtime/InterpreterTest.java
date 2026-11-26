@@ -327,7 +327,7 @@ class InterpreterTest {
         Files.createDirectories(home.resolve("projets"));
         run("cd ~/projets");
         assertThat(session.currentDirectory()).isEqualTo(home.resolve("projets"));
-        // ~ follows the HOME variable of the session, changed at runtime (env --set HOME=…).
+        // ~ follows the HOME variable of the session, changed at runtime (env --set HOME …).
         Path other = Files.createDirectories(tmp.resolve("other"));
         session.environment().put("HOME", other.toString());
         run("cd ~");

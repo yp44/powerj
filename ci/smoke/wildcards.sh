@@ -17,7 +17,7 @@ cat "$WORK/ignore-case.txt"
 expect "$WORK/ignore-case.txt" '^a.txt b.txt Notes.TXT$'
 
 # The variable is read at each use: env --set applies from the next command.
-"$PJ" -c 'env --set POWERJ_GLOB_IGNORE_CASE=1 ; ^echo notes*' > "$WORK/env-set.txt"
+"$PJ" -c 'env --set POWERJ_GLOB_IGNORE_CASE 1 ; ^echo notes*' > "$WORK/env-set.txt"
 cat "$WORK/env-set.txt"
 expect "$WORK/env-set.txt" '^Notes.TXT$'
 

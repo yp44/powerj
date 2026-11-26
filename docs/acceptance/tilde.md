@@ -12,7 +12,7 @@ As in the previous steps: **Actions** tab, latest run of the **CI** workflow, ar
 
 | Situation | `~` |
 |---|---|
-| `HOME` is set (Git Bash, WSL users, or `env --set HOME=…`) | the `HOME` directory |
+| `HOME` is set (Git Bash, WSL users, or `env --set HOME …`) | the `HOME` directory |
 | `HOME` is not set (usual on Windows) | `%USERPROFILE%` (e.g. `C:\Users\yves`) |
 | neither | the user directory of Java (`user.home`) |
 
@@ -25,7 +25,7 @@ As in the previous steps: **Actions** tab, latest run of the **CI** workflow, ar
 | 3 | `ls ~/Documents` | Same result: `/` and `\` are both accepted after `~`. |
 | 4 | `ls ~/Doc` then Tab | Completes to `~/Documents/` (path completion follows the same directory). |
 | 5 | `"bonjour" > ~/test-tilde.txt` then `notepad ~\test-tilde.txt` | The file is created in your home directory and opens in Notepad (native programs receive the expanded path). |
-| 6 | `env --set HOME=C:\Windows` then `cd ~` then `pwd` | `C:\Windows`: `~` follows `HOME` at once. |
+| 6 | `env --set HOME C:\Windows` then `cd ~` then `pwd` | `C:\Windows`: `~` follows `HOME` at once. |
 | 7 | `env --unset HOME` then `cd ~` | Back to `%USERPROFILE%`. |
 | 8 | `^cmd /c echo ~ "~" a~b` | First word expanded (`C:\Users\<you>`); `"~"` (quotes included, as cmd prints them) and `a~b` are left as is. |
 | 9 | `cd` (no argument) | Goes to the same directory as `cd ~`. |

@@ -297,7 +297,7 @@ structures, functions) can be built on it. The work is organised in phases (revi
 - **Wildcards keep case by default, in the cmdlets as well as in the native programs** (behaviour change; review C-22).
   `ls *.txt`, `ls --filter`, `cat` and `grep` used to ignore case and no longer match `NOTES.TXT`; `rm`, `cp`, `mv` and
   `touch` were already case-sensitive off Windows. The environment variable **`POWERJ_GLOB_IGNORE_CASE`** (`true` or `1`)
-  makes every wildcard ignore case, read at each use, so `env --set POWERJ_GLOB_IGNORE_CASE=true` applies at once; any
+  makes every wildcard ignore case, read at each use, so `env --set POWERJ_GLOB_IGNORE_CASE true` applies at once; any
   other value is an error where a wildcard is expanded. `ps` always ignores case (FR-74). On Windows the matcher of the
   platform ignores case and the variable has no effect.
 - `powerj-fs`: `GlobExpander` (the expansion), `Globs.hasWildcard` (a shell also sees `[a-c]`, which `Globs.isPattern`
@@ -1612,6 +1612,21 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
   `FaultyFileSystem` injects these failures.
 - **Mutation testing of `io.powerj.fs`**: `./mvnw -Pmutation -pl powerj-fs test-compile org.pitest:pitest-maven:mutationCoverage`.
   83.8 % before the change (74.6 % with the tests of before #96), 84.0-84.2 % after; see `docs/quality/mutation.md`.
+
+### Changed (`env` shows several variables, `--set` without `=`, [#249](https://github.com/yp44/powerj/issues/249))
+- **`env PATH JAVA_HOME MAVEN_OPTS` shows each variable**, in the order given; a name that is not set is a non-blocking
+  error and the others are still shown. `env` alone still lists them all.
+- **`env --set NAME the value` replaces `env --set NAME=value`**, like `--append` and `--prepend`: the argument of `--set`
+  is the name, the words that follow are the value, joined by one blank (quote the value to keep several blanks). A value
+  may hold a `=`. A value that starts with `-` comes after `--`, else it is read as an option: `env --set MAVEN_OPTS --
+  -Xmx2g`. The `NAME=value` form is gone (there is no release to stay compatible with): `env --set A=b` is a usage error
+  that shows the expected form, as is `env --set NAME` without a value. The documentation, the acceptance sheets and the
+  smoke test `ci/smoke/wildcards.sh` use the new form.
+- **FR-18 states the rule for every command**: a word that starts with `-` is an option, even between double quotes, so a
+  value that starts with `-` goes after `--`; single quotes stay in the argument (`'-Xmx2g'` keeps its quotes, without an
+  error). The help of `env --set` says it too.
+- `Env.Params` (`powerj-cmdlets`): the positional `String name` and `String value` are one `List<String> names`, as in
+  `ps`. Messages: `env.set.format` is gone, `env.value.expected` names the option, `env.value.twice` lists the values.
 
 ## [0.1.0] — never released (baseline)
 
