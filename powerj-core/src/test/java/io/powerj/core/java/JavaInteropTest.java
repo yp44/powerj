@@ -155,6 +155,25 @@ class JavaInteropTest {
     }
 
     @Test
+    void aBlockIsInvokedWithAsManyArgumentsAsItsParameters() throws Exception {
+        run("$b = { (q, s) -> (q.toString() + s.toString()).toUpperCase() }");
+        assertThat(value("$b.invoke(\"ttt\", \"eee\")")).isEqualTo("TTTEEE");
+        assertThat(value("{ (a, b, c) -> a + b + c }.invoke(1, 2, 3)")).isEqualTo(6);
+        assertThat(value("{ x -> x }.invoke(\"v\")")).isEqualTo("v");
+        assertThat(value("{ $_ }.invoke(\"w\")")).isEqualTo("w");
+        assertThat(value("{ x -> x }.invoke()")).isNull();
+        assertThat(value("{ x -> x }.invoke(null)")).isNull();
+        assertThat(value("{ (a, b) -> b }.invoke(null, 5)")).isEqualTo(5);
+        run("$c = String::concat");
+        assertThat(value("$c.invoke(\"a\", \"b\")")).isEqualTo("ab");
+
+        run("$b.invoke(\"ttt\")");
+        assertThat(errors).singleElement().asString().contains("declares 2 parameters, 1 received");
+        run("{ $_ }.invoke(1, 2)");
+        assertThat(errors).singleElement().asString().contains("this block receives 2 arguments");
+    }
+
+    @Test
     void javaExceptionsAreShortErrorsKeptInErrors() throws Exception {
         run("Integer.parseInt(\"x\")");
         assertThat(errors).containsExactly("java.lang.NumberFormatException: For input string: \"x\"");

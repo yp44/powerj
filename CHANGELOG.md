@@ -1650,6 +1650,17 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
 - Tests: `PromptRendererTest` (24 cases), `ReplTest` (profile, Alt+V, message below the line, `$ansi`), `InterpreterTest` (a native
   command run by the block is not `$last`), `AnsiTest`; acceptance sheet [prompt.md](docs/acceptance/prompt.md).
 
+### Added (`ScriptBlock#invoke` with any number of arguments, [#254](https://github.com/yp44/powerj/issues/254))
+- **A lambda of several parameters can be called**: `$b = { (q, s) -> q + s }; $b.invoke("a", "b")` gives `ab`; a method
+  reference too (`$c = String::concat; $c.invoke("a", "b")`). Before, only `invoke(x)` existed and the call was refused with
+  "no overload of invoke". The arity is checked as for Java (`declares 2 parameters, 1 received`).
+- API (additive, `default`): `ScriptBlock.invoke()`, and `ScriptBlock.invoke(Object first, Object second, Object... more)`.
+  The first two arguments are separate parameters, not one `Object...`: so `invoke(null)` and `invoke(array)` stay calls of
+  `invoke(Object)` with one argument, in Java as in the shell. The default refuses two arguments or more
+  (`block.tooManyArguments`, now also in the API's messages); the blocks of the shell (`Applicable`) take as many as they declare.
+- Tests: `JavaInteropTest.aBlockIsInvokedWithAsManyArgumentsAsItsParameters`,
+  `SpanAndScriptBlockTest.aBlockOfOneArgumentRefusesTwoOrMore`.
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.

@@ -23,6 +23,20 @@ public interface ScriptBlock {
     }
 
     /**
+     * Evaluates the block with two arguments or more, one per parameter of a lambda {@code { (a, b) -> … }} or of a
+     * method reference ({@code String::concat}). The first two are separate parameters so that {@link #invoke(Object)}
+     * stays the method of a single argument, {@code null} or an array included.
+     * <p>
+     * This default is for a block of one argument: it refuses more. The blocks of the shell take as many as they declare.
+     *
+     * @throws IllegalArgumentException if the block does not take that number of arguments
+     * @throws java.util.concurrent.CancellationException if the user requested cancellation (Ctrl+C)
+     */
+    default Object invoke(Object first, Object second, Object... more) {
+        throw new IllegalArgumentException(Messages.get("block.tooManyArguments", 2 + more.length));
+    }
+
+    /**
      * Evaluates the block as {@link #invoke} does, but an error of the evaluation is the result and not an exception:
      * the cmdlet reports it and goes on with the next object (FR-36). A cancellation (Ctrl+C) is still thrown.
      */
