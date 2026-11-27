@@ -13,6 +13,9 @@ final class Lines {
     /** The number of the line that the current thread (or the stage thread it started) runs; unbound outside a line. */
     private static final ScopedValue<Long> RUNNING = ScopedValue.newInstance();
 
+    /** The number of what runs {@link #detached}: never a line, since lines are numbered from 1. */
+    private static final long DETACHED = -1;
+
     private final AtomicLong latest = new AtomicLong();
 
     /** A new line begins; the one that was running, if it still is, is stale from now on. */
@@ -23,6 +26,14 @@ final class Lines {
     /** Runs {@code body} as the line {@code line}. */
     <X extends Throwable> void run(long line, ScopedValue.CallableOp<Void, X> body) throws X {
         ScopedValue.where(RUNNING, line).call(body);
+    }
+
+    /**
+     * Runs {@code body} outside of any line typed: as a line that is always stale, so nothing it writes is kept
+     * ({@code $?}, {@code $exit}, {@code $last}, {@code $errors}). The prompt is computed this way (FR-79).
+     */
+    <T, X extends Throwable> T detached(ScopedValue.CallableOp<T, X> body) throws X {
+        return ScopedValue.where(RUNNING, DETACHED).call(body);
     }
 
     /** {@code true} if {@code line} is the line of the interpreter. */
