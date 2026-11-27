@@ -10,19 +10,27 @@ import org.jline.utils.AttributedString;
 
 /**
  * JLine line reader that shows the preview (FR-66) below the line being typed, in the area where JLine lists the
- * completion candidates. The candidates take precedence while they are displayed; the preview never stays on screen
- * once the line is accepted or abandoned.
+ * completion candidates, and above it a notice: why the prompt is the default one (FR-79). The candidates take precedence
+ * while they are displayed; neither stays on screen once the line is accepted or abandoned.
  */
 final class PreviewLineReader extends org.jline.reader.impl.LineReaderImpl {
 
+    private static final AttributedString NEW_LINE = new AttributedString("\n");
+
     private volatile AttributedString preview;
+    /** Shown right below the line, above the preview; {@code null} for none. */
+    private volatile AttributedString notice;
     /** Told of the line and the cursor at each redisplay: after each key, cursor moves included. */
     private volatile BiConsumer<String, Integer> lineListener;
     /** The line is being accepted or abandoned: the preview is cleared from the screen. */
     private volatile boolean leaving;
     private final Supplier<AttributedString> previewPost = () -> {
         AttributedString text = preview;
-        return text == null ? AttributedString.EMPTY : text;
+        AttributedString above = notice;
+        if (above == null) {
+            return text == null ? AttributedString.EMPTY : text;
+        }
+        return text == null ? above : AttributedString.join(NEW_LINE, above, text);
     };
 
     PreviewLineReader(Terminal terminal, String appName, Map<String, Object> variables) {
@@ -36,6 +44,16 @@ final class PreviewLineReader extends org.jline.reader.impl.LineReaderImpl {
     /** Text shown below the line, or {@code null} for none; displayed at the next redisplay. */
     void preview(AttributedString text) {
         this.preview = text;
+    }
+
+    /** Text shown right below the line, above the preview, or {@code null} for none; displayed at the next redisplay. */
+    void notice(AttributedString text) {
+        this.notice = text;
+    }
+
+    /** Text shown right below the line now, or {@code null}. */
+    AttributedString notice() {
+        return notice;
     }
 
     /** Text shown below the line now, or {@code null}. */
@@ -56,7 +74,7 @@ final class PreviewLineReader extends org.jline.reader.impl.LineReaderImpl {
             listener.accept(buf.toString(), buf.cursor());
         }
         if (post == null || post == previewPost) {
-            post = preview == null || leaving ? null : previewPost;
+            post = preview == null && notice == null || leaving ? null : previewPost;
         }
         super.redisplay(flush);
     }

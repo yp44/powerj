@@ -1628,6 +1628,28 @@ this section only says where things stood when 0.2.0 was prepared. Phases 1 to 5
 - `Env.Params` (`powerj-cmdlets`): the positional `String name` and `String value` are one `List<String> names`, as in
   `ps`. Messages: `env.set.format` is gone, `env.value.expected` names the option, `env.value.twice` lists the values.
 
+### Added (a prompt computed by a `$prompt` block, [#252](https://github.com/yp44/powerj/issues/252))
+- **`$prompt = { … }` sets the prompt** (FR-79), usually in `profile.pj`: the block is evaluated before each line of the
+  interactive shell, after a `cd` and after Alt+V / Alt+P, and what it returns is the prompt. PowerJ puts nothing of its own in
+  it: the branch of a Git repository, the status of the last line or the time are the block's business (JDK calls, a native
+  command run from Java, a group `(git branch --show-current)`). `$prompt = null` gives the default prompt back.
+- **The block changes nothing of the last line**: it runs outside of any line (`Interpreter.callDetached`, `Lines.detached`), so
+  `$?`, `$exit`, `$last` and `$errors` stay those of the line typed, and the block can show them.
+- **`$POWERJ_MODE_CURRENT`** holds the mode of the line editor, `normal`, `preview` or `perf`, set before each evaluation; it is a
+  variable of the session, not of the environment of native commands. The default prompt keeps `PJ?` and `PJ%`.
+- **`$ansi` colors a text**: `$ansi.green("main")`, `red`, `yellow`, `blue`, `magenta`, `cyan`, `white`, `black`, `gray`,
+  `color(0..255, …)`, `bold`, `dim`, `italic`, `underline` (`io.powerj.core.format.Ansi`); each ends only its own color or style, so
+  the calls nest, and without colors (no terminal, `NO_COLOR`) the text is left alone. Raw ANSI codes work too.
+- **The text of the block is shown as it is**: every `%` is doubled for JLine (U-13, #151), so `%N`, `%M` or `%{…%}` are not read as
+  patterns.
+- **The prompt never blocks or breaks the shell**: a block that throws, returns `null`, is not a block, or runs longer than
+  `POWERJ_PROMPT_TIMEOUT_MS` (500 ms by default, 10,000 at most) gives the default prompt for that line, and a message below the line
+  being typed says why (English and French, `prompt.*`; the Java stack trace with `$debug = true`). Ctrl+C during the evaluation
+  gives the default prompt at once; a block that has not ended since the previous line is not started again. The message comes back
+  at each line until `$prompt` is fixed.
+- Tests: `PromptRendererTest` (24 cases), `ReplTest` (profile, Alt+V, message below the line, `$ansi`), `InterpreterTest` (a native
+  command run by the block is not `$last`), `AnsiTest`; acceptance sheet [prompt.md](docs/acceptance/prompt.md).
+
 ## [0.1.0] — never released (baseline)
 
 The functional baseline that 0.2.0 starts from; it was only ever built as `0.1.0-SNAPSHOT`.

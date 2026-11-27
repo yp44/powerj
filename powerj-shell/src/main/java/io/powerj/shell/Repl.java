@@ -94,7 +94,10 @@ public final class Repl {
      * @return the shell's exit code
      */
     public int run(BuildInfo buildInfo) {
-        var previous = terminal.handle(Terminal.Signal.INT, _ -> supervisor.cancel());
+        var previous = terminal.handle(Terminal.Signal.INT, _ -> {
+            supervisor.cancel();
+            prompt.cancel(); // Ctrl+C while $prompt is evaluated: the default prompt at once (FR-79)
+        });
         try {
             return loop(buildInfo);
         } finally {

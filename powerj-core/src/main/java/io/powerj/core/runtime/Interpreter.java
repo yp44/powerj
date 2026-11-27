@@ -19,6 +19,7 @@ import io.powerj.core.command.NativeAccessPolicy;
 import io.powerj.core.error.PjError;
 import io.powerj.core.error.PjException;
 import io.powerj.core.i18n.Messages;
+import io.powerj.core.java.Applicable;
 import io.powerj.core.lang.Ast.Statement;
 import io.powerj.core.lang.Ast;
 import io.powerj.core.lang.Parser;
@@ -244,6 +245,17 @@ public final class Interpreter implements CommandCatalog {
             }
             measurement.finish(cancelled);
         }
+    }
+
+    /**
+     * Calls {@code block} without arguments, outside of any line typed (FR-79, the prompt {@code $prompt}): what it runs
+     * is not recorded, so {@code $?}, {@code $exit}, {@code $last} and {@code $errors} stay those of the last line.
+     *
+     * @throws PjException           if the evaluation fails
+     * @throws CancellationException if the calling thread is interrupted
+     */
+    public Object callDetached(Applicable block) {
+        return session.lines().detached(() -> block.apply(new Object[0]));
     }
 
     /** Perf mode (FR-76): {@code true} while the lines executed are measured. */

@@ -251,7 +251,7 @@ PowerJ keeps its files in `~/.powerj/` (`%USERPROFILE%\.powerj\` on Windows, or 
 |---|---|
 | `history` | Command history (UTF-8), reloaded at startup. A line that starts with a space is not kept: type ` curl -u me:secret …` to keep a line with a secret out of it |
 | `config.properties` | `history.size=10000`, `language=en` (or `fr`), `modules.nativeAccess.<module>=sha256:<fingerprint>` or `=false` (consent to load a module that uses native code, asked once per version of the module). Java properties syntax: a backslash in a value is written twice. A file that cannot be read is reported at startup and the defaults apply |
-| `profile.pj` | Commands run when the interactive shell starts: `$proj = Path.of("/home/me/dev")`, `import java.time.*`, `env --set MAVEN_OPTS -- -Xmx2g` — errors show their line and never prevent startup ([profile](docs/acceptance/profile.md)) |
+| `profile.pj` | Commands run when the interactive shell starts: `$proj = Path.of("/home/me/dev")`, `import java.time.*`, `env --set MAVEN_OPTS -- -Xmx2g`, the prompt (`$prompt = { … }`, see below) — errors show their line and never prevent startup ([profile](docs/acceptance/profile.md)) |
 | `protected-paths` | Paths that `rm` and `mv` refuse to remove (one per line, `~` for the home folder); written with the defaults of the platform on first launch, then yours to edit ([fileops](docs/acceptance/fileops.md)) |
 | `modules/` | Third-party module jars, or folders (a module and its dependencies), loaded at startup |
 | `fx-grid.properties` | Position and size of the window of `grid`, written when it is closed |
@@ -264,8 +264,30 @@ PowerJ keeps its files in `~/.powerj/` (`%USERPROFILE%\.powerj\` on Windows, or 
 | `POWERJ_PERF_AUTOEXIT` | `1`: perf mode ends by itself after the next measured line, so each Alt+P measures one line; set it in `profile.pj` with `env --set` |
 | `POWERJ_PERF_JFR_SAMPLEPERIOD` | Sampling period of the profiler in perf mode (default `10ms`; `2ms`, `500us`; minimum `1ms`); set it in `profile.pj` with `env --set` |
 | `POWERJ_PERF_JFR_ALLOCTHROTTLE` | Limit of the allocations the profiler samples in perf mode: `100/s`, `5/ms`, `600/m`, or `off`; set it in `profile.pj` with `env --set` |
+| `POWERJ_PROMPT_TIMEOUT_MS` | Longest evaluation of `$prompt` (default `500`, at most `10000`); past it, the default prompt is shown for that line |
 | `POWERJ_NATIVE_ENCODING`, `POWERJ_NATIVE_ENCODING_<NAME>` | Encoding of the output of native commands, globally or for one program |
 | `NO_COLOR` | Disables colors |
+
+**Prompt.** `$prompt` set to a block replaces `PJ <dir>> `: the block is evaluated before each line, and what it returns is the prompt. PowerJ puts nothing of its own in it, so a Git branch is the block's business, for example in `profile.pj`:
+
+```text
+# runs a program in the current directory and gives its output, without its errors (outside a repository: "")
+$git = { args -> new String(new ProcessBuilder(args).directory($pwd.toFile()).redirectError(ProcessBuilder.Redirect.DISCARD)
+                 .start().getInputStream().readAllBytes()).strip() }
+# "1\t2" from git rev-list → " ↑2 ↓1": commits ahead of and behind the upstream
+$aheadBehind = { counts -> counts.isEmpty() ? "" : " ↑" + counts.split("\t")[1] + " ↓" + counts.split("\t")[0] }
+$prompt = { ($? ? "" : $ansi.red("✗ ")) + "PJ " + $pwd + " " + $ansi.green($git.invoke(["git", "branch", "--show-current"]))
+            + $aheadBehind.invoke($git.invoke(["git", "rev-list", "--left-right", "--count", "@{u}...HEAD"])) + "> " }
+```
+
+```text
+PJ /home/me/dev/powerj main ↑2 ↓1>
+```
+
+- The block does not change `$?`, `$exit`, `$last` or `$errors`: it can show the status of the line typed before it.
+- `$POWERJ_MODE_CURRENT` is `normal`, `preview` (Alt+V) or `perf` (Alt+P) when the block runs; the prompt is computed again when the mode changes.
+- `$ansi` colors a text: `green`, `red`, `yellow`, `blue`, `magenta`, `cyan`, `white`, `black`, `gray`, `color(0..255, x)`, `bold`, `dim`, `italic`, `underline`; without colors (`NO_COLOR`, no terminal) the text is left alone. The text is shown as it is: a `%` is never read as a JLine pattern.
+- A block that fails, returns `null`, or is slower than `POWERJ_PROMPT_TIMEOUT_MS` gives the default prompt, and a message below the line says why (with the Java stack trace if `$debug = true`); Ctrl+C during the evaluation gives it at once. `$prompt = null` brings the default prompt back ([prompt](docs/acceptance/prompt.md)).
 
 **Language.** By default PowerJ follows the display language of the system (French → French, anything else → English). Precedence: system property `-Dpowerj.language`, then `POWERJ_LANG`, then the `language` key of `config.properties`, then the system ([i18n](docs/acceptance/i18n.md)).
 

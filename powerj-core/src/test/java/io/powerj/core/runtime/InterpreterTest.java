@@ -18,6 +18,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import io.powerj.core.command.CmdletRegistry;
 import io.powerj.core.error.PjException;
+import io.powerj.core.java.Applicable;
 import io.powerj.core.nativeexec.NativeRun;
 import io.powerj.fs.Host;
 import io.powerj.core.support.ProcessGroups;
@@ -85,6 +86,20 @@ class InterpreterTest {
         // A duration with its unit: which unit depends on how fast the machine ran `sh` (966.7 µs failed a Linux runner).
         assertThat(run("$last.duration")).matches("\\d+([.,]\\d+)? (ns|µs|ms|s)" + System.lineSeparator());
         assertThat(run("$last")).contains("command", "exitCode", "/sh", "[-c, exit 3]");
+    }
+
+    /** FR-79: the prompt's block runs outside of any line; the program it starts is not "the last native command". */
+    @Test
+    void aBlockCalledDetachedRecordsNothingOfWhatItRuns() throws Exception {
+        run("$b = { (sh -c \"echo ok\") }");
+        run("sh -c \"exit 3\"");
+        var before = session.lastNative();
+
+        assertThat(interpreter.callDetached((Applicable) session.variable("b"))).isEqualTo("ok");
+
+        assertThat(session.lastNative()).isEqualTo(before);
+        assertThat(session.lastSucceeded()).isFalse();
+        assertThat(run("$exit")).isEqualTo("3" + System.lineSeparator());
     }
 
     @Test

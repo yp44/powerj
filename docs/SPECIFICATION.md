@@ -101,8 +101,17 @@ Each requirement has an identifier `FR-xx` and one or more verifiable **acceptan
 
 ### 3.1 REPL
 
-**FR-01 — Prompt.** On startup, PowerJ displays a banner (`PowerJ 0.x — Java 25`) then the prompt `PJ <current directory>> `.
+**FR-01 — Prompt.** On startup, PowerJ displays a banner (`PowerJ 0.x — Java 25`) then the prompt `PJ <current directory>> `, unless the user has set `$prompt` (FR-79).
 - CA: launching `powerj.exe` from `C:\Users\yves` displays `PJ C:\Users\yves> `.
+
+**FR-79 — Configurable prompt.** When the variable **`$prompt`** holds a block (usually set in `profile.pj`, FR-63), the interactive shell evaluates it before each prompt, and after Alt+V and Alt+P (FR-66, FR-76), and shows what it returns (`String.valueOf`) instead of the prompt of FR-01. `$prompt = null`, or no `$prompt`, gives the default prompt. Non-interactive mode (FR-04d) has no prompt and never evaluates it.
+- **PowerJ puts nothing in it.** No placeholder for Git or anything else: the block computes what it shows (JDK calls, a group `(git branch --show-current)`, a static method of a jar).
+- **The state of the last line is left alone.** The block runs outside of any line: what it does is not recorded in `$?`, `$exit`, `$last` or `$errors`, so it can show the status of the line typed before it (`$? ? "" : "✗ "`).
+- **`$POWERJ_MODE_CURRENT`** holds the mode of the line editor when the block is evaluated: `normal`, `preview` or `perf`. It is a PowerJ variable, set by the interactive shell from its start and before each evaluation; native commands do not see it. The default prompt keeps its markers `PJ?` and `PJ%`.
+- **Colors.** The text may hold ANSI escape sequences; the line editor shows them as colors and does not count them in the width of the prompt. **`$ansi`** gives the codes: `$ansi.green(x)`, `red`, `yellow`, `blue`, `magenta`, `cyan`, `white`, `black`, `gray`, `color(n, x)` (`n` from 0 to 255 of the palette), `bold`, `dim`, `italic`, `underline`; each takes any value (`$ansi.green($pwd)`), ends only its own color or style so that the calls nest, and gives the text back as it is when the terminal shows no colors (FR-64, `NO_COLOR`).
+- **Shown as it is.** Every `%` of the result is doubled for the line editor, which would otherwise read `%N`, `%M`, `%P`, `%{…%}` as patterns: a block that returns `100%N> ` shows `100%N> `.
+- **Never blocking.** If the block throws, returns `null`, is not a block, or runs longer than **`POWERJ_PROMPT_TIMEOUT_MS`** of the session environment (milliseconds, default `500`; not a positive integer → `500`; more than `10000` → `10000`), the default prompt is shown for that line and a message below the line being typed says why (`$prompt failed: …`, `$prompt returned null`, `$prompt must be a block such as …`, `$prompt took longer than 500 ms…`; with `$debug = true`, the Java stack trace). Ctrl+C during the evaluation gives the default prompt at once. A block still running since the previous line is not started again (`$prompt has not ended since the previous line`). The message comes back at each line until `$prompt` is fixed. Without a line editor (a "dumb" terminal), the message is printed before the prompt.
+- CA: with `$prompt = { "λ " + $pwd.fileName + " $ " }` in `profile.pj`, the first prompt is `λ dev $ ` and it follows `cd`; `$prompt = { (git branch --show-current) + "> " }` in a repository shows the branch; after `sh -c "exit 3"`, `$prompt = { "[" + $exit + "] > " }` shows `[3] > ` and `$exit` is still `3`; `$prompt = { $POWERJ_MODE_CURRENT + "> " }` shows `normal> `, then `preview> ` after Alt+V, `perf> ` after Alt+P; `$prompt = { "100%N-%M> " }` shows `100%N-%M> `; `$prompt = { "abc".charAt(10) }` shows the default prompt and `$prompt failed: …` below the line, at each line; `$prompt = "PJ> "` shows the default prompt and how to write the block; `env --set POWERJ_PROMPT_TIMEOUT_MS 50` and `$prompt = { Thread.sleep(2000) }` show the default prompt and `$prompt took longer than 50 ms…`; with `POWERJ_PROMPT_TIMEOUT_MS` at `10000`, Ctrl+C during `Thread.sleep(20000)` gives the default prompt at once; `$prompt = null` gives `PJ <dir>> ` back.
 
 **FR-02 — Multi-line input.** If a line ends with `|`, `&&` or `||`, or if a brace, parenthesis or quote is left open (no continuation with `\`, so that `cd C:\` remains valid), the shell displays a continuation prompt `>> ` and waits for the rest.
 - CA: `ls |` + Enter displays `>> `; `where { $_.dir }` + Enter runs the complete pipeline.
@@ -396,7 +405,7 @@ Sizes and durations in readable format (`14.2 KB`, `2 h 05 min`; the decimal sep
 
 ### 3.8 Expression language
 
-**FR-31 — Variables.** `$name = <pipeline>` assigns the result (one object → the object; several → list; none → `null`). Automatic variables: `$_` (current object), `$last` (metadata of the last native command), `$exit` (its return code), `$?` (success of the last command), `$errors` (recent errors), `$home`, `$pwd`.
+**FR-31 — Variables.** `$name = <pipeline>` assigns the result (one object → the object; several → list; none → `null`). Automatic variables: `$_` (current object), `$last` (metadata of the last native command), `$exit` (its return code), `$?` (success of the last command), `$errors` (recent errors), `$home`, `$pwd`. The interactive shell also sets `$POWERJ_MODE_CURRENT` (mode of the line editor) and `$ansi` (colors), and reads `$prompt` (FR-79).
 
 **FR-32 — Literals.** As in Java, with a few shell additions:
 - **strings** between double quotes, with **Java escapes**: `\\` for a backslash, `\"`, `\n`, `\t`, `\uXXXX` → `"C:\\Users\\yves"`; interpolation `$var` and `$(expr)` (`\$` for a literal `$`); text blocks `"""…"""`;
@@ -1746,7 +1755,7 @@ User folder `~/.powerj/` (created on first launch):
 | `logs/` | Diagnostic log, in English (FR-60). |
 | `protected-paths` | Paths that `rm` and `mv` refuse to remove (FR-72): one per line, `~` for the home folder, `#` for comments; created at first launch with the defaults of the platform. |
 | `fx-grid.properties` | Position and size of the window of `grid` (`x`, `y`, `width`, `height`), written when the window is closed (FR-77). |
-| `profile.pj` | Commands run when the interactive shell starts (FR-63): variable assignments (`$proj = Path.of("D:/dev")`), `import java.time.*`, `env --set MAVEN_OPTS -- -Xmx2g`. `$profile` contains its path. |
+| `profile.pj` | Commands run when the interactive shell starts (FR-63): variable assignments (`$proj = Path.of("D:/dev")`), `import java.time.*`, `env --set MAVEN_OPTS -- -Xmx2g`, the prompt (`$prompt = { … }`, FR-79). `$profile` contains its path. |
 
 Environment variables read by PowerJ:
 
@@ -1756,6 +1765,7 @@ Environment variables read by PowerJ:
 | `POWERJ_NATIVE_ENCODING` | Encoding of native commands (FR-40b). |
 | `POWERJ_NATIVE_ENCODING_<NAME>` | Encoding for a specific executable (FR-40b). |
 | `POWERJ_GLOB_IGNORE_CASE` | `true` or `1`: wildcards ignore case, in the cmdlets and in the arguments of native programs; case counts by default (FR-40). |
+| `POWERJ_PROMPT_TIMEOUT_MS` | Longest evaluation of `$prompt`, in milliseconds (FR-79): `500` by default, `10000` at most; read at each prompt, so `env --set` applies at once. |
 | `POWERJ_LANG` | Language of the messages, `en` or `fr` (FR-61); takes precedence over the `language` key of `config.properties`, and is overridden by the system property `-Dpowerj.language`. |
 
 ---
@@ -1961,6 +1971,7 @@ The backlog cmdlets (§12.3) are added **one per mini-iteration**, each with a s
 | 27 | `join` (inner and left outer join by key) | FR-78 | `docs/acceptance/join.md` |
 | 28 | Wildcards in the arguments of a native program, case rule of wildcards | FR-40 | `docs/acceptance/wildcards.md` |
 | 29 | The shell is case-sensitive: options, enum values, units, literals, settings, `ps`, `env` | FR-12, FR-18, FR-19, FR-20 | `docs/acceptance/case-sensitivity.md` |
+| 30 | Configurable prompt: `$prompt`, `$POWERJ_MODE_CURRENT`, `$ansi`, `POWERJ_PROMPT_TIMEOUT_MS` | FR-79 | `docs/acceptance/prompt.md` |
 
 Version 2 will introduce scripting (`if`, `foreach`, functions, `.pj` files).
 
