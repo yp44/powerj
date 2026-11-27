@@ -1,12 +1,16 @@
 package io.powerj.shell;
 
 import java.util.Map;
+import java.util.function.Consumer;
 
 import org.jline.terminal.Terminal;
+import org.jline.utils.AttributedString;
+import org.jline.utils.AttributedStyle;
 import org.jline.utils.InfoCmp;
 
 import io.powerj.core.assist.Completions;
 import io.powerj.core.command.CmdletRegistry;
+import io.powerj.core.format.Ansi;
 import io.powerj.core.perf.PerfMode;
 import io.powerj.core.perf.Profiler;
 import io.powerj.core.runtime.ConsoleInput;
@@ -23,6 +27,9 @@ import io.powerj.core.runtime.Supervisor;
  * features to leave out.
  */
 final class InteractiveShell {
+
+    /** The variable that holds the colors for the prompt (FR-79): {@code $ansi.green("main")}. */
+    static final String ANSI_VARIABLE = "ansi";
 
     private InteractiveShell() {
     }
@@ -44,13 +51,26 @@ final class InteractiveShell {
         reader.setCompleter(ShellCompletion.completer());
         reader.setHighlighter(ShellCompletion.highlighter(interpreter));
         var modes = new ModeController();
-        var prompt = new PromptRenderer(session, modes, terminal, colors);
+        session.setVariable(ANSI_VARIABLE, new Ansi(colors)); // colors for $prompt (FR-79)
+        // Why the prompt is the default one: below the line being typed, or before the prompt without a line editor.
+        Consumer<String> problems = interactive
+                ? message -> reader.notice(message == null ? null : new AttributedString(message,
+                        colors ? AttributedStyle.DEFAULT.foreground(AttributedStyle.RED) : AttributedStyle.DEFAULT))
+                : message -> {
+                    if (message != null) {
+                        errors.print(message);
+                    }
+                };
+        var prompt = new PromptRenderer(session, modes, terminal, colors, interpreter::callDetached, problems);
         Runnable afterInput = () -> { };
         if (interactive) {
             var previewer = new Previewer(reader, interpreter, completions, terminal::getColumns, colors, modes);
             previewer.bind(prompt::forJLine);
             new Perfer(interpreter, modes).bind(reader, prompt::forJLine);
-            afterInput = previewer::reset; // stops the evaluation of the line being previewed (FR-66)
+            afterInput = () -> {
+                previewer.reset(); // stops the evaluation of the line being previewed (FR-66)
+                reader.notice(null);
+            };
         }
         return new Repl(reader::readLine, terminal, supervisor, session, interpreter, prompt, errors, afterInput);
     }

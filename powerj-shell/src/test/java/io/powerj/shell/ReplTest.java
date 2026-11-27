@@ -295,6 +295,47 @@ class ReplTest {
         assertThat(screen.indexOf("profile.pj:2:")).isLessThan(screen.indexOf("PJ "));
     }
 
+    /** FR-79: {@code $prompt} set in the profile is the prompt from the first line on. */
+    @Test
+    void aPromptSetInTheProfileIsUsedFromTheFirstLine() throws Exception {
+        profile("$prompt = { \"λ \" + $pwd.fileName + \" $ \" }\n");
+        session("exit" + ENTER);
+
+        assertThat(screen).contains("λ dev $ ").doesNotContain("PJ " + tmp.resolve("dev") + "> ");
+    }
+
+    /** FR-79: Alt+V computes the prompt again, with {@code $POWERJ_MODE_CURRENT} set to the new mode. */
+    @Test
+    void thePromptIsComputedAgainWhenTheModeChanges() throws Exception {
+        profile("$prompt = { $POWERJ_MODE_CURRENT == \"preview\" ? \"VIEW> \" : \"NORM> \" }\n");
+        session(Previewer.TOGGLE_KEY + CTRL_D);
+
+        // JLine redraws only what changed: "NORM> " then "VIEW" over its beginning.
+        assertThat(screen).contains("NORM> ", "VIEW");
+    }
+
+    /** FR-79: a block that fails gives the default prompt, and the reason is shown below the line being typed. */
+    @Test
+    void aPromptThatFailsShowsTheDefaultPromptAndTheReasonBelowTheLine() throws Exception {
+        profile("$prompt = { null }\n");
+        session("exit" + ENTER);
+
+        assertThat(screen).contains("PJ " + tmp.resolve("dev") + "> ", "$prompt returned null (the default prompt is shown)");
+        assertThat(screen.indexOf("$prompt returned null")).isGreaterThan(screen.indexOf("PJ " + tmp.resolve("dev")));
+    }
+
+    /**
+     * FR-79: {@code $ansi} is there from the start, and the codes it puts in the prompt are read by the line editor as
+     * colors, not shown as text (the test terminal draws no colors; {@code PromptRendererTest} checks the codes).
+     */
+    @Test
+    void theColorsOfAnsiAreReadByTheLineEditorAndNotShownAsText() throws Exception {
+        profile("$prompt = { $ansi.green(\"git:main\") + \"> \" }\n");
+        session("exit" + ENTER);
+
+        assertThat(screen).contains("git:main> ").doesNotContain("[32m");
+    }
+
     @Test
     void profileVariableDesignatesTheFile() throws Exception {
         session("$profile" + ENTER);
