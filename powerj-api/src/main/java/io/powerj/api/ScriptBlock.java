@@ -18,6 +18,10 @@ public interface ScriptBlock {
      */
     Object invoke(Object current);
 
+    default Object invoke() {
+        return invoke(null);
+    }
+
     /**
      * Evaluates the block as {@link #invoke} does, but an error of the evaluation is the result and not an exception:
      * the cmdlet reports it and goes on with the next object (FR-36). A cancellation (Ctrl+C) is still thrown.

@@ -96,6 +96,7 @@ public abstract interface io.powerj.api.ScriptBlock
   public default boolean io.powerj.api.ScriptBlock.test(java.lang.Object)
   public default io.powerj.api.Attempt<java.lang.Boolean> io.powerj.api.ScriptBlock.tryTest(java.lang.Object)
   public default io.powerj.api.Attempt<java.lang.Object> io.powerj.api.ScriptBlock.tryInvoke(java.lang.Object)
+  public default java.lang.Object io.powerj.api.ScriptBlock.invoke()
 
 public final record io.powerj.api.Span
   component int end
